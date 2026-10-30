@@ -5,16 +5,20 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Activar, desactivar y archivar reglas"
 scenario: "Regla archivada con transacciones clasificadas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001", "FR-RULES-010"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/rules.service.test.ts
+  - packages/contexts/rules/src/domain/rule.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -37,7 +41,7 @@ expected_result:
   - "ruleRefs con ruleName Supermercado, versión 1 y archivada"
   - "La regla nueva se crea"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-040 — Archivar conserva las referencias y libera el nombre

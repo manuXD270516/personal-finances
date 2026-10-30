@@ -29,6 +29,8 @@ import {
   Transaction,
   transferFee,
   type AdjustmentDirection,
+  type CategoryOrigin,
+  type RuleRef,
   type ChangedField,
   type ConversionDetail,
   type CustomFieldChange,
@@ -55,9 +57,11 @@ import {
 import {
   legsPayload,
   linkEntry,
+  originAudit,
   postEntry,
   publishEvent,
   publishPosted,
+  refsAudit,
   splitsAudit,
   splitsPayload,
   transactionSteps,
@@ -81,6 +85,13 @@ export interface SplitDto {
    * mencionados; los demás conservan su valor (en una edición, el del split actual en la misma posición).
    */
   readonly customFields?: readonly CustomFieldValueInputDto[];
+  /**
+   * INTERNO (add-rule-engine): origen de la categoría decidido por la aplicación (reglas de la creación manual); la API
+   * HTTP nunca lo acepta del cliente.
+   */
+  readonly categoryOrigin?: CategoryOrigin;
+  readonly categoryRule?: { readonly ruleId: string; readonly ruleVersion: number } | null;
+  readonly ruleRefs?: readonly RuleRef[];
 }
 
 export interface RecordTransactionCommand {
@@ -106,6 +117,20 @@ export interface RecordTransactionCommand {
   readonly confirmRefundExceedsOriginal?: boolean;
   readonly reason?: string | null;
   readonly splits?: readonly SplitDto[];
+  /**
+   * `false` ⇒ no se aplican las reglas de la creación manual (add-rule-engine); por defecto `true` para ingresos,
+   * gastos y reembolsos manuales.
+   */
+  readonly applyRules?: boolean;
+  /**
+   * INTERNO (add-rule-engine): marca de revisión inicial decidida por la aplicación (filas importadas); la API HTTP no la
+   * acepta del cliente.
+   */
+  readonly review?: {
+    readonly reason: 'RULE' | 'USER';
+    readonly rule?: { ruleId: string; ruleVersion: number };
+    readonly at: string;
+  };
 }
 
 /** `RecordTransfer` (add-transfers): fachada `POST W/transfers` sobre el agregado `Transaction`. */
@@ -177,6 +202,8 @@ export interface UpdateTransactionCommand {
    */
   readonly reconciliationMode?: string;
   readonly splits?: readonly SplitDto[];
+  /** `true` marca la revisión pendiente (motivo `USER`); `false` la quita (add-rule-engine). */
+  readonly needsReview?: boolean;
 }
 
 /** Sesión de reconciliación en cuyo nombre se confirman transacciones (add-reconciliation decisión 2). */
@@ -276,10 +303,13 @@ export class TransactionsService {
 
   /** `RecordTransaction` / `RecordRefund` / `RecordAdjustment` (+ `warnings[]` de duplicados si `source = MANUAL`). */
   recordTransaction(
-    cmd: RecordTransactionCommand,
+    input: RecordTransactionCommand,
   ): Promise<{ readonly transaction: TransactionState; readonly warnings: readonly TransactionWarning[] }> {
     const { uow, transactions, ids } = this.deps;
-    return uow.run(cmd.workspaceId, async () => {
+    return uow.run(input.workspaceId, async () => {
+      // Reglas de la creación manual (add-rule-engine decisión 5): completan solo los campos vacíos, en esta operación.
+      const { cmd, review: ruleReview } = await this.applyManualRules(input);
+      const review = cmd.review ?? ruleReview;
       // Los kinds administrados (préstamos) solo los crea su contexto dueño (add-loans, decisión 10).
       if (isManagedKind(cmd.kind)) {
         throw new DomainError(
@@ -368,6 +398,7 @@ export class TransactionsService {
         ...(splits ? { splits } : {}),
         defaultCategoryId,
         defaultSplitId: ids.next(),
+        ...(review ? { review } : {}),
       });
       const warnings =
         (cmd.source ?? 'MANUAL') === 'MANUAL'
@@ -860,6 +891,11 @@ export class TransactionsService {
         newToAccountId = target.accountId;
       }
       if (cmd.amount !== undefined) changes.amount = await this.parseMoney(cmd.amount, '/amount');
+      if (cmd.needsReview !== undefined) {
+        changes.review = cmd.needsReview
+          ? { mark: true, reason: 'USER', at: this.deps.clock.now().toString() }
+          : { mark: false };
+      }
       if (cmd.splits !== undefined) changes.splits = await this.parseSplits(cmd.splits);
       await this.validateClassification(cmd.userId, workspaceId, before.kind, cmd.splits, cmd.counterpartyId);
       if (cmd.splits !== undefined && changes.splits !== undefined) {
@@ -1476,9 +1512,143 @@ export class TransactionsService {
         counterpartyId: s.counterpartyId ?? null,
         tagIds: s.tagIds ?? [],
         memo: s.memo ?? null,
+        ...(s.categoryOrigin ? { categoryOrigin: s.categoryOrigin } : {}),
+        ...(s.categoryRule ? { categoryRule: s.categoryRule } : {}),
+        ...(s.ruleRefs ? { ruleRefs: s.ruleRefs } : {}),
       });
     }
     return out;
+  }
+
+  /**
+   * Aplica las reglas con disparador de creación manual a una transacción NUEVA (add-rule-engine decisión 5): solo
+   * ingresos, gastos y reembolsos manuales con `applyRules !== false`, y solo los campos vacíos (categoría «sin
+   * categoría», contraparte, campos personalizados); agrega etiquetas, notas y la marca de revisión. Devuelve el comando
+   * efectivo con el origen de lo que fijó cada regla. Sin el puerto, o sin reglas coincidentes, no cambia nada.
+   */
+  private async applyManualRules(cmd: RecordTransactionCommand): Promise<{
+    readonly cmd: RecordTransactionCommand;
+    readonly review:
+      { reason: 'RULE'; rule: { ruleId: string; ruleVersion: number }; at: string } | undefined;
+  }> {
+    const port = this.deps.ruleSuggestions;
+    const kind = cmd.kind;
+    if (
+      !port ||
+      cmd.applyRules === false ||
+      (cmd.source ?? 'MANUAL') !== 'MANUAL' ||
+      (kind !== 'INCOME' && kind !== 'EXPENSE' && kind !== 'REFUND') ||
+      cmd.refundOfTransactionId // un reembolso hereda la categoría del gasto original
+    ) {
+      return { cmd, review: undefined };
+    }
+    const { workspaceId } = cmd;
+    const uncategorized = await this.deps.categories.uncategorized(
+      workspaceId,
+      kind === 'INCOME' ? 'INCOME' : 'EXPENSE',
+    );
+    const given = cmd.splits;
+    const first = given?.[0];
+    const single = given === undefined || given.length === 1;
+    const firstFields = (first?.customFields ?? []).flatMap((c) =>
+      c.fieldId !== undefined && c.value !== null ? [{ fieldId: c.fieldId, value: c.value }] : [],
+    );
+    const hasKeyedFields = (first?.customFields ?? []).some((c) => c.fieldId === undefined);
+    const suggestion = await port.suggest({
+      workspaceId,
+      subject: {
+        ref: 'new',
+        kind,
+        accountId: cmd.accountId,
+        date: cmd.transactionDate,
+        amount: cmd.amount,
+        description: cmd.description ?? null,
+        counterpartyId: cmd.counterpartyId ?? null,
+        counterpartyOrigin: cmd.counterpartyId ? 'USER' : null,
+        categoryId: first && first.categoryId !== uncategorized ? first.categoryId : null,
+        tagIds: first?.tagIds ?? [],
+        externalSource: 'MANUAL',
+        customFields: firstFields,
+        splitCount: given?.length ?? 1,
+        notes: cmd.notes ?? null,
+      },
+    });
+    if (!suggestion) return { cmd, review: undefined };
+    const refs: RuleRef[] = [];
+    const ref = (field: string, o: { ruleId: string; ruleVersion: number }) =>
+      refs.push({ field, ruleId: o.ruleId, ruleVersion: o.ruleVersion });
+    let counterpartyId = cmd.counterpartyId ?? null;
+    if (suggestion.counterparty && counterpartyId === null) {
+      counterpartyId = suggestion.counterparty.counterpartyId;
+      ref('COUNTERPARTY', suggestion.counterparty.origin);
+    }
+    let description = cmd.description ?? null;
+    if (suggestion.description && (description ?? '').trim().length === 0) {
+      description = suggestion.description.text;
+      ref('DESCRIPTION', suggestion.description.origin);
+    }
+    let notes = cmd.notes ?? null;
+    if (suggestion.appendNotes.length > 0) {
+      notes = [notes ?? '', ...suggestion.appendNotes.map((n) => n.text)]
+        .filter((t) => t.length > 0)
+        .join('\n');
+      ref('NOTES', suggestion.appendNotes[0]!.origin);
+    }
+    let splits = given;
+    const splitChanges =
+      single &&
+      !hasKeyedFields &&
+      (suggestion.category !== null || suggestion.addTags.length > 0 || suggestion.customFields.length > 0);
+    if (splitChanges) {
+      const categoryId = suggestion.category?.categoryId ?? first?.categoryId ?? uncategorized;
+      if (!categoryId) return { cmd, review: undefined };
+      const tagIds = [...new Set([...(first?.tagIds ?? []), ...suggestion.addTags.map((t) => t.tagId)])];
+      for (const t of suggestion.addTags) ref(`TAG:${t.tagId}`, t.origin);
+      const customFields = [
+        ...(first?.customFields ?? []),
+        ...suggestion.customFields.map((f) => ({ fieldId: f.fieldId, value: f.value })),
+      ];
+      for (const f of suggestion.customFields) ref(`CUSTOM_FIELD:${f.fieldId}`, f.origin);
+      const fromRule = suggestion.category !== null;
+      splits = [
+        {
+          ...(first ?? { amount: cmd.amount, categoryId }),
+          amount: first?.amount ?? cmd.amount,
+          categoryId,
+          tagIds,
+          ...(customFields.length > 0 ? { customFields } : {}),
+          categoryOrigin: fromRule
+            ? 'RULE'
+            : (first?.categoryOrigin ?? (first ? 'MANUAL' : 'SYSTEM_DEFAULT')),
+          categoryRule: fromRule ? suggestion.category!.origin : null,
+          ruleRefs: refs,
+        },
+      ];
+    }
+    const mark = suggestion.markForReview;
+    if (!splitChanges && refs.length === 0 && !mark) return { cmd, review: undefined };
+    // Los refs de contraparte, descripción y notas viajan en el primer (único) split.
+    if (!splitChanges && refs.length > 0 && single) {
+      splits = [
+        {
+          ...(first ?? { amount: cmd.amount, categoryId: uncategorized ?? '' }),
+          amount: first?.amount ?? cmd.amount,
+          categoryId: first?.categoryId ?? (uncategorized as string),
+          categoryOrigin: first?.categoryOrigin ?? (first ? 'MANUAL' : 'SYSTEM_DEFAULT'),
+          ruleRefs: refs,
+        },
+      ];
+    }
+    return {
+      cmd: {
+        ...cmd,
+        counterpartyId,
+        description,
+        notes,
+        ...(splits ? { splits } : {}),
+      },
+      review: mark ? { reason: 'RULE', rule: mark, at: this.deps.clock.now().toString() } : undefined,
+    };
   }
 
   /**
@@ -1729,7 +1899,24 @@ export function diff(
       });
     else if (f === 'splits')
       out.push({ field: 'splits', before: splitsAudit(before), after: splitsAudit(after) });
-    else out.push({ field: f, before: before[f], after: after[f] });
+    else if (f === 'categoryOrigin') out.push(...originAudit(before, after));
+    else if (f === 'ruleRefs')
+      out.push({ field: 'ruleRefs', before: refsAudit(before), after: refsAudit(after) });
+    else if (f === 'needsReview') {
+      out.push({ field: 'needsReview', before: !!before.review, after: !!after.review });
+      if ((before.review?.ruleId ?? null) !== (after.review?.ruleId ?? null)) {
+        out.push({
+          field: 'reviewRuleId',
+          before: before.review?.ruleId ?? null,
+          after: after.review?.ruleId ?? null,
+        });
+        out.push({
+          field: 'reviewRuleVersion',
+          before: before.review?.ruleVersion ?? null,
+          after: after.review?.ruleVersion ?? null,
+        });
+      }
+    } else out.push({ field: f, before: before[f], after: after[f] });
   }
   if (newEntryId) {
     out.push({ field: 'revision', before: before.revision, after: after.revision });

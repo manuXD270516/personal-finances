@@ -5,16 +5,21 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Vista previa de una regla"
 scenario: "Probar una definición sin guardar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-007"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+  - tests/e2e/specs/rules.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +36,7 @@ expected_result:
   - "matched = true; ambas condiciones met = true; actions = [SET_CATEGORY Telefonía]"
   - "Sin reglas nuevas ni auditoría"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-025 — La vista previa de una definición no guarda ni audita

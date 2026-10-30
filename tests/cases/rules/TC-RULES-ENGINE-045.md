@@ -5,16 +5,19 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Cobertura de clasificación por reglas"
 scenario: "Corrección posterior y anulaciones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-010"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/evaluation.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -33,7 +36,7 @@ expected_result:
   - "total 198; RULE 145"
   - "ruleCoverage \"0.7323\" (HALF_EVEN a 4 decimales)"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-045 — Correcciones y anulaciones bajan la cobertura

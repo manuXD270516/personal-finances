@@ -284,6 +284,7 @@ const NAV_PATHS: Record<NavKey, string> = {
   accounts: 'M3 7h18v12H3zM3 11h18M7 15h3',
   fx: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15m0 5v-5h5',
   classification: 'M3 4h7l10 10-6 6L4 10zM7.5 7.5h.01',
+  rules: 'M4 6h16M4 12h10M4 18h6M18 14l3 3-3 3M21 17h-7',
   planning: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M8 14h3',
   recurring: 'M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5',
   goals: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',

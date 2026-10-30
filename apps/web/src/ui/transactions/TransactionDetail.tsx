@@ -37,6 +37,7 @@ import type { TransactionLifecycle } from '../lifecycle/types';
 import { describe, SignedAmount, StatusBadge, WithoutStatementBadge } from './TransactionsListView';
 import { TransactionTimeline } from './TransactionTimeline';
 import { AttachmentsSection } from '../documents/AttachmentsSection';
+import { CreateRuleLink, ReviewBanner, SplitClassificationView } from '../rules/TransactionRules';
 
 export function TransactionDetailPage({ transactionId, notice }: { transactionId: string; notice?: string }) {
   return (
@@ -140,6 +141,7 @@ function Detail({
   const { t, locale } = f;
   const catalogs = useCatalogs(ctx);
   const cf = useFormat('CustomFields', ctx);
+  const rf2 = useFormat('Rules', ctx);
   const customFields = useCustomFields(ctx);
   const [tx, setTx] = useState<Transaction | undefined>();
   const [history, setHistory] = useState<readonly AuditLogEntry[] | undefined>();
@@ -351,6 +353,36 @@ function Detail({
                     </>
                   ) : null}
                 </dl>
+                <ReviewBanner
+                  tx={tx}
+                  f={rf2}
+                  canEdit={ctx.canEdit && tx.status !== 'VOIDED'}
+                  busy={busy}
+                  onResolve={() =>
+                    void act(
+                      () =>
+                        ctx.api.command<Transaction>(
+                          'PATCH',
+                          `${ctx.base}/transactions/${current.id}`,
+                          { needsReview: false },
+                          { ifMatch: current.version },
+                        ),
+                      rf2.t('review.resolved'),
+                    )
+                  }
+                  onMark={() =>
+                    void act(
+                      () =>
+                        ctx.api.command<Transaction>(
+                          'PATCH',
+                          `${ctx.base}/transactions/${current.id}`,
+                          { needsReview: true },
+                          { ifMatch: current.version },
+                        ),
+                      rf2.t('review.marked'),
+                    )
+                  }
+                />
                 {tx.loanId ? <LoanTransactionInfo ctx={ctx} tx={tx} /> : null}
                 <TransactionGoalInfo ctx={ctx} tx={tx} />
                 <section aria-labelledby="tx-legs-title" style={cardStyle}>
@@ -394,7 +426,14 @@ function Detail({
                         <tbody>
                           {tx.splits.map((s) => (
                             <tr key={s.id} data-testid="tx-split">
-                              <td style={cellStyle}>{catalogs.names.category(s.categoryId) ?? '…'}</td>
+                              <td style={cellStyle}>
+                                <SplitClassificationView
+                                  split={s}
+                                  categoryName={catalogs.names.category(s.categoryId) ?? '…'}
+                                  tagName={(id) => catalogs.names.tag(id) ?? '…'}
+                                  f={rf2}
+                                />
+                              </td>
                               <td style={cellStyle}>
                                 {(s.tagIds ?? []).map((id) => catalogs.names.tag(id) ?? '…').join(', ')}
                               </td>
@@ -435,6 +474,19 @@ function Detail({
                       <button type="button" onClick={() => setEditing(true)} disabled={editing || busy}>
                         {t('detail.edit')}
                       </button>
+                    ) : null}
+                    {RECORD.includes(tx.kind) && tx.kind !== 'ADJUSTMENT' ? (
+                      <CreateRuleLink
+                        f={rf2}
+                        href={ctx.href}
+                        seed={{
+                          ...(tx.description ? { description: tx.description } : {}),
+                          kind: tx.kind as 'INCOME' | 'EXPENSE' | 'REFUND',
+                          accountId: tx.legs[0]?.accountId ?? '',
+                          ...(tx.splits[0] ? { categoryId: tx.splits[0].categoryId } : {}),
+                          ...(tx.counterpartyId ? { counterpartyId: tx.counterpartyId } : {}),
+                        }}
+                      />
                     ) : null}
                     {actions.post ? (
                       <button

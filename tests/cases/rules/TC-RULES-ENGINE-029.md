@@ -5,16 +5,21 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Aplicación del dry-run como edición masiva auditada"
 scenario: "Aplicar el dry-run de septiembre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-008", "FR-RULES-010", "FR-TRANSACTIONS-033"]
 nfr: []
 invariants: ["INV-029"]
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/logic.test.ts
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+  - tests/e2e/specs/rules.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -36,7 +41,7 @@ expected_result:
   - "4 auditorías con el mismo bulkOperationId"
   - "Variante: 3 aplicados y 1 en notApplicable con PERIOD_CLOSED"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-029 — Aplicar el dry-run es atómico y auditado con un identificador común

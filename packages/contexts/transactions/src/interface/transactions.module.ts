@@ -14,7 +14,13 @@ import type { LedgerOpeningBalanceQuery, LedgerPostingPort } from '@pf/ledger/co
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
-import type { OutboxPort, TransactionsDeps, WorkspaceCalendar } from '../application/ports/index.js';
+import type {
+  OutboxPort,
+  RuleNameLookup,
+  RuleSuggestionPort,
+  TransactionsDeps,
+  WorkspaceCalendar,
+} from '../application/ports/index.js';
 import { BulkEditService } from '../application/bulk-edit.service.js';
 import { ConversionsService } from '../application/conversions.service.js';
 import { ReconciliationsService } from '../application/reconciliations.service.js';
@@ -42,10 +48,14 @@ import {
   PgTransactionStatusQuery,
 } from '../infrastructure/pg-imported.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
+import { PgClassificationCoverage, PgClassificationSubjects } from '../infrastructure/pg-rule-queries.js';
 import { LOAN_TRANSACTIONS_PORT, type TransactionExistenceQuery } from '../contracts/index.js';
 import type {
   AccountMovementsQuery,
+  ClassificationCoverageQuery,
+  ClassificationSubjectsQuery,
   CounterpartyCategoryUsageQuery,
+  RuleClassificationCommand,
   GoalTransferPort,
   LoanTransactionsPort,
   DuplicateCandidatesQuery,
@@ -62,7 +72,7 @@ import type {
 import { BULK_EDIT_SERVICE, BulkEditController } from './bulk-edit-http.js';
 import { CONVERSIONS_SERVICE, ConversionsController } from './conversions-http.js';
 import { RECONCILIATIONS_SERVICE, ReconciliationsController } from './reconciliations-http.js';
-import { TRANSACTIONS_SERVICE, TransactionsController } from './transactions-http.js';
+import { RULE_NAME_LOOKUP, TRANSACTIONS_SERVICE, TransactionsController } from './transactions-http.js';
 
 export interface TransactionsRuntimeOptions {
   readonly pool: Pool;
@@ -84,6 +94,8 @@ export interface TransactionsRuntimeOptions {
   readonly openingBalance: LedgerOpeningBalanceQuery;
   /** Fecha de hoy en la zona horaria del workspace (add-reconciliation, RISK-020). */
   readonly calendar: WorkspaceCalendar;
+  /** Reglas de la creación manual (add-rule-engine decisión 5); el adaptador lo implementa la composición de `apps/api`. */
+  readonly ruleSuggestions?: RuleSuggestionPort;
 }
 
 export interface TransactionsRuntime {
@@ -121,6 +133,12 @@ export interface TransactionsRuntime {
   readonly duplicateCandidates: DuplicateCandidatesQuery;
   /** Estado actual de transacciones por id (add-basic-csv-import: vínculos superados). */
   readonly statuses: TransactionStatusQuery;
+  /** Sujetos de clasificación para RULES: dry-run, aplicación y vista previa (add-rule-engine). */
+  readonly classificationSubjects: ClassificationSubjectsQuery;
+  /** Aplicación atómica de clasificación por reglas, reutilizando el dominio de la edición masiva (add-rule-engine). */
+  readonly ruleClassification: RuleClassificationCommand;
+  /** Cobertura de clasificación por reglas y estadísticas por regla (add-rule-engine, D334). */
+  readonly classificationCoverage: ClassificationCoverageQuery;
 }
 
 /**
@@ -168,12 +186,14 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
         }),
     },
     calendar: options.calendar,
+    ...(options.ruleSuggestions ? { ruleSuggestions: options.ruleSuggestions } : {}),
   };
   const service = new TransactionsService(deps);
+  const bulkEdit = new BulkEditService(deps, service);
   const reconciliations = new ReconciliationsService(deps, service);
   return {
     service,
-    bulkEdit: new BulkEditService(deps, service),
+    bulkEdit,
     conversions: new ConversionsService(deps),
     reconciliations,
     reconciliationStatus: reconciliations,
@@ -194,6 +214,9 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     imported: new RecordImportedTransactions(deps, new PgImportedRefReader()),
     duplicateCandidates: new PgDuplicateCandidatesQuery(deps.uow, deps.currencies),
     statuses: new PgTransactionStatusQuery(deps.uow),
+    classificationSubjects: new PgClassificationSubjects(),
+    ruleClassification: bulkEdit,
+    classificationCoverage: new PgClassificationCoverage(),
   };
 }
 
@@ -220,6 +243,8 @@ export function createAccountMovementsQuery(pool: Pool, lookup: ClassificationLo
 export interface TransactionsModuleOptions {
   readonly runtime: TransactionsRuntime;
   readonly conventions: ApiConventionsOptions;
+  /** Nombres de las reglas que clasificaron (add-rule-engine); el adaptador lo implementa la composición. */
+  readonly ruleNames?: RuleNameLookup;
 }
 
 /** Módulo HTTP de TRANSACTIONS (`/transactions*`, `/transfers`, `/conversions*`). */
@@ -238,6 +263,7 @@ export class TransactionsModule {
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: TRANSACTIONS_SERVICE, useValue: options.runtime.service },
+        ...(options.ruleNames ? [{ provide: RULE_NAME_LOOKUP, useValue: options.ruleNames }] : []),
         { provide: BULK_EDIT_SERVICE, useValue: options.runtime.bulkEdit },
         { provide: CONVERSIONS_SERVICE, useValue: options.runtime.conversions },
         { provide: RECONCILIATIONS_SERVICE, useValue: options.runtime.reconciliations },

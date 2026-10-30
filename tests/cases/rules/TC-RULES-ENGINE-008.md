@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Operadores y comparación de texto"
 scenario: "Contraparte vacía"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-003"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/condition.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +31,7 @@ steps:
 expected_result:
   - "Solo el gasto sin contraparte cumple"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-008 — is_empty sobre contraparte distingue gastos sin contraparte

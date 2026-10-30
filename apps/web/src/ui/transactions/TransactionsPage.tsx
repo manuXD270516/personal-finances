@@ -39,10 +39,12 @@ export function TransactionsPage({
   accountId,
   kind,
   withoutStatement,
+  needsReview,
 }: {
   accountId?: string;
   kind?: string;
   withoutStatement?: boolean;
+  needsReview?: boolean;
 }) {
   const k = KINDS.find((x) => x === kind);
   return (
@@ -53,6 +55,7 @@ export function TransactionsPage({
           {...(accountId ? { accountId } : {})}
           {...(k ? { kind: k } : {})}
           {...(withoutStatement ? { withoutStatement: true } : {})}
+          {...(needsReview ? { needsReview: true } : {})}
         />
       )}
     </WithWorkspace>
@@ -68,11 +71,13 @@ function Register({
   accountId,
   kind,
   withoutStatement,
+  needsReview,
 }: {
   ctx: WorkspaceContext;
   accountId?: string;
   kind?: TransactionKind;
   withoutStatement?: boolean;
+  needsReview?: boolean;
 }) {
   const f = useFormat('Transactions', ctx);
   const { t } = f;
@@ -85,6 +90,7 @@ function Register({
     accountId: accountId ?? '',
     kind: kind ?? '',
     withoutStatement: withoutStatement ?? false,
+    needsReview: needsReview ?? false,
   });
   const [draftQ, setDraftQ] = useState('');
   const [items, setItems] = useState<readonly Transaction[] | undefined>();
@@ -289,6 +295,21 @@ function Register({
             >
               <option value="">{t('filters.any')}</option>
               <option value="yes">{t('filters.withoutStatementOnly')}</option>
+            </select>
+          )}
+        </Field>
+        <Field label={t('filters.needsReview')} hint={t('filters.needsReviewHint')}>
+          {(p) => (
+            <select
+              {...p}
+              name="needsReview"
+              style={inputStyle}
+              value={filters.needsReview ? 'yes' : ''}
+              data-testid="filter-needs-review"
+              onChange={(e) => setFilter({ needsReview: e.target.value === 'yes' })}
+            >
+              <option value="">{t('filters.any')}</option>
+              <option value="yes">{t('filters.needsReviewOnly')}</option>
             </select>
           )}
         </Field>

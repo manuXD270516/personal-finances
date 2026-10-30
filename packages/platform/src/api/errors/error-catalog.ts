@@ -254,6 +254,16 @@ export const ERROR_CATALOG = {
     status: 409,
     title: 'The contribution suggestion was already decided or expired',
   },
+  // rules (Phase 6, add-rule-engine)
+  RULE_INVALID_REGEX: {
+    status: 422,
+    title: 'The regular expression is invalid or uses constructs without linear-time evaluation',
+  },
+  RULE_LIMIT_EXCEEDED: { status: 422, title: 'The workspace reached the maximum number of rules' },
+  RULE_DRY_RUN_STALE: {
+    status: 409,
+    title: 'A rule or a transaction changed after the dry-run; run it again',
+  },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

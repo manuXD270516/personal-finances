@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: ["imports/import-pipeline"]
 requirement: "Evaluación sin efectos en la importación"
 scenario: "La regla cambia antes de aprobar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-009", "FR-RULES-010"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -34,7 +36,7 @@ expected_result:
   - "La transacción conserva lo mostrado con origen v1"
   - "Variante: la vista previa muestra v2"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-033 — Editar una regla después de la vista previa no cambia lo aprobado

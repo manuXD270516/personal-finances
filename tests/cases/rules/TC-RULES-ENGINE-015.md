@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Acciones de descripción, nota y exclusión del import"
 scenario: "Renombrar una glosa bancaria"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-005"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +33,7 @@ expected_result:
   - "description propuesta = \"Netflix\""
   - "El staging conserva \"DEB AUT NFLX.COM 0412\""
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-015 — Renombrar la descripción conserva el texto original en la importación

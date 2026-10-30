@@ -5,16 +5,17 @@ spec: transactions/transaction-recording
 related_specs: ["rules/rule-engine", "transactions/bulk-edit"]
 requirement: "Origen de la clasificación de cada split"
 scenario: "Edición masiva de la categoría"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-010", "FR-TRANSACTIONS-033"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +31,7 @@ steps:
 expected_result:
   - "categoryOrigin MANUAL y sin ruleRefs de categoría"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-056 — La edición masiva deja el origen manual

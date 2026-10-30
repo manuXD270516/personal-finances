@@ -330,6 +330,9 @@ Content-Type: application/json
 | debt (P4) | `INSTALLMENT_PLAN_INVALID` | 422 | La compra no es un gasto posteado de una cuenta de la tarjeta, ya tiene plan, o las cuotas están fuera de 2..60 |
 | debt (P4) | `PAYMENT_BREAKDOWN_MISMATCH` | 422 | Σ del desglose distinta del monto (`details {sum, amount}`) |
 | transactions (P4) | `TRANSACTION_MANAGED_EXTERNALLY` | 409 | La transacción `LOAN_DISBURSEMENT`/`LOAN_PAYMENT` la administra un préstamo: editar lo financiero o anularla se hace desde Debt (`details {managedBy: 'DEBT', loanId}`); descripción, notas y tags siguen editables. `POST W/transactions` con esos kinds responde `VALIDATION_FAILED` |
+| rules (P6) | `RULE_INVALID_REGEX` | 422 | La expresión regular de una condición no es válida o usa construcciones sin tiempo lineal (referencias hacia atrás, lookaround) o supera 200 caracteres (`add-rule-engine`) |
+| rules (P6) | `RULE_LIMIT_EXCEEDED` | 422 | El workspace ya tiene el máximo de reglas no archivadas (500, `RULES_MAX_PER_WORKSPACE`) |
+| rules (P6) | `RULE_DRY_RUN_STALE` | 409 | Una regla o una transacción cambió después del dry-run: la aplicación se rechaza completa y no cambia nada |
 
 `INSTALLMENT_ALREADY_PAID` (previsto en este catálogo) no se usa: un pago se imputa a la siguiente cuota no pagada. En préstamos, `VALIDATION_FAILED` es 400, un préstamo en USD pagado desde una cuenta en BOB se rechaza con `CURRENCY_MISMATCH` (D157) y los `details` de los errores de dominio viajan en la extensión `details` del problem.
 | goals (P4) | `EARMARK_EXCEEDS_BALANCE` | 422 | INV-018: la reserva haría que lo reservado de la cuenta (reservas más aportes reales netos de las metas) supere su saldo contable; `details {balance, reserved, available}` (`add-savings-goals`) |
@@ -622,3 +625,8 @@ Las convenciones de §2–§7 y §9–§11 son comportamiento verificable en `@p
 | BFF (§1.3) | `apps/web/src/bff/finance-api-client.ts` | `Idempotency-Key` UUIDv7 por intento del usuario, reutilizada en reintentos técnicos; `If-Match`/`If-None-Match` |
 
 Pendiente: generación de tipos con `openapi-typescript` (`@pf/api-contracts`, §1.3), mocks MSW y el informe de cobertura de operaciones del contrato (§1.4) llegan con el primer contexto de negocio; el E2E Playwright de doble clic / dos pestañas llega con el primer formulario que crea registros (ver `openspec/changes/add-api-conventions/tasks.md` 7.1).
+
+
+### Reglas de clasificación (`add-rule-engine`, Phase 6)
+
+Tag Rules (`x-openspec-capability: rules/rule-engine`), todo aditivo: `listRules` (`GET W/rules`, filtros `enabled`, `trigger`, `includeArchived`, `needsAttention`; cada regla con `stats`), `createRule` (`Idempotency-Key`), `getRule` (`ETag` = versión de la fila), `updateRule` (`PUT`, `If-Match`; crea una versión inmutable si cambia la definición), `enableRule`/`disableRule`/`archiveRule` (`POST …/{ruleId}/enable|disable|archive`, `If-Match`; `DELETE` ⇒ `405`), `listRuleVersions`, `reorderRules` (`PUT W/rules/order`), `previewRule` (sin efectos), `dryRunRules` (`x-rate-limit: costly`; devuelve `token`) y `applyRuleDryRun` (`Idempotency-Key`, `x-rate-limit: costly`; hasta 500 ítems con la versión de cada transacción; `409 RULE_DRY_RUN_STALE`), y `getRuleCoverage` (`GET W/rules/coverage`; `count`, `byOrigin` en camelCase, `ruleCoverage` con 4 decimales, `target` `0.7000`, `byRule`). Transactions suma `applyRules` en la entrada de `createTransaction`, `needsReview`/`review` en `Transaction`, `categoryOrigin` y `ruleRefs` en cada split, `needsReview` en `TransactionUpdate` y el filtro `needsReview` de `listTransactions`.

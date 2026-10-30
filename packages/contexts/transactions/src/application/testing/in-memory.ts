@@ -273,6 +273,7 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
               s.legs.some((l) => filter.accountIds?.includes(l.accountId)),
           )
           .filter((s) => !filter.systemFlags || filter.systemFlags.every((f) => systemFlagsOf(s).includes(f)))
+          .filter((s) => filter.needsReview !== true || !!s.review)
           .filter((s) => !filter.statuses || filter.statuses.includes(s.status))
           .filter((s) => !filter.kinds || filter.kinds.includes(s.kind))
           .filter((s) => !filter.currency || s.amount.currency.code === filter.currency)

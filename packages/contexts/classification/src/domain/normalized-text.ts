@@ -1,16 +1,12 @@
+import { normalizeText } from '@pf/shared-kernel';
+
 /**
  * VO `NormalizedText` (design §5): minúsculas, sin acentos (NFD + quitar diacríticos), espacios colapsados y sin
  * espacios en los extremos. Base de la unicidad de nombres (categorías, grupos, tags, counterparties) y de la
- * coincidencia de alias en descripciones bancarias.
+ * coincidencia de alias en descripciones bancarias. `normalizeText` vive en `@pf/shared-kernel` (`text/normalize`,
+ * openspec add-rule-engine): RULES y CLASSIFICATION comparan igual; se re-exporta sin cambio de comportamiento.
  */
-export function normalizeText(raw: string): string {
-  return raw
-    .normalize('NFD')
-    .replace(/\p{M}+/gu, '')
-    .toLowerCase()
-    .replace(/\s+/gu, ' ')
-    .trim();
-}
+export { normalizeText };
 
 export class NormalizedText {
   private constructor(readonly value: string) {}

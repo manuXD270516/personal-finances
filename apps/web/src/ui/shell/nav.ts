@@ -9,6 +9,7 @@ export type NavKey =
   | 'accounts'
   | 'fx'
   | 'classification'
+  | 'rules'
   | 'planning'
   | 'recurring'
   | 'goals'
@@ -31,6 +32,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'accounts', path: '/cuentas', also: ['/instituciones'] },
   { key: 'fx', path: '/fx' },
   { key: 'classification', path: '/clasificacion' },
+  // Phase 6 (add-rule-engine): reglas de clasificación (lista, editor, ejecución sobre el historial y cobertura).
+  { key: 'rules', path: '/reglas' },
   // Phase 2 (add-financial-periods): calendario financiero; pf-p2b agrega presupuestos bajo /planificacion.
   { key: 'planning', path: '/planificacion/periodos', also: ['/planificacion'] },
   // Phase 3 (add-recurrence-engine): pagos recurrentes (Próximos, Por aprobar con contador, Definiciones); la lista

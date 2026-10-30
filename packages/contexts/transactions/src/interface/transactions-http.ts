@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Optional,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { isDomainError } from '@pf/shared-kernel';
 import { ApiProblem, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, buildPage } from '@pf/platform/api';
 import {
@@ -12,7 +24,7 @@ import {
 } from '@pf/platform/nest';
 import type { AuditLogEntryDto } from '@pf/audit/contracts';
 import type { ConversionCostDto } from '@pf/fx/contracts';
-import type { CustomFieldFilter, TransactionSort } from '../application/ports/index.js';
+import type { CustomFieldFilter, RuleNameLookup, TransactionSort } from '../application/ports/index.js';
 import type {
   ListTransactionsQuery,
   MoneyDto,
@@ -35,6 +47,10 @@ import {
 import { conversionDetailDto, rateDto } from './conversion-dto.js';
 
 export const TRANSACTIONS_SERVICE = Symbol('TRANSACTIONS_SERVICE');
+/** Nombres de las reglas que clasificaron (opcional; lo aporta la composición, add-rule-engine). */
+export const RULE_NAME_LOOKUP = Symbol('RULE_NAME_LOOKUP');
+
+export type RuleNames = ReadonlyMap<string, { readonly name: string; readonly archived: boolean }>;
 
 export type Json = Record<string, unknown>;
 export const str = (b: Json, k: string): string | undefined =>
@@ -78,6 +94,7 @@ export function listFiltersOf(query: Json) {
     kind: list(query, 'kind') ?? null,
     status: list(query, 'status') ?? null,
     systemFlag: list(query, 'systemFlag') ?? null,
+    needsReview: query['needsReview'] === true || query['needsReview'] === 'true' ? true : null,
     currency: str(query, 'currency') ?? null,
     dateFrom: str(query, 'dateFrom') ?? null,
     dateTo: str(query, 'dateTo') ?? null,
@@ -104,6 +121,7 @@ export function listQueryOf(
     ...(filters.kind ? { kinds: filters.kind as TransactionKind[] } : {}),
     ...(filters.status ? { statuses: filters.status as TransactionStatus[] } : {}),
     ...(filters.systemFlag ? { systemFlags: filters.systemFlag as SystemFlag[] } : {}),
+    ...(filters.needsReview ? { needsReview: true } : {}),
     ...(filters.currency ? { currency: filters.currency } : {}),
     ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
     ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
@@ -125,7 +143,18 @@ export function userIdOf(req: ApiRequest): string {
 }
 
 /** `Transaction` del contrato OpenAPI (dinero como string decimal). */
-export function toTransactionDto(s: TransactionState, totalCost?: ConversionCostDto | null) {
+export function toTransactionDto(
+  s: TransactionState,
+  totalCost?: ConversionCostDto | null,
+  ruleNames?: RuleNames,
+) {
+  const refDto = (r: { field: string; ruleId: string; ruleVersion: number }) => ({
+    field: r.field,
+    ruleId: r.ruleId,
+    ruleVersion: r.ruleVersion,
+    ruleName: ruleNames?.get(r.ruleId)?.name ?? null,
+    ruleArchived: ruleNames?.get(r.ruleId)?.archived ?? false,
+  });
   return {
     id: s.id,
     kind: s.kind,
@@ -144,6 +173,16 @@ export function toTransactionDto(s: TransactionState, totalCost?: ConversionCost
     paymentMethod: s.paymentMethod,
     notes: s.notes,
     counterpartyId: s.counterpartyId,
+    needsReview: !!s.review,
+    review: s.review
+      ? {
+          reason: s.review.reason,
+          ruleId: s.review.ruleId,
+          ruleVersion: s.review.ruleVersion,
+          ruleName: s.review.ruleId ? (ruleNames?.get(s.review.ruleId)?.name ?? null) : null,
+          markedAt: s.review.markedAt,
+        }
+      : null,
     legs: s.legs.map((l) => ({ accountId: l.accountId, amount: l.amount.toJSON(), role: l.role })),
     splits: s.splits.map((x) => ({
       id: x.id,
@@ -153,6 +192,13 @@ export function toTransactionDto(s: TransactionState, totalCost?: ConversionCost
       tagIds: [...x.tagIds],
       memo: x.memo,
       customFields: Object.fromEntries(x.customFields.map((v) => [v.key, v.value])),
+      // Origen de la clasificación (add-rule-engine): `UNKNOWN` para lo anterior; la categoría de una regla viaja como
+      // referencia `CATEGORY` junto a las de los demás campos.
+      categoryOrigin: x.categoryOrigin ?? 'UNKNOWN',
+      ruleRefs: [
+        ...(x.categoryOrigin === 'RULE' && x.categoryRule ? [{ field: 'CATEGORY', ...x.categoryRule }] : []),
+        ...(x.ruleRefs ?? []),
+      ].map(refDto),
     })),
     conversion: s.conversion ? conversionDetailDto(s.conversion, totalCost) : null,
     // Préstamos (add-loans): desglose del pago y préstamo que administra la transacción (`null` si no es de préstamo).
@@ -190,7 +236,7 @@ const splitsOf = (body: Json): SplitDto[] | undefined =>
         body['splits'] as (Omit<SplitDto, 'customFields'> & {
           customFields?: Record<string, string | boolean | null>;
         })[]
-      ).map(({ customFields, ...rest }) => ({
+      ).map(({ customFields, categoryOrigin: _origin, categoryRule: _rule, ruleRefs: _refs, ...rest }) => ({
         ...rest,
         ...(customFields
           ? { customFields: Object.entries(customFields).map(([key, value]) => ({ key, value })) }
@@ -208,7 +254,25 @@ export class TransactionsController {
   constructor(
     @Inject(TRANSACTIONS_SERVICE) private readonly service: TransactionsService,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
+    @Optional() @Inject(RULE_NAME_LOOKUP) private readonly ruleNameLookup?: RuleNameLookup,
   ) {}
+
+  /** Nombres de las reglas referenciadas por las transacciones dadas (una consulta; vacío sin el puerto). */
+  private async namesOf(workspaceId: string, states: readonly TransactionState[]): Promise<RuleNames> {
+    const ids = [
+      ...new Set(
+        states.flatMap((s) => [
+          ...(s.review?.ruleId ? [s.review.ruleId] : []),
+          ...s.splits.flatMap((x) => [
+            ...(x.categoryRule ? [x.categoryRule.ruleId] : []),
+            ...(x.ruleRefs ?? []).map((r) => r.ruleId),
+          ]),
+        ]),
+      ),
+    ];
+    if (!this.ruleNameLookup || ids.length === 0) return new Map();
+    return this.ruleNameLookup.names(workspaceId, ids);
+  }
 
   @Get('workspaces/:workspaceId/transactions')
   async listTransactions(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
@@ -237,7 +301,11 @@ export class TransactionsController {
       (r) => [r.at],
       (position) => this.options.cursors.encode(scope, position),
     );
-    return { data: page.data.map((r) => toTransactionDto(r.s)), page: page.page };
+    const names = await this.namesOf(
+      workspaceId,
+      page.data.map((r) => r.s),
+    );
+    return { data: page.data.map((r) => toTransactionDto(r.s, undefined, names)), page: page.page };
   }
 
   @Post('workspaces/:workspaceId/transactions')
@@ -269,10 +337,13 @@ export class TransactionsController {
       externalRef: (body['externalRef'] as { namespace: string; id: string } | undefined) ?? null,
       ...(splitsOf(body) ? { splits: splitsOf(body) as SplitDto[] } : {}),
     };
-    const { transaction, warnings } = await this.service.recordTransaction(cmd);
+    const { transaction, warnings } = await this.service.recordTransaction({
+      ...cmd,
+      ...(body['applyRules'] === false ? { applyRules: false } : {}),
+    });
     res.setHeader('location', `/api/v1/workspaces/${workspaceId}/transactions/${transaction.id}`);
     return {
-      ...toTransactionDto(transaction),
+      ...toTransactionDto(transaction, undefined, await this.namesOf(workspaceId, [transaction])),
       warnings: warnings.map((w) => ({ ...w, transactionIds: [...w.transactionIds] })),
     };
   }
@@ -363,7 +434,8 @@ export class TransactionsController {
     @Param('workspaceId') workspaceId: string,
     @Param('transactionId') transactionId: string,
   ) {
-    return toTransactionDto(await this.service.getTransaction(workspaceId, transactionId));
+    const state = await this.service.getTransaction(workspaceId, transactionId);
+    return toTransactionDto(state, undefined, await this.namesOf(workspaceId, [state]));
   }
 
   @Patch('workspaces/:workspaceId/transactions/:transactionId')
@@ -387,9 +459,11 @@ export class TransactionsController {
         ? { reconciliationMode: str(body, 'reconciliationMode') as string }
         : {}),
       ...(splitsOf(body) ? { splits: splitsOf(body) as SplitDto[] } : {}),
+      ...(typeof body['needsReview'] === 'boolean' ? { needsReview: body['needsReview'] } : {}),
       ...pickNullable(body, ['postingDate', 'description', 'notes', 'counterpartyId', 'paymentMethod']),
     };
-    return toTransactionDto(await this.service.updateTransaction(cmd));
+    const updated = await this.service.updateTransaction(cmd);
+    return toTransactionDto(updated, undefined, await this.namesOf(workspaceId, [updated]));
   }
 
   @Get('workspaces/:workspaceId/transactions/:transactionId/history')

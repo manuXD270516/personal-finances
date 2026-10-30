@@ -75,7 +75,7 @@ tags:
   - name: Imports
     description: "Phase 3 (docs/35 D122, FR-IMPORTS-003): basic CSV import of one account (upload, manual column mapping, preview, approval, asynchronous persistence by batches). Phase 6 adds documents, presigned uploads, mapping profiles, rules, other formats and connections."
   - name: Rules
-    description: "LATER (Phase 6): rules engine (conditions/actions)."
+    description: "Phase 6: WHEN/THEN classification rules with deterministic priority, versions, preview, retroactive dry-run and its audited application, and the classification coverage that measures the 70 % exit criterion (add-rule-engine)."
   - name: Forecasts
     description: "LATER (Phase 8): statistical forecasts (async)."
   - name: Assistant
@@ -1351,6 +1351,10 @@ paths:
             items: { $ref: '#/components/schemas/SystemFlag' }
           style: form
           explode: true
+        - name: needsReview
+          in: query
+          description: '`true` returns only the transactions pending review (add-rule-engine).'
+          schema: { type: boolean }
         - name: currency
           in: query
           schema: { $ref: '#/components/schemas/CurrencyCode' }
@@ -9845,6 +9849,445 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Rules: reglas de clasificación automática (openspec add-rule-engine) ──
+  /workspaces/{workspaceId}/rules:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Rules]
+      operationId: listRules
+      summary: List the classification rules of the workspace
+      description: |
+        Ordered by evaluation priority (lower number first, then creation date and id). Archived rules only with `includeArchived`.
+        Every rule carries `stats` (transactions that hold a field set by it today, last application and the "no applications in 90 days" signal) and `needsAttention` (a target of its actions was archived or no longer exists).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      parameters:
+        - name: enabled
+          in: query
+          schema: { type: boolean }
+        - name: trigger
+          in: query
+          schema: { $ref: '#/components/schemas/RuleTrigger' }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+        - name: needsAttention
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: List the classification rules of the workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Rules]
+      operationId: createRule
+      summary: Create a classification rule
+      description: |
+        The rule is created active in version 1. Without `triggers` it applies to imports and retroactive runs (manual creation is opt-in per rule). A definition without conditions or actions, over the limits (20 conditions, 10 actions) or with an action that tries to set the amount, currency, account, date, kind or status answers `VALIDATION_FAILED`; an invalid or non-linear-time regular expression answers `RULE_INVALID_REGEX`. Every referenced category, tag, counterparty and custom field must exist and be active. A workspace has at most 500 non-archived rules (`RULE_LIMIT_EXCEEDED`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleInput' }
+      responses:
+        '201':
+          description: Create a classification rule
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED or CUSTOM_FIELD_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, RULE_INVALID_REGEX, RULE_LIMIT_EXCEEDED, REFERENCE_NOT_FOUND, CUSTOM_FIELD_VALUE_INVALID or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/order:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    put:
+      tags: [Rules]
+      operationId: reorderRules
+      summary: Reorder the classification rules
+      description: |
+        Receives every non-archived rule exactly once; assigns the priorities 10, 20, 30… in that order. Audited with the previous and new priority; it does not create versions.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleOrderInput' }
+      responses:
+        '200':
+          description: Reorder the classification rules
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: previewRule
+      summary: Test a rule against a transaction or an example
+      description: |
+        Tests a saved rule (`ruleId`) or an unsaved `definition` against an existing transaction or an example. Shows every condition with its result and current value, the resulting actions and the skipped ones with their reason. Persists nothing and does not audit.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RulePreviewInput' }
+      responses:
+        '200':
+          description: Test a rule against a transaction or an example
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RulePreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED or RULE_INVALID_REGEX.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/dry-run:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: dryRunRules
+      summary: Run rules over existing transactions without changing anything
+      description: |
+        Runs one rule, a set or every active rule with the retroactive trigger over the non-voided income, expense and refund transactions of a range of up to 366 days (optionally filtered by accounts), and returns the diff per transaction (field, current value, proposed value, rule and version). The default mode `FILL_EMPTY` only completes empty fields; `OVERWRITE` must be requested. A range over 5 000 transactions answers `truncated: true`. The `token` fingerprints the rules (id and version) and the mode: apply it with `applyRuleDryRun`.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleDryRunInput' }
+      responses:
+        '200':
+          description: Run rules over existing transactions without changing anything
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleDryRun' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/dry-run/apply:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: applyRuleDryRun
+      summary: Apply the diff of a dry-run as an audited bulk edit
+      description: |
+        Applies up to 500 transactions per operation, atomically and with the version each transaction had in the dry-run. If a rule or any of those transactions changed since the dry-run the whole operation answers 409 `RULE_DRY_RUN_STALE` and nothing changes. Transactions in a closed period, reconciled or managed by another module are returned in `notApplicable[]`. Every modified transaction records the rule and version and an audit entry sharing the `bulkOperationId`. Apply by pages of 500.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleDryRunApplyInput' }
+      responses:
+        '200':
+          description: Apply the diff of a dry-run as an audited bulk edit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleDryRunApplyResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'RULE_DRY_RUN_STALE.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/coverage:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Rules]
+      operationId: getRuleCoverage
+      summary: Classification coverage of the imported transactions
+      description: |
+        Of the non-voided income, expense and refund transactions created by imports (no transfers or conversions) in the date range, or of one import, how many hold today a category set by a rule, by the default category of the counterparty, by the user or are still uncategorized. `ruleCoverage` is "classified by rules ÷ total" with 4 decimals (HALF_EVEN) next to the Phase 6 target `0.7000`. A category the user corrected after the rule does not count as classified by rules. Give `from`/`to` or `importJobId`.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: importJobId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Classification coverage of the imported transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleCoverage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/{ruleId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleId'
+    get:
+      tags: [Rules]
+      operationId: getRule
+      summary: Get a classification rule
+      description: The `ETag` is the row version of the rule (use it in `If-Match`); `version` is the version of its definition.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Get a classification rule
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [Rules]
+      operationId: updateRule
+      summary: Edit a classification rule
+      description: |
+        Merge-patch. Changing the conditions, actions, combination mode, triggers or `stopProcessing` creates a new immutable version (the previous ones stay queryable and the transactions already classified do not change). Changing the name, description or priority is audited without a version. An archived rule cannot be edited (409 `INVALID_STATUS_TRANSITION`). `DELETE` is not allowed: rules are archived (405 `METHOD_NOT_ALLOWED`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleUpdateInput' }
+      responses:
+        '200':
+          description: Edit a classification rule
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN, INVALID_STATUS_TRANSITION, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED or CUSTOM_FIELD_ARCHIVED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, RULE_INVALID_REGEX, REFERENCE_NOT_FOUND or CUSTOM_FIELD_VALUE_INVALID.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/{ruleId}/enable:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleId'
+    post:
+      tags: [Rules]
+      operationId: enableRule
+      summary: Enable a classification rule
+      description: An inactive rule becomes active again. Enabling an archived rule answers 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Enable a classification rule
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/{ruleId}/disable:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleId'
+    post:
+      tags: [Rules]
+      operationId: disableRule
+      summary: Disable a classification rule
+      description: An inactive rule is not evaluated by any trigger. It keeps its definition and versions.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Disable a classification rule
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/{ruleId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleId'
+    post:
+      tags: [Rules]
+      operationId: archiveRule
+      summary: Archive a classification rule
+      description: The rule stops being evaluated and frees its name; the transactions it classified keep resolving it with its name and version. Idempotent.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archive a classification rule
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/{ruleId}/versions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleId'
+    get:
+      tags: [Rules]
+      operationId: listRuleVersions
+      summary: List the immutable versions of a rule
+      description: One snapshot per change of the definition, oldest first.
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: List the immutable versions of a rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleVersionList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ── Goals: metas de ahorro (openspec add-savings-goals) ──
   /workspaces/{workspaceId}/goals:
     parameters:
@@ -11555,6 +11998,12 @@ components:
       required: true
       description: Attachment link UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
+    RuleId:
+      name: ruleId
+      in: path
+      required: true
+      description: Classification rule UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     GoalSuggestionId:
       name: suggestionId
       in: path
@@ -12018,6 +12467,9 @@ components:
         - GOAL_TRANSACTION_ALREADY_LINKED        # 409 (add-savings-goals: the transaction already backs a movement of a goal)
         - GOAL_CURRENCY_LOCKED                   # 409 (add-savings-goals: the target currency cannot change once the goal has movements)
         - GOAL_SUGGESTION_NOT_PENDING            # 409 (add-savings-goals: the contribution suggestion was already confirmed, dismissed or expired)
+        - RULE_INVALID_REGEX                     # 422 (add-rule-engine: the regular expression is invalid or uses constructs without linear-time evaluation; also rejects back-references, lookaround and patterns over 200 characters)
+        - RULE_LIMIT_EXCEEDED                    # 422 (add-rule-engine: the workspace has the maximum of 500 non-archived rules)
+        - RULE_DRY_RUN_STALE                     # 409 (add-rule-engine: a rule or a transaction changed after the dry-run; run it again)
 
     # ── Identity ──
     WorkspaceRole:
@@ -12812,6 +13264,454 @@ components:
         role:
           type: string
           enum: [MAIN, SOURCE, TARGET, FEE]
+    # ── Rules: reglas de clasificación (openspec add-rule-engine) ──
+    RuleTrigger:
+      type: string
+      enum: [IMPORT, MANUAL_CREATE, RETROACTIVE]
+      description: When the rule is evaluated. The default triggers of a new rule are `IMPORT` and `RETROACTIVE` (manual creation is opt-in per rule).
+    RuleMatchMode:
+      type: string
+      enum: [ALL, ANY]
+    RuleStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, ARCHIVED]
+    RuleEvaluationMode:
+      type: string
+      enum: [FILL_EMPTY, OVERWRITE]
+      description: '`FILL_EMPTY` (default) only completes empty fields; `OVERWRITE` also replaces fields that already have a value.'
+    RuleCondition:
+      type: object
+      additionalProperties: false
+      required: [field, operator]
+      description: |
+        One test over a transaction field. Text comparisons ignore case, accents and repeated spaces; amounts are compared exactly (decimal strings, never JSON numbers) and only against transactions of the condition currency. `matches_regex` uses a linear-time engine (no back-references or lookaround; pattern up to 200 characters, text up to 500).
+      properties:
+        field:
+          type: string
+          enum: [DESCRIPTION, COUNTERPARTY, AMOUNT, CURRENCY, ACCOUNT, KIND, DATE, WEEKDAY, DAY_OF_MONTH, CATEGORY, TAG, EXTERNAL_SOURCE, CUSTOM_FIELD]
+        operator:
+          type: string
+          enum: [equals, not_equals, contains, not_contains, starts_with, ends_with, matches_regex, gt, gte, lt, lte, between, in, is_empty, is_not_empty]
+        value:
+          description: Operand (text, id, decimal string, `YYYY-MM-DD`, ISO weekday 1–7, day of month 1–31, `INCOME`/`EXPENSE`/`REFUND` or a boolean for custom fields).
+          oneOf:
+            - { type: string, maxLength: 500 }
+            - { type: integer }
+            - { type: boolean }
+        valueTo:
+          description: Upper bound of `between`.
+          oneOf:
+            - { type: string, maxLength: 500 }
+            - { type: integer }
+        values:
+          type: array
+          maxItems: 100
+          description: Operands of `in`.
+          items:
+            oneOf:
+              - { type: string, maxLength: 500 }
+              - { type: integer }
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+          description: Required with `AMOUNT`.
+        fieldId:
+          $ref: '#/components/schemas/Uuid'
+          description: Required with `CUSTOM_FIELD`.
+    RuleConditionGroup:
+      type: object
+      additionalProperties: false
+      required: [match, items]
+      description: A group of conditions with its own combination mode (one level only).
+      properties:
+        match: { $ref: '#/components/schemas/RuleMatchMode' }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RuleCondition' }
+    RuleConditionItem:
+      oneOf:
+        - $ref: '#/components/schemas/RuleCondition'
+        - $ref: '#/components/schemas/RuleConditionGroup'
+    RuleAction:
+      type: object
+      additionalProperties: false
+      required: [type]
+      description: |
+        An effect of the rule. There is no property for the amount, currency, account, date, kind or status of a transaction: rules never change financial data or create entries.
+        `SET_CATEGORY` (categoryId), `ADD_TAG`/`REMOVE_TAG` (tagId), `SET_COUNTERPARTY` (counterpartyId), `SET_CUSTOM_FIELD` (fieldId, value), `MARK_FOR_REVIEW`, `SET_DESCRIPTION` (text), `APPEND_NOTE` (text) and `EXCLUDE_FROM_IMPORT` (imports only).
+      properties:
+        type:
+          type: string
+          enum: [SET_CATEGORY, ADD_TAG, REMOVE_TAG, SET_COUNTERPARTY, SET_CUSTOM_FIELD, MARK_FOR_REVIEW, SET_DESCRIPTION, APPEND_NOTE, EXCLUDE_FROM_IMPORT]
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        tagId: { $ref: '#/components/schemas/Uuid' }
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        fieldId: { $ref: '#/components/schemas/Uuid' }
+        value:
+          oneOf:
+            - { type: string, maxLength: 500 }
+            - { type: boolean }
+        text: { type: string, minLength: 1, maxLength: 500 }
+    RuleInput:
+      type: object
+      additionalProperties: false
+      required: [name, conditions, actions]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80, description: 'Unique among the non-archived rules, ignoring case.' }
+        description: { type: [string, 'null'], maxLength: 500 }
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 100
+          description: Lower number is evaluated first; ties break by creation date and id. In each single-valued field (and each tag) the first rule that sets it wins.
+        triggers:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/RuleTrigger' }
+        matchMode: { $ref: '#/components/schemas/RuleMatchMode' }
+        conditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RuleConditionItem' }
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: { $ref: '#/components/schemas/RuleAction' }
+        stopProcessing:
+          type: boolean
+          default: false
+          description: When the rule matches, the rules of lower priority are not evaluated for that transaction.
+    RuleUpdateInput:
+      type: object
+      additionalProperties: false
+      description: Merge-patch; absent properties do not change.
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: [string, 'null'], maxLength: 500 }
+        priority: { type: integer, minimum: 0, maximum: 1000000 }
+        triggers:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/RuleTrigger' }
+        matchMode: { $ref: '#/components/schemas/RuleMatchMode' }
+        conditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RuleConditionItem' }
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: { $ref: '#/components/schemas/RuleAction' }
+        stopProcessing: { type: boolean }
+    RuleStats:
+      type: object
+      required: [classifiedTransactions, lastAppliedAt, unusedFor90Days]
+      properties:
+        classifiedTransactions: { type: integer, minimum: 0, description: Transactions that hold today a field set by this rule. }
+        lastAppliedAt: { oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }] }
+        unusedFor90Days: { type: boolean, description: Active rule with no applications in the last 90 days. }
+    Rule:
+      type: object
+      required: [id, name, priority, enabled, status, triggers, matchMode, conditions, actions, stopProcessing, version, rowVersion, needsAttention, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        priority: { type: integer }
+        enabled: { type: boolean }
+        status: { $ref: '#/components/schemas/RuleStatus' }
+        triggers:
+          type: array
+          items: { $ref: '#/components/schemas/RuleTrigger' }
+        matchMode: { $ref: '#/components/schemas/RuleMatchMode' }
+        conditions:
+          type: array
+          items: { $ref: '#/components/schemas/RuleConditionItem' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/RuleAction' }
+        stopProcessing: { type: boolean }
+        version: { type: integer, minimum: 1, description: Version of the definition; it grows only when the definition changes. }
+        rowVersion: { type: integer, minimum: 1, description: Version of the row (the `ETag`); it grows with every change. }
+        needsAttention: { type: boolean, description: 'A target of an action (category, tag, counterparty or custom field) was archived or no longer exists.' }
+        archivedAt: { oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }] }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        stats: { $ref: '#/components/schemas/RuleStats' }
+    RuleList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Rule' }
+    RuleVersion:
+      type: object
+      required: [ruleId, version, createdAt, name, triggers, matchMode, conditions, actions, stopProcessing, schemaVersion]
+      properties:
+        ruleId: { $ref: '#/components/schemas/Uuid' }
+        version: { type: integer, minimum: 1 }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        createdBy: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        triggers:
+          type: array
+          items: { $ref: '#/components/schemas/RuleTrigger' }
+        matchMode: { $ref: '#/components/schemas/RuleMatchMode' }
+        conditions:
+          type: array
+          items: { $ref: '#/components/schemas/RuleConditionItem' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/RuleAction' }
+        stopProcessing: { type: boolean }
+        schemaVersion: { type: integer }
+    RuleVersionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/RuleVersion' }
+    RuleOrderInput:
+      type: object
+      additionalProperties: false
+      required: [ruleIds]
+      properties:
+        ruleIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+          description: Every non-archived rule exactly once, in the new evaluation order.
+    RulePreviewInput:
+      type: object
+      additionalProperties: false
+      required: [subject]
+      description: Give `ruleId` (saved rule) or `definition` (unsaved).
+      properties:
+        ruleId: { $ref: '#/components/schemas/Uuid' }
+        definition:
+          type: object
+          additionalProperties: false
+          required: [conditions, actions]
+          properties:
+            matchMode: { $ref: '#/components/schemas/RuleMatchMode' }
+            conditions:
+              type: array
+              items: { $ref: '#/components/schemas/RuleConditionItem' }
+            actions:
+              type: array
+              items: { $ref: '#/components/schemas/RuleAction' }
+            triggers:
+              type: array
+              items: { $ref: '#/components/schemas/RuleTrigger' }
+            stopProcessing: { type: boolean }
+        subject:
+          type: object
+          additionalProperties: false
+          description: An existing transaction or a free example.
+          properties:
+            transactionId: { $ref: '#/components/schemas/Uuid' }
+            sample:
+              type: object
+              additionalProperties: false
+              required: [amount]
+              properties:
+                description: { type: [string, 'null'], maxLength: 500 }
+                amount: { $ref: '#/components/schemas/PositiveMoney' }
+                accountId: { $ref: '#/components/schemas/Uuid' }
+                date: { $ref: '#/components/schemas/LocalDate' }
+                kind: { type: string, enum: [INCOME, EXPENSE, REFUND] }
+                categoryId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+                counterpartyId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+                tagIds:
+                  type: array
+                  items: { $ref: '#/components/schemas/Uuid' }
+        trigger:
+          $ref: '#/components/schemas/RuleTrigger'
+          description: Trigger semantics to preview (default `IMPORT`).
+        mode: { $ref: '#/components/schemas/RuleEvaluationMode' }
+    RulePreview:
+      type: object
+      required: [matched, conditions, actions, skipped]
+      properties:
+        matched: { type: boolean }
+        conditions:
+          type: array
+          items:
+            type: object
+            required: [path, met, actual]
+            properties:
+              path: { type: string, description: JSON pointer to the condition in the definition. }
+              met: { type: boolean }
+              actual: { type: [string, 'null'], description: Current value of the evaluated field. }
+        actions:
+          type: array
+          description: Resulting actions in the DSL form.
+          items: { $ref: '#/components/schemas/RuleAction' }
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [action, reason]
+            properties:
+              action: { type: string }
+              reason: { $ref: '#/components/schemas/RuleSkipReason' }
+    RuleSkipReason:
+      type: string
+      description: Why an action was skipped. Open set — clients must handle unknown values.
+      x-extensible-enum:
+        - RULE_ACTION_TARGET_ARCHIVED
+        - CATEGORY_KIND_MISMATCH
+        - MULTI_SPLIT
+        - NOT_EMPTY
+        - ALREADY_APPLIED
+        - TRANSACTION_MANAGED_EXTERNALLY
+        - TRANSACTION_RECONCILED
+        - PERIOD_CLOSED
+    RuleDryRunInput:
+      type: object
+      additionalProperties: false
+      required: [from, to]
+      properties:
+        ruleIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+          description: Rules to run; absent means every active rule with the retroactive trigger.
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        accountIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        mode: { $ref: '#/components/schemas/RuleEvaluationMode' }
+    RuleDryRunChange:
+      type: object
+      required: [field, before, after, ruleId, ruleVersion]
+      properties:
+        field: { type: string, description: '`categoryId`, `counterpartyId`, `tagAdded`, `tagRemoved`, `customField:<fieldId>`, `description`, `notes` or `needsReview`.' }
+        before: { oneOf: [{ type: string }, { type: boolean }, { type: 'null' }] }
+        after: { oneOf: [{ type: string }, { type: boolean }, { type: 'null' }] }
+        ruleId: { $ref: '#/components/schemas/Uuid' }
+        ruleVersion: { type: integer, minimum: 1 }
+    RuleDryRunItem:
+      type: object
+      required: [transactionId, version, applicable, reasons, changes]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        version: { $ref: '#/components/schemas/Version' }
+        applicable: { type: boolean }
+        reasons:
+          type: array
+          items: { $ref: '#/components/schemas/RuleSkipReason' }
+        changes:
+          type: array
+          items: { $ref: '#/components/schemas/RuleDryRunChange' }
+    RuleDryRun:
+      type: object
+      required: [scanned, changed, truncated, token, items]
+      properties:
+        scanned: { type: integer, minimum: 0 }
+        changed: { type: integer, minimum: 0 }
+        truncated: { type: boolean, description: The range has more than 5 000 transactions; only the first ones were evaluated. }
+        token: { type: string, description: SHA-256 of the rules (id and version) and the mode; send it back to apply. }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RuleDryRunItem' }
+    RuleDryRunApplyInput:
+      type: object
+      additionalProperties: false
+      required: [token, items]
+      properties:
+        token: { type: string }
+        ruleIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+          description: The same selection as the dry-run.
+        mode: { $ref: '#/components/schemas/RuleEvaluationMode' }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          description: The transactions to apply, each with the version shown by the dry-run.
+          items:
+            type: object
+            additionalProperties: false
+            required: [transactionId, version]
+            properties:
+              transactionId: { $ref: '#/components/schemas/Uuid' }
+              version: { $ref: '#/components/schemas/Version' }
+    RuleDryRunApplyResult:
+      type: object
+      required: [bulkOperationId, applied, notApplicable]
+      properties:
+        bulkOperationId: { $ref: '#/components/schemas/Uuid' }
+        applied: { type: integer, minimum: 0 }
+        notApplicable:
+          type: array
+          items:
+            type: object
+            required: [transactionId, reason]
+            properties:
+              transactionId: { $ref: '#/components/schemas/Uuid' }
+              reason: { type: string, description: 'Error code, for example `PERIOD_CLOSED`.' }
+    CategoryOrigin:
+      type: string
+      description: Where the category of a split came from. `UNKNOWN` for splits recorded before the rule engine. Open set — clients must handle unknown values.
+      x-extensible-enum: [MANUAL, RULE, COUNTERPARTY_DEFAULT, SYSTEM_DEFAULT, UNKNOWN]
+    SplitRuleRef:
+      type: object
+      required: [field, ruleId, ruleVersion]
+      properties:
+        field: { type: string, description: '`CATEGORY`, `TAG:<tagId>`, `COUNTERPARTY`, `CUSTOM_FIELD:<fieldId>`, `DESCRIPTION` or `NOTES`.' }
+        ruleId: { $ref: '#/components/schemas/Uuid' }
+        ruleVersion: { type: integer, minimum: 1 }
+        ruleName: { type: [string, 'null'], description: Name of the rule (archived rules keep resolving). }
+        ruleArchived: { type: boolean }
+    TransactionReview:
+      type: object
+      required: [reason, markedAt]
+      properties:
+        reason: { type: string, enum: [RULE, USER] }
+        ruleId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        ruleVersion: { type: [integer, 'null'] }
+        ruleName: { type: [string, 'null'] }
+        markedAt: { $ref: '#/components/schemas/Instant' }
+    RuleCoverage:
+      type: object
+      required: [count, byOrigin, ruleCoverage, target, meetsTarget, byRule]
+      properties:
+        count: { type: integer, minimum: 0, description: 'Imported income, expense and refund transactions in scope (not voided; no transfers or conversions).' }
+        byOrigin:
+          type: object
+          required: [rule, counterpartyDefault, manual, systemDefault, unknown]
+          description: 'How many of them hold today a category set by a rule, by the default category of the counterparty, by the user, still uncategorized or recorded before the rule engine.'
+          properties:
+            rule: { type: integer, minimum: 0 }
+            counterpartyDefault: { type: integer, minimum: 0 }
+            manual: { type: integer, minimum: 0 }
+            systemDefault: { type: integer, minimum: 0 }
+            unknown: { type: integer, minimum: 0 }
+        ruleCoverage: { type: string, pattern: '^\d\.\d{4}$', description: '"classified by rules ÷ count" with 4 decimals (HALF_EVEN).' }
+        target: { type: string, pattern: '^\d\.\d{4}$', description: 'Phase 6 target, `0.7000`.' }
+        meetsTarget: { type: boolean }
+        byRule:
+          type: array
+          items:
+            type: object
+            required: [ruleId, name, version, archived, count]
+            properties:
+              ruleId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              version: { type: [integer, 'null'] }
+              archived: { type: boolean }
+              count: { type: integer, minimum: 0 }
     TransactionSplit:
       type: object
       required: [id, amount, categoryId]
@@ -12829,6 +13729,11 @@ components:
         customFields:
           $ref: '#/components/schemas/CustomFieldValues'
           description: Custom field values of this split keyed by field key (Phase 2). Numeric values travel as decimal strings (never JSON numbers).
+        categoryOrigin: { $ref: '#/components/schemas/CategoryOrigin' }
+        ruleRefs:
+          type: array
+          description: Rule and version that set the category (`CATEGORY`) and each other field (add-rule-engine). Archived rules keep resolving.
+          items: { $ref: '#/components/schemas/SplitRuleRef' }
     SplitInput:
       type: object
       additionalProperties: false
@@ -13022,12 +13927,21 @@ components:
         version: { $ref: '#/components/schemas/Version' }
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
+        needsReview: { type: boolean, description: The transaction waits for review (marked by a rule or by the user); no effect on the ledger or the status. }
+        review:
+          oneOf:
+            - $ref: '#/components/schemas/TransactionReview'
+            - type: 'null'
     TransactionCreate:
       type: object
       additionalProperties: false
       required: [kind, transactionDate, accountId, amount]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
+        applyRules:
+          type: boolean
+          default: true
+          description: '`false` skips the rules with the manual-creation trigger for this transaction (income, expense and refund only). Rules complete only the fields left empty and never replace what the user chose.'
         paymentMethod:
           anyOf: [{ $ref: '#/components/schemas/PaymentMethod' }, { type: 'null' }]
           description: Medio de pago (D27); no afecta el ledger
@@ -13128,6 +14042,9 @@ components:
           maxItems: 50
           description: Full replacement of the split list
           items: { $ref: '#/components/schemas/SplitInput' }
+        needsReview:
+          type: boolean
+          description: '`true` marks the transaction pending review (reason `USER`); `false` clears the mark. Audited; no effect on the ledger.'
     VoidRequest:
       type: object
       additionalProperties: false

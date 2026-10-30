@@ -5,16 +5,19 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Crear una regla desde una transacción o fila importada"
 scenario: "Regla desde una fila de Tigo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001", "FR-RULES-007"]
 nfr: []
 invariants: []
 priority: low
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/rules/logic.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - tests/e2e/specs/rules.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +34,7 @@ expected_result:
   - "Editor con \"descripción contiene tigo money recarga\", \"tipo = gasto\" y \"categoría = Telefonía\""
   - "Ninguna regla nueva hasta guardar"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-054 — Crear regla desde una fila prellena sin guardar hasta confirmar

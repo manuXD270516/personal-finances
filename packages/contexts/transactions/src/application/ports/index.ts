@@ -59,6 +59,8 @@ export interface TransactionListFilter {
   readonly amountMax?: string;
   /** Texto ya normalizado (minúsculas, sin acentos). */
   readonly q?: string;
+  /** `true` ⇒ solo las pendientes de revisión (índice parcial `transaction_review_pending_ix`). */
+  readonly needsReview?: boolean;
   readonly sort: TransactionSort;
 }
 
@@ -330,6 +332,66 @@ export interface IdGenerator {
   next(): string;
 }
 
+/**
+ * Sujeto que TRANSACTIONS entrega a las reglas al registrar una transacción manual (misma forma que `RuleSubjectDto` de
+ * `@pf/rules/contracts`: este contexto no importa RULES; el adaptador vive en la composición de `apps/api`).
+ */
+export interface RuleSuggestionSubject {
+  readonly ref: string;
+  readonly kind: 'INCOME' | 'EXPENSE' | 'REFUND';
+  readonly accountId: string;
+  readonly date: string;
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly description: string | null;
+  readonly counterpartyId: string | null;
+  readonly counterpartyOrigin: 'USER' | 'ALIAS' | null;
+  readonly categoryId: string | null;
+  readonly tagIds: readonly string[];
+  readonly externalSource: string | null;
+  readonly customFields: readonly { readonly fieldId: string; readonly value: string | boolean }[];
+  readonly splitCount: number;
+  readonly notes?: string | null;
+}
+
+export interface RuleSuggestionOrigin {
+  readonly ruleId: string;
+  readonly ruleVersion: number;
+}
+
+/** Resultado de evaluar las reglas de la creación manual (`RuleOutcomeDto`, solo lo que esta operación usa). */
+export interface RuleSuggestion {
+  readonly category: { readonly categoryId: string; readonly origin: RuleSuggestionOrigin } | null;
+  readonly counterparty: { readonly counterpartyId: string; readonly origin: RuleSuggestionOrigin } | null;
+  readonly addTags: readonly { readonly tagId: string; readonly origin: RuleSuggestionOrigin }[];
+  readonly customFields: readonly {
+    readonly fieldId: string;
+    readonly value: string | boolean;
+    readonly origin: RuleSuggestionOrigin;
+  }[];
+  readonly description: { readonly text: string; readonly origin: RuleSuggestionOrigin } | null;
+  readonly appendNotes: readonly { readonly text: string; readonly origin: RuleSuggestionOrigin }[];
+  readonly markForReview: RuleSuggestionOrigin | null;
+}
+
+/**
+ * Puerto de las reglas de la creación manual (openspec add-rule-engine decisión 5): `suggest` evalúa, sin efectos y en la
+ * unidad de trabajo en curso, las reglas con disparador de creación manual en modo «completar vacíos».
+ */
+export interface RuleSuggestionPort {
+  suggest(input: {
+    readonly workspaceId: string;
+    readonly subject: RuleSuggestionSubject;
+  }): Promise<RuleSuggestion | null>;
+}
+
+/** Nombre y estado de las reglas que clasificaron (para mostrarlas en el detalle; las archivadas se siguen resolviendo). */
+export interface RuleNameLookup {
+  names(
+    workspaceId: string,
+    ruleIds: readonly string[],
+  ): Promise<ReadonlyMap<string, { readonly name: string; readonly archived: boolean }>>;
+}
+
 export interface TransactionsDeps {
   readonly uow: UnitOfWork;
   readonly transactions: TransactionRepository;
@@ -353,4 +415,6 @@ export interface TransactionsDeps {
   readonly reconciliations: ReconciliationRepository;
   readonly openingBalances: OpeningBalanceReader;
   readonly calendar: WorkspaceCalendar;
+  /** Reglas de la creación manual (add-rule-engine); sin él, el registro no aplica reglas. */
+  readonly ruleSuggestions?: RuleSuggestionPort;
 }

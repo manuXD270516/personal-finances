@@ -5,16 +5,20 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Versionado de reglas"
 scenario: "Reordenar no versiona"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-006", "FR-RULES-010"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/logic.test.ts
+  - packages/contexts/rules/src/application/rules.service.test.ts
+  - packages/contexts/rules/src/domain/rule.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +35,7 @@ expected_result:
   - "La versión de definición no cambia"
   - "Auditoría con prioridad anterior y nueva"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-043 — Cambiar la prioridad se audita sin crear versión

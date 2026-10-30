@@ -5,16 +5,19 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Dry-run sobre transacciones existentes"
 scenario: "Modo de reemplazo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-008"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +35,7 @@ expected_result:
   - "changed = 6"
   - "Con 6 000 transacciones: truncated = true y scanned = 5000"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-028 — El modo de reemplazo propone también los campos ya clasificados

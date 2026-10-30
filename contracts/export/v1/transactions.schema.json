@@ -37,7 +37,12 @@
     "reconciliation_id",
     "reconciliation_mode",
     "import_job_id",
-    "loan_payment_breakdown"
+    "loan_payment_breakdown",
+    "review_status",
+    "review_reason",
+    "review_rule_id",
+    "review_rule_version",
+    "review_marked_at"
   ],
   "properties": {
     "id": {
@@ -195,7 +200,39 @@
       ],
       "format": "uuid"
     },
-    "loan_payment_breakdown": {}
+    "loan_payment_breakdown": {},
+    "review_status": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "review_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "review_rule_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "review_rule_version": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "review_marked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
   },
   "x-pfos-table": "txn.transaction",
   "x-pfos-context": "transactions"

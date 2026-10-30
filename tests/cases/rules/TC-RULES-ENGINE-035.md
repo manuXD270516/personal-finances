@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: ["transactions/transaction-recording"]
 requirement: "Aplicación al crear una transacción manual"
 scenario: "El usuario ya eligió categoría"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-009"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +31,7 @@ steps:
 expected_result:
   - "Split en Regalos con categoryOrigin MANUAL"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-035 — Las reglas no reemplazan la categoría elegida por el usuario

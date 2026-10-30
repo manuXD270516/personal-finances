@@ -132,6 +132,37 @@ export const splitsAudit = (s: TransactionState): string =>
     })),
   );
 
+/**
+ * Origen de la clasificación para la auditoría (add-rule-engine): el del primer split (las reglas solo actúan sobre
+ * transacciones de un split) y la regla y versión cuando es `RULE`. `UNKNOWN` para lo anterior al cambio.
+ */
+export const originAudit = (
+  before: TransactionState | null,
+  after: TransactionState,
+): { field: string; before: string | number | null; after: string | number | null }[] => {
+  const pick = (s: TransactionState | null) => ({
+    origin: s ? (s.splits[0]?.categoryOrigin ?? 'UNKNOWN') : null,
+    ruleId: s ? (s.splits[0]?.categoryRule?.ruleId ?? null) : null,
+    ruleVersion: s ? (s.splits[0]?.categoryRule?.ruleVersion ?? null) : null,
+  });
+  const b = pick(before);
+  const a = pick(after);
+  const out: { field: string; before: string | number | null; after: string | number | null }[] = [
+    { field: 'categoryOrigin', before: b.origin, after: a.origin },
+  ];
+  if (b.ruleId !== a.ruleId) out.push({ field: 'categoryRuleId', before: b.ruleId, after: a.ruleId });
+  if (b.ruleVersion !== a.ruleVersion) {
+    out.push({ field: 'categoryRuleVersion', before: b.ruleVersion, after: a.ruleVersion });
+  }
+  return out;
+};
+
+/** Referencias de reglas de todos los splits como texto JSON; `null` si no hay (la allow-list solo admite escalares). */
+export const refsAudit = (s: TransactionState | null): string | null => {
+  const refs = (s?.splits ?? []).flatMap((x) => x.ruleRefs ?? []);
+  return refs.length === 0 ? null : JSON.stringify(refs);
+};
+
 /** `Rate` del contrato: valor exacto de la cotizada; derivadas (efectiva) con 18 decimales HALF_EVEN. */
 export const rateJson = (
   r: { readonly base: { code: string }; readonly quote: { code: string }; toPersisted(): string },

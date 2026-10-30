@@ -5,16 +5,20 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Vista previa de una regla"
 scenario: "Condición que falla"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-007"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +35,7 @@ expected_result:
   - "matched = false; condición de monto met = false con actual 180.00 BOB"
   - "actions = []"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-026 — La vista previa muestra la condición que no se cumple

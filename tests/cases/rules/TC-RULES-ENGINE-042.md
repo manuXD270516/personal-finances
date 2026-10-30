@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Versionado de reglas"
 scenario: "Edición concurrente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-010"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/rules/src/application/rules.service.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +32,7 @@ steps:
 expected_result:
   - "El primero 200; el segundo 412 PRECONDITION_FAILED"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-042 — Dos ediciones con la misma versión: la segunda falla

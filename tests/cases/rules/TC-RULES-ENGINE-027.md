@@ -5,16 +5,21 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Dry-run sobre transacciones existentes"
 scenario: "Completar categorías vacías de septiembre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-008"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+  - tests/e2e/specs/rules.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -34,7 +39,7 @@ expected_result:
   - "Los 2 de Hogar sin cambio"
   - "Ninguna transacción modificada; se devuelve token"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-027 — El dry-run en modo completar solo propone campos vacíos y no persiste

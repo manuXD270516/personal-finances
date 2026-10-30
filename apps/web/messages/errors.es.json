@@ -160,5 +160,8 @@
   "DOCUMENT_REJECTED": "El documento fue rechazado por la verificación de seguridad de archivos.",
   "DOCUMENT_DELETED": "El documento fue eliminado.",
   "DOCUMENT_CONTENT_CORRUPTED": "El contenido almacenado está dañado o fue modificado. No se entregó el archivo.",
-  "ATTACHMENT_LIMIT_EXCEEDED": "Este elemento ya tiene el máximo de adjuntos. Quita alguno para agregar otro."
+  "ATTACHMENT_LIMIT_EXCEEDED": "Este elemento ya tiene el máximo de adjuntos. Quita alguno para agregar otro.",
+  "RULE_INVALID_REGEX": "La expresión regular no es válida o usa construcciones sin evaluación de tiempo lineal (referencias hacia atrás, lookaround o más de 200 caracteres).",
+  "RULE_LIMIT_EXCEEDED": "El espacio de trabajo alcanzó el máximo de reglas. Archiva alguna para crear otra.",
+  "RULE_DRY_RUN_STALE": "Una regla o una transacción cambió después de la ejecución. No se aplicó nada: vuelve a ejecutar."
 }

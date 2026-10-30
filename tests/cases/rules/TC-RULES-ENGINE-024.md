@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Referencias y acciones no aplicables"
 scenario: "Categoría de gasto sobre un ingreso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-005", "FR-RULES-006"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +32,7 @@ expected_result:
   - "A omitida con CATEGORY_KIND_MISMATCH"
   - "category = Reembolsos varios (origen B)"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-024 — Una acción omitida por tipo de categoría deja fijar el campo a la siguiente regla

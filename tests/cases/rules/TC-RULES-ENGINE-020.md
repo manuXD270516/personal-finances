@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Prioridad y resolución acumulativa determinista"
 scenario: "Empate de prioridad"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-006"]
 nfr: []
 invariants: []
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+  - packages/contexts/rules/test/integration/pg-rules.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +34,7 @@ expected_result:
   - "Siempre gana la categoría de A"
   - "La propiedad se cumple (timeout explícito)"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-020 — Empate de prioridad se resuelve por antigüedad y el resultado es reproducible

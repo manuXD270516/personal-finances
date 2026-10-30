@@ -29,6 +29,9 @@ import {
   type AccountNature,
   type ConversionDetail,
   type AdjustmentDirection,
+  type CategoryOrigin,
+  type RuleRef,
+  type Split,
   type LegRole,
   type PaymentMethod,
   type ReconciliationMode,
@@ -74,6 +77,12 @@ interface TxnDb {
     reconciliation_id: string | null;
     reconciliation_mode: ReconciliationMode | null;
     import_job_id: string | null;
+    /** Marca de revisión pendiente (add-rule-engine). */
+    review_status: 'PENDING' | null;
+    review_reason: 'RULE' | 'USER' | null;
+    review_rule_id: string | null;
+    review_rule_version: number | null;
+    review_marked_at: string | null;
     revision: number;
     active_entry_id: string | null;
     voided_at: string | null;
@@ -106,6 +115,12 @@ interface TxnDb {
     category_id: string;
     counterparty_id: string | null;
     memo: string | null;
+    /** Origen de la categoría (add-rule-engine); `null` ⇒ UNKNOWN. */
+    category_origin: CategoryOrigin | null;
+    category_rule_id: string | null;
+    category_rule_version: number | null;
+    /** `jsonb`: se escribe como texto JSON. */
+    rule_refs: RuleRef[] | string | null;
     revision: number;
     superseded_in_revision: number | null;
   };
@@ -171,6 +186,11 @@ const TX_COLUMN_TYPES: Record<keyof ReturnType<typeof txRow>, string> = {
   reconciliation_id: 'uuid',
   reconciliation_mode: 'text',
   import_job_id: 'uuid',
+  review_status: 'text',
+  review_reason: 'text',
+  review_rule_id: 'uuid',
+  review_rule_version: 'int',
+  review_marked_at: 'timestamptz',
   revision: 'int',
   active_entry_id: 'uuid',
   voided_at: 'timestamptz',
@@ -188,6 +208,10 @@ const SPLIT_COLUMN_TYPES = {
   category_id: 'uuid',
   counterparty_id: 'uuid',
   memo: 'text',
+  category_origin: 'text',
+  category_rule_id: 'uuid',
+  category_rule_version: 'int',
+  rule_refs: 'jsonb',
   revision: 'int',
   superseded_in_revision: 'int',
 } as const;
@@ -245,6 +269,10 @@ const txColumns = [
   't.reconciliation_id',
   't.reconciliation_mode',
   't.import_job_id',
+  't.review_status',
+  't.review_reason',
+  't.review_rule_id',
+  't.review_rule_version',
   't.loan_payment_breakdown',
   't.revision',
   't.active_entry_id',
@@ -255,6 +283,7 @@ const txColumns = [
   sql<string>`t.transaction_date::text`.as('transaction_date'),
   sql<string | null>`t.posting_date::text`.as('posting_date'),
   iso('t.voided_at').as('voided_at'),
+  iso('t.review_marked_at').as('review_marked_at'),
   iso('t.created_at').as('created_at'),
   iso('t.updated_at').as('updated_at'),
   'c.scale',
@@ -269,6 +298,14 @@ function breakdownOf(
   const json = typeof raw === 'string' ? (JSON.parse(raw) as LoanPaymentBreakdownJson) : raw;
   return LoanPaymentBreakdown.fromJson(json, currency);
 }
+
+/** Columnas de origen de la clasificación de un split (add-rule-engine): `null` ⇒ UNKNOWN. */
+const splitOriginColumns = (split: Split) => ({
+  category_origin: split.categoryOrigin ?? null,
+  category_rule_id: split.categoryRule?.ruleId ?? null,
+  category_rule_version: split.categoryRule?.ruleVersion ?? null,
+  rule_refs: (split.ruleRefs?.length ?? 0) > 0 ? JSON.stringify(split.ruleRefs) : null,
+});
 
 const searchText = (s: TransactionState): string => normalizeText(`${s.description ?? ''} ${s.notes ?? ''}`);
 
@@ -297,6 +334,11 @@ function txRow(s: TransactionState): Omit<TxnDb['txn.transaction'], 'created_at'
     reconciliation_id: s.reconciliationId,
     reconciliation_mode: s.reconciliationMode,
     import_job_id: s.importJobId,
+    review_status: s.review ? 'PENDING' : null,
+    review_reason: s.review?.reason ?? null,
+    review_rule_id: s.review?.ruleId ?? null,
+    review_rule_version: s.review?.ruleVersion ?? null,
+    review_marked_at: s.review?.markedAt ?? null,
     loan_payment_breakdown: s.loanPaymentBreakdown ? JSON.stringify(s.loanPaymentBreakdown.toJson()) : null,
     revision: s.revision,
     active_entry_id: s.activeEntryId,
@@ -354,6 +396,7 @@ export class PgTransactionRepository implements TransactionRepository {
         category_id: split.categoryId,
         counterparty_id: split.counterpartyId,
         memo: split.memo,
+        ...splitOriginColumns(split),
         revision: s.revision,
         superseded_in_revision: null,
       })),
@@ -496,6 +539,7 @@ export class PgTransactionRepository implements TransactionRepository {
           category_id: split.categoryId,
           counterparty_id: split.counterpartyId,
           memo: split.memo,
+          ...splitOriginColumns(split),
           revision: s.revision,
           superseded_in_revision: null,
         })
@@ -506,6 +550,7 @@ export class PgTransactionRepository implements TransactionRepository {
             category_id: split.categoryId,
             counterparty_id: split.counterpartyId,
             memo: split.memo,
+            ...splitOriginColumns(split),
           }),
         )
         .execute();
@@ -723,25 +768,40 @@ export class PgTransactionRepository implements TransactionRepository {
     const states = txs.map((t) => ({ tx: t, s: t.snapshot }));
     const header = await sql`
       UPDATE txn.transaction t
-         SET status = v.status, notes = v.notes, counterparty_id = v.counterparty_id,
-             search_text = v.search_text, version = v.version, updated_at = now()
+         SET status = v.status, notes = v.notes, description = v.description, counterparty_id = v.counterparty_id,
+             search_text = v.search_text, version = v.version, review_status = v.review_status,
+             review_reason = v.review_reason, review_rule_id = v.review_rule_id,
+             review_rule_version = v.review_rule_version, review_marked_at = v.review_marked_at, updated_at = now()
         FROM unnest(${states.map((x) => x.s.id)}::uuid[], ${states.map((x) => x.s.status)}::text[],
-                    ${states.map((x) => x.s.notes)}::text[], ${states.map((x) => x.s.counterpartyId)}::uuid[],
+                    ${states.map((x) => x.s.notes)}::text[], ${states.map((x) => x.s.description)}::text[],
+                    ${states.map((x) => x.s.counterpartyId)}::uuid[],
                     ${states.map((x) => searchText(x.s))}::text[], ${states.map((x) => x.s.version)}::int[],
-                    ${states.map((x) => x.tx.persistedVersion ?? -1)}::int[])
-             AS v(id, status, notes, counterparty_id, search_text, version, persisted)
+                    ${states.map((x) => x.tx.persistedVersion ?? -1)}::int[],
+                    ${states.map((x) => (x.s.review ? 'PENDING' : null))}::text[],
+                    ${states.map((x) => x.s.review?.reason ?? null)}::text[],
+                    ${states.map((x) => x.s.review?.ruleId ?? null)}::uuid[],
+                    ${states.map((x) => x.s.review?.ruleVersion ?? null)}::int[],
+                    ${states.map((x) => x.s.review?.markedAt ?? null)}::timestamptz[])
+             AS v(id, status, notes, description, counterparty_id, search_text, version, persisted, review_status,
+                  review_reason, review_rule_id, review_rule_version, review_marked_at)
        WHERE t.workspace_id = ${workspaceId} AND t.id = v.id AND t.version = v.persisted`.execute(k);
     if (Number(header.numAffectedRows ?? 0) !== txs.length) return false;
     const splits = states.flatMap((x) => x.s.splits);
     if (splits.length === 0) return true;
+    const origins = splits.map((x) => splitOriginColumns(x));
     await sql`
       UPDATE txn.transaction_split s
-         SET category_id = v.category_id
-        FROM unnest(${splits.map((x) => x.id)}::uuid[], ${splits.map((x) => x.categoryId)}::uuid[])
-             AS v(id, category_id)
-       WHERE s.workspace_id = ${workspaceId} AND s.id = v.id AND s.category_id IS DISTINCT FROM v.category_id`.execute(
-      k,
-    );
+         SET category_id = v.category_id, category_origin = v.category_origin, category_rule_id = v.category_rule_id,
+             category_rule_version = v.category_rule_version, rule_refs = v.rule_refs
+        FROM unnest(${splits.map((x) => x.id)}::uuid[], ${splits.map((x) => x.categoryId)}::uuid[],
+                    ${origins.map((o) => o.category_origin)}::text[], ${origins.map((o) => o.category_rule_id)}::uuid[],
+                    ${origins.map((o) => o.category_rule_version)}::int[], ${origins.map((o) => o.rule_refs)}::jsonb[])
+             AS v(id, category_id, category_origin, category_rule_id, category_rule_version, rule_refs)
+       WHERE s.workspace_id = ${workspaceId} AND s.id = v.id
+         AND (s.category_id IS DISTINCT FROM v.category_id OR s.category_origin IS DISTINCT FROM v.category_origin
+              OR s.category_rule_id IS DISTINCT FROM v.category_rule_id
+              OR s.category_rule_version IS DISTINCT FROM v.category_rule_version
+              OR s.rule_refs IS DISTINCT FROM v.rule_refs)`.execute(k);
     const splitIds = splits.map((x) => x.id);
     await k
       .deleteFrom('txn.split_tag')
@@ -804,6 +864,8 @@ export class PgTransactionRepository implements TransactionRepository {
     if (filter.systemFlags?.includes('RECONCILED_WITHOUT_STATEMENT')) {
       q = q.where('t.reconciliation_mode', '=', 'WITHOUT_STATEMENT');
     }
+    // Pendientes de revisión (add-rule-engine): índice parcial `transaction_review_pending_ix`.
+    if (filter.needsReview === true) q = q.where('t.review_status', '=', 'PENDING');
     if (filter.kinds?.length) q = q.where('t.kind', 'in', [...filter.kinds]);
     if (filter.statuses?.length) q = q.where('t.status', 'in', [...filter.statuses]);
     if (filter.sources?.length) q = q.where('t.source', 'in', [...filter.sources]);
@@ -1080,6 +1142,10 @@ export class PgTransactionRepository implements TransactionRepository {
         's.category_id',
         's.counterparty_id',
         's.memo',
+        's.category_origin',
+        's.category_rule_id',
+        's.category_rule_version',
+        's.rule_refs',
         's.currency',
         sql<number>`(SELECT c.scale FROM fx.currency c WHERE c.code = s.currency)`.as('scale'),
         sql<string>`s.amount::text`.as('amount'),
@@ -1184,6 +1250,15 @@ export class PgTransactionRepository implements TransactionRepository {
         reconciliationMode: r.reconciliation_mode,
         reconciliationId: r.reconciliation_id,
         importJobId: r.import_job_id,
+        review:
+          r.review_status === 'PENDING' && r.review_reason && r.review_marked_at
+            ? {
+                reason: r.review_reason,
+                ruleId: r.review_rule_id,
+                ruleVersion: r.review_rule_version,
+                markedAt: r.review_marked_at,
+              }
+            : null,
         legs: legs
           .filter((l) => l.transaction_id === r.id)
           .map((l) => ({
@@ -1203,6 +1278,17 @@ export class PgTransactionRepository implements TransactionRepository {
             tagIds: s.tag_ids,
             memo: s.memo,
             customFields: customFieldsOf(s.id),
+            categoryOrigin: s.category_origin,
+            categoryRule:
+              s.category_rule_id !== null && s.category_rule_version !== null
+                ? { ruleId: s.category_rule_id, ruleVersion: s.category_rule_version }
+                : null,
+            ruleRefs:
+              s.rule_refs === null
+                ? []
+                : typeof s.rule_refs === 'string'
+                  ? JSON.parse(s.rule_refs)
+                  : s.rule_refs,
           })),
         revision: r.revision,
         version: r.version,

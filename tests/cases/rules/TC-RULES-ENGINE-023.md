@@ -5,16 +5,19 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Referencias y acciones no aplicables"
 scenario: "Categoría archivada después de crear la regla"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-005", "FR-CLASSIFICATION-002"]
 nfr: []
 invariants: ["INV-019"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/rules.service.test.ts
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -35,7 +38,7 @@ expected_result:
   - "Etiqueta y contraparte se aplican"
   - "La regla aparece con needsAttention = true"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-023 — Una categoría archivada omite la acción y la regla requiere atención

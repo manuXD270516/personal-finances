@@ -5,16 +5,21 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Definición de reglas WHEN/THEN"
 scenario: "Regla sin acciones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/logic.test.ts
+  - packages/contexts/rules/src/application/rules.service.test.ts
+  - packages/contexts/rules/src/domain/condition.test.ts
+  - packages/contexts/rules/src/domain/rule.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -33,7 +38,7 @@ expected_result:
   - "422 VALIDATION_FAILED con puntero en cada caso"
   - "Ninguna regla creada"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-002 — Una regla sin acciones o fuera de los límites se rechaza

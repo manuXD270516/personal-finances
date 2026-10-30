@@ -59,6 +59,8 @@ import {
 } from '@pf/documents/interface/documents.module';
 import { IDENTITY_AUDIT_POLICY, type WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import { IMPORTS_AUDIT_POLICY } from '@pf/imports/contracts';
+import { RULES_AUDIT_POLICY } from '@pf/rules/contracts';
+import { RulesModule, createRulesRuntime, type RulesRuntime } from '@pf/rules/interface/rules.module';
 import {
   createImportsRuntime,
   ImportsModule,
@@ -269,6 +271,8 @@ export const AUDIT_POLICIES = [
   GOALS_AUDIT_POLICY,
   // add-document-attachments (Phase 6): documentos y vínculos (nunca el nombre original ni el contenido).
   DOCUMENTS_AUDIT_POLICY,
+  // add-rule-engine (Phase 6): reglas de clasificación (condiciones y acciones como texto JSON).
+  RULES_AUDIT_POLICY,
 ];
 
 /**
@@ -351,6 +355,10 @@ export function financeRuntimes(input: {
         | 'IMPORT_REVIEW_TTL'
         | 'IMPORT_FUTURE_DATE_TOLERANCE_DAYS'
         | 'ACCOUNTS_INSTITUTION_CATALOG_DIR'
+        | 'RULES_MAX_PER_WORKSPACE'
+        | 'RULES_DRY_RUN_MAX_DAYS'
+        | 'RULES_DRY_RUN_MAX_TRANSACTIONS'
+        | 'RULES_APPLY_MAX_ITEMS'
       >
     > &
     Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>> &
@@ -390,6 +398,7 @@ export function financeRuntimes(input: {
     commitments?: CommitmentsRuntime;
     goals?: GoalsRuntime;
     accounts?: AccountsRuntime;
+    rules?: RulesRuntime;
   } = {};
   const classification = createClassificationRuntime({
     pool: input.pool,
@@ -459,8 +468,37 @@ export function financeRuntimes(input: {
     // add-reconciliation: saldo inicial (LEDGER) y "hoy" en la zona horaria del workspace (RISK-020).
     openingBalance: ledger.openingBalance,
     calendar: workspaceCalendar(input.pool, input.clock, input.config.APP_TIMEZONE),
+    // add-rule-engine decisión 5: reglas de la creación manual por el puerto público de RULES (se compone después).
+    ruleSuggestions: {
+      suggest: async ({ workspaceId, subject }) => {
+        const rules = deferred.rules;
+        if (!rules) return null;
+        const [outcome] = await rules.evaluation.evaluate({
+          workspaceId,
+          trigger: 'MANUAL_CREATE',
+          mode: 'FILL_EMPTY',
+          subjects: [subject],
+        });
+        return outcome ?? null;
+      },
+    },
   });
   deferred.categoryUsage = transactions.categoryUsage;
+  // RULES (add-rule-engine): reglas de clasificación. Solo contratos públicos de CLASSIFICATION y TRANSACTIONS; sin
+  // consumidores de eventos ni colas nuevas (D249, presupuesto de conexiones).
+  const rules = createRulesRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    validator: classification.validator,
+    categories: classification.categories,
+    counterparties: classification.counterparties,
+    subjects: transactions.classificationSubjects,
+    classifier: transactions.ruleClassification,
+    coverage: transactions.classificationCoverage,
+    settings: rulesSettingsFrom(input.config),
+  });
+  deferred.rules = rules;
   // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
   const reportingHistograms = otelHistograms('@pf/reporting');
   const reporting = createReportingRuntime({
@@ -718,6 +756,7 @@ export function financeRuntimes(input: {
     cards,
     debtSummary,
     goals,
+    rules,
   };
 }
 
@@ -772,6 +811,7 @@ export function identityImports(input: {
     cards,
     debtSummary,
     goals,
+    rules,
   } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
@@ -857,7 +897,12 @@ export function identityImports(input: {
     ...accountsImports({ runtime: accounts, conventions: input.conventions }),
     // LEDGER: solo la vista técnica de balance de comprobación (add-ledger-core 6.3, docs/31 D44).
     LedgerHttpModule.register({ balances: ledger.balances, conventions: input.conventions }),
-    TransactionsModule.register({ runtime: transactions, conventions: input.conventions }),
+    TransactionsModule.register({
+      runtime: transactions,
+      conventions: input.conventions,
+      // add-rule-engine: nombre y estado de las reglas que clasificaron (las archivadas se siguen resolviendo).
+      ruleNames: { names: (workspaceId, ids) => rules.queries.names(workspaceId, ids) },
+    }),
     FxModule.register({ runtime: fx, conventions: input.conventions }),
     ReportingModule.register({ runtime: reporting, conventions: input.conventions }),
     // PLANNING — openspec add-financial-periods (Phase 2).
@@ -878,6 +923,8 @@ export function identityImports(input: {
       conventions: input.conventions,
       reauth: (authTimeSeconds) => reauthPolicy.assertRecent(authTimeSeconds, input.conventions.clock.now()),
     }),
+    // RULES — openspec add-rule-engine (Phase 6): `/rules*`.
+    RulesModule.register({ runtime: rules, conventions: input.conventions }),
   ];
 }
 
@@ -994,6 +1041,28 @@ export function lifecycleExportLoaders(
       lifecycle: await classification.queries.lifecycleOf(userId, workspaceId, 'Counterparty', aggregateId),
       label: (await classification.queries.getCounterparty(userId, workspaceId, aggregateId)).name,
     }),
+  };
+}
+
+/** Ajustes `RULES_*` de RULES desde la configuración (los valores ausentes usan el default del runtime, D339). */
+export function rulesSettingsFrom(
+  config: Partial<
+    Pick<
+      ApiConfig,
+      | 'RULES_MAX_PER_WORKSPACE'
+      | 'RULES_DRY_RUN_MAX_DAYS'
+      | 'RULES_DRY_RUN_MAX_TRANSACTIONS'
+      | 'RULES_APPLY_MAX_ITEMS'
+    >
+  >,
+) {
+  return {
+    ...(config.RULES_MAX_PER_WORKSPACE ? { maxRules: config.RULES_MAX_PER_WORKSPACE } : {}),
+    ...(config.RULES_DRY_RUN_MAX_DAYS ? { dryRunMaxDays: config.RULES_DRY_RUN_MAX_DAYS } : {}),
+    ...(config.RULES_DRY_RUN_MAX_TRANSACTIONS
+      ? { dryRunMaxTransactions: config.RULES_DRY_RUN_MAX_TRANSACTIONS }
+      : {}),
+    ...(config.RULES_APPLY_MAX_ITEMS ? { applyMaxItems: config.RULES_APPLY_MAX_ITEMS } : {}),
   };
 }
 

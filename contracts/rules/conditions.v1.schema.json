@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/rules/conditions.v1.schema.json",
+  "title": "rules.conditions.v1",
+  "description": "Árbol de condiciones (CUANDO) de una regla de clasificación (openspec add-rule-engine, decisión 8; docs/08 §5.13, schema_version 1): entre 1 y 20 condiciones, con grupos de un solo nivel. El modo de combinación del nivel superior vive en la columna `match_mode`. La matriz operador × campo, la moneda obligatoria de los montos y las expresiones regulares (motor de tiempo lineal, patrón de hasta 200 caracteres) las valida además el dominio.",
+  "type": "array",
+  "minItems": 1,
+  "maxItems": 20,
+  "items": {
+    "oneOf": [{ "$ref": "#/$defs/Condition" }, { "$ref": "#/$defs/Group" }]
+  },
+  "$defs": {
+    "Condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "operator"],
+      "properties": {
+        "field": {
+          "enum": [
+            "DESCRIPTION",
+            "COUNTERPARTY",
+            "AMOUNT",
+            "CURRENCY",
+            "ACCOUNT",
+            "KIND",
+            "DATE",
+            "WEEKDAY",
+            "DAY_OF_MONTH",
+            "CATEGORY",
+            "TAG",
+            "EXTERNAL_SOURCE",
+            "CUSTOM_FIELD"
+          ]
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "contains",
+            "not_contains",
+            "starts_with",
+            "ends_with",
+            "matches_regex",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "between",
+            "in",
+            "is_empty",
+            "is_not_empty"
+          ]
+        },
+        "value": {
+          "oneOf": [{ "type": "string", "maxLength": 500 }, { "type": "integer" }, { "type": "boolean" }]
+        },
+        "valueTo": {
+          "oneOf": [{ "type": "string", "maxLength": 500 }, { "type": "integer" }]
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "oneOf": [{ "type": "string", "maxLength": 500 }, { "type": "integer" }]
+          }
+        },
+        "currency": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{1,15}$" },
+        "fieldId": { "type": "string", "minLength": 1, "maxLength": 100 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "field": { "const": "AMOUNT" } }, "required": ["field"] },
+          "then": { "required": ["currency"] },
+          "else": { "not": { "required": ["currency"] } }
+        },
+        {
+          "if": { "properties": { "field": { "const": "CUSTOM_FIELD" } }, "required": ["field"] },
+          "then": { "required": ["fieldId"] },
+          "else": { "not": { "required": ["fieldId"] } }
+        },
+        {
+          "if": { "properties": { "operator": { "enum": ["is_empty", "is_not_empty"] } }, "required": ["operator"] },
+          "then": {
+            "not": { "anyOf": [{ "required": ["value"] }, { "required": ["valueTo"] }, { "required": ["values"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "operator": { "const": "in" } }, "required": ["operator"] },
+          "then": { "required": ["values"] }
+        },
+        {
+          "if": { "properties": { "operator": { "const": "between" } }, "required": ["operator"] },
+          "then": { "required": ["value", "valueTo"] }
+        }
+      ]
+    },
+    "Group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match", "items"],
+      "properties": {
+        "match": { "enum": ["ALL", "ANY"] },
+        "items": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/$defs/Condition" } }
+      }
+    }
+  },
+  "examples": [
+    [{ "field": "DESCRIPTION", "operator": "contains", "value": "hipermaxi" }],
+    [
+      { "field": "KIND", "operator": "equals", "value": "EXPENSE" },
+      { "field": "AMOUNT", "operator": "between", "value": "100.00", "valueTo": "500.00", "currency": "BOB" },
+      {
+        "match": "ANY",
+        "items": [
+          { "field": "DESCRIPTION", "operator": "contains", "value": "uber" },
+          { "field": "DESCRIPTION", "operator": "matches_regex", "value": "yango\\s+viaje" }
+        ]
+      }
+    ]
+  ]
+}

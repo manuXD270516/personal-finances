@@ -5,16 +5,20 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Cobertura de clasificación por reglas"
 scenario: "Tres meses importados"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-010", "FR-IMPORTS-008"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/rules/logic.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - tests/e2e/specs/rules.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -33,7 +37,7 @@ expected_result:
   - "ruleCoverage \"0.7400\", target \"0.7000\""
   - "Transferencias y conversiones excluidas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-044 — La cobertura de tres meses informa el desglose y el cociente

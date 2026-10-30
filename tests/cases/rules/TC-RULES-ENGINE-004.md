@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Campos de condición"
 scenario: "Monto entre dos valores en bolivianos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-002", "FR-RULES-003"]
 nfr: []
 invariants: ["INV-001"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/condition.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +33,7 @@ expected_result:
   - "No cumplen 500.01 BOB ni 250.00 USD"
   - "Ningún monto se convierte a number"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-004 — La condición de monto compara exacto y solo en su moneda

@@ -5,16 +5,20 @@ spec: transactions/transaction-recording
 related_specs: ["rules/rule-engine"]
 requirement: "Marca de revisión pendiente"
 scenario: "Filtrar y resolver las pendientes de revisión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-005", "FR-TRANSACTIONS-033"]
 nfr: []
 invariants: ["INV-029"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+  - tests/e2e/specs/rules.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -33,7 +37,7 @@ expected_result:
   - "Exactamente 3 resultados con review.reason RULE y la regla"
   - "Saldo sin cambio y auditoría de la resolución"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-057 — Filtrar y quitar la marca de revisión sin tocar el ledger

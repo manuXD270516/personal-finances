@@ -16,7 +16,11 @@
     "counterparty_id",
     "memo",
     "revision",
-    "superseded_in_revision"
+    "superseded_in_revision",
+    "category_origin",
+    "category_rule_id",
+    "category_rule_version",
+    "rule_refs"
   ],
   "properties": {
     "id": {
@@ -66,7 +70,27 @@
         "integer",
         "null"
       ]
-    }
+    },
+    "category_origin": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "category_rule_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "category_rule_version": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "rule_refs": {}
   },
   "x-pfos-table": "txn.transaction_split",
   "x-pfos-context": "transactions"
