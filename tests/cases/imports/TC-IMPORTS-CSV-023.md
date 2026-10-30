@@ -16,7 +16,7 @@ automation_status: automated
 automated_tests:
   - apps/api/test/api/imports.api.test.ts
   - packages/contexts/imports/src/application/imports.service.test.ts
-  - packages/contexts/transactions/src/application/imported-transactions.adapter.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
 status: automated
 regression_suite: true
 phase: 3

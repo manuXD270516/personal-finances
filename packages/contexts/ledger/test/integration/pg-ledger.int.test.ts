@@ -4,11 +4,17 @@ import type { AuditPort } from '@pf/audit/contracts';
 import { PgUnitOfWork, requireSqlExecutor, runWithRequestContext } from '@pf/platform/api';
 import { EventSchemaRegistry, PgOutboxWriter } from '@pf/platform/events';
 import { runWithCorrelation } from '@pf/platform/logging';
-import { currency, DomainError, FixedClock, Instant } from '@pf/shared-kernel';
+import { currency, DomainError, FixedClock, Instant, LocalDate, Money } from '@pf/shared-kernel';
 import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import type { PostingLineDto, PostJournalEntryCommand } from '../../src/contracts/index.js';
-import { PgLedgerUnitOfWork } from '../../src/infrastructure/pg-ledger.js';
+import { JournalEntry } from '../../src/domain/index.js';
+import {
+  PgJournalEntryRepository,
+  PgLedgerAccountRepository,
+  PgLedgerUnitOfWork,
+  uuidV7Ids,
+} from '../../src/infrastructure/pg-ledger.js';
 import { createLedgerRuntime, type LedgerRuntime } from '../../src/interface/ledger.module.js';
 
 declare module 'vitest' {
@@ -1024,5 +1030,156 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     ]);
     expect(currency('BOB', 2).code).toBe('BOB');
     expect(PgUnitOfWork).toBeDefined();
+  });
+
+  // ------------------------------------------------------------ escritura por conjunto (add-bulk-imported-transactions)
+  describe('postJournalEntries (escritura por conjunto)', () => {
+    const expenseCmd = (
+      amount: string,
+      over: Partial<PostJournalEntryCommand> = {},
+    ): PostJournalEntryCommand => ({
+      workspaceId: w1,
+      entryDate: '2026-04-10',
+      entryType: 'STANDARD',
+      sourceRef: { type: 'Transaction', id: randomUUID(), revision: 1 },
+      postings: [sysLine('EXPENSE', amount, 'BOB', randomUUID()), userLine(bankA, `-${amount}`)],
+      ...over,
+    });
+    const outboxCount = async (aggregateIds: string[]): Promise<number> => {
+      const w = new Pool({ connectionString: deps.workerDatabaseUrl, max: 1 });
+      try {
+        const { rows } = await w.query<{ n: string }>(
+          `SELECT count(*)::text AS n FROM platform.outbox WHERE aggregate_id = ANY($1::uuid[])`,
+          [aggregateIds],
+        );
+        return Number(rows[0]?.n);
+      } finally {
+        await w.end();
+      }
+    };
+
+    it('[TC-TRANSACTIONS-BULKIMPORT-001] (BD) un conjunto de 50 asientos queda cuadrado, con secuencia creciente, un evento y una auditoría por asiento', async () => {
+      const before = await balance(w1, bankA);
+      const commands = Array.from({ length: 50 }, (_, i) => expenseCmd(`${i + 1}.00`));
+      const posted = await asUser(() => ledger.posting.postJournalEntries(commands));
+      expect(posted).toHaveLength(50);
+      expect(posted.every((p) => p.created)).toBe(true);
+      const sequences = posted.map((p) => BigInt(p.sequence));
+      expect(sequences.every((v, i) => i === 0 || v > (sequences[i - 1] as bigint))).toBe(true);
+      // Σ 1..50 = 1275.00 de gasto.
+      expect([before, await balance(w1, bankA)]).toEqual([before, (Number(before) - 1275).toFixed(2)]);
+      const ids = posted.map((p) => p.journalEntryId);
+      expect(await outboxCount(ids)).toBe(50);
+      const audited = await inCtx(app, w1, (c) =>
+        c.query<{ n: string }>(
+          `SELECT count(*)::text AS n FROM audit.audit_log WHERE aggregate_id = ANY($1::uuid[]) AND action = 'ledger.journal_entry.posted'`,
+          [ids],
+        ),
+      );
+      expect(audited.rows[0]?.n).toBe('50');
+      // El mismo conjunto otra vez: todos existentes, sin duplicar.
+      const again = await asUser(() => ledger.posting.postJournalEntries(commands));
+      expect(again.map((a) => [a.journalEntryId, a.created])).toEqual(
+        posted.map((p) => [p.journalEntryId, false]),
+      );
+      expect(await outboxCount(ids)).toBe(50);
+    });
+
+    it('[TC-TRANSACTIONS-BULKIMPORT-002] (BD) una fecha en periodo cerrado rechaza el conjunto con PERIOD_CLOSED y no deja asientos', async () => {
+      await asUser(() =>
+        ledger.periodLock.lockPeriod({ workspaceId: w1, yearMonth: '2026-05', periodId: randomUUID() }),
+      );
+      const before = await balance(w1, bankA);
+      const commands = [
+        expenseCmd('10.00', { entryDate: '2026-04-11' }),
+        expenseCmd('20.00', { entryDate: '2026-05-15' }),
+      ];
+      expect(await domainCode(asUser(() => ledger.posting.postJournalEntries(commands)))).toBe(
+        'PERIOD_CLOSED',
+      );
+      const { rows } = await migrator.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM ledger.journal_entry WHERE source_id = ANY($1::uuid[])`,
+        [commands.map((c) => c.sourceRef.id)],
+      );
+      expect(rows[0]?.n).toBe('0');
+      expect(await balance(w1, bankA)).toBe(before);
+    });
+
+    it('[TC-TRANSACTIONS-BULKIMPORT-001] (BD) un asiento descuadrado inyectado revierte el conjunto: los disparadores diferidos siguen activos', async () => {
+      const uow = new PgLedgerUnitOfWork(app);
+      const accounts = new PgLedgerAccountRepository(uuidV7Ids);
+      const repo = new PgJournalEntryRepository(accounts);
+      const BOB = currency('BOB', 2);
+      const before = await balance(w1, bankA);
+      const sources: string[] = [];
+      const err = await asUser(() =>
+        uow
+          .run(w1, async () => {
+            const bank = await accounts.getOrCreateForUserAccount({
+              workspaceId: w1,
+              sourceAccountId: bankA,
+              nature: 'ASSET',
+              currency: BOB,
+            });
+            const expense = await accounts.getOrCreateSystem({
+              workspaceId: w1,
+              kind: 'EXPENSE',
+              currency: BOB,
+            });
+            const make = (amount: string) => {
+              const sourceId = randomUUID();
+              sources.push(sourceId);
+              return JournalEntry.post(
+                {
+                  id: randomUUID(),
+                  workspaceId: w1,
+                  entryDate: LocalDate.parse('2026-04-12'),
+                  entryType: 'STANDARD',
+                  sourceRef: { context: 'TRANSACTIONS', type: 'Transaction', id: sourceId, revision: 1 },
+                  reversesEntryId: null,
+                  memo: null,
+                  correlationId: null,
+                  createdBy: null,
+                  postings: [
+                    {
+                      id: randomUUID(),
+                      account: expense,
+                      amount: Money.parse(amount, BOB),
+                      splitId: randomUUID(),
+                    },
+                    {
+                      id: randomUUID(),
+                      account: bank,
+                      amount: Money.parse(`-${amount}`, BOB),
+                      splitId: null,
+                    },
+                  ],
+                },
+                { periodLocked: false },
+              );
+            };
+            const good = make('10.00');
+            const valid = make('20.00');
+            // Descuadre inyectado en la segunda: el dominio no lo permite, la BD sí debe rechazarlo al COMMIT.
+            const bad = Object.create(valid, {
+              postings: {
+                value: valid.postings.map((p, i) =>
+                  i === 1 ? { ...p, amount: Money.parse('-19.00', BOB) } : p,
+                ),
+              },
+            }) as JournalEntry;
+            await repo.appendMany([good, bad]);
+          })
+          .catch((e: unknown) => e),
+      );
+      expect((err as DomainError).code).toBe('LEDGER_UNBALANCED_ENTRY');
+      expect(((err as DomainError).cause as { code: string }).code).toBe('PF001');
+      const { rows } = await migrator.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM ledger.journal_entry WHERE source_id = ANY($1::uuid[])`,
+        [sources],
+      );
+      expect(rows[0]?.n).toBe('0');
+      expect(await balance(w1, bankA)).toBe(before);
+    });
   });
 });

@@ -58,6 +58,7 @@ Changes 51 a 56 redactados el 2026-10-29 (orden y capabilities en [docs/03](03-o
 
 | # | Change | Estado |
 |---|---|---|
+| 52 | `add-bulk-imported-transactions` | **Implementado** (2026-10-29, rama `feat/add-bulk-imported-transactions`; sin archivar: faltan 5.2 —`nightly` sobre `main` y dos programados— y el archivado). Cierra D152: `RecordImportedTransactions` (`ImportedTransactionsCommand.recordBatch`, mismo contrato) valida y escribe el lote POR CONJUNTO. Puertos por lote aditivos: `LedgerPostingPort.postJournalEntries` (nuevo; idempotencia por origen, cuentas y periodos cerrados en una consulta, asientos y movimientos con `unnest`), `TransactionRepository.insertMany` (nuevo: transacciones, splits, legs y vínculos) y los `AuditPort.appendMany`, `LifecyclePort.recordMany` y `OutboxPort.appendMany` que ya existían por la edición masiva. Disparadores del ledger intactos; sin migraciones, endpoints ni eventos nuevos; los lotes de una cuenta se serializan con un candado transaccional (TC-TRANSACTIONS-BULKIMPORT-004). Equivalencia con el registro individual probada por PBT (TC-TRANSACTIONS-BULKIMPORT-005). Medido en el nightly (`workflow_dispatch` desde `claude/bulk-import-experiments`, runs `40975506101` y siguientes): persistencia de 5 000 filas en 9,6–17,9 s en la fila del host (antes ≈ 120–254 s; runs `40975506101`, `40976054478`, `40976041351`, `40981081770`), la fila informativa del código llegó a 29 s en la suite completa; lote de 200 filas ≈ 650 ms. La fila de la configuración del host de `imports.perf.ts` es además la fila bloqueante de la ráfaga del import (D359): persistencia ≤ 20 s por omisión, sin `PF_PERF_STRICT_IMPORT` ni techo de 300 s. |
 | 57 | `add-pdf-statement-parser` | **Redactado** (2026-10-29, rama `docs/add-pdf-statement-parser`): lectura de extractos PDF con texto en un `worker_thread` aislado con `pdfjs-dist`, diseños por institución versionados (BCP y Ganadero; BNB sujeto a validación; BISA fuera), coherencia de saldos con falla cerrada, rechazo de PDF escaneados (`IMPORT_PDF_NO_TEXT`) y fixtures PDF generados por código (ninguno versionado). 1 MODIFIED + 13 ADDED en `imports/import-pipeline`; TC-IMPORTS-PDF-001..049. Requiere aplicados el 53 y el 54 y se archiva después del 54. Preguntas en [docs/58](58-pdf-statement-parser-questions.md) (bloqueantes: 1 y 4) |
 
 ## 2. Esperan al owner
@@ -78,7 +79,7 @@ Ninguna sesión puede cerrarlos por su cuenta.
 
 ## 3. Diferidos por decisión
 
-- **Persistencia del import CSV ≤ 20 s para 5 000 filas** (hoy ~120 s): Phase 6, con la escritura masiva de `RecordImportedTransactions` (D152). `PF_PERF_STRICT_IMPORT=1` exige la meta.
+- ~~Persistencia del import CSV ≤ 20 s para 5 000 filas (D152)~~: cumplida por el change 52 `add-bulk-imported-transactions` (≈ 16 s en el nightly); ya no es un diferido.
 - **`optimize-consumer-throughput` (Phase 6, implementado, falta 6.3 y archivar):** E6–E10b medidos y consumidores agrupados ([docs/59](59-consumer-throughput-findings.md)); la fila de throughput con handler real del nightly sigue informativa (D300) y el umbral por consumidor es el drenado de la ráfaga ≤ 120 s con la configuración del host (D312, fila bloqueante de `imports.perf.ts` por D311). Antes de `add-bulk-imported-transactions`.
 - **Datos de demostración** de suscripciones, tarjetas, metas y préstamos: hechos en `add-phase-4-demo-data` (44, #139).
 - **Commodities y valoración de inversiones** (changes 42 y 43): Phase 7 o backlog; el owner no tiene esos activos (D221).
@@ -127,6 +128,7 @@ Ninguna sesión puede cerrarlos por su cuenta.
 - Fuera de Phase 4: horizonte "hasta el próximo ingreso", categorías esenciales y alertas de déficit (Phase 7, D218).
 
 **Importación CSV**
+- La persistencia por conjunto (change 52) serializa los lotes de una misma cuenta con un candado transaccional: dos imports simultáneos a la misma cuenta se procesan uno tras otro (≤ ~650 ms por lote). Los campos nuevos de la fila (clasificación, tipo de movimiento) los agrega quien los implemente también en el camino por lote y en el test de equivalencia (decisión 6 del design).
 - `getImport` no devuelve las filas de muestra: al retomar una importación no se ve la muestra.
 - Las huellas incluyen workspace y cuenta: reimportar tras restaurar un export muestra "probables duplicados" (documentado en docs/13 §7.3).
 

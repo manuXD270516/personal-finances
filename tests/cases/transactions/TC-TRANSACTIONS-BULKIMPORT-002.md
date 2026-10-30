@@ -12,9 +12,13 @@ invariants: ["INV-015", "INV-029"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/bulk-imported-transactions.api.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "bulk-write", "D152"]
@@ -57,3 +61,4 @@ Entonces el lote se rechaza con `PERIOD_CLOSED`
 ## Notas
 
 - Change: `add-bulk-imported-transactions` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+- 2026-10-29: automatizado (`PERIOD_CLOSED` con una fila de agosto en un lote de 200: sin transacciones, asientos, eventos ni auditoría y saldo intacto; cuenta archivada, monto cero y escala excedida con el código del camino individual).

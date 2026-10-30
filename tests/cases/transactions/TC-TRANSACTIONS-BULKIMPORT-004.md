@@ -12,9 +12,10 @@ invariants: ["INV-014"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/bulk-imported-transactions.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "bulk-write", "D152"]
@@ -55,3 +56,4 @@ Entonces cada referencia tiene exactamente una transacción no anulada
 ## Notas
 
 - Change: `add-bulk-imported-transactions` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+- 2026-10-29: automatizado con dos lotes simultáneos de las mismas 200 referencias; `RecordImportedTransactions` serializa los lotes de una cuenta con un candado transaccional (`ImportedRefReader.lockAccount`) y el segundo ve las referencias del primero como existentes; el índice único `transaction_import_ref_uk` sigue como barrera.

@@ -409,3 +409,92 @@ describe('LedgerService — ReverseJournalEntry y periodos', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('LedgerService — PostJournalEntries (escritura por conjunto, add-bulk-imported-transactions)', () => {
+  const expenseCmd = (amount: string, over: Partial<PostJournalEntryCommand> = {}) =>
+    cmd([system('EXPENSE', amount, 'BOB', S1), asset(BANK_A, `-${amount}`)], over);
+
+  it('[TC-TRANSACTIONS-BULKIMPORT-001] (ledger) un conjunto crea un asiento por comando, con un evento y una auditoría por asiento, en orden', async () => {
+    const commands = [expenseCmd('10.00'), expenseCmd('20.00'), expenseCmd('30.50')];
+    const posted = await svc.postJournalEntries(commands);
+    expect(posted.map((p) => p.created)).toEqual([true, true, true]);
+    expect(mem.entries.map((e) => e.id)).toEqual(posted.map((p) => p.journalEntryId));
+    expect(mem.entries.map((e) => e.sourceRef.id)).toEqual(commands.map((c) => c.sourceRef.id));
+    expect(BigInt(posted[2]!.sequence) > BigInt(posted[0]!.sequence)).toBe(true);
+    expect(mem.events.map((e) => e.eventType)).toEqual(Array(3).fill('ledger.JournalEntryPosted'));
+    expect(mem.events.every((e) => e.correlationId === mem.correlation)).toBe(true);
+    expect(mem.audits.map((a) => a.action)).toEqual(Array(3).fill('ledger.journal_entry.posted'));
+    expect(balanceOf(userLedgerAccount(BANK_A))).toBe('-60.50');
+    // Cuentas contables creadas una sola vez.
+    expect(mem.accounts.filter((a) => a.code.value === 'EXPENSE:BOB')).toHaveLength(1);
+  });
+
+  it('[TC-TRANSACTIONS-BULKIMPORT-005] (ledger) el conjunto produce los mismos asientos, eventos y auditoría que uno por uno', async () => {
+    const commands = [expenseCmd('10.00'), expenseCmd('20.00', { entryDate: '2026-03-11' })];
+    const bulk = await svc.postJournalEntries(commands);
+    const bulkState = {
+      entries: mem.entries.map((e) => [
+        e.entryDate.toString(),
+        e.memo,
+        e.createdBy,
+        e.correlationId,
+        e.postings.map((p) => [p.amount.toFixed(), p.splitId]),
+      ]),
+      events: mem.events.map((e) => ({ ...e.payload, journalEntryId: undefined, postings: undefined })),
+      audits: mem.audits.map((a) => [a.action, a.aggregateType, a.aggregateVersion]),
+    };
+    mem = new InMemoryLedger();
+    svc = new LedgerService(mem.deps(), mem.auditPort);
+    for (const c of commands) await svc.postJournalEntry(c);
+    const single = {
+      entries: mem.entries.map((e) => [
+        e.entryDate.toString(),
+        e.memo,
+        e.createdBy,
+        e.correlationId,
+        e.postings.map((p) => [p.amount.toFixed(), p.splitId]),
+      ]),
+      events: mem.events.map((e) => ({ ...e.payload, journalEntryId: undefined, postings: undefined })),
+      audits: mem.audits.map((a) => [a.action, a.aggregateType, a.aggregateVersion]),
+    };
+    expect(bulkState).toEqual(single);
+    expect(bulk).toHaveLength(2);
+  });
+
+  it('[TC-TRANSACTIONS-BULKIMPORT-003] (ledger) los comandos con origen ya registrado se informan como existentes sin duplicar', async () => {
+    const first = expenseCmd('10.00');
+    const [a] = await svc.postJournalEntries([first]);
+    const second = expenseCmd('20.00');
+    const posted = await svc.postJournalEntries([first, second]);
+    expect(posted[0]).toEqual({ ...a, created: false });
+    expect(posted[1]!.created).toBe(true);
+    expect(mem.entries).toHaveLength(2);
+    expect(mem.events).toHaveLength(2);
+    expect(mem.audits).toHaveLength(2);
+  });
+
+  it('[TC-TRANSACTIONS-BULKIMPORT-002] (ledger) una fecha en periodo cerrado rechaza el conjunto con PERIOD_CLOSED y no deja nada', async () => {
+    await svc.lockPeriod({ workspaceId: W1, yearMonth: '2026-08', periodId: T1 });
+    const events = mem.events.length;
+    const audits = mem.audits.length;
+    const code = await codeOf(
+      svc.postJournalEntries([
+        expenseCmd('10.00', { entryDate: '2026-09-01' }),
+        expenseCmd('20.00', { entryDate: '2026-08-15' }),
+      ]),
+    );
+    expect(code).toBe('PERIOD_CLOSED');
+    expect(mem.entries).toHaveLength(0);
+    expect([mem.events.length, mem.audits.length]).toEqual([events, audits]);
+  });
+
+  it('[TC-TRANSACTIONS-BULKIMPORT-002] (ledger) un asiento descuadrado rechaza el conjunto con el mismo código que el individual', async () => {
+    const bad = cmd([system('EXPENSE', '50.00', 'BOB', S1), asset(BANK_A, '-49.00')]);
+    expect(await codeOf(svc.postJournalEntries([expenseCmd('10.00'), bad]))).toBe('LEDGER_UNBALANCED_ENTRY');
+    expect(mem.entries).toHaveLength(0);
+    expect(await codeOf(svc.postJournalEntries(Array.from({ length: 1001 }, () => expenseCmd('1.00'))))).toBe(
+      'VALIDATION_FAILED',
+    );
+    expect(await svc.postJournalEntries([])).toEqual([]);
+  });
+});

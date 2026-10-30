@@ -1,5 +1,5 @@
 import type { LifecycleEventRefDto, LifecycleStepInput } from '@pf/audit/contracts';
-import type { PostingLineDto } from '@pf/ledger/contracts';
+import type { PostingLineDto, PostJournalEntryCommand } from '@pf/ledger/contracts';
 import { DomainError } from '@pf/shared-kernel';
 import { TRANSACTION_EVENTS } from '../contracts/index.js';
 import {
@@ -21,8 +21,8 @@ import type { OutboxEvent, TransactionsDeps } from './ports/index.js';
  */
 type Deps = Pick<TransactionsDeps, 'ledger' | 'transactions' | 'outbox' | 'ids' | 'clock'>;
 
-/** Traduce la revisión vigente a asiento (docs/09 §6) y la postea; devuelve el id del asiento. */
-export async function postEntry(deps: Deps, tx: Transaction): Promise<string> {
+/** Comando de asiento de la revisión vigente (traducción de docs/09 §6); lo comparten el posteo individual y el de un lote. */
+export function journalCommandOf(tx: Transaction): PostJournalEntryCommand {
   const draft = toJournalEntryDraft(tx.snapshot);
   const postings: PostingLineDto[] = draft.postings.map((p) => ({
     target:
@@ -32,14 +32,19 @@ export async function postEntry(deps: Deps, tx: Transaction): Promise<string> {
     amount: p.amount.toJSON(),
     splitId: p.splitId,
   }));
-  const posted = await deps.ledger.postJournalEntry({
+  return {
     workspaceId: tx.workspaceId,
     entryDate: draft.entryDate,
     entryType: 'STANDARD',
     sourceRef: draft.sourceRef,
     memo: draft.memo,
     postings,
-  });
+  };
+}
+
+/** Traduce la revisión vigente a asiento (docs/09 §6) y la postea; devuelve el id del asiento. */
+export async function postEntry(deps: Deps, tx: Transaction): Promise<string> {
+  const posted = await deps.ledger.postJournalEntry(journalCommandOf(tx));
   return posted.journalEntryId;
 }
 

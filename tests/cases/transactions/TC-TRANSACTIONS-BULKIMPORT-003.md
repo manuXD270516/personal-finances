@@ -12,9 +12,12 @@ invariants: ["INV-014"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/bulk-imported-transactions.api.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "bulk-write", "D152"]
@@ -55,3 +58,4 @@ Entonces se crean 180 transacciones
 ## Notas
 
 - Change: `add-bulk-imported-transactions` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+- 2026-10-29: automatizado (20 referencias previas ⇒ 180 creadas y 20 existentes con su transacción).

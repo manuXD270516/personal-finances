@@ -45,21 +45,13 @@ recordSuiteLoad(import.meta.url, inject('deps').superuserUrl);
 /**
  * NFR-PERF-007 / NFR-PERF-008 (TC-IMPORTS-CSV-029, Should; openspec add-basic-csv-import, decisión 16; docs/33 D112):
  * un extracto de 5 000 filas nuevas llega a la vista previa en ≤ 30 s desde la subida, se persiste en ≤ 20 s desde la
- * aprobación y el backlog de CADA consumidor de eventos (los reales del worker, incluidos `planning.budget-thresholds`,
+ * aprobación (escritura masiva, add-bulk-imported-transactions) y el backlog de CADA consumidor de eventos (los reales del worker, incluidos `planning.budget-thresholds`,
  * `reporting.data-version` y los de Phase 3) se drena en ≤ 120 s; el import publica exactamente 2 eventos propios.
  * Corre en el job nightly `perf` (`pnpm perf:bench`); no bloquea los PR. El archivo se genera aquí (no se versiona).
  */
 const ROWS = 5000;
 const PREVIEW_BUDGET_MS = 30_000;
 const PERSIST_BUDGET_MS = 20_000;
-/**
- * Techo de regresión de la persistencia. MEDIDO (2026-10-10, Windows 11 local, PostgreSQL 18 en Docker): ~24 ms por fila
- * (~60 sentencias SQL por transacción: asiento, postings, split, legs, auditoría ×2, recorrido y 3 eventos) ⇒ ~120 s para
- * 5 000 filas, 6× el objetivo de 20 s de la spec (≈ 4 ms/fila), que exige una ruta de escritura masiva (multi-fila) de
- * Transactions/Ledger. Esa ruta es el contrato `RecordImportedTransactions` de Phase 6 (ver tasks.md 7.3 y el informe);
- * mientras tanto el techo evita que el costo por fila empeore sin que nadie lo note.
- */
-const PERSIST_CEILING_MS = 300_000;
 const DRAIN_BUDGET_MS = 120_000;
 
 let h: Harness;
@@ -444,10 +436,10 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
     }
 
     expect(previewMs).toBeLessThanOrEqual(PREVIEW_BUDGET_MS);
-    // Objetivo de la spec: ≤ 20 s. Estricto con PF_PERF_STRICT_IMPORT=1; por omisión solo el techo de regresión.
-    expect(persistMs).toBeLessThanOrEqual(
-      process.env['PF_PERF_STRICT_IMPORT'] === '1' ? PERSIST_BUDGET_MS : PERSIST_CEILING_MS,
-    );
+    // Fila bloqueante de la ráfaga del import (D152, D311, D359; add-bulk-imported-transactions): con la escritura masiva
+    // la persistencia cumple los 20 s de la spec por omisión (se retiraron la variable de relajación y el techo de 300 s) y los
+    // ~15 000 hechos llegan juntos a los consumidores, que drenan en ≤ 120 s cada uno (aserción siguiente).
+    expect(persistMs).toBeLessThanOrEqual(PERSIST_BUDGET_MS);
     // El backlog de los consumidores se drena en ≤ 120 s DESPUÉS de la última transacción creada; si no, el fallo nombra
     // los consumidores que terminaron después del presupuesto [TC-PLATFORM-PIPELINE-032].
     expect(drainAfterPersistMs, verdict.message).toBeLessThanOrEqual(DRAIN_BUDGET_MS);

@@ -1363,6 +1363,42 @@ describe('Volumen y cuota', () => {
     });
     expect(events).toEqual(['imports.ImportApproved', 'imports.ImportCompleted']);
   }, 300_000);
+  it('[TC-IMPORTS-PIPELINE-001] un import de 4 filas y uno de 5 000 publican los mismos 2 eventos propios, ninguno por fila', async () => {
+    const acct = await createAccount('Banco eventos propios', 'BANK', '10000000.00');
+    // Octubre (abierto), combinaciones día/monto distintas dentro del archivo y entre los dos archivos (sin duplicados).
+    const csvOf = (n: number, label: string, base: number) =>
+      csv(
+        Array.from({ length: n }, (_, i) => {
+          const day = String((i % 28) + 1).padStart(2, '0');
+          return `${day}/10/2026;${label} ${i};-${(i % 90) + base},${String(i % 100).padStart(2, '0')}`;
+        }),
+      );
+    const run = async (n: number, label: string, base: number) => {
+      const created = await uploaded(csvOf(n, label, base), acct);
+      const mapped = await mapImport(created);
+      expect(mapped.previewSummary.counts).toMatchObject({ rows: n, new: n });
+      ok(await approve(mapped), 202);
+      const done = await settled(created.id);
+      expect(done.status).toBe('COMPLETED');
+      expect(done.counters.created).toBe(n);
+      const events = await asAdmin(h, async (c) => {
+        const { rows: r } = await c.query<{ event_type: string; aggregate_type: string }>(
+          `SELECT event_type, aggregate_type FROM platform.outbox
+            WHERE workspace_id = $1 AND event_type LIKE 'imports.%' AND aggregate_id = $2::uuid`,
+          [owner.ws, created.id],
+        );
+        return r;
+      });
+      // Los hechos propios cuelgan del job (nunca de una fila): aprobación y fin, siempre los mismos.
+      expect(events.map((e) => e.event_type).sort()).toEqual([
+        'imports.ImportApproved',
+        'imports.ImportCompleted',
+      ]);
+      expect(events.every((e) => e.aggregate_type === 'ImportJob')).toBe(true);
+    };
+    await run(4, 'PEQUENO', 1);
+    await run(5000, 'GRANDE', 200);
+  }, 900_000);
 });
 
 describe('Retención', () => {

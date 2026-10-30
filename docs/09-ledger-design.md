@@ -756,6 +756,8 @@ Leyenda de "Dónde": **D** = dominio (agregado/VO), **A** = aplicación (caso de
 | INV-033 | Recategorizar (o etiquetar) nunca crea, modifica ni revierte asientos. | D, A | U, I | ∀ recategorización: #asientos y saldos por cuenta inalterados |
 | INV-034 | Presupuesto: los "actuales" se derivan de transacciones posteadas (proyección reconstruible); nunca se editan a mano. | A | I, PBT | ∀ replay de eventos: `actuals(budget)` == Σ splits posteados por categoría y mes |
 
+Nota as-built (`add-bulk-imported-transactions`): la escritura por conjunto del import (`LedgerPostingPort.postJournalEntries`) inserta asientos y movimientos con sentencias multi-fila, pero los disparadores de INV-004 (suma cero por moneda), INV-005 (≥ 2 movimientos), INV-015 (periodo abierto), INV-007 (inmutabilidad) e INV-021 (Σ splits) siguen activos por fila; un asiento descuadrado inyectado en el conjunto revierte el lote completo con `PF001` (TC-TRANSACTIONS-BULKIMPORT-001).
+
 Los TC correspondientes viven en `tests/cases/ledger/` y `tests/cases/transactions/` (nombres `TC-LEDGER-*`, `TC-TRANSACTIONS-*`), ver [16-testing-strategy.md](16-testing-strategy.md) y [17-test-traceability.md](17-test-traceability.md).
 
 ### 16.1 Generadores fast-check sugeridos
