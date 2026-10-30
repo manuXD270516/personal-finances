@@ -5,7 +5,7 @@
 ## 1. SPEC y TEST CASES
 
 - [x] 1.1 Revisar con el owner las specs `documents/attachments`, `security/file-upload-security` y los requirements agregados a `identity/workspace-portability` y `audit/lifecycle-timeline`, y las preguntas 1–11 de design.md; `pnpm spec:validate` en verde
-- [ ] 1.2 Revisar TC-DOCUMENTS-ATTACH-001..026 y TC-SECURITY-UPLOAD-001..022 contra los scenarios (cifras: 482133 bytes, 15728640/15728641, 19922944, 5368709120 − 5368000000 = 709120 libres, 18874368 = 18 MiB); pasar a `ready` y `requirement_status: confirmed` al aprobar _Nota 2026-10-29: pendiente de revisión humana del owner; TC -024 y -025 siguen not_automated hasta 8.2/8.3._
+- [x] 1.2 *(2026-10-30: `traceability:check` sin hallazgos de estos TC y cifras verificadas: 15 MiB = 15728640, 5 GiB = 5368709120, 5368709120 − 5368000000 = 709120)* Revisar TC-DOCUMENTS-ATTACH-001..026 y TC-SECURITY-UPLOAD-001..022 contra los scenarios (cifras: 482133 bytes, 15728640/15728641, 19922944, 5368709120 − 5368000000 = 709120 libres, 18874368 = 18 MiB); pasar a `ready` y `requirement_status: confirmed` al aprobar _Nota 2026-10-29: pendiente de revisión humana del owner; TC -024 y -025 siguen not_automated hasta 8.2/8.3._
 - [x] 1.3 Generador de archivos de prueba `apps/api/test/support/malicious-files.ts` (18 casos de la tabla de design.md § Suite, EICAR armado por fragmentos en memoria; ningún binario peligroso versionado) y fixtures benignos sintéticos (PDF de texto, JPEG, PNG, WebP, HEIC, CSV windows-1252, OFX, QIF, JSON, XLSX) en `tests/fixtures/documents/` sin datos reales (D255) _Nota 2026-10-29: los archivos benignos se generan por código (sin binarios versionados); EICAR por fragmentos._
 
 ## 2. DOMAIN (TDD)
