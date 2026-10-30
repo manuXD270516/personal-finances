@@ -35,7 +35,7 @@ El owner respondió las 9 bloqueantes con la recomendación y aceptó en bloque 
 | D337 | Q27 Disparador de creación manual por defecto | Se acepta (a): las reglas nuevas no lo traen — . |
 | D338 | Q28 Aplicación asíncrona posterior (ARCHITECTURE §7) | Se acepta (a): no hay aplicación asíncrona en Phase 6 — sin consumidor nuevo (D249) y sin cambiar lo aprobado. |
 | D339 | Q29 Límites | Se acepta la recomendación: aceptarlos; son configurables (`RULES_*` en `@pf/platform`). |
-| D340 | Q30 Ampliar el alcance a datos privados de exchanges | Empezar por los archivos de historial exportados por el owner (sin credenciales), compartidos solo en la conversación; la API privada después, con ADR-0030. |
+| D340 | Q30 Ampliar el alcance a datos privados de exchanges | Empezar por los archivos de historial exportados por el owner (sin credenciales), compartidos solo en la conversación; la API privada después, con ADR-0031. |
 | D341 | Q31 Qué exchanges y qué reportes | Binance y Bybit, con una exportación real de cada uno compartida en la conversación y nunca en el repositorio. |
 | D342 | Q32 Custodia de la clave privada del worker | Se acepta (b): archivo montado con permisos 0400 fuera del repositorio — en N1 (no aparece en `docker inspect`), (c) en Phase 9. |
 | D343 | Q33 Depósitos y retiros | Se acepta (a): ingreso o gasto con señal "posible transferencia" — ; (b) bloquearía imports por movimientos con wallets externas que no están en PFOS. |

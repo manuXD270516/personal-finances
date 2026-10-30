@@ -146,7 +146,7 @@ cualquier estado no terminal ──revoke──▶ REVOKED (terminal, credencial
 
 - `FAKE_EXCHANGE` (solo `local`, `test`, `ci`; el arranque falla en staging y producción si está habilitado) cubre todo el comportamiento en CI.
 - `EXCHANGE_FILE_BINANCE`, `EXCHANGE_FILE_BYBIT`, `EXCHANGE_API_BINANCE`, `EXCHANGE_API_BYBIT`: descriptores con `termsStatus = PENDING`. Para pasar a `VERIFIED` (grupo 9 de tasks.md, **tareas del owner**):
-  1. **Decisión del owner** (pregunta 1) de ampliar el alcance de ADR-0029 a datos privados de su cuenta con clave de solo lectura (hoy C4 lo prohíbe) ⇒ **ADR-0030** "Lectura de movimientos de exchanges con claves de solo lectura".
+  1. **Decisión del owner** (pregunta 1) de ampliar el alcance de ADR-0029 a datos privados de su cuenta con clave de solo lectura (hoy C4 lo prohíbe) ⇒ **ADR-0031** "Lectura de movimientos de exchanges con claves de solo lectura".
   2. Lectura directa de los términos de la API privada y de la exportación de historial desde una red con acceso (la misma limitación que la tarea 1.5 del change 38; puede hacerse en la misma sesión desde la máquina del owner o el VPS N1).
   3. Muestras reales de los archivos de historial (sin subirlas al repositorio, D255) para fijar los formatos y grabar fixtures anonimizados.
   4. Fixtures grabados de los endpoints privados con una clave de solo lectura del owner (anonimizados; la clave nunca en el repositorio).
@@ -245,12 +245,12 @@ Sin eventos nuevos ni consumidores nuevos. Las conversiones creadas emiten `tran
 - **`add-import-pipeline` (Phase 6, en paralelo) — bloquea la integración (grupos 5 y 7), no el núcleo (grupos 2–4):** (a) entrada de registros externos desde la etapa normalize, independiente del formato (`StageExternalRecords(jobId, records)` o equivalente); (b) `ImportJob` con `connectionId` y fuentes `EXCHANGE_API`/`EXCHANGE_FILE`; (c) filas de conversión que afectan dos cuentas mapeadas y su persistencia con `ImportedConversionsCommand`; (d) "vincular como transferencia" para filas `POSSIBLE_TRANSFER`; (e) subida de archivo con `connectionId`; (f) la ruta masiva de `RecordImportedTransactions` (D152) también para estas filas.
 - **`add-rule-engine`:** las filas de ingreso y gasto pasan por `RuleEvaluationQuery`.
 - **`add-crypto-rate-providers` (change 38):** reutiliza `ProviderHttpClient` (allowlist, query fija) y el patrón de descriptores `VERIFIED`; la tarea 1.5 de ese change y la 9.2 de este se pueden hacer en la misma sesión con red. El 38 no depende de este.
-- **ADR-0029:** su condición C4 sigue vigente para precios; este change necesita ADR-0030 para datos privados (pregunta 1).
+- **ADR-0029:** su condición C4 sigue vigente para precios; este change necesita ADR-0031 para datos privados (pregunta 1).
 - **Documents / `security/file-upload-security`** (Phase 6): subida del archivo de historial.
 
 ## Preguntas abiertas
 
-1. **[B para el grupo 9, no para Phase 6] Ampliar el alcance a datos privados de exchanges.** ADR-0029 C4 prohíbe claves y endpoints privados. Opciones: (a) aprobar la lectura con claves de **solo lectura** del owner en un ADR-0030 nuevo, tras leer los términos de la API privada; (b) solo archivos de historial exportados por el owner (sin claves); (c) ninguna integración de exchanges en Phase 6 (solo el puerto y el simulado). **Recomendación: (b) primero y (a) después**: el archivo no necesita credenciales ni términos de API (son los datos del propio usuario) y cubre FR-IMPORTS-014; la API se habilita cuando ADR-0030 y la lectura de términos estén hechos.
+1. **[B para el grupo 9, no para Phase 6] Ampliar el alcance a datos privados de exchanges.** ADR-0029 C4 prohíbe claves y endpoints privados. Opciones: (a) aprobar la lectura con claves de **solo lectura** del owner en un ADR-0031 nuevo, tras leer los términos de la API privada; (b) solo archivos de historial exportados por el owner (sin claves); (c) ninguna integración de exchanges en Phase 6 (solo el puerto y el simulado). **Recomendación: (b) primero y (a) después**: el archivo no necesita credenciales ni términos de API (son los datos del propio usuario) y cubre FR-IMPORTS-014; la API se habilita cuando ADR-0031 y la lectura de términos estén hechos.
 2. **[B para el grupo 9] Qué exchanges y qué reportes.** D251 nombra Binance, Bitget y Bybit para precios. Opciones: (a) Binance y Bybit (los verificados en ADR-0029); (b) solo Binance; (c) los tres. **Recomendación: (a)**, y el owner comparte (en la conversación, nunca en el repositorio) una exportación real de trades y de depósitos y retiros de cada uno.
 3. **Custodia de la clave privada del worker.** Opciones: (a) variable de entorno del worker en el VPS (como los demás secretos de N1); (b) archivo montado con permisos 0400 fuera del repositorio; (c) KMS cuando haya cloud. **Recomendación: (b)** en N1 (no aparece en `docker inspect`), (c) en Phase 9.
 4. **Depósitos y retiros.** Opciones: (a) ingreso o gasto con señal "posible transferencia" (decisión 8); (b) transferencia pendiente de vincular obligatoriamente antes de aprobar. **Recomendación: (a)**; (b) bloquearía imports por movimientos con wallets externas que no están en PFOS.
@@ -260,12 +260,12 @@ Sin eventos nuevos ni consumidores nuevos. Las conversiones creadas emiten `tran
 
 ## Cambios a docs compartidos
 
-- **docs/01:** FR-IMPORTS-013 (cifrado de sobre asimétrico, verificación de solo lectura, revocación con destrucción criptográfica); FR-IMPORTS-014 (archivo primero, API tras ADR-0030; P2P fuera).
+- **docs/01:** FR-IMPORTS-013 (cifrado de sobre asimétrico, verificación de solo lectura, revocación con destrucción criptográfica); FR-IMPORTS-014 (archivo primero, API tras ADR-0031; P2P fuera).
 - **docs/08:** `imports.connection` y `imports.connection_credential` (reemplazan `secret_ref`), columna `import_job.connection_id`, índice `transaction_provider_ref_uk`, export sin credenciales.
 - **docs/10:** operaciones de conexiones y proveedores; códigos `BANKING_PROVIDER_NOT_AVAILABLE`, `CONNECTION_CREDENTIAL_NOT_READ_ONLY`, `CONNECTION_SYNC_IN_PROGRESS`, `IMPORT_CONNECTION_EXPIRED` en §9.1.
 - **docs/12 §1, §9 y §10:** credenciales de proveedores en `imports.connection_credential` con sobre X25519 (no Secrets Manager en N1); claves `CONNECTION_CREDENTIALS_*`; STRIDE del flujo de conexión (NFR-SEC-020).
 - **docs/13 §2, §6, §13–§15:** `Connection` con estados, descriptor, puerto real, namespace `imports.provider:<id>:<tipo>`, archivo de historial como proveedor.
-- **docs/adr:** ADR-0030 (pregunta 1) y nota en ADR-0029 de que C4 aplica a precios.
+- **docs/adr:** ADR-0031 (pregunta 1) y nota en ADR-0029 de que C4 aplica a precios.
 - **docs/config-reference.md:** `CONNECTION_CREDENTIALS_PUBLIC_KEYS`, `CONNECTION_CREDENTIALS_PRIVATE_KEYS`, `CONNECTION_SYNC_MAX_DAYS`, `CONNECTION_PROVIDER_REQUESTS_PER_MINUTE`, `IMPORTS_PROVIDER_FAKE_ENABLED`.
 - **docs/statement-formats/exchanges/:** fichas de formato con fixtures sintéticos.
 - **docs/38 §2:** puerta del owner (decisión, términos, muestras, fixtures).
