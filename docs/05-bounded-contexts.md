@@ -60,7 +60,7 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 - **Propósito:** registro contable de doble entrada, inmutable y multi-moneda; fuente de verdad de saldos.
 - **Responsabilidades:** validar y persistir asientos balanceados por moneda; reversas; plan de cuentas (usuario + sistema por moneda, creadas con *get-or-create* al primer posting); saldo contable y snapshots; bloqueo de periodos mensuales; verificación de integridad. El saldo proyectado (con `pending`) no es del ledger: lo calcula Reporting (FR-LEDGER-013).
 - **NO responsabilidades:** clasificación (Transactions/Classification); valoración en moneda de reporte (Reporting); estados de transacción, conciliación (Transactions); decidir cuándo se cierra un mes (Planning).
-- **API pública:** port sync `LedgerPostingPort` (`PostJournalEntry`, `ReverseJournalEntry`), `LedgerPeriodLockPort` (`LockPeriod`, `UnlockPeriod`); qry `GetBalance`, `GetBalances`, `GetBalanceHistory`, `GetTrialBalance`, `GetEntriesBySource`.
+- **API pública:** port sync `LedgerPostingPort` (`PostJournalEntry`, `PostJournalEntries` por conjunto para el import masivo —`add-bulk-imported-transactions`—, `ReverseJournalEntry`), `LedgerPeriodLockPort` (`LockPeriod`, `UnlockPeriod`); qry `GetBalance`, `GetBalances`, `GetBalanceHistory`, `GetTrialBalance`, `GetEntriesBySource`.
 - **Eventos publicados:** `ledger.JournalEntryPosted`. **Consumidos:** ninguno (todo entra síncrono).
 - **Dependencias:** sólo shared-kernel y catálogo de monedas. Es el contexto más "upstream" en invariantes.
 - **Extracción:** Baja — su valor es la atomicidad con Transactions. No se extrae.

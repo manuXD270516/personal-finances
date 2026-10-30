@@ -64,6 +64,20 @@ export interface TransactionListFilter {
 
 export interface TransactionRepository {
   insert(tx: Transaction): Promise<void>;
+  /**
+   * Inserta transacciones nuevas con sus splits, legs y, si las traen, vínculos al asiento, con sentencias multi-fila
+   * (openspec add-bulk-imported-transactions decisión 3; solo kinds sin detalle de conversión). Mismo efecto que
+   * `insert` + `linkEntry` por transacción.
+   */
+  insertMany(
+    txs: readonly Transaction[],
+    links: readonly {
+      readonly transactionId: string;
+      readonly revision: number;
+      readonly journalEntryId: string;
+      readonly linkType: 'POSTED' | 'REVERSAL';
+    }[],
+  ): Promise<void>;
   /** Optimistic locking por `persistedVersion`; `false` si otra escritura ganó (CONCURRENCY_CONFLICT). */
   update(tx: Transaction): Promise<boolean>;
   /**
@@ -296,6 +310,12 @@ export interface OutboxPort {
 
 /** Lectura de referencias externas de filas importadas (add-basic-csv-import): idempotencia del registro en lote. */
 export interface ImportedRefReader {
+  /**
+   * Serializa los lotes de importación de una cuenta hasta el fin de la unidad de trabajo (candado transaccional):
+   * dos lotes con las mismas referencias se registran uno tras otro y el segundo las ve como existentes
+   * (TC-TRANSACTIONS-BULKIMPORT-004). El índice único parcial `transaction_import_ref_uk` sigue como barrera.
+   */
+  lockAccount(input: { readonly workspaceId: string; readonly accountId: string }): Promise<void>;
   /** Transacciones NO anuladas de la cuenta con alguna de las referencias; mapa `externalRef.id → transactionId`. */
   existingByRefs(input: {
     readonly workspaceId: string;

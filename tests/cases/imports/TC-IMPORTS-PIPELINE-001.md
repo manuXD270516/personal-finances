@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "events", "D152"]
@@ -55,3 +56,4 @@ Entonces cada importación publicó los mismos 2 eventos propios, de aprobación
 ## Notas
 
 - Change: `add-bulk-imported-transactions` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+- 2026-10-29: automatizado en `imports.api.test.ts` con un CSV de 4 filas y uno de 5 000 en la misma cuenta: ambos publican `ImportApproved` e `ImportCompleted` colgados del job y ningún evento propio por fila.

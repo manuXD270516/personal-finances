@@ -12,9 +12,12 @@ invariants: ["INV-001", "INV-003", "INV-004", "INV-029"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+  - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "bulk-write", "D152"]
@@ -58,3 +61,4 @@ Entonces ambos workspaces tienen 2 gastos de 18.00 BOB "Sin categoría" y 1 ingr
 
 - Change: `add-bulk-imported-transactions` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
 - PBT con fast-check: además del ejemplo del scenario, lotes generados con montos y escalas válidas, filas idénticas y descripciones con caracteres especiales (decisión 5 de design.md).
+- 2026-10-29: PBT con fast-check (60 corridas, timeout de 60 s) sobre lotes de 1 a 25 filas con montos de 0.01 a 99 999 999.99, fechas del mes, descripciones con comillas, barras, acentos y CJK, y filas idénticas; compara transacciones, splits, legs, vínculos, asientos, eventos, auditoría y recorrido normalizando identificadores. `pg-transactions.int.test.ts` compara además las filas que escribe `insertMany` con las de `insert` + `linkEntry` en PostgreSQL.

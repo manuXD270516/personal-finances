@@ -34,7 +34,7 @@ import { PgAccountMovementsQuery, systemCategoryCodesFrom } from '../infrastruct
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
 import { GoalTransferAdapter } from '../application/goal-transfer.port.js';
 import { LoanTransactionsAdapter } from '../application/loan-transactions.port.js';
-import { ImportedTransactionsAdapter } from '../application/imported-transactions.adapter.js';
+import { RecordImportedTransactions } from '../application/record-imported-transactions.js';
 import {
   PgDuplicateCandidatesQuery,
   PgImportedRefReader,
@@ -190,7 +190,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
       deps.currencies,
       systemCategoryCodesFrom(deps.categories),
     ),
-    imported: new ImportedTransactionsAdapter(service, new PgImportedRefReader(), deps.uow),
+    imported: new RecordImportedTransactions(deps, new PgImportedRefReader()),
     duplicateCandidates: new PgDuplicateCandidatesQuery(deps.uow, deps.currencies),
     statuses: new PgTransactionStatusQuery(deps.uow),
   };

@@ -19,7 +19,7 @@ automated_tests:
   - packages/contexts/imports/src/domain/duplicate-classifier.test.ts
   - packages/contexts/imports/src/domain/row-fingerprint.test.ts
   - packages/contexts/imports/test/integration/pg-imports.int.test.ts
-  - packages/contexts/transactions/src/application/imported-transactions.adapter.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
   - packages/contexts/transactions/test/integration/pg-imported.int.test.ts
 status: automated
 regression_suite: true

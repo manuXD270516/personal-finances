@@ -290,6 +290,88 @@ export class PgJournalEntryRepository implements JournalEntryRepository {
     }
   }
 
+  /**
+   * Asientos y postings por conjunto (openspec add-bulk-imported-transactions decisión 3): `INSERT … SELECT FROM
+   * unnest(…)` de arreglos tipados (sin concatenar SQL). Los disparadores de integridad (suma cero por moneda, ≥ 2
+   * postings, periodo abierto, inmutabilidad) siguen activos por fila: el conjunto no los esquiva.
+   */
+  async appendMany(entries: readonly JournalEntry[]): Promise<readonly JournalEntry[]> {
+    const first = entries[0];
+    if (!first) return [];
+    try {
+      return await this.insertMany(first.workspaceId, entries);
+    } catch (err) {
+      if (
+        pgCode(err) === '23505' &&
+        (err as { constraint?: string }).constraint === 'journal_entry_source_uk'
+      ) {
+        throw new DomainError('CONCURRENCY_CONFLICT', 'the source was posted concurrently; retry', {
+          cause: err,
+        });
+      }
+      throw err;
+    }
+  }
+
+  private async insertMany(workspaceId: string, entries: readonly JournalEntry[]): Promise<JournalEntry[]> {
+    await sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${'ledger.balance_snapshot:' + workspaceId}, 0))`.execute(
+      db(),
+    );
+    const inserted = await sql<{ id: string; sequence: string }>`
+      INSERT INTO ledger.journal_entry
+        (id, workspace_id, entry_date, entry_type, source_type, source_id, source_revision, reverses_entry_id, memo,
+         correlation_id, created_by)
+      SELECT t.id, ${workspaceId}::uuid, t.entry_date, t.entry_type, t.source_type, t.source_id, t.source_revision,
+             t.reverses_entry_id, t.memo, t.correlation_id, t.created_by
+        FROM unnest(
+          ${entries.map((e) => e.id)}::uuid[], ${entries.map((e) => e.entryDate.toString())}::date[],
+          ${entries.map((e) => e.entryType)}::text[], ${entries.map((e) => e.sourceRef.type)}::text[],
+          ${entries.map((e) => e.sourceRef.id)}::uuid[], ${entries.map((e) => e.sourceRef.revision)}::int[],
+          ${entries.map((e) => e.reversesEntryId)}::uuid[], ${entries.map((e) => e.memo)}::text[],
+          ${entries.map((e) => e.correlationId)}::uuid[], ${entries.map((e) => e.createdBy)}::uuid[]
+        ) WITH ORDINALITY AS t(id, entry_date, entry_type, source_type, source_id, source_revision, reverses_entry_id,
+                               memo, correlation_id, created_by, ord)
+       ORDER BY t.ord
+      RETURNING id, sequence::text AS sequence`.execute(db());
+    const sequenceOf = new Map(inserted.rows.map((r) => [r.id, r.sequence]));
+    const lines = entries.flatMap((e) => e.postings.map((p) => ({ e, p })));
+    await sql`
+      INSERT INTO ledger.posting
+        (id, workspace_id, journal_entry_id, entry_date, line_no, ledger_account_id, account_type, currency, amount,
+         split_id)
+      SELECT t.id, ${workspaceId}::uuid, t.journal_entry_id, t.entry_date, t.line_no, t.ledger_account_id,
+             t.account_type, t.currency, t.amount, t.split_id
+        FROM unnest(
+          ${lines.map((l) => l.p.id)}::uuid[], ${lines.map((l) => l.e.id)}::uuid[],
+          ${lines.map((l) => l.e.entryDate.toString())}::date[], ${lines.map((l) => l.p.lineNo)}::smallint[],
+          ${lines.map((l) => l.p.account.id)}::uuid[], ${lines.map((l) => l.p.account.nature)}::text[],
+          ${lines.map((l) => l.p.amount.currency.code)}::text[], ${lines.map((l) => l.p.amount.toNumeric())}::numeric[],
+          ${lines.map((l) => l.p.splitId)}::uuid[]
+        ) WITH ORDINALITY AS t(id, journal_entry_id, entry_date, line_no, ledger_account_id, account_type, currency,
+                               amount, split_id, ord)
+       ORDER BY t.ord`.execute(db());
+    return entries.map((e) => e.withSequence(sequenceOf.get(e.id) ?? ''));
+  }
+
+  /** Asientos existentes de esos orígenes (una consulta): `${source_id}|${source_revision}` → id y secuencia. */
+  async existingBySources(
+    workspaceId: string,
+    sources: readonly SourceRef[],
+    entryType: EntryType,
+  ): Promise<ReadonlyMap<string, { readonly id: string; readonly sequence: string }>> {
+    if (sources.length === 0) return new Map();
+    const { rows } = await sql<{ id: string; sequence: string; source_id: string; source_revision: number }>`
+      SELECT e.id, e.sequence::text AS sequence, e.source_id, e.source_revision
+        FROM unnest(${sources.map((x) => x.type)}::text[], ${sources.map((x) => x.id)}::uuid[],
+                    ${sources.map((x) => x.revision)}::int[]) AS s(source_type, source_id, source_revision)
+        JOIN ledger.journal_entry e
+          ON e.workspace_id = ${workspaceId}::uuid AND e.source_type = s.source_type AND e.source_id = s.source_id
+         AND e.source_revision = s.source_revision AND e.entry_type = ${entryType}`.execute(db());
+    return new Map(
+      rows.map((r) => [`${r.source_id}|${r.source_revision}`, { id: r.id, sequence: r.sequence }]),
+    );
+  }
+
   private async insert(entry: JournalEntry): Promise<JournalEntry> {
     // Candado compartido por workspace: espera a un `RebuildBalanceSnapshots` en curso (exclusivo) para que el
     // checkpoint `last_sequence` de los snapshots sea exacto (pg-ledger-maintenance.ts).
@@ -458,6 +540,19 @@ export class PgPeriodLockRepository implements PeriodLockRepository {
          WHERE l.workspace_id = ${workspaceId}
            AND ${date.toString()}::date BETWEEN l.period_start AND l.period_end) AS locked`.execute(db());
     return res.rows[0]?.locked === true;
+  }
+
+  async lockedDates(workspaceId: string, dates: readonly LocalDate[]): Promise<ReadonlySet<string>> {
+    if (dates.length === 0) return new Set();
+    const { rows } = await sql<{ d: string }>`
+      SELECT d.d::text AS d
+        FROM unnest(${dates.map((x) => x.toString())}::date[]) AS d(d)
+       WHERE EXISTS (
+         SELECT 1 FROM ledger.period_lock l
+          WHERE l.workspace_id = ${workspaceId}::uuid AND d.d BETWEEN l.period_start AND l.period_end)`.execute(
+      db(),
+    );
+    return new Set(rows.map((r) => r.d));
   }
 
   async lock(lock: PeriodLock, lockedBy: string | null): Promise<boolean> {

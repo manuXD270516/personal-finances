@@ -54,3 +54,4 @@ Entonces el reporte muestra una fila con la configuración del código y otra co
 ## Notas
 
 - Change: `optimize-consumer-throughput` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+- 2026-10-29 (change 52 `add-bulk-imported-transactions`, D359): con la escritura masiva, esta fila bloqueante (configuración del host) es también la fila de la ráfaga del import: exige la persistencia de 5 000 filas ≤ 20 s por omisión (D152) además del drenado ≤ 120 s por consumidor; `throughput.perf.ts` sigue informativa.

@@ -12,9 +12,13 @@ invariants: ["INV-004", "INV-021", "INV-023", "INV-029"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/bulk-imported-transactions.api.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "bulk-write", "D152"]
@@ -59,3 +63,4 @@ Entonces existen 200 transacciones posteadas con origen import y 200 asientos, c
 ## Notas
 
 - Change: `add-bulk-imported-transactions` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+- 2026-10-29: automatizado con PostgreSQL real (`bulk-imported-transactions.api.test.ts`: 200 transacciones, 200 asientos con suma 0.00, saldo 5250.00, 200 auditorías con origen import y actor, 200 recorridos y 600 eventos: `TransactionCreated`, `TransactionPosted` y `JournalEntryPosted`) y con dobles en memoria; los disparadores diferidos del ledger siguen activos (`pg-ledger.int.test.ts`: un asiento descuadrado inyectado en el conjunto revierte todo con PF001).

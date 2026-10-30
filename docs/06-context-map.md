@@ -57,7 +57,7 @@ flowchart LR
     IDP[(OIDC IdP<br/>Keycloak)]
   end
 
-  TX == "P · SYNC-TX<br/>LedgerPostingPort" ==> LG
+  TX == "P · SYNC-TX<br/>LedgerPostingPort (incl. postJournalEntries por lote)" ==> LG
   ACC -- "C/S · SYNC-Q" --> TX
   CL -- "C/S · SYNC-Q" --> TX
   FX -- "C/S · SYNC-Q (reference rate)" --> TX

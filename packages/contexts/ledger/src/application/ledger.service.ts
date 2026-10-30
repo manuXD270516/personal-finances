@@ -1,5 +1,5 @@
 import type { AuditPort } from '@pf/audit/contracts';
-import { DomainError, LocalDate, Money } from '@pf/shared-kernel';
+import { DomainError, LocalDate, Money, type Currency } from '@pf/shared-kernel';
 import type {
   LedgerPeriodLockPort,
   LedgerPostingPort,
@@ -8,7 +8,7 @@ import type {
   PostingLineDto,
   ReverseJournalEntryCommand,
 } from '../contracts/index.js';
-import { JOURNAL_ENTRY_POSTED } from '../contracts/index.js';
+import { JOURNAL_ENTRY_POSTED, MAX_POST_BATCH } from '../contracts/index.js';
 import {
   JournalEntry,
   ReversalFactory,
@@ -20,7 +20,7 @@ import {
   type SourceRef,
 } from '../domain/index.js';
 import { journalEntryPostedPayload } from './journal-entry-posted.js';
-import type { LedgerDeps } from './ports/index.js';
+import type { LedgerDeps, LedgerOutboxDraft } from './ports/index.js';
 
 /**
  * Casos de uso de escritura del ledger (design.md §Decisiones 1–6, 11): `PostJournalEntry`, `ReverseJournalEntry`,
@@ -80,6 +80,112 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
         aggregateVersion: 1,
       });
       return { journalEntryId: saved.id, sequence: saved.sequence ?? '', created: true };
+    });
+  }
+
+  /**
+   * `PostJournalEntry` por conjunto (openspec add-bulk-imported-transactions decisión 3): mismas reglas que
+   * `postJournalEntry` por comando, con una consulta por conjunto para la idempotencia por origen, los periodos
+   * cerrados (fechas distintas) y las cuentas contables (cada una se resuelve una vez), y escrituras multi-fila de
+   * asientos, postings, eventos y auditoría. Un comando inválido revierte el conjunto (unidad de trabajo del llamador).
+   */
+  postJournalEntries(commands: readonly PostJournalEntryCommand[]): Promise<readonly PostedEntryDto[]> {
+    const first = commands[0];
+    if (!first) return Promise.resolve([]);
+    if (commands.length > MAX_POST_BATCH) {
+      return Promise.reject(
+        new DomainError('VALIDATION_FAILED', `a batch has at most ${MAX_POST_BATCH} journal entries`),
+      );
+    }
+    const workspaceId = first.workspaceId;
+    return this.deps.uow.run(workspaceId, async () => {
+      const { entries, periods, ids, context } = this.deps;
+      if (commands.some((c) => c.workspaceId !== workspaceId)) {
+        throw new DomainError('VALIDATION_FAILED', 'a batch belongs to a single workspace');
+      }
+      const sourceOf = (c: PostJournalEntryCommand): SourceRef => ({
+        context: 'TRANSACTIONS',
+        type: c.sourceRef.type,
+        id: c.sourceRef.id,
+        revision: c.sourceRef.revision,
+      });
+      const keyOf = (type: string, id: string, revision: number) => `${type}|${id}|${revision}`;
+      // Idempotencia por origen: una consulta por tipo de asiento del conjunto.
+      const existing = new Map<string, { readonly id: string; readonly sequence: string }>();
+      for (const type of new Set(commands.map((c) => c.entryType))) {
+        const own = commands.filter((c) => c.entryType === type);
+        const found = await entries.existingBySources(workspaceId, own.map(sourceOf), type);
+        for (const c of own) {
+          const hit = found.get(`${c.sourceRef.id}|${c.sourceRef.revision}`);
+          if (hit) existing.set(keyOf(type, c.sourceRef.id, c.sourceRef.revision), hit);
+        }
+      }
+      // Un origen repetido dentro del conjunto se comporta como en llamadas sucesivas: el primero crea, el resto es existente.
+      const seen = new Set<string>();
+      const fresh = commands.filter((c) => {
+        const key = keyOf(c.entryType, c.sourceRef.id, c.sourceRef.revision);
+        if (existing.has(key) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const dates = new Map(fresh.map((c) => [c.entryDate, LocalDate.parse(c.entryDate)] as const));
+      const locked =
+        fresh.length > 0 ? await periods.lockedDates(workspaceId, [...dates.values()]) : new Set<string>();
+      const resolve = this.accountResolver(workspaceId, true);
+      const built: JournalEntry[] = [];
+      for (const command of fresh) {
+        const postings: PostingInput[] = [];
+        for (const [i, line] of command.postings.entries()) {
+          try {
+            postings.push(await resolve(line));
+          } catch (err) {
+            throw err instanceof DomainError ? err.at(`/postings/${i}`) : err;
+          }
+        }
+        built.push(
+          JournalEntry.post(
+            {
+              id: ids.newId(),
+              workspaceId,
+              entryDate: dates.get(command.entryDate) as LocalDate,
+              entryType: command.entryType,
+              sourceRef: sourceOf(command),
+              reversesEntryId: null,
+              memo: command.memo ?? null,
+              correlationId: context.correlationId(),
+              createdBy: context.actorUserId(),
+              postings,
+            },
+            { periodLocked: locked.has(command.entryDate) },
+          ),
+        );
+      }
+      const saved = built.length > 0 ? await entries.appendMany(built) : [];
+      await this.publishMany(saved);
+      if (saved.length > 0) {
+        const auditEntries = saved.map((entry) => ({
+          workspaceId: entry.workspaceId,
+          action: 'ledger.journal_entry.posted',
+          aggregateType: 'JournalEntry',
+          aggregateId: entry.id,
+          aggregateVersion: 1,
+        }));
+        if (this.audit.appendMany) await this.audit.appendMany(auditEntries);
+        else for (const e of auditEntries) await this.audit.append(e);
+      }
+      const bySource = new Map(
+        saved.map((e) => [keyOf(e.entryType, e.sourceRef.id, e.sourceRef.revision), e] as const),
+      );
+      const reported = new Set<string>();
+      return commands.map((c): PostedEntryDto => {
+        const key = keyOf(c.entryType, c.sourceRef.id, c.sourceRef.revision);
+        const hit = existing.get(key);
+        if (hit) return { journalEntryId: hit.id, sequence: hit.sequence, created: false };
+        const entry = bySource.get(key) as JournalEntry;
+        const created = !reported.has(key);
+        reported.add(key);
+        return { journalEntryId: entry.id, sequence: entry.sequence ?? '', created };
+      });
     });
   }
 
@@ -206,28 +312,87 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
   }
 
   private async posting(workspaceId: string, line: PostingLineDto): Promise<PostingInput> {
+    return this.accountResolver(workspaceId, false)(line);
+  }
+
+  /**
+   * Resuelve la cuenta contable de cada línea. Con `cache` (escritura por conjunto) cada cuenta y moneda se consulta
+   * una sola vez; sin él (un asiento) cada línea consulta, como siempre.
+   */
+  private accountResolver(
+    workspaceId: string,
+    cache: boolean,
+  ): (line: PostingLineDto) => Promise<PostingInput> {
     const { accounts, currencies, ids } = this.deps;
-    const currency = await currencies.currencyOf(line.amount.currency);
-    const amount = Money.parse(line.amount.amount, currency);
-    let account: LedgerAccount | null;
-    switch (line.target.kind) {
-      case 'USER_ACCOUNT':
-        account = await accounts.getOrCreateForUserAccount({
-          workspaceId,
-          sourceAccountId: line.target.accountId,
-          nature: line.target.nature,
-          currency,
-        });
-        break;
-      case 'SYSTEM':
-        account = await accounts.getOrCreateSystem({ workspaceId, kind: line.target.systemKind, currency });
-        break;
-      case 'LEDGER_ACCOUNT':
-        account = await accounts.findById(workspaceId, line.target.ledgerAccountId);
-        break;
-    }
-    if (!account) throw new DomainError('REFERENCE_NOT_FOUND', 'ledger account not found');
-    return { id: ids.newId(), account, amount, splitId: line.splitId ?? null };
+    const currencyCache = new Map<string, Promise<Currency>>();
+    const accountCache = new Map<string, Promise<LedgerAccount | null>>();
+    const once = <T>(map: Map<string, Promise<T>>, key: string, load: () => Promise<T>): Promise<T> => {
+      if (!cache) return load();
+      let hit = map.get(key);
+      if (!hit) {
+        hit = load();
+        map.set(key, hit);
+      }
+      return hit;
+    };
+    return async (line) => {
+      const currency = await once(currencyCache, line.amount.currency, () =>
+        currencies.currencyOf(line.amount.currency),
+      );
+      const amount = Money.parse(line.amount.amount, currency);
+      let account: LedgerAccount | null;
+      switch (line.target.kind) {
+        case 'USER_ACCOUNT': {
+          const target = line.target;
+          account = await once(accountCache, `U|${target.accountId}|${target.nature}|${currency.code}`, () =>
+            accounts.getOrCreateForUserAccount({
+              workspaceId,
+              sourceAccountId: target.accountId,
+              nature: target.nature,
+              currency,
+            }),
+          );
+          break;
+        }
+        case 'SYSTEM': {
+          const target = line.target;
+          account = await once(accountCache, `S|${target.systemKind}|${currency.code}`, () =>
+            accounts.getOrCreateSystem({ workspaceId, kind: target.systemKind, currency }),
+          );
+          break;
+        }
+        case 'LEDGER_ACCOUNT': {
+          const target = line.target;
+          account = await once(accountCache, `L|${target.ledgerAccountId}`, () =>
+            accounts.findById(workspaceId, target.ledgerAccountId),
+          );
+          break;
+        }
+      }
+      if (!account) throw new DomainError('REFERENCE_NOT_FOUND', 'ledger account not found');
+      return { id: ids.newId(), account, amount, splitId: line.splitId ?? null };
+    };
+  }
+
+  private async publishMany(entries: readonly JournalEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const actorId = this.deps.context.actorUserId();
+    const drafts: LedgerOutboxDraft[] = entries.map((entry) => ({
+      eventId: this.deps.ids.newId(),
+      eventType: JOURNAL_ENTRY_POSTED.eventType,
+      eventVersion: JOURNAL_ENTRY_POSTED.eventVersion,
+      occurredAt: this.deps.clock.now().toString(),
+      workspaceId: entry.workspaceId,
+      aggregateType: 'JournalEntry',
+      aggregateId: entry.id,
+      aggregateVersion: 1,
+      payload: journalEntryPostedPayload(entry),
+      ...(entry.correlationId ? { correlationId: entry.correlationId } : {}),
+      actor: actorId ? { type: 'USER' as const, id: actorId } : { type: 'SYSTEM' as const, id: null },
+    }));
+    const { outbox } = this.deps;
+    if (outbox.appendMany) await outbox.appendMany(drafts);
+    else for (const d of drafts) await outbox.append(d);
   }
 
   private async publish(entry: JournalEntry): Promise<void> {
