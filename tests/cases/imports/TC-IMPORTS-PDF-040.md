@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +33,7 @@ steps:
 expected_result:
   - "todas sus filas quedan inválidas con `IMPORT_CURRENCY_MISMATCH`"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-040 — Un extracto en bolivianos sobre una cuenta en USD deja todas las filas inválidas

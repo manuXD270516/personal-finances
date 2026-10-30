@@ -12,9 +12,10 @@ invariants: ["INV-001", "INV-003"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/pdf/grammars.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "el monto leído es igual al generado"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-031 — Todo monto generado y escrito con los separadores de un diseño se lee igual

@@ -55,6 +55,9 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-imports.js';
 import { PgMappingProfileRepository } from '../infrastructure/pg-mapping-profiles.js';
+import { PdfStatementReader } from '../application/pdf/pdf-statement-reader.js';
+import { FilePdfLayoutRegistry } from '../infrastructure/pdf/file-pdf-layout-registry.js';
+import { PdfjsTextExtractor } from '../infrastructure/pdf/pdfjs-text-extractor.js';
 import { DefaultStatementReader } from '../infrastructure/readers/statement-reader.js';
 import {
   CsvUploadGuard,
@@ -81,6 +84,12 @@ export const DEFAULT_IMPORTS_SETTINGS: ImportsSettings = {
   duplicateHighScore: '0.9000',
   duplicateLowScore: '0.6000',
   documentMaxBytes: 20 * 1024 * 1024,
+  pdfExtractionTimeoutMs: 30_000,
+  pdfMaxPages: 200,
+  pdfMaxTextItems: 300_000,
+  pdfMaxTextChars: 4_194_304,
+  pdfWorkerMaxOldMb: 192,
+  pdfMinPageTextChars: 20,
 };
 
 export interface ImportsRuntimeOptions {
@@ -213,6 +222,18 @@ export function createImportsRuntime(options: ImportsRuntimeOptions): ImportsRun
     conversions: options.transactions.importedConversions,
     readers: new DefaultStatementReader(),
     refs: options.refs,
+    // Lector de extractos PDF (add-pdf-statement-parser): extracción en un hilo aislado, sin consumidores nuevos.
+    pdf: new PdfStatementReader(
+      new PdfjsTextExtractor({
+        timeoutMs: settings.pdfExtractionTimeoutMs,
+        maxPages: settings.pdfMaxPages,
+        maxTextItems: settings.pdfMaxTextItems,
+        maxTextChars: settings.pdfMaxTextChars,
+        workerMaxOldMb: settings.pdfWorkerMaxOldMb,
+      }),
+      new FilePdfLayoutRegistry(),
+      { minPageTextChars: settings.pdfMinPageTextChars },
+    ),
   };
   return {
     service: new ImportsService(deps),

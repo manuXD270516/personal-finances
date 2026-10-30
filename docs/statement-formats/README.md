@@ -16,7 +16,7 @@ Cada carpeta de fixture tiene `statement.txt` (imita la salida de `pdftotext -la
 ## Conclusiones comunes
 
 1. **Las cuatro muestras son PDF con texto extraíble** (ninguna es solo imagen): `IMAGE_ONLY_STATEMENT` no aplica a ninguna. No hace falta OCR.
-2. **Extracción recomendada:** `pdftotext -layout` conserva las columnas y alcanza para BCP, Ganadero y BISA. Para BNB el diseño por columnas se desordena entre líneas (ver la ficha): conviene extraer con coordenadas (`pdftotext -bbox-layout` o una librería que entregue cada palabra con su posición) y reconstruir las filas por posición. Es una hipótesis a validar con el parser de Phase 6, no una decisión.
+2. **Extracción (decisión de `add-pdf-statement-parser`):** por **coordenadas** con `pdfjs-dist` en un hilo aislado (ADR-0032); los diseños publicados y su versión están en cada ficha. *Análisis original:* `pdftotext -layout` conserva las columnas y alcanza para BCP, Ganadero y BISA. Para BNB el diseño por columnas se desordena entre líneas (ver la ficha): conviene extraer con coordenadas (`pdftotext -bbox-layout` o una librería que entregue cada palabra con su posición) y reconstruir las filas por posición. Es una hipótesis a validar con el parser de Phase 6, no una decisión.
 3. **Formatos de número y fecha por entidad** (no hay un estándar; el perfil de mapeo debe declararlos):
 
    | | Fecha | Hora | Miles | Decimal | Signo |
@@ -35,6 +35,17 @@ Cada carpeta de fixture tiene `statement.txt` (imita la salida de `pdftotext -la
    - Los encabezados traen datos personales (titular, dirección, cuenta, operador): el parser debe descartarlos del staging salvo el número de cuenta para casar con la cuenta destino.
    - Los metadatos del PDF (autor, creador) pueden traer datos personales; no se conservan.
 6. **Valor recomendado de `statementImport`** (vocabulario de design.md decisión 5; ver cada ficha): las cuatro quedan `PENDING_SAMPLE`. Con esta información no se puede declarar `GENERIC_ONLY` (exige un CSV o XLS exportable compatible con el CSV básico y no hay evidencia de que la entidad lo ofrezca) ni `NOT_ELIGIBLE` (`IMAGE_ONLY_STATEMENT` es falso: el texto es extraíble). Pasan a `GENERIC_ONLY` si el owner confirma que el banco exporta CSV o XLS, y a `SUPPORTED` cuando Phase 6/11 entregue un perfil o parser de PDF. **La actualización en el archivo real del catálogo (`reference/institutions/BO.json`) queda para la tarea 4.2**; estas recomendaciones no modifican ningún archivo de catálogo.
+
+## Lectura en el producto (change 57)
+
+| Entidad | Diseño | Estado |
+|---|---|---|
+| BCP | `bo.bcp.cuenta` v1 | Núcleo (Must). Pendiente de validar con un extracto real. |
+| Banco Ganadero | `bo.ganadero.cuenta` v1 | Núcleo (Must). Pendiente de validar con un extracto real. |
+| BNB | `bo.bnb.cuenta` v1 | Should: reconstrucción por monto como ancla y secciones. Se publica como soportada solo si el diagnóstico local sobre un extracto real da coherencia correcta (D349); si no, `NOT_ELIGIBLE/UNSTABLE_FORMAT`. |
+| BISA | — | Fuera de este change (D348): la muestra no tiene movimientos. |
+
+Los PDF de tarjetas de crédito están fuera (D356). Todo fixture PDF se **genera por código** a partir del `expected.json` sintético (`tests/fixtures/imports/statements-bo/pdf/paint-statement.ts`) y nunca se versiona.
 
 ## Procedimiento para sumar una entidad
 

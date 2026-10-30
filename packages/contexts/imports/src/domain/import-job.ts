@@ -252,14 +252,22 @@ export interface ImportWarning {
 
 export type ImportActor = { readonly type: 'USER'; readonly userId: string } | { readonly type: 'SYSTEM' };
 
-export const IMPORT_SOURCES = ['FILE_CSV', 'FILE_OFX', 'FILE_QIF', 'FILE_JSON', 'FILE_XLSX'] as const;
+export const IMPORT_SOURCES = [
+  'FILE_CSV',
+  'FILE_OFX',
+  'FILE_QIF',
+  'FILE_JSON',
+  'FILE_XLSX',
+  'FILE_PDF',
+] as const;
 export type ImportSource = (typeof IMPORT_SOURCES)[number];
 
 export const sourceOfFormat = (format: StatementFormat): ImportSource => `FILE_${format}`;
 
 /** Falla estructural del archivo (`PARSE_FAILED`): código y ubicación, nunca texto del archivo (NFR-SEC-015). */
 export interface ImportFailure {
-  readonly code: 'IMPORT_PARSE_FAILED' | 'IMPORT_TOO_MANY_ROWS' | 'IMPORT_UNSUPPORTED_FORMAT';
+  readonly code:
+    'IMPORT_PARSE_FAILED' | 'IMPORT_TOO_MANY_ROWS' | 'IMPORT_UNSUPPORTED_FORMAT' | PdfImportFailureCode;
   readonly pointer: string | null;
   readonly detail?: string;
 }
@@ -286,6 +294,44 @@ export interface ImportStatementInfo {
   readonly closingDate: string | null;
   readonly periodFrom: string | null;
   readonly periodTo: string | null;
+}
+
+/** Códigos de falla propios de la lectura de extractos PDF (openspec add-pdf-statement-parser). */
+export const PDF_IMPORT_FAILURE_CODES = [
+  'IMPORT_PDF_NO_TEXT',
+  'IMPORT_PDF_LAYOUT_UNKNOWN',
+  'IMPORT_PDF_EXTRACTION_FAILED',
+  'IMPORT_PDF_TOTALS_MISMATCH',
+  'IMPORT_PDF_PAGE_COUNT_MISMATCH',
+  'IMPORT_PDF_ACCOUNT_MISMATCH',
+] as const;
+export type PdfImportFailureCode = (typeof PDF_IMPORT_FAILURE_CODES)[number];
+
+export interface ImportPdfMoney {
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/**
+ * Lo que la lectura de un extracto PDF informa del documento (`ImportJob.pdf`). Solo estructura y conteos: ningún
+ * texto del extracto, ningún dato del titular, ningún metadato del PDF (NFR-SEC-015).
+ */
+export interface ImportPdfInfo {
+  readonly layout: { readonly id: string; readonly version: number } | null;
+  readonly pagesRead: number;
+  readonly pagesDeclared: number | null;
+  readonly pagesWithoutText: readonly number[];
+  readonly coherence: {
+    readonly totals: 'OK' | 'MISMATCH' | 'NOT_AVAILABLE';
+    readonly difference: ImportPdfMoney | null;
+    readonly balanceChain: 'OK' | 'GAPS' | 'NOT_AVAILABLE';
+    readonly unrecognizedLines: readonly { readonly page: number; readonly line: number }[];
+  } | null;
+  /** `saldo inicial del extracto − saldo de la cuenta` al cierre del día anterior al periodo (solo se muestra). */
+  readonly openingDifference: ImportPdfMoney | null;
+  readonly extractionFailure:
+    'TIMEOUT' | 'MEMORY' | 'PAGE_LIMIT' | 'TEXT_LIMIT' | 'MALFORMED' | 'ENCRYPTED' | null;
+  readonly warnings: readonly 'IMPORT_PDF_ACCOUNT_UNVERIFIED'[];
 }
 
 /** Resultado de la reconciliación contra el saldo final del extracto (decisión 14; sin ajuste automático). */
@@ -369,6 +415,8 @@ export interface ImportJobState {
   readonly revertedBy: string | null;
   readonly rulesSummary: ImportRulesSummary | null;
   readonly failure: ImportFailure | null;
+  /** Información de la lectura de un extracto PDF (`null` en los demás formatos). */
+  readonly pdf: ImportPdfInfo | null;
 }
 
 const transition = (from: ImportStatus, to: ImportStatus) =>
@@ -396,6 +444,7 @@ const NO_PHASE6 = {
   revertedBy: null,
   rulesSummary: null,
   failure: null,
+  pdf: null,
 } as const;
 
 export class ImportJob {
@@ -732,11 +781,20 @@ export class ImportJob {
   }
 
   /** `UPLOADED | PROCESSING → PARSE_FAILED`: error estructural; sin filas ni texto del archivo. */
-  failParse(input: { readonly failure: ImportFailure; readonly now: string }): void {
+  failParse(input: {
+    readonly failure: ImportFailure;
+    readonly pdf?: ImportPdfInfo | null;
+    readonly now: string;
+  }): void {
     this.move(
       'FAIL_PARSE',
       'PARSE_FAILED',
-      { failure: input.failure, expiresAt: null, progress: { ...this.current.progress, stage: null } },
+      {
+        failure: input.failure,
+        ...(input.pdf === undefined ? {} : { pdf: input.pdf }),
+        expiresAt: null,
+        progress: { ...this.current.progress, stage: null },
+      },
       input.now,
     );
   }
@@ -747,6 +805,12 @@ export class ImportJob {
       throw transition(this.current.status, 'AWAITING_REVIEW');
     }
     this.update({ statement }, now);
+  }
+
+  /** Información de la lectura de un PDF (diseño, páginas, coherencia); se fija al leerlo y al llegar a revisión. */
+  setPdf(pdf: ImportPdfInfo, now: string): void {
+    if (this.current.status !== 'PROCESSING') throw transition(this.current.status, 'PROCESSING');
+    this.update({ pdf }, now);
   }
 
   /** Anotación del recorrido: se reevaluaron las reglas (conteos nuevos y cobertura). */

@@ -35,7 +35,7 @@ Imports **NO**:
 
 | Término | Definición |
 |---|---|
-| **ImportSource** | Origen lógico: `FILE_CSV`, `FILE_OFX`, `FILE_QIF`, `FILE_JSON`, `FILE_XLS` (futuro), `FILE_PDF` (futuro OCR), `BANK_API`, `AGGREGATOR_API`, `EXCHANGE_API`, `MANUAL_PASTE`. |
+| **ImportSource** | Origen lógico: `FILE_CSV`, `FILE_OFX`, `FILE_QIF`, `FILE_JSON`, `FILE_XLS` (futuro), `FILE_PDF` (PDF con texto, Phase 6; el OCR sigue en Phase 11), `BANK_API`, `AGGREGATOR_API`, `EXCHANGE_API`, `MANUAL_PASTE`. |
 | **ImportJob** | Agregado raíz que representa una ejecución de importación sobre **una cuenta destino** (o un conjunto declarado de cuentas para exchanges). |
 | **RawRecord** | Fila/registro tal como fue leído (strings), con número de línea y hash del contenido crudo. |
 | **StagedTransaction** | Registro normalizado (Money, fecha de negocio, descripción limpia, external id) con resultados de validación, duplicados, reglas y decisión del usuario. Vive solo en `imports`. |
@@ -210,7 +210,7 @@ sequenceDiagram
 
 ## 5. Adapters de entrada (parsers)
 
-> **Phase 6 (`add-import-pipeline`, decisiones 5 y 7):** puerto `StatementParser` por formato (CSV, OFX 1.x SGML y 2.x XML sin DTD ni entidades externas, QIF, JSON con el esquema real `contracts/imports/import-file.v1.schema.json`, XLSX Could). XLSX lee el **valor guardado** de la celda (nunca evalúa fórmulas) y toma la representación decimal más corta que reconstruye el `double`, con la regla de escala (exceso de decimales ⇒ `IMPORT_INVALID_AMOUNT`, INV-003). La limpieza de descripción (`descriptionCleanup`) usa **prefijos literales**, no expresiones regulares (evita ReDoS; las expresiones viven en las reglas). Los perfiles de mapeo tienen forma `imports.profile.v1` (`contracts/imports/imports.profile.v1.schema.json`). El PDF queda fuera (change propio).
+> **Phase 6 (`add-import-pipeline`, decisiones 5 y 7):** puerto `StatementParser` por formato (CSV, OFX 1.x SGML y 2.x XML sin DTD ni entidades externas, QIF, JSON con el esquema real `contracts/imports/import-file.v1.schema.json`, XLSX Could). XLSX lee el **valor guardado** de la celda (nunca evalúa fórmulas) y toma la representación decimal más corta que reconstruye el `double`, con la regla de escala (exceso de decimales ⇒ `IMPORT_INVALID_AMOUNT`, INV-003). La limpieza de descripción (`descriptionCleanup`) usa **prefijos literales**, no expresiones regulares (evita ReDoS; las expresiones viven en las reglas). Los perfiles de mapeo tienen forma `imports.profile.v1` (`contracts/imports/imports.profile.v1.schema.json`). El PDF con texto entra por el change propio `add-pdf-statement-parser` (ver más abajo).
 
 Puerto de application:
 
@@ -231,8 +231,18 @@ interface FileParser {
 | **OFX/QFX** | 6 | SGML (1.x) y XML (2.x). `FITID` → `external_id`. `LEDGERBAL`/`AVAILBAL` → `StatementBalance`. `DTPOSTED` con offset → fecha de negocio en TZ del workspace. |
 | **QIF** | 6 | Sin ids externos (solo fingerprint). Formato de fecha ambiguo (`D1/2'26`) → requiere perfil. Tipos `!Type:Bank`, `!Type:CCard`. Splits `S/$`. |
 | **JSON** | 6 | Esquema propio documentado (`contracts/imports/import-file.v1.schema.json`) para exportaciones de otras apps / migración desde planillas del owner. Validado con JSON Schema antes de normalizar. |
-| **PDF** | Futuro (post-Phase 9) | Ver §6.3 — OCR/extracción tabular. No en alcance. |
+| **PDF** (con texto) | 6 (`add-pdf-statement-parser`) | Diseños declarativos y versionados por institución, reconstrucción por coordenadas en un `worker_thread` aislado (ver más abajo). El OCR y los PDF escaneados siguen fuera. |
 | **Manual paste** | 6 (Could) | Pegar desde portapapeles una tabla → tratado como CSV con tab. |
+
+> **Phase 6 (`add-pdf-statement-parser`, change 57; ADR-0032; D324, D347–D358):** el lector de **PDF con texto** entra a la etapa `PARSE` del consumidor `imports.persist` (sin consumidores ni conexiones nuevos, D249).
+>
+> - **Extracción:** `pdfjs-dist` (solo `getTextContent`, `isEvalSupported: false`, sin render ni metadatos, sin binarios nativos) en un `worker_thread` por documento con `resourceLimits`, `env: {}`, temporizador (`IMPORT_PDF_EXTRACTION_TIMEOUT`), tope de páginas (200), fragmentos (300 000) y caracteres (4 MiB), y respuesta validada con `zod`. Entrega un `PdfTextDocument` (fragmentos con posición); todo lo demás es dominio puro.
+> - **Diseños:** JSON validado contra `contracts/imports/pdf-layout.v1.schema.json` (sin expresiones regulares ni nombres del banco o del titular), versionados e **inmutables** (`pdf-layouts.lock.json` con la suma SHA-256 de cada versión publicada). Resolución: perfil de la cuenta o de la institución (`{ pdfLayout: { id, version } }`) → detección por los literales de la primera página (versión más reciente primero). El job guarda `pdf.layout` con su versión.
+> - **Reconstrucción por coordenadas** (no por el orden del flujo): palabras → líneas por línea base → bandas por los rótulos del encabezado de cada página → celdas (una palabra que cruza dos bandas ⇒ `IMPORT_PDF_AMBIGUOUS_CELL`) → filas por ancla de fecha (Ganadero, BCP) o de monto con las líneas vecinas por cercanía vertical (BNB), glosas multilínea y corte de glosa en el salto de página, secciones con signo, filas en el orden impreso (nunca por fecha).
+> - **Montos y fechas exactos:** gramática por diseño (`T`/`D` declarados; sin `number`; exceso de decimales ⇒ `IMPORT_INVALID_AMOUNT`; separador del otro diseño ⇒ `IMPORT_AMBIGUOUS_NUMBER`) y meses en español por tabla propia, sin locale ni zona del sistema.
+> - **Falla cerrada (D347):** `saldo inicial + Σ movimientos = saldo final`, total de cada sección = Σ sus filas, páginas leídas = declaradas y cero líneas sin reconocer; si algo no cuadra, `PARSE_FAILED` con `IMPORT_PDF_TOTALS_MISMATCH` (o `IMPORT_PDF_PAGE_COUNT_MISMATCH`) y `ImportJob.pdf` con la diferencia y las páginas y líneas no reconocidas (sin textos). El saldo inicial contra la cuenta al día anterior se muestra como diferencia, sin bloquear.
+> - **Cuenta y moneda:** solo se conservan los últimos 4 dígitos del número de cuenta; distinto de `accountNumberLast4` de la cuenta destino ⇒ `IMPORT_PDF_ACCOUNT_MISMATCH` (D353); sin dígitos registrados ⇒ advertencia `IMPORT_PDF_ACCOUNT_UNVERIFIED`. Titular, dirección, operador y metadatos del PDF se descartan.
+> - **Escaneados (`IMPORT_PDF_NO_TEXT`)** y **diseño desconocido (`IMPORT_PDF_LAYOUT_UNKNOWN`)** se rechazan sin OCR. Las anotaciones de estado variables de la glosa (`Aún falta {n}`, `Completado`) se declaran por diseño y solo se quitan de la descripción de la huella (§7.2).
 
 ### 5.1 `MappingProfile` (por institución)
 
@@ -304,7 +314,7 @@ interface BankingProvider {
 ### 6.3 Realidad Bolivia
 
 - La mayoría de bancos bolivianos **no ofrece APIs abiertas** ni agregadores con cobertura confiable. Formatos reales: **CSV/XLS(X)** desde banca en línea y **PDF** de extractos mensuales.
-- Por eso el diseño prioriza: (1) **ingreso manual rápido** (Phase 1), (2) **CSV/XLSX con perfiles por institución** (Phase 3/6), (3) exchange APIs para USDT/P2P (Phase 6 Could), (4) **PDF extraction como feature futura de OCR** (puerto `DocumentExtractor`, posible uso de extracción tabular local o servicio externo con consentimiento; fuera de roadmap actual).
+- Por eso el diseño prioriza: (1) **ingreso manual rápido** (Phase 1), (2) **CSV/XLSX con perfiles por institución** (Phase 3/6), (3) exchange APIs para USDT/P2P (Phase 6 Could), (4) **PDF con texto** de las entidades del owner por diseños declarativos y coordenadas (Phase 6, `add-pdf-statement-parser`, ADR-0032); el **OCR** de PDF escaneados (puerto `DocumentExtractor`, extracción local o servicio externo con consentimiento) sigue como feature futura (FR-DOCUMENTS-009, Phase 11).
 - Extractos P2P de USDT suelen venir como capturas o chats: no se importan; se registran como **conversión manual** (ver 28-ui-ux-design-system.md, flujo USDT→BOB).
 
 ### 6.4 Exchange API → transacciones de dominio
@@ -342,6 +352,8 @@ fingerprint = SHA-256( canonical_json([
 ```
 
 - `occurrenceIndex`: ordinal de la fila **entre filas con la misma tupla** (fecha, monto, descripción) dentro de la misma fuente y día. Resuelve el caso legítimo de **dos compras idénticas el mismo día** (dos cafés de 15,00 BOB): la primera tiene índice 0, la segunda 1. En un reimport del mismo rango, se recalcula igual y coincide.
+> **Phase 6 (`add-pdf-statement-parser`, decisión 12):** las filas de PDF usan la misma huella. Re-descargar el mismo mes cambia los bytes y la «fecha de consulta» del encabezado, pero no las huellas: las 11 filas de un mes ya importado se muestran «ya importadas» y se crean 0. Los `volatileFragments` del diseño (literales con comodín numérico `{n}`, sin expresiones regulares) se quitan SOLO de la descripción usada en la huella; la transacción guarda la glosa completa. Las referencias no únicas (Ganadero, BNB) no se usan como identificador externo.
+
 - Persistido en `imports.row_link (workspace_id, account_id, fingerprint) UNIQUE → transaction_id`. Si la transacción vinculada se anula (`void`), el link se marca `superseded` y deja de bloquear.
 
 ### 7.3 Nivel proveedor — `external_id`
@@ -555,7 +567,8 @@ Ejemplos de TC: `TC-IMPORTS-CSV-001` (coma decimal y dd/mm/yyyy), `TC-IMPORTS-ID
 |---|---|
 | 3 (Could) | **Implementado** (`add-basic-csv-import`): CSV de una cuenta con mapeo manual (sin perfiles reutilizables), preview, duplicados exactos por huella y probables por candidato (sin score), persistencia asíncrona por lotes, fallo parcial con reintento. Sin reglas (Rules llega en 6), sin reconciliación automática, sin deshacer. |
 | 6 | Pipeline completo: CSV/XLSX/OFX/QIF/JSON, perfiles versionados, duplicados probables con score, rules dry-run, reconciliación, revert, workers con progreso, ExchangeProvider (Could). |
-| Futuro | Aggregators (Plaid/regionales), Bank APIs, PDF/OCR, auto-approve por conexión. |
+| 6 (`add-pdf-statement-parser`) | Extractos PDF con texto de BCP y Banco Ganadero (BNB tras validar un extracto real): diseños versionados, hilo aislado, falla cerrada por coherencia, diagnóstico local `pnpm imports:pdf:probe`. |
+| Futuro | Aggregators (Plaid/regionales), Bank APIs, OCR de PDF escaneados, auto-approve por conexión. |
 
 ## Preguntas abiertas
 

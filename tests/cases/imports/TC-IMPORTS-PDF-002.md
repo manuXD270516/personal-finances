@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "se rechaza con `IMPORT_UNSUPPORTED_FORMAT` y no se crea ninguna importación"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-002 — Un documento PNG se rechaza con IMPORT_UNSUPPORTED_FORMAT al crear la importación

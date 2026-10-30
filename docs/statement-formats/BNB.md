@@ -47,6 +47,16 @@
 - `Total depósitos` = suma de la sección Depósitos = `Total de créditos`; `Total retiros` = suma de Retiros = `Total de débitos`.
 - Número de páginas leídas = `M` de `Página N de M`.
 
+
+## Diseño publicado (change 57, `add-pdf-statement-parser`)
+
+- **Diseño:** `bo.bnb.cuenta` **versión 1** (`packages/contexts/imports/src/infrastructure/pdf/layouts/bo.bnb.cuenta.v1.json`, inmutable; un formato nuevo del banco es la versión 2). Los literales de detección son rótulos fijos de la primera página, sin el nombre del banco ni datos del titular.
+- **Extracción:** por **coordenadas** con PDF.js (decisión del change, ya no hipótesis): el motor ordena los fragmentos por posición, arma las bandas de columna con los rótulos de cada página y reconstruye cada fila; el orden del flujo de contenido no cuenta.
+- **Lectura:** el **monto** es el ancla de cada fila; la fecha, la hora, la glosa y la referencia de las líneas vecinas se asignan al ancla más cercana en vertical dentro de su página y sección (por eso el desorden del texto plano no importa); las secciones `Depósitos` y `Retiros` dan el signo y cada una verifica su `Total` impreso; el resumen verifica `Total de débitos` y `Total de créditos` y el saldo del inicio y del final; la página en blanco intencional se omite; de la glosa solo se conserva la primera línea (la contraparte va aparte y las líneas que repiten al titular se descartan).
+- **Sin saldo corrido:** la verificación es por totales; no hay `IMPORT_RUNNING_BALANCE_GAP`.
+- **Publicación (D349):** se publica como soportada solo si el diagnóstico local sobre un extracto real de BNB da coherencia correcta; los fragmentos de «Dato Adicional» que invaden la columna Referencia no están modelados en el fixture sintético y son lo primero que el diagnóstico debe confirmar.
+- **Verificación con extractos reales:** pendiente del owner con `pnpm imports:pdf:probe <ruta-absoluta-al-pdf>` (solo imprime estructura, nunca montos ni nombres; tarea 9.1). `statementImport` sigue en `PENDING_SAMPLE` hasta entonces.
+
 ## Valor recomendado de `statementImport`
 
 **`PENDING_SAMPLE`.** Texto extraíble (no `IMAGE_ONLY_STATEMENT`), sin evidencia de una exportación CSV/XLS (no `GENERIC_ONLY`). Si el owner confirma una exportación, `GENERIC_ONLY`; si no, un perfil de PDF por coordenadas en Phase 6/11 lo llevaría a `SUPPORTED`. Si el parser por coordenadas resulta inestable, la razón de `NOT_ELIGIBLE` sería `UNSTABLE_FORMAT`, pero con una sola muestra no hay base para declararlo.

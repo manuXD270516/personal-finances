@@ -12,9 +12,10 @@ invariants: ["INV-001"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +33,7 @@ expected_result:
   - "la vista previa tiene una sola fila con la glosa completa"
   - "el encabezado repetido no aparece como fila"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-022 — Una glosa cortada por el salto de página se une al último movimiento de la página anterior

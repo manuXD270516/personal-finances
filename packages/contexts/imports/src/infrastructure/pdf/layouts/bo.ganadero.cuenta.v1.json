@@ -1,0 +1,45 @@
+{
+  "schema": "imports.pdf-layout.v1",
+  "id": "bo.ganadero.cuenta",
+  "version": 1,
+  "currencyLabels": [{ "label": "EXPRESADO EN BOLIVIANOS", "currency": "BOB" }],
+  "detect": { "literals": ["OFICINA/CANAL", "TRANSACCIÓN", "NRO. DE CUENTA"] },
+  "header": {
+    "account": { "label": "NRO. DE CUENTA:" },
+    "period": { "kind": "DATE_RANGE" },
+    "openingBalance": { "kind": "SKIP_ROW", "description": "Saldo anterior" },
+    "closingBalance": { "kind": "LABEL", "label": "TOTAL SALDO ACTUAL:", "occurrence": "LAST" },
+    "totalPages": { "kind": "LABEL", "label": "Total Páginas:" }
+  },
+  "table": {
+    "columns": [
+      { "labels": ["FECHA"], "role": "DATE", "align": "LEFT" },
+      { "labels": ["HORA"], "role": "TIME", "align": "LEFT" },
+      { "labels": ["OFICINA/CANAL"], "role": "IGNORE", "align": "LEFT" },
+      { "labels": ["TRANSACCIÓN"], "role": "REFERENCE", "align": "LEFT" },
+      { "labels": ["DESCRIPCIÓN"], "role": "DESCRIPTION", "align": "LEFT" },
+      { "labels": ["DÉBITO"], "role": "DEBIT", "align": "RIGHT" },
+      { "labels": ["CRÉDITO"], "role": "CREDIT", "align": "RIGHT" },
+      { "labels": ["SALDO"], "role": "BALANCE", "align": "RIGHT" }
+    ],
+    "rowAnchor": "DATE",
+    "skipRows": [{ "description": "Saldo anterior" }],
+    "endLabels": [
+      "TOTAL SALDO ACTUAL",
+      "TOTAL FONDOS RESERVADOS",
+      "SALDO DISPONIBLE",
+      "DEPOSITO POR CONFIRMAR"
+    ]
+  },
+  "page": {
+    "repeatedLiterals": [],
+    "footerLiterals": ["Página Actual:"],
+    "blankPageLiterals": [],
+    "discardLiterals": []
+  },
+  "number": { "decimal": ".", "thousands": "," },
+  "date": "DD/MM/YYYY",
+  "time": "HH:mm:ss",
+  "reference": { "unique": false },
+  "volatileFragments": ["Aún falta {n}", "Completado"]
+}

@@ -3809,7 +3809,9 @@
       "IMPORT_AMBIGUOUS_NUMBER": "El número es ambiguo: indica el separador decimal.",
       "IMPORT_RUNNING_BALANCE_GAP": "El saldo corrido del archivo no cuadra con esta fila.",
       "IMPORT_RULES_UNAVAILABLE": "Las reglas no estuvieron disponibles: la fila queda sin propuesta.",
-      "IMPORT_OCCURRENCE_LINK_SKIPPED": "El compromiso ya se había resuelto: la transacción se creó sin vínculo."
+      "IMPORT_OCCURRENCE_LINK_SKIPPED": "El compromiso ya se había resuelto: la transacción se creó sin vínculo.",
+      "IMPORT_PDF_AMBIGUOUS_CELL": "Un monto o fecha del PDF cruza dos columnas y no se pudo leer con certeza.",
+      "IMPORT_PDF_BOTH_DEBIT_AND_CREDIT": "La fila del PDF trae débito y crédito a la vez; no se puede decidir el monto."
     },
     "warnings": {
       "IMPORT_FILE_ALREADY_IMPORTED": "Este mismo archivo ya se importó en esta cuenta el {date}. Puedes continuar: las filas ya importadas no se duplican.",
@@ -3874,7 +3876,7 @@
     "docUpload": {
       "intro": "Elige la cuenta del extracto y su archivo (hasta {max}). El archivo se guarda cifrado como documento del espacio de trabajo y se procesa en segundo plano; el formato se detecta por su contenido.",
       "file": "Extracto",
-      "fileHint": "CSV, OFX, QIF, JSON del esquema propio o XLSX.",
+      "fileHint": "CSV, OFX, QIF, JSON del esquema propio, XLSX o un PDF con texto de un banco soportado.",
       "profile": "Perfil de mapeo",
       "profileHint": "Opcional: por omisión se aplica solo el de la cuenta o el de su institución.",
       "profileAuto": "Automático",
@@ -4082,6 +4084,39 @@
       "archiveTitle": "Archivar el perfil «{name}»",
       "archiveBody": "Deja de sugerirse y aplicarse a importaciones nuevas; las ya hechas no cambian.",
       "keep": "Conservar"
+    },
+    "pdf": {
+      "title": "Lectura del extracto PDF",
+      "layout": "Diseño detectado: {id}, versión {version}.",
+      "pages": "Páginas leídas: {read} de {declared}.",
+      "pagesOnly": "Páginas leídas: {read}.",
+      "coherenceOk": "Los saldos y totales impresos en el extracto cuadran con los movimientos leídos.",
+      "chainGaps": "El saldo corrido del extracto no cuadra en alguna fila (advertencia; revísalas en la tabla).",
+      "openingDifference": "Diferencia entre el saldo inicial del extracto y el saldo de tu cuenta el día anterior: {amount}.",
+      "openingMatches": "El saldo inicial del extracto coincide con el saldo de tu cuenta el día anterior.",
+      "openingHint": "Una diferencia indica meses sin importar o movimientos manuales; puedes aprobar igual.",
+      "warning": {
+        "IMPORT_PDF_ACCOUNT_UNVERIFIED": "No pudimos verificar que el extracto sea de esta cuenta. Registra los últimos 4 dígitos de su número en la cuenta para que se verifique."
+      },
+      "failure": {
+        "title": "Detalle de la lectura del PDF",
+        "layout": "Diseño: {id}, versión {version}.",
+        "noText": "Páginas sin texto: {pages}.",
+        "unrecognized": "Líneas que no se pudieron leer (página:línea): {lines}.",
+        "difference": "Diferencia entre los saldos del extracto y los movimientos leídos: {amount}.",
+        "pages": "Se leyeron {read} páginas y el extracto declara {declared}.",
+        "reason": {
+          "TIMEOUT": "La lectura tardó más del tiempo permitido.",
+          "MEMORY": "El PDF necesitó más memoria de la permitida.",
+          "PAGE_LIMIT": "El PDF tiene más páginas de las permitidas.",
+          "TEXT_LIMIT": "El PDF tiene más texto del permitido.",
+          "MALFORMED": "El PDF está dañado o incompleto.",
+          "ENCRYPTED": "El PDF está protegido con contraseña."
+        }
+      },
+      "pin": "Fijar el diseño {id} v{version} en esta cuenta",
+      "pinHint": "Las próximas importaciones de esta cuenta usarán esa versión aunque el banco publique una nueva.",
+      "pinned": "Diseño fijado en un perfil PDF de la cuenta."
     }
   },
   "Debt": {

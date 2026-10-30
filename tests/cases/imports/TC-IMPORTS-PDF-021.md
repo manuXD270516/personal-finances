@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "la fila es una salida de 1325.00 BOB con fecha 2026-03-21, hora 13:40 y esa glosa completa"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-021 — Con el monto como ancla, la fecha y la hora de otra línea se asignan a su movimiento

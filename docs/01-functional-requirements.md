@@ -360,9 +360,11 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-IMPORTS-013 | Puerto `BankingProvider` (fuentes `bank_api`, `aggregator`, `exchange`) definido con contrato de sync incremental (cursor), mapeo a la misma etapa *normalize* del pipeline y almacenamiento de tokens solo cifrados (nunca credenciales de usuario). | Should | 6 | imports/banking-providers |
 | FR-IMPORTS-014 | Adapter de exchange (p.ej. export CSV de historial P2P/spot) que produce conversiones con `ConversionDetail`. | Should | 6 | imports/banking-providers |
 | FR-IMPORTS-015 | Adapters reales de bank API / agregador cuando existan para las instituciones del usuario. | Could | 11 | imports/banking-providers |
-| FR-IMPORTS-016 | Import de extractos **PDF** de bancos bolivianos mediante parsers por institución (best effort, siempre con preview). | Could | 11 | imports/import-pipeline |
+| FR-IMPORTS-016 | Import de extractos **PDF con texto** de bancos bolivianos mediante diseños por institución (BCP y Banco Ganadero; BNB sujeto a un extracto real; BISA, tarjetas de crédito y PDF escaneados fuera), siempre con vista previa y **falla cerrada** si los saldos del extracto no cuadran con los movimientos leídos. *(Adelantado de Phase 11 a Phase 6 y subido de Could a **Must** por D324 y D350: es la única vía hoy para el criterio de salida con los extractos reales; si el owner confirma una exportación CSV o XLS de su banco, se puede bajar a Should. `add-pdf-statement-parser`, change 57.)* | Must | 6 | imports/import-pipeline |
 | FR-IMPORTS-017 | Import desde XLS/XLSX. | Could | 6 | imports/import-pipeline |
 
+> **Estado (Phase 6, change 57 `add-pdf-statement-parser`):** FR-IMPORTS-016 queda cubierto por los diseños declarativos y versionados de `bo.bcp.cuenta`, `bo.ganadero.cuenta` y `bo.bnb.cuenta` (ADR-0032); ninguna entidad se publica como soportada hasta que el owner valide un extracto real (`pnpm imports:pdf:probe`).
+>
 > **Estado (Phase 6, change 54 `add-import-pipeline`):** FR-IMPORTS-001, 002 y 004 a 012 quedan cubiertos por `add-import-pipeline` (el orden del pipeline es lectura → normalización → validación → clasificación por reglas → duplicados → vista previa; las etapas son `stage` de `PROCESSING`). FR-IMPORTS-017 (XLSX) sigue **Could** (D331: se sube con evidencia de que un banco exporta XLSX; XLS binario fuera, D323).
 
 ## 15. RULES — Rules Engine

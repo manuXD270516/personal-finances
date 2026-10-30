@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-statement-reader.pdf.test.ts
+  - packages/contexts/imports/src/infrastructure/pdf/pdfjs-text-extractor.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "ese texto no aparece en la importación, en sus filas, en la auditoría, en los eventos ni en los logs"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-009 — El autor declarado en los metadatos del PDF no llega a la importación, la auditoría, los eventos ni los logs

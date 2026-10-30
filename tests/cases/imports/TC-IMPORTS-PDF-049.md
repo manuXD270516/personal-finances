@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pdf.test.tsx
+  - tests/e2e/specs/import-pdf.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf", "ui", "i18n"]
@@ -32,7 +34,7 @@ expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PDF_NO_TEXT` y sin filas"
   - "la interfaz indica descargar el extracto digital o registrar los movimientos a mano"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-049 — Desde el asistente, un PDF escaneado muestra el rechazo y la alternativa en es, en y pt

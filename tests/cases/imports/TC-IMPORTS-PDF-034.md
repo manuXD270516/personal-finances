@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PDF_TOTALS_MISMATCH` y una diferencia de 9.00 BOB, sin filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-034 — Un total de sección distinto de la suma de sus filas falla la importación

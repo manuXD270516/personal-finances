@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-statement-reader.pdf.test.ts
+  - packages/contexts/imports/src/infrastructure/pdf/pdfjs-text-extractor.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "la importación queda \"en revisión\" con sus 4 filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-008 — Un extracto con contraseña solo de propietario se lee como cualquier otro

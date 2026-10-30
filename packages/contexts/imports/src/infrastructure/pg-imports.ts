@@ -123,6 +123,7 @@ interface JobRow {
   reverted_by: string | null;
   rules_summary: ImportJobState['rulesSummary'];
   failure: ImportJobState['failure'];
+  pdf: ImportJobState['pdf'];
 }
 
 const JOB_COLUMNS = sql`
@@ -140,7 +141,7 @@ const JOB_COLUMNS = sql`
   j.version, j.source, j.document_id, j.format, j.mapping_profile_id, j.mapping_profile_version, j.profile_mapping,
   j.read_options, j.mapping_help, j.statement, j.reconciliation, j.revert,
   to_char(j.reverted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS reverted_at,
-  j.reverted_by, j.rules_summary, j.failure`;
+  j.reverted_by, j.rules_summary, j.failure, j.pdf`;
 
 const toJob = (r: JobRow): ImportJob =>
   ImportJob.rehydrate({
@@ -193,6 +194,7 @@ const toJob = (r: JobRow): ImportJob =>
     revertedBy: r.reverted_by,
     rulesSummary: r.rules_summary,
     failure: r.failure,
+    pdf: r.pdf,
   });
 
 const json = (value: unknown): string => JSON.stringify(value);
@@ -208,7 +210,7 @@ export class PgImportJobRepository implements ImportJobRepository {
          row_count, column_count, header, mapping, counters, progress, errors, warnings, approved_by, approved_at,
          completed_at, cancelled_at, cancelled_by, expires_at, created_by, created_at, updated_at, version,
          source, document_id, format, mapping_profile_id, mapping_profile_version, profile_mapping, read_options, mapping_help,
-         statement, reconciliation, revert, reverted_at, reverted_by, rules_summary, failure)
+         statement, reconciliation, revert, reverted_at, reverted_by, rules_summary, failure, pdf)
       VALUES
         (${s.id}, ${s.workspaceId}, ${s.accountId}, ${s.status}, ${s.originalName}, decode(${s.fileChecksum}, 'hex'),
          ${s.fileSizeBytes}, ${s.encoding}, ${s.delimiter}, ${s.rowCount}, ${s.columnCount}, ${json(s.header)}::jsonb,
@@ -221,7 +223,7 @@ export class PgImportJobRepository implements ImportJobRepository {
          ${s.mappingProfile?.version ?? null}, ${jsonOrNull(s.profileMapping)}::jsonb, ${jsonOrNull(s.readOptions)}::jsonb, ${jsonOrNull(s.mappingHelp)}::jsonb,
          ${jsonOrNull(s.statement)}::jsonb, ${jsonOrNull(s.reconciliation)}::jsonb, ${jsonOrNull(s.revert)}::jsonb,
          ${s.revertedAt}::timestamptz, ${s.revertedBy}, ${jsonOrNull(s.rulesSummary)}::jsonb,
-         ${jsonOrNull(s.failure)}::jsonb)`.execute(db());
+         ${jsonOrNull(s.failure)}::jsonb, ${jsonOrNull(s.pdf)}::jsonb)`.execute(db());
   }
 
   async findById(workspaceId: string, id: string, options?: { readonly lock?: 'update' }) {
@@ -243,7 +245,7 @@ export class PgImportJobRepository implements ImportJobRepository {
         profile_mapping = ${jsonOrNull(s.profileMapping)}::jsonb, read_options = ${jsonOrNull(s.readOptions)}::jsonb, mapping_help = ${jsonOrNull(s.mappingHelp)}::jsonb,
         statement = ${jsonOrNull(s.statement)}::jsonb, reconciliation = ${jsonOrNull(s.reconciliation)}::jsonb,
         revert = ${jsonOrNull(s.revert)}::jsonb, reverted_at = ${s.revertedAt}::timestamptz, reverted_by = ${s.revertedBy},
-        rules_summary = ${jsonOrNull(s.rulesSummary)}::jsonb, failure = ${jsonOrNull(s.failure)}::jsonb,
+        rules_summary = ${jsonOrNull(s.rulesSummary)}::jsonb, failure = ${jsonOrNull(s.failure)}::jsonb, pdf = ${jsonOrNull(s.pdf)}::jsonb,
         counters = ${json(s.counters)}::jsonb, progress = ${json(s.progress)}::jsonb, errors = ${json(s.errors)}::jsonb,
         warnings = ${json(s.warnings)}::jsonb, approved_by = ${s.approvedBy}, approved_at = ${s.approvedAt}::timestamptz,
         completed_at = ${s.completedAt}::timestamptz, cancelled_at = ${s.cancelledAt}::timestamptz,

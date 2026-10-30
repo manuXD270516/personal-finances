@@ -2,16 +2,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/imports/imports.profile.v1.schema.json",
   "title": "imports.profile.v1",
-  "description": "Opciones de lectura de un perfil de mapeo por institución (superconjunto de imports.mapping.v1). CSV y XLSX exigen `mapping` (fecha, descripción y monto); OFX, JSON y QIF son autodescritos y solo aportan `descriptionCleanup` (prefijos literales, no expresiones regulares) y, en QIF, `dateOrder`. Cada columna se referencia por posición y opcionalmente por el nombre del encabezado, que el sistema compara sin mayúsculas ni acentos.",
+  "description": "Opciones de lectura de un perfil de mapeo por institución (superconjunto de imports.mapping.v1). CSV y XLSX exigen `mapping` (fecha, descripción y monto); OFX, JSON y QIF son autodescritos y solo aportan `descriptionCleanup` (prefijos literales, no expresiones regulares) y, en QIF, `dateOrder`; PDF exige `pdfLayout` (id y versión del diseño) y admite `descriptionCleanup`. Cada columna se referencia por posición y opcionalmente por el nombre del encabezado, que el sistema compara sin mayúsculas ni acentos.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "version": { "const": "imports.profile.v1" },
     "mapping": { "$ref": "#/$defs/Mapping" },
     "descriptionCleanup": { "$ref": "#/$defs/Cleanup" },
-    "dateOrder": { "enum": ["DMY", "MDY"] }
+    "dateOrder": { "enum": ["DMY", "MDY"] },
+    "pdfLayout": { "$ref": "#/$defs/PdfLayoutRef" }
   },
   "$defs": {
+    "PdfLayoutRef": {
+      "description": "PDF: diseño de extracto publicado que el perfil fija (id y versión). Un perfil PDF no edita columnas (openspec add-pdf-statement-parser).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
     "Column": {
       "type": "object",
       "additionalProperties": false,

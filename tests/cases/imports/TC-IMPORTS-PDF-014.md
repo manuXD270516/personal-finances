@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PDF_LAYOUT_UNKNOWN` y sin filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-014 — Un PDF con texto sin los rótulos de ningún diseño falla con IMPORT_PDF_LAYOUT_UNKNOWN

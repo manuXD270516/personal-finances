@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - apps/web/src/ui/imports/pdf.test.tsx
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-statement-reader.pdf.test.ts
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +36,7 @@ expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PDF_NO_TEXT` y sin filas"
   - "la interfaz indica descargar el extracto digital o registrar los movimientos a mano"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-010 — Un PDF de solo imágenes falla con IMPORT_PDF_NO_TEXT y la interfaz indica la alternativa

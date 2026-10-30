@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "la importación registra el saldo del extracto de 2640.00 a 12050.66 BOB y tiene 11 filas, sin la fila \"Saldo anterior\""
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-035 — La fila de saldo anterior y el total del pie son saldos del extracto y no movimientos

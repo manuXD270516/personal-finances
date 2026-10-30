@@ -165,5 +165,11 @@
   "ATTACHMENT_LIMIT_EXCEEDED": "Este item já tem o número máximo de anexos. Remova um para adicionar outro.",
   "RULE_INVALID_REGEX": "A expressão regular é inválida ou usa construções sem avaliação em tempo linear (referências para trás, lookaround ou mais de 200 caracteres).",
   "RULE_LIMIT_EXCEEDED": "O espaço de trabalho atingiu o máximo de regras. Arquive alguma para criar outra.",
-  "RULE_DRY_RUN_STALE": "Uma regra ou uma transação mudou depois da execução. Nada foi aplicado: execute novamente."
+  "RULE_DRY_RUN_STALE": "Uma regra ou uma transação mudou depois da execução. Nada foi aplicado: execute novamente.",
+  "IMPORT_PDF_NO_TEXT": "Este PDF não tem texto (parece digitalizado ou fotografado). Baixe o extrato digital no internet banking ou registre os lançamentos à mão.",
+  "IMPORT_PDF_LAYOUT_UNKNOWN": "Este PDF tem texto, mas não corresponde a nenhum formato de extrato conhecido. Baixe o extrato da conta (não o do cartão) no internet banking; se o banco mudou o formato, avise-nos.",
+  "IMPORT_PDF_EXTRACTION_FAILED": "Não conseguimos ler o PDF dentro dos limites de segurança (tempo, memória, páginas ou arquivo danificado). Baixe-o novamente no internet banking.",
+  "IMPORT_PDF_TOTALS_MISMATCH": "Os saldos e totais do extrato não batem com as linhas que lemos, por isso não importamos nada para não deixar um saldo errado. Os detalhes indicam as páginas e linhas a revisar.",
+  "IMPORT_PDF_PAGE_COUNT_MISMATCH": "O extrato declara mais páginas do que o PDF tem. Baixe-o completo novamente.",
+  "IMPORT_PDF_ACCOUNT_MISMATCH": "O extrato é de outra conta que não a escolhida (os últimos 4 dígitos não coincidem). Escolha a conta certa e tente novamente."
 }

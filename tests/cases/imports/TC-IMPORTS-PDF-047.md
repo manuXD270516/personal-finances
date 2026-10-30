@@ -12,9 +12,10 @@ invariants: []
 priority: low
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-probe.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +33,7 @@ expected_result:
   - "la salida informa el diseño `bo.ganadero.cuenta` versión 1, 2 páginas, 11 filas y la coherencia correcta"
   - "no contiene ningún monto, descripción, nombre ni número de cuenta del extracto"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-047 — El diagnóstico local informa la estructura del extracto sin montos, descripciones ni cuentas

@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: security
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdfjs-text-extractor.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PDF_EXTRACTION_FAILED` y el motivo de páginas, sin leer el contenido de ninguna página"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-006 — Un PDF de 201 páginas falla por el límite de páginas antes de leer el contenido
