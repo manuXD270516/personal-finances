@@ -22,6 +22,7 @@ import { defaultPeriodId, formatBusinessDate, newestFirst, periodName, type Fina
 import { loadPeriods } from './PeriodsPage';
 import { PeriodSelector } from './PeriodSelector';
 import { PlanningNav } from './PlanningNav';
+import { AttachmentsSection } from '../documents/AttachmentsSection';
 
 export function CloseMonthPage({ periodId }: { periodId?: string | undefined }) {
   return <WithWorkspace>{(ctx) => <CloseMonth ctx={ctx} periodId={periodId} />}</WithWorkspace>;
@@ -287,6 +288,7 @@ function CloseMonth({ ctx, periodId }: { ctx: WorkspaceContext; periodId: string
           ) : null}
         </>
       )}
+      {period ? <AttachmentsSection targetType="MONTH_CLOSING" targetId={period.id} /> : null}
     </section>
   );
 }

@@ -110,3 +110,58 @@ export async function ensureExportsBucket(
     }
   }
 }
+
+/**
+ * Solo local/CI: bucket de CUARENTENA de las subidas directas de documentos (openspec add-document-attachments,
+ * decisión 2). SIN versioning (un DELETE borra de verdad el texto plano) y con CORS SOLO para el origen de la app:
+ * `PUT`/`HEAD`, cabeceras libres (la firma exige `content-type` y `x-amz-checksum-sha256`) y `ETag` expuesto.
+ */
+export async function ensureQuarantineBucket(
+  s3: S3Client,
+  options: {
+    readonly bucket: string;
+    readonly corsOrigins: readonly string[];
+    readonly logger: Logger;
+    readonly attempts?: number;
+    readonly delayMs?: number;
+  },
+): Promise<void> {
+  const attempts = options.attempts ?? 30;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      let created = false;
+      try {
+        await s3.send(new HeadBucketCommand({ Bucket: options.bucket }));
+      } catch (err) {
+        if (httpStatus(err) !== 404) throw err;
+        await s3.send(new CreateBucketCommand({ Bucket: options.bucket }));
+        created = true;
+      }
+      if (options.corsOrigins.length > 0) {
+        await s3.send(
+          new PutBucketCorsCommand({
+            Bucket: options.bucket,
+            CORSConfiguration: {
+              CORSRules: [
+                {
+                  AllowedOrigins: [...options.corsOrigins],
+                  AllowedMethods: ['PUT', 'HEAD'],
+                  AllowedHeaders: ['*'],
+                  ExposeHeaders: ['ETag'],
+                  MaxAgeSeconds: 600,
+                },
+              ],
+            },
+          }),
+        );
+      }
+      options.logger.info({ bucket: options.bucket, created }, 'quarantine bucket ready');
+      return;
+    } catch (err) {
+      const status = httpStatus(err);
+      if ((status === 400 || status === 403) && attempt > 3) throw err;
+      if (attempt >= attempts) throw err;
+      await new Promise((r) => setTimeout(r, options.delayMs ?? 1000));
+    }
+  }
+}

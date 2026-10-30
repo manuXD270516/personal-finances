@@ -500,3 +500,10 @@ export const DEBT_AUDIT_POLICY = {
 } as const satisfies AuditFieldPoliciesDto;
 
 export * from './portability.js';
+
+// ───────────────────────────────────────────── add-document-attachments (DOCUMENTS)
+
+/** Existencia de préstamos en el workspace (consulta aditiva para los adjuntos de DOCUMENTS; sin FK cruzadas). */
+export interface LoanExistenceQuery {
+  existing(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
+}

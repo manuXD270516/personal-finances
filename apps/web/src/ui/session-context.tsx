@@ -132,6 +132,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+/** Como `useSession`, pero `undefined` fuera de un `SessionProvider` (componentes opcionales de las vistas). */
+export function useOptionalSession(): SessionContextValue | undefined {
+  return useContext(Ctx);
+}
+
 export function useSession(): SessionContextValue {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useSession fuera de SessionProvider');

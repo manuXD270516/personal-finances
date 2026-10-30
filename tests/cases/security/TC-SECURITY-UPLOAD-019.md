@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Escaneo antimalware opcional"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-008"
 nfr: []
@@ -13,8 +13,9 @@ invariants: []
 priority: low
 type: security
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/application/uploads.service.test.ts", "packages/contexts/documents/src/infrastructure/malware-scanners.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

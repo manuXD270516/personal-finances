@@ -42,6 +42,10 @@ export class InMemoryPortability {
   zipContent: Buffer = Buffer.from('PK-fake-zip with Bank A');
   manifest: ExportManifest | undefined;
   buildFailure: Error | undefined;
+  /** Contenidos de documentos que entrega el puerto `DocumentContentsExporter` (ZIP de contenidos ficticio). */
+  contentsZip: Buffer = Buffer.from('PK-fake-contents-zip');
+  contentsCount = 3;
+  contentsFailure: Error | undefined;
   importFailure: Error | undefined;
   readonly importCalls: { newWorkspaceId: string; name: string }[] = [];
   reauthMaxAgeSeconds = 600;
@@ -185,6 +189,11 @@ export class InMemoryPortability {
         async put(key, body) {
           self.objects.set(key, Buffer.from(body));
         },
+        async putStream(key, source) {
+          const chunks: Buffer[] = [];
+          for await (const c of source) chunks.push(Buffer.from(c));
+          self.objects.set(key, Buffer.concat(chunks));
+        },
         async openStream(key) {
           const o = self.objects.get(key);
           if (!o) throw new ObjectMissingError(key);
@@ -205,6 +214,17 @@ export class InMemoryPortability {
             encrypted: fakeSeal(Buffer.concat([Buffer.from(`${context}\n`), plain])),
             keyId: 'k1',
             wrappedKey: Buffer.from('wrapped'),
+          };
+        },
+        async sealStream(plainStream, context) {
+          const chunks: Buffer[] = [];
+          for await (const c of plainStream) chunks.push(c as Buffer);
+          const plain = Buffer.concat(chunks);
+          return {
+            encrypted: Readable.from([fakeSeal(Buffer.concat([Buffer.from(`${context}\n`), plain]))]),
+            keyId: 'k1',
+            wrappedKey: Buffer.from('wrapped'),
+            stats: () => ({ sha256: createHash('sha256').update(plain).digest('hex'), size: plain.length }),
           };
         },
         async open(enc, _wrapped: WrappedDataKey, context) {
@@ -229,6 +249,12 @@ export class InMemoryPortability {
           for await (const c of source) chunks.push(c as Buffer);
           const opened = fakeOpen(Buffer.concat(chunks));
           return Readable.from([opened.subarray(Buffer.from(`${context}\n`).length)]);
+        },
+      },
+      contents: {
+        async open() {
+          if (self.contentsFailure) throw self.contentsFailure;
+          return { stream: Readable.from([self.contentsZip]), count: self.contentsCount };
         },
       },
       builder: {

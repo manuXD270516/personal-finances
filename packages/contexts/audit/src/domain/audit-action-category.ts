@@ -29,6 +29,10 @@ export const SECURITY_ACTIONS = [
   'identity.export.downloaded',
   'identity.export.discarded',
   'identity.export.expired',
+  // add-document-attachments (tarea 8.2/8.3): el archivo de contenidos del export y su restauración también son de seguridad.
+  'identity.export.contents_downloaded',
+  'documents.contents_restore.requested',
+  'documents.contents_restore.completed',
   'identity.import.requested',
   'identity.import.rejected',
   'identity.import.succeeded',
@@ -55,6 +59,8 @@ export const DATA_ACTION_ENTITIES = [
   'classification.custom_field',
   'classification.tag',
   // add-loans (Phase 4): préstamos, tablas del banco y comparaciones; y las transacciones administradas del préstamo.
+  // add-document-attachments (Phase 6): documentos adjuntos (metadatos; nunca el contenido ni el nombre original).
+  'documents.document',
   'debt.loan',
   'debt.loan_comparison',
   'debt.loan_reference',

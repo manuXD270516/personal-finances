@@ -115,3 +115,5 @@ Informe completo y evidencia: [spikes/SPIKE-07-object-storage/README.md](../../s
 - Endpoint S3 público (firma de URLs para el navegador) separado del interno.
 
 **Correcciones a esta ADR/docs:** RustFS publicó 1.0.0 estable el 2026-09-16 (la nota "sin 1.0 estable" quedó desactualizada). El puerto de host 9000/9001 previsto en docs/19 colisiona con otro MinIO en la máquina del owner; elegir otro default.
+
+**Nota 2026-10-29 (ADR-0030):** para los documentos adjuntos, la descarga ya no es un presigned GET sino un streaming por la API, el cifrado en reposo es de la aplicación (cifrado de sobre, no SSE del almacenamiento) y la verificación del archivo ocurre de forma síncrona en la confirmación (plan B: un consumidor del worker). El resto de esta ADR sigue vigente.

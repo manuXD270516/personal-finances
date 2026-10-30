@@ -12,17 +12,21 @@ value_of() { sed -n "s/^$1=//p" "${ENV_FILE}" | tail -n 1; }
 
 bucket="$(value_of OBJECT_STORAGE_BUCKET)"
 exports_bucket="$(value_of OBJECT_STORAGE_EXPORTS_BUCKET)"
+quarantine_bucket="$(value_of OBJECT_STORAGE_QUARANTINE_BUCKET)"
+files_origin="https://$(value_of PF_DOMAIN_FILES)"
 origin="https://$(value_of PF_DOMAIN_APP)"
-[ -n "${bucket}" ] && [ -n "${exports_bucket}" ] && [ "${origin}" != "https://" ] || {
-  echo "faltan OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_EXPORTS_BUCKET o PF_DOMAIN_APP en ${ENV_FILE}" >&2
+[ -n "${bucket}" ] && [ -n "${exports_bucket}" ] && [ -n "${quarantine_bucket}" ] && [ "${origin}" != "https://" ] || {
+  echo "faltan OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_EXPORTS_BUCKET, OBJECT_STORAGE_QUARANTINE_BUCKET o PF_DOMAIN_APP en ${ENV_FILE}" >&2
   exit 1
 }
+# CORS de la cuarentena (subida directa desde el navegador): SOLO PUT/HEAD y SOLO el origen de la app; expone ETag.
+qcors="$(printf '{"CORSRules":[{"AllowedOrigins":["%s"],"AllowedMethods":["PUT","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":600}]}' "${origin}")"
 cors="$(printf '{"CORSRules":[{"AllowedOrigins":["%s"],"AllowedMethods":["GET","PUT","POST","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag","x-amz-version-id","x-amz-checksum-sha256"],"MaxAgeSeconds":600}]}' "${origin}")"
 
 AWS_ACCESS_KEY_ID="$(value_of PF_DEV_S3_ACCESS_KEY)" AWS_SECRET_ACCESS_KEY="$(value_of PF_DEV_S3_SECRET_KEY)" \
   docker run --rm -i --network pfos_default --read-only --tmpfs /tmp \
   -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=us-east-1 \
-  -e BUCKET="${bucket}" -e EXPORTS_BUCKET="${exports_bucket}" -e CORS="${cors}" --entrypoint /bin/sh "${AWS_CLI_IMAGE}" <<'EOF'
+  -e BUCKET="${bucket}" -e EXPORTS_BUCKET="${exports_bucket}" -e QUARANTINE_BUCKET="${quarantine_bucket}" -e CORS="${cors}" -e QCORS="${qcors}" --entrypoint /bin/sh "${AWS_CLI_IMAGE}" <<'EOF'
 set -eu
 s3() { aws --endpoint-url http://object-storage:8333 s3api "$@"; }
 s3 head-bucket --bucket "$BUCKET" 2>/dev/null || s3 create-bucket --bucket "$BUCKET"
@@ -32,5 +36,9 @@ s3 get-bucket-versioning --bucket "$BUCKET"
 # Exports del workspace: sin versioning y con lifecycle de 8 días como red de seguridad de la retención de 7 días.
 s3 head-bucket --bucket "$EXPORTS_BUCKET" 2>/dev/null || s3 create-bucket --bucket "$EXPORTS_BUCKET"
 s3 put-bucket-lifecycle-configuration --bucket "$EXPORTS_BUCKET" --lifecycle-configuration \n  '{"Rules":[{"ID":"expire-exports","Status":"Enabled","Filter":{"Prefix":""},"Expiration":{"Days":8}}]}' || echo "lifecycle no soportado: la retención la aplica el job identity.export-retention" >&2
+# Cuarentena de documentos: SIN versioning (un DELETE borra el texto plano de verdad) y CORS solo PUT/HEAD del origen de la app.
+s3 head-bucket --bucket "$QUARANTINE_BUCKET" 2>/dev/null || s3 create-bucket --bucket "$QUARANTINE_BUCKET"
+s3 put-bucket-cors --bucket "$QUARANTINE_BUCKET" --cors-configuration "$QCORS"
 EOF
+echo "bucket de cuarentena ${quarantine_bucket} listo (sin versioning; CORS solo PUT/HEAD para ${origin}; entra por ${files_origin})"
 echo "bucket ${bucket} listo (versioning + CORS para ${origin}); bucket de exports ${exports_bucket} listo"

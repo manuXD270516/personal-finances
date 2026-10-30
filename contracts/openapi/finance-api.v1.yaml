@@ -66,12 +66,12 @@ tags:
     description: "Phase 3: recurring definitions, occurrences, committed amount and upcoming payments (add-recurrence-engine); subscriptions with price history, price-change detection, cost and reminders (add-subscriptions)."
   - name: Goals
     description: "Phase 4: savings goals with real contributions (transfer) or earmarks, progress and tracking derived on read, reservations per account, contribution plans and suggestions (add-savings-goals)."
+  - name: Documents
+    description: "Phase 6: document attachments (add-document-attachments): direct upload to a quarantine bucket with a presigned PUT, synchronous verification by content, envelope encryption by the application, N:M links to transactions, conversions, loans, subscriptions, accounts, imports and month closings, quota, archive, delete and download through the API only."
   - name: Debt
     description: "Phase 4: loans (register, disburse, payments with breakdown, installment commitments), French amortization schedules and comparison with the bank table (add-loans). Credit cards and statements: LATER."
   - name: FxRates
     description: "Phase 1 (docs/31 D29, ADR-0025): market rate providers (paralelo.bo primary, bo.dolarapi.com fallback/official), provider status and anomaly review. Manual rates are under FX. More providers, crypto and commodities: Phase 5."
-  - name: Documents
-    description: "LATER (Phase 6): documents, presigned uploads/downloads and attachment links."
   - name: Imports
     description: "Phase 3 (docs/35 D122, FR-IMPORTS-003): basic CSV import of one account (upload, manual column mapping, preview, approval, asynchronous persistence by batches). Phase 6 adds documents, presigned uploads, mapping profiles, rules, other formats and connections."
   - name: Rules
@@ -380,6 +380,22 @@ paths:
       x-rate-limit: costly
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        description: |
+          Optional. `includeDocumentContents: true` also produces, after the main archive, a SEPARATE encrypted file with the
+          contents of every `AVAILABLE` document (the main archive keeps carrying only the metadata and the links). It
+          expires and is discarded together with the export; download it with `downloadWorkspaceExportDocumentContents` and
+          restore it into the imported workspace with `restoreDocumentContents`. Without document storage configured ⇒ 503.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                includeDocumentContents:
+                  type: boolean
+                  default: false
       responses:
         '202':
           description: Export accepted; poll the operation or the export.
@@ -467,6 +483,48 @@ paths:
         '200':
           description: >-
             The export archive as an attachment (`Content-Disposition: attachment; filename="pfos-export-<workspace>-<date>.zip"`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+            Repr-Digest:
+              description: 'RFC 9530: SHA-256 of the plain archive, `sha-256=:<base64>:`.'
+              schema: { type: string }
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/Gone' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/exports/{exportId}/document-contents/download:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ExportId'
+    get:
+      tags: [Identity]
+      operationId: downloadWorkspaceExportDocumentContents
+      summary: Download the document contents file of an export (OWNER, recent authentication)
+      description: |
+        Streams the DECRYPTED `application/zip` with the contents of the documents (an index `documents-manifest.json`
+        first, then one `documents/<documentId>` entry per document, stored without compression). Same rules as
+        `downloadWorkspaceExport`: the whole encrypted object is authenticated and its SHA-256 checked before a single byte is
+        sent (422 `EXPORT_FILE_CORRUPTED`), `Repr-Digest` carries the SHA-256, OWNER with a recent authentication
+        (403 `REAUTHENTICATION_REQUIRED`), not finished ⇒ 409 `EXPORT_NOT_READY`, expired or discarded ⇒ 410 `EXPORT_EXPIRED`.
+        An export requested without `includeDocumentContents` answers 404. Every download is audited
+        (`identity.export.contents_downloaded`). There is NO presigned URL.
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: OWNER
+      responses:
+        '200':
+          description: >-
+            The contents archive as an attachment (`Content-Disposition: attachment; filename="pfos-export-<workspace>-<date>-documentos.zip"`).
           headers:
             Content-Disposition:
               description: Always `attachment` with a safe ASCII file name.
@@ -6330,10 +6388,11 @@ paths:
       operationId: getOperation
       summary: Poll a long-running operation (202 + operation pattern)
       description: |
-        Asynchronous operations (`202 + Location`, docs/10 §8). Phase 2 has a single kind, `EXPORT` (the workspace
-        export of `identity/workspace-portability`, created by `requestWorkspaceExport`): `PENDING → RUNNING → SUCCEEDED |
-        FAILED`, with `progressPct`, the `result` (`exportId`, `expiresAt`) or the failure as a problem. OWNER only
-        (the same role that requests and downloads the export).
+        Asynchronous operations (`202 + Location`, docs/10 §8). Kinds: `EXPORT` (the workspace export of
+        `identity/workspace-portability`, created by `requestWorkspaceExport`) and `DOCUMENT_CONTENTS_RESTORE` (created by
+        `restoreDocumentContents`; its `result` is `{ restored, alreadyAvailable, mismatched, absent }`): `PENDING → RUNNING →
+        SUCCEEDED | FAILED`, with `progressPct`, the `result` (`exportId`, `expiresAt` for an export) or the failure as a
+        problem. OWNER only (the same role that requests and downloads the export).
       x-openspec-capability: [platform/api-conventions, identity/workspace-portability]
       x-required-role: OWNER
       responses:
@@ -10668,6 +10727,519 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ──────────────── Documents: adjuntos de documentos (add-document-attachments, documents/attachments) ────────────────
+  /workspaces/{workspaceId}/documents/uploads:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Documents]
+      operationId: requestDocumentUpload
+      summary: Request the direct upload of a file (OWNER or EDITOR)
+      description: |
+        Registers the document as `PENDING_UPLOAD` and returns a presigned `PUT` to the QUARANTINE bucket (valid
+        `DOCUMENT_UPLOAD_URL_TTL`, 5 minutes by default and never more than 10) bound to the EXACT size, the content type and the
+        SHA-256 declared: the API never receives the file. The browser must send `upload.headers` as given.
+        The declaration is validated against the allow-list (`pdf`, `png`, `jpg`, `jpeg`, `webp`, `heic`, `csv`, `ofx`, `qfx`,
+        `qif`, `json`, `xlsx`; any other extension or a type that does not match the extension answers 422
+        `UPLOAD_TYPE_NOT_ALLOWED`), the size limit of the purpose (15 MiB for documents and 20 MiB for `IMPORT_SOURCE`, hard cap
+        25 MiB: 413 `UPLOAD_TOO_LARGE`; an empty file answers 400) and the workspace quota (422 `DOCUMENT_QUOTA_EXCEEDED`, 409
+        `DOCUMENT_PENDING_UPLOADS_EXCEEDED`; two concurrent requests for the last space register exactly one).
+        If the workspace already has an `AVAILABLE` document with the same `sha256`, that document is returned (200,
+        `deduplicated: true`, `upload: null`) and no quota is consumed. A VIEWER answers 403 `INSUFFICIENT_ROLE`.
+        Counts against the `costly` quota (10 per user and minute); an idempotent replay does not.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DocumentUploadRequest' }
+      responses:
+        '200':
+          description: The workspace already had the same content (`deduplicated`); no upload is needed
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentUploadResult' }
+        '201':
+          description: Document registered and upload URL issued
+          headers:
+            Location: { schema: { type: string }, description: URL of the document }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentUploadResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'DOCUMENT_PENDING_UPLOADS_EXCEEDED or IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'UPLOAD_TYPE_NOT_ALLOWED, DOCUMENT_QUOTA_EXCEEDED or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/content-restores:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Documents]
+      operationId: restoreDocumentContents
+      summary: Restore the contents of the imported documents from an export contents file (OWNER, recent authentication, asynchronous)
+      description: |
+        Uploads the contents file downloaded with `downloadWorkspaceExportDocumentContents` (`multipart/form-data`, field `file`)
+        and restores, in the background, the content of every `CONTENT_PENDING` document of the workspace whose SHA-256 appears
+        in the file's index. The upload is STREAMED to the quarantine bucket (never held in memory); the maximum size is the
+        workspace storage quota plus a small margin (413 `UPLOAD_TOO_LARGE`) and a file that is not a contents archive answers 422
+        `EXPORT_FORMAT_UNSUPPORTED`. Each content is verified like a new upload (checksum against the index, structural inspection
+        and malware scan), encrypted with NEW keys and the document becomes `AVAILABLE`, one unit of work per document. A
+        content that does not match (`CHECKSUM_MISMATCH`, or the inspection reason) leaves its document `CONTENT_PENDING`.
+        Idempotent per document: restoring the same file again changes nothing. The final `Operation.result` is
+        `{ restored, alreadyAvailable, mismatched: [{ documentId, reason }], absent: [documentId] }`. Requires the OWNER role and a
+        recent authentication (403 `REAUTHENTICATION_REQUIRED`). Counts against the `costly` quota (10 per user and minute); the
+        uploaded file is part of the idempotency payload (same key with another file ⇒ 422 `IDEMPOTENCY_KEY_REUSED`). Audited
+        (`documents.contents_restore.*`).
+      x-openspec-capability: [identity/workspace-portability]
+      x-required-role: OWNER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The document contents archive (`application/zip`) of an export.
+      responses:
+        '202':
+          description: Restore accepted; poll `getOperation` (kind `DOCUMENT_CONTENTS_RESTORE`).
+          headers:
+            Location:
+              description: URL of the operation (`/api/v1/workspaces/{workspaceId}/operations/{operationId}`).
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Operation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/usage:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Documents]
+      operationId: getDocumentStorageUsage
+      summary: Storage usage and quota of the workspace
+      description: Every member (VIEWER included) can read the used, reserved and total quota and the pending uploads.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Storage usage
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentStorageUsage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: List the documents of the workspace (newest first)
+      description: |
+        Without `status` only the usable documents (`AVAILABLE` and `CONTENT_PENDING`) are returned; archived documents only
+        with `archived=only|include`. Filter by `purpose`, `status` or the element a document is attached to
+        (`targetType` together with `targetId`). Each item carries its `links`. Never returns documents of another workspace.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: VIEWER
+      parameters:
+        - name: purpose
+          in: query
+          schema: { $ref: '#/components/schemas/DocumentPurpose' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/DocumentStatus' }
+        - name: archived
+          in: query
+          description: '`exclude` (default), `only` or `include`.'
+          schema: { type: string, enum: [exclude, only, include], default: exclude }
+        - name: targetType
+          in: query
+          schema: { $ref: '#/components/schemas/AttachmentTargetType' }
+        - name: targetId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Documents page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Get one document with its links
+      description: A document of another workspace answers 404 `RESOURCE_NOT_FOUND`, exactly like a non-existent one.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The document
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Delete a document (OWNER or EDITOR)
+      description: |
+        The content becomes unrecoverable (the wrapped data key is destroyed in the same transaction and the object and all
+        its versions are deleted afterwards), the links are removed, the metadata are kept in `DELETED` and the size is
+        released from the quota. No transaction or journal entry changes. A document that is not `AVAILABLE` or
+        `CONTENT_PENDING` answers 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+    post:
+      tags: [Documents]
+      operationId: completeDocumentUpload
+      summary: Confirm the upload and verify the file (OWNER or EDITOR)
+      description: |
+        Verifies synchronously, outside any database transaction: the object exists with the declared size, its SHA-256, the
+        real type by content (signature and structure, never the name or the declared type), the controls of each format
+        (PDF without active content or user password, text without active markup or null bytes, JSON depth, XLSX without
+        macros or compression bombs), the optional antimalware scan, and finally encrypts the content with its own data key
+        and moves it out of the quarantine. The answer is 200 with the document in its FINAL state: `AVAILABLE`, or
+        `REJECTED` with a `rejectionReason` (a rejection is the result of the verification, not an error of the request).
+        Confirming again a verified document returns the same result without verifying again. A missing object answers 409
+        `DOCUMENT_UPLOAD_MISSING` and the document stays pending. Too many verifications in progress, an unavailable scanner or
+        storage answer 503 with `Retry-After` and the document stays pending or uploaded (it is retried). The operation is
+        naturally idempotent, so `Idempotency-Key` is optional. Counts against the `costly` quota.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '200':
+          description: The document in its final state
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'DOCUMENT_UPLOAD_MISSING or INVALID_STATUS_TRANSITION.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}/download:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: downloadDocument
+      summary: Download an available document through the API (any member)
+      description: |
+        The ONLY way to read a content: there are no presigned download URLs because the object store only holds ciphertext
+        (envelope encryption by the application). The content is decrypted in streaming, verified block by block
+        (a tampered object answers 422 `DOCUMENT_CONTENT_CORRUPTED` with no unverified bytes) and always delivered as an
+        attachment: `Content-Type` is the canonical type of the detected format, `X-Content-Type-Options: nosniff`,
+        `Content-Security-Policy: sandbox; default-src 'none'`, `Cache-Control: private, no-store`, a safely encoded
+        `Content-Disposition` and `Repr-Digest: sha-256=:<base64>:`. Each download is audited (before the body) without the
+        file name. A pending, rejected or deleted document answers 409 `DOCUMENT_NOT_AVAILABLE`, 409 `DOCUMENT_REJECTED` or
+        410 `DOCUMENT_DELETED`.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: The original content as an attachment
+          headers:
+            Content-Disposition: { schema: { type: string }, description: Always `attachment` with an encoded file name }
+            X-Content-Type-Options: { schema: { type: string } }
+            Content-Security-Policy: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
+            Repr-Digest: { schema: { type: string }, description: 'RFC 9530 SHA-256 of the content.' }
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+            image/heic: { schema: { type: string, format: binary } }
+            text/csv: { schema: { type: string, format: binary } }
+            application/x-ofx: { schema: { type: string, format: binary } }
+            application/qif: { schema: { type: string, format: binary } }
+            application/json: { schema: { type: string, format: binary } }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'DOCUMENT_NOT_AVAILABLE or DOCUMENT_REJECTED.'
+        '410': { $ref: '#/components/responses/Gone' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'DOCUMENT_CONTENT_CORRUPTED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}/links:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+    post:
+      tags: [Documents]
+      operationId: linkDocument
+      summary: Attach an available document to an element of the workspace (OWNER or EDITOR)
+      description: |
+        Many to many: a document can be attached to several elements and an element can have several documents. Attaching
+        twice returns the existing link (200). The element must exist in the workspace (422 `REFERENCE_NOT_FOUND`, also for an
+        element of another workspace); `targetType` outside the supported set answers 400. Allowed on elements of a closed
+        period (no entry or period changes, D65). At most `DOCUMENT_MAX_LINKS_PER_TARGET` (20) documents per element: 409
+        `ATTACHMENT_LIMIT_EXCEEDED`. A pending, rejected or deleted document answers 409 `DOCUMENT_NOT_AVAILABLE`, 409
+        `DOCUMENT_REJECTED` or 410 `DOCUMENT_DELETED` without creating the link.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttachmentLinkRequest' }
+      responses:
+        '200':
+          description: The link already existed
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentLink' }
+        '201':
+          description: Link created
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentLink' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'DOCUMENT_NOT_AVAILABLE, DOCUMENT_REJECTED, ATTACHMENT_LIMIT_EXCEEDED or IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '410': { $ref: '#/components/responses/Gone' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}/links/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+      - $ref: '#/components/parameters/DocumentLinkId'
+    delete:
+      tags: [Documents]
+      operationId: unlinkDocument
+      summary: Remove the link between a document and an element (OWNER or EDITOR)
+      description: The document is kept with its other links. Removing its last link starts the retention clock of unlinked documents.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: EDITOR
+      responses:
+        '204': { description: Link removed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+    post:
+      tags: [Documents]
+      operationId: archiveDocument
+      summary: Archive a document (OWNER or EDITOR)
+      description: An archived document leaves the default list, keeps its links, stays downloadable and is exempt from the purge of unlinked documents.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: The archived document
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+    post:
+      tags: [Documents]
+      operationId: unarchiveDocument
+      summary: Unarchive a document (OWNER or EDITOR)
+      description: Returns the document to the default list; the retention clock of unlinked documents applies again.
+      x-openspec-capability: [documents/attachments]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: The unarchived document
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/documents/{documentId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: getDocumentLifecycle
+      summary: Lifecycle of a document
+      description: |
+        Machine `Document` (docs/31 D37): request upload, confirm, accept, reject, expire, delete, purge and restore content;
+        archiving, unarchiving, linking and unlinking are annotations. Any member who can see the document can read it.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Lifecycle of a document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -10970,6 +11542,18 @@ components:
       in: path
       required: true
       description: Savings goal UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      description: Document UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    DocumentLinkId:
+      name: linkId
+      in: path
+      required: true
+      description: Attachment link UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
     GoalSuggestionId:
       name: suggestionId
@@ -11409,6 +11993,15 @@ components:
         - LOAN_INSTALLMENTS_PENDING              # 409 (add-loan-amortization-advanced: partially paid or overdue installments; details.installmentNos[])
         - LOAN_RATE_FIXED                        # 409 (add-loan-amortization-advanced: only a variable-rate loan admits rate changes)
         - LOAN_CHANGE_DATE_INVALID               # 422 (add-loan-amortization-advanced: the effective date precedes the first unpaid period)
+        - UPLOAD_TYPE_NOT_ALLOWED                  # 422 (add-document-attachments: extension or declared type outside the allow-list (SVG, HTML, executables, archives, XLSM, XLS))
+        - DOCUMENT_QUOTA_EXCEEDED                  # 422 (add-document-attachments: used + reserved + requested bytes exceed DOCUMENT_WORKSPACE_QUOTA_BYTES)
+        - DOCUMENT_PENDING_UPLOADS_EXCEEDED        # 409 (add-document-attachments: DOCUMENT_MAX_PENDING_UPLOADS reached)
+        - DOCUMENT_UPLOAD_MISSING                  # 409 (add-document-attachments: completing an upload whose object is not in the quarantine; the document stays pending)
+        - DOCUMENT_NOT_AVAILABLE                   # 409 (add-document-attachments: pending, uploading or content pending restore)
+        - DOCUMENT_REJECTED                        # 409 (add-document-attachments: the document was rejected and cannot be linked or downloaded)
+        - DOCUMENT_DELETED                         # 410 (add-document-attachments: the document content was destroyed)
+        - DOCUMENT_CONTENT_CORRUPTED               # 422 (add-document-attachments: integrity check of the encrypted object failed; no unverified bytes were delivered)
+        - ATTACHMENT_LIMIT_EXCEEDED                # 409 (add-document-attachments: DOCUMENT_MAX_LINKS_PER_TARGET reached)
         - PAYMENT_BREAKDOWN_MISMATCH             # 422 (add-loans: the breakdown does not add up to the amount; details.sum, details.amount)
         - TRANSACTION_MANAGED_EXTERNALLY         # 409 (add-loans: the transaction is managed by a loan; details.managedBy, details.loanId)
         - CREDIT_CARD_ACCOUNT_INVALID            # 422 (add-credit-cards: the account is not an active credit_card account, or two accounts share a currency)
@@ -11607,6 +12200,18 @@ components:
           description: Failure code when status = FAILED
           oneOf:
             - type: string
+            - type: 'null'
+        documentContents:
+          description: >-
+            The document contents file (only when the export was requested with `includeDocumentContents`); kept after the
+            file expires.
+          oneOf:
+            - type: object
+              required: [sizeBytes, sha256, count]
+              properties:
+                sizeBytes: { type: integer, minimum: 0 }
+                sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+                count: { type: integer, minimum: 0 }
             - type: 'null'
     ImportStatus:
       type: string
@@ -14728,11 +15333,11 @@ components:
       pattern: '^[A-Z][A-Za-z]{0,63}$'
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
       # aditiva (Category y Counterparty, decisión del owner D52; FinancialPeriod, add-financial-periods).
-      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal]
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal, Document]
     LifecycleAggregateTypeInput:
       type: string
       description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
-      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal]
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal, Document]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).
@@ -16499,7 +17104,7 @@ components:
         id: { $ref: '#/components/schemas/Uuid' }
         kind:
           type: string
-          description: Open set (IMPORT_PARSE, IMPORT_COMMIT, FORECAST, EXPORT, WORKSPACE_DELETE, REBUILD, ...)
+          description: Open set (IMPORT_PARSE, IMPORT_COMMIT, FORECAST, EXPORT, DOCUMENT_CONTENTS_RESTORE, WORKSPACE_DELETE, REBUILD, ...)
         status:
           type: string
           enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED]
@@ -16798,6 +17403,179 @@ components:
           required: [meta]
           properties:
             meta: { $ref: '#/components/schemas/GoalMeta' }
+    # ── Documents: adjuntos de documentos (add-document-attachments) ──
+    DocumentPurpose:
+      type: string
+      description: Purpose of the document. Open set — clients must handle unknown values.
+      x-extensible-enum: [RECEIPT, INVOICE, STATEMENT, CONTRACT, IMPORT_SOURCE, OTHER]
+    DocumentStatus:
+      type: string
+      description: |
+        Lifecycle state. `PENDING_UPLOAD` (waiting for the file), `UPLOADED` (being verified), `AVAILABLE`, `REJECTED`
+        (terminal), `DELETED` (terminal, content destroyed) and `CONTENT_PENDING` (restored from a workspace export, content
+        still to be restored). Open set — clients must handle unknown values.
+      x-extensible-enum: [PENDING_UPLOAD, UPLOADED, AVAILABLE, REJECTED, DELETED, CONTENT_PENDING]
+    DocumentFormat:
+      type: string
+      description: Real format detected by content. Open set — clients must handle unknown values.
+      x-extensible-enum: [PDF, PNG, JPEG, WEBP, HEIC, CSV, OFX, QIF, JSON, XLSX]
+    DocumentRejectionReason:
+      type: string
+      description: Why a document was rejected (not an HTTP error). Open set — clients must handle unknown values.
+      x-extensible-enum:
+        - UPLOAD_NOT_COMPLETED
+        - SIZE_MISMATCH
+        - CHECKSUM_MISMATCH
+        - TYPE_NOT_ALLOWED
+        - TYPE_MISMATCH
+        - ACTIVE_CONTENT
+        - ENCRYPTED_CONTENT
+        - MACROS_PRESENT
+        - ARCHIVE_LIMITS_EXCEEDED
+        - MALFORMED_CONTENT
+        - MALWARE_DETECTED
+    DocumentScanStatus:
+      type: string
+      description: '`NOT_SCANNED` when the antimalware scanner is disabled. Open set.'
+      x-extensible-enum: [NOT_SCANNED, CLEAN]
+    AttachmentTargetType:
+      type: string
+      description: Element a document can be attached to. Open set — clients must handle unknown values.
+      x-extensible-enum: [TRANSACTION, CONVERSION, LOAN, SUBSCRIPTION, ACCOUNT, IMPORT_JOB, MONTH_CLOSING]
+    DocumentUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [fileName, contentType, sizeBytes, sha256, purpose]
+      properties:
+        fileName: { type: string, minLength: 1, maxLength: 255, description: 'Original name; normalized by the server (NFC, no paths or control characters). Never used in object keys, logs or audit.' }
+        contentType: { type: string, minLength: 1, maxLength: 255, examples: ['application/pdf'] }
+        sizeBytes: { type: integer, format: int64, minimum: 1, examples: [482133] }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$', description: 'SHA-256 of the file in lowercase hexadecimal.' }
+        purpose: { $ref: '#/components/schemas/DocumentPurpose' }
+    DocumentUploadInstructions:
+      type: object
+      additionalProperties: false
+      required: [url, method, headers, expiresAt]
+      properties:
+        url: { type: string, description: 'Presigned URL of the quarantine bucket (public endpoint).' }
+        method: { type: string, enum: [PUT] }
+        headers:
+          type: object
+          description: 'Headers the browser must send as given (they are signed): `Content-Type` and `x-amz-checksum-sha256`.'
+          additionalProperties: { type: string }
+        expiresAt: { $ref: '#/components/schemas/Instant' }
+    DocumentUploadResult:
+      type: object
+      additionalProperties: false
+      required: [document, upload, deduplicated]
+      properties:
+        document: { $ref: '#/components/schemas/Document' }
+        upload:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentUploadInstructions'
+            - type: 'null'
+        deduplicated: { type: boolean }
+    AttachmentLinkRequest:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { $ref: '#/components/schemas/AttachmentTargetType' }
+        targetId: { $ref: '#/components/schemas/Uuid' }
+    AttachmentLinkSummary:
+      type: object
+      additionalProperties: false
+      required: [id, targetType, targetId, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        targetType: { $ref: '#/components/schemas/AttachmentTargetType' }
+        targetId: { $ref: '#/components/schemas/Uuid' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+    AttachmentLink:
+      type: object
+      additionalProperties: false
+      required: [id, documentId, targetType, targetId, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        documentId: { $ref: '#/components/schemas/Uuid' }
+        targetType: { $ref: '#/components/schemas/AttachmentTargetType' }
+        targetId: { $ref: '#/components/schemas/Uuid' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+    Document:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - purpose
+        - status
+        - originalName
+        - extension
+        - declaredContentType
+        - detectedContentType
+        - detectedFormat
+        - sizeBytes
+        - sha256
+        - scanStatus
+        - rejectionReason
+        - uploadExpiresAt
+        - availableAt
+        - archivedAt
+        - deletedAt
+        - links
+        - createdBy
+        - createdAt
+        - version
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        purpose: { $ref: '#/components/schemas/DocumentPurpose' }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        originalName: { type: string, maxLength: 255 }
+        extension: { type: string }
+        declaredContentType: { type: string }
+        detectedContentType: { type: [string, 'null'] }
+        detectedFormat:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentFormat'
+            - type: 'null'
+        sizeBytes: { type: integer, format: int64 }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        scanStatus:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentScanStatus'
+            - type: 'null'
+        rejectionReason:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentRejectionReason'
+            - type: 'null'
+        uploadExpiresAt: { type: [string, 'null'], format: date-time }
+        availableAt: { type: [string, 'null'], format: date-time }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+        links:
+          type: array
+          items: { $ref: '#/components/schemas/AttachmentLinkSummary' }
+        createdBy: { $ref: '#/components/schemas/Uuid' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        version: { type: integer, minimum: 1 }
+    DocumentPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Document' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    DocumentStorageUsage:
+      type: object
+      additionalProperties: false
+      required: [usedBytes, reservedBytes, quotaBytes, pendingUploads, maxPendingUploads]
+      properties:
+        usedBytes: { type: integer, format: int64, minimum: 0 }
+        reservedBytes: { type: integer, format: int64, minimum: 0 }
+        quotaBytes: { type: integer, format: int64, minimum: 1 }
+        pendingUploads: { type: integer, minimum: 0 }
+        maxPendingUploads: { type: integer, minimum: 1 }
     GoalList:
       type: object
       additionalProperties: false

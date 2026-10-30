@@ -51,6 +51,27 @@ const duration = z
   .transform((v) => Number(v.slice(0, -1)) * (v.endsWith('h') ? 3_600_000 : 60_000))
   .refine((ms) => ms > 0, 'debe ser mayor que cero');
 
+/** Duración en segundos (`30s`), minutos (`5m`), horas (`1h`) o días (`30d`), en milisegundos. */
+const shortDuration = z
+  .string()
+  .regex(/^\d+[smhd]$/, 'duración en segundos (`30s`), minutos (`5m`), horas (`1h`) o días (`30d`)')
+  .transform((v) => {
+    const unit = v.slice(-1);
+    const factor = unit === 's' ? 1000 : unit === 'm' ? 60_000 : unit === 'h' ? 3_600_000 : 86_400_000;
+    return Number(v.slice(0, -1)) * factor;
+  })
+  .refine((ms) => ms > 0, 'debe ser mayor que cero');
+const bucketName = z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, 'nombre de bucket S3 inválido');
+const cronOrOff = z
+  .string()
+  .regex(/^(off|(\S+\s+){4}\S+)$/, 'debe ser una expresión cron de 5 campos (p. ej. `*/10 * * * *`) u `off`');
+const keyring = z
+  .string()
+  .regex(
+    /^[A-Za-z0-9_-]{1,32}:([A-Za-z0-9_-]{43}|[0-9a-f]{64})(,[A-Za-z0-9_-]{1,32}:([A-Za-z0-9_-]{43}|[0-9a-f]{64}))*$/,
+    'formato kid:clave[,kid:clave…] con claves de 32 bytes en base64url (43 caracteres) o hexadecimal (64)',
+  );
+
 /** Detectores de recurso OTel que filtran PII (usuario de SO, hostname, argumentos) — SPIKE-10 hallazgo 5. */
 const FORBIDDEN_RESOURCE_DETECTORS = ['all', 'host', 'process'];
 
@@ -1045,6 +1066,157 @@ export const VARIABLES = {
       default: 'env,os,serviceinstance',
     },
   ),
+
+  // ── Documentos adjuntos (openspec add-document-attachments, docs/57 D313–D323) ──
+  OBJECT_STORAGE_QUARANTINE_BUCKET: variable(bucketName, {
+    group: 'Documentos adjuntos',
+    description:
+      'Bucket de CUARENTENA de las subidas directas (sin versioning, sin lectura pública: un DELETE borra el texto plano de verdad). El objeto se verifica y se mueve cifrado al bucket de documentos; ninguno permanece más de 24 h. En local/CI lo crea `migrate` con `OBJECT_STORAGE_ENSURE_BUCKET=true` (con CORS para la subida).',
+    default: 'pfos-quarantine',
+    example: 'pfos-local-quarantine',
+  }),
+  OBJECT_STORAGE_PUBLIC_ENDPOINT: variable(httpUrl, {
+    group: 'Documentos adjuntos',
+    description:
+      'Endpoint S3 PÚBLICO con el que se firman las URL de subida (el host forma parte de la firma y debe ser alcanzable por el navegador). Sin valor: el mismo `OBJECT_STORAGE_ENDPOINT`. En producción es el hostname `PF_DOMAIN_FILES` de Caddy, limitado a `PUT` firmados sobre el bucket de cuarentena.',
+    optional: true,
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+    example: 'http://127.0.0.1:29000',
+  }),
+  DOCUMENT_MAX_BYTES: variable(positiveInt.max(26_214_400), {
+    group: 'Documentos adjuntos',
+    description:
+      'Tamaño máximo de un documento (15 MiB por defecto, D317). Tope duro 26214400 (25 MiB): la configuración no puede superarlo.',
+    default: '15728640',
+  }),
+  DOCUMENT_IMPORT_SOURCE_MAX_BYTES: variable(positiveInt.max(26_214_400), {
+    group: 'Documentos adjuntos',
+    description:
+      'Tamaño máximo de un extracto a importar (propósito `IMPORT_SOURCE`, 20 MiB por defecto, docs/13 §11). Tope duro 26214400.',
+    default: '20971520',
+  }),
+  DOCUMENT_WORKSPACE_QUOTA_BYTES: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description:
+      'Cuota de almacenamiento de documentos por workspace (suma de pendientes, disponibles y archivados; 5 GiB por defecto, D317).',
+    default: '5368709120',
+  }),
+  DOCUMENT_MAX_PENDING_UPLOADS: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description: 'Subidas pendientes simultáneas por workspace (20 por defecto).',
+    default: '20',
+  }),
+  DOCUMENT_MAX_LINKS_PER_TARGET: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description: 'Adjuntos máximos por elemento (transacción, préstamo, cuenta…; 20 por defecto).',
+    default: '20',
+  }),
+  DOCUMENT_UPLOAD_URL_TTL: variable(
+    shortDuration.refine((ms) => ms <= 600_000, 'máximo 10m (NFR-SEC-012)'),
+    {
+      group: 'Documentos adjuntos',
+      description: 'Vigencia de la URL de subida presignada (5m por defecto; nunca más de 10m).',
+      default: '5m',
+    },
+  ),
+  DOCUMENT_UPLOAD_GRACE: variable(shortDuration, {
+    group: 'Documentos adjuntos',
+    description:
+      'Gracia tras vencer la URL de subida antes de que `ExpirePendingUploads` rechace el documento por subida no completada y libere la reserva de cuota.',
+    default: '1h',
+  }),
+  DOCUMENT_UNLINKED_RETENTION: variable(shortDuration, {
+    group: 'Documentos adjuntos',
+    description:
+      'Plazo tras el cual se eliminan (actor sistema) los documentos disponibles, sin vínculos y no archivados (30d por defecto, D318). Archivar los conserva.',
+    default: '30d',
+  }),
+  DOCUMENT_VERIFY_MAX_CONCURRENCY: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description:
+      'Verificaciones de confirmación simultáneas por proceso de API (2 por defecto): acota la memoria (hasta 25 MiB por archivo). Si está lleno, la confirmación responde 503 con `Retry-After`.',
+    default: '2',
+  }),
+  DOCUMENT_INSPECTION_TIMEOUT: variable(shortDuration, {
+    group: 'Documentos adjuntos',
+    description:
+      'Plazo de la inspección de PDF y XLSX en un `worker_thread` con límites de memoria (10s por defecto); vencido ⇒ rechazo `MALFORMED_CONTENT` (falla cerrada).',
+    default: '10s',
+  }),
+  DOCUMENT_XLSX_MAX_ENTRIES: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description: 'Entradas máximas del libro XLSX (1000 por defecto).',
+    default: '1000',
+  }),
+  DOCUMENT_ARCHIVE_MAX_UNCOMPRESSED_BYTES: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description:
+      'Suma máxima de tamaños descomprimidos de un XLSX (100 MiB por defecto); se aplica sobre el directorio central y sobre el inflado real.',
+    default: '104857600',
+  }),
+  DOCUMENT_ARCHIVE_MAX_RATIO: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description: 'Razón de compresión máxima por entrada de un XLSX (100:1 por defecto).',
+    default: '100',
+  }),
+  DOCUMENT_JSON_MAX_DEPTH: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description: 'Profundidad máxima de anidamiento de un JSON subido (64 por defecto).',
+    default: '64',
+  }),
+  DOCUMENT_ENCRYPTION_KEYS: variable(keyring, {
+    group: 'Documentos adjuntos',
+    description:
+      'Llavero de CLAVES MAESTRAS que envuelven la clave de datos de cada documento (cifrado de sobre AES-256-GCM): `kid:clave` separadas por coma, con la clave de 32 bytes en base64url (43 caracteres) o hexadecimal (64; `openssl rand -hex 32`). Llavero SEPARADO del de exports (los documentos viven años). La vigente es `DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID`; las anteriores permanecen mientras queden documentos envueltos con ellas (el arranque falla nombrando la clave faltante). Perder el llavero implica perder todos los documentos: respáldalo FUERA del host. Nunca en el repositorio. Sin ella los documentos están deshabilitados (503); obligatoria en staging/production.',
+    optional: true,
+    requiredWhen: '`PFOS_ENV=staging|production`',
+    secret: true,
+  }),
+  DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID: variable(
+    z.string().regex(/^[A-Za-z0-9_-]{1,32}$/, 'identificador de clave inválido'),
+    {
+      group: 'Documentos adjuntos',
+      description:
+        'Identificador (`kid`) de la clave maestra vigente de `DOCUMENT_ENCRYPTION_KEYS` con la que se envuelven los documentos NUEVOS y a la que el mantenimiento diario re-envuelve los existentes. Sin valor: la primera del llavero.',
+      optional: true,
+      example: 'k1',
+    },
+  ),
+  DOCUMENT_MALWARE_SCANNER: variable(z.enum(['none', 'clamav']), {
+    group: 'Documentos adjuntos',
+    description:
+      'Escáner antimalware de los documentos: `none` (defecto; apagado en producción por el host de 2 GB, D314: allí rigen la lista de tipos, la inspección estructural y la entrega solo como adjunto) o `clamav` (clamd por TCP; lo enciende la suite del nightly). Con `clamav`, un escáner caído hace fallar la confirmación con 503 (falla cerrada).',
+    default: 'none',
+  }),
+  CLAMAV_HOST: variable(z.string().min(1), {
+    group: 'Documentos adjuntos',
+    description: 'Host de clamd (solo con `DOCUMENT_MALWARE_SCANNER=clamav`).',
+    optional: true,
+    requiredWhen: '`DOCUMENT_MALWARE_SCANNER=clamav`',
+    example: 'clamav',
+  }),
+  CLAMAV_PORT: variable(port, {
+    group: 'Documentos adjuntos',
+    description: 'Puerto TCP de clamd.',
+    default: '3310',
+  }),
+  DOCUMENT_MALWARE_SCAN_TIMEOUT: variable(shortDuration, {
+    group: 'Documentos adjuntos',
+    description: 'Plazo del escaneo de un archivo (30s por defecto); vencido ⇒ escáner no disponible (503).',
+    default: '30s',
+  }),
+  DOCUMENT_MAINTENANCE_CRON: variable(cronOrOff, {
+    group: 'Documentos adjuntos',
+    description:
+      'Cron del mantenimiento de documentos del worker (cada 10 minutos por defecto): expira subidas no completadas, reintenta verificaciones atascadas, barre la cuarentena (> 24 h) y los objetos huérfanos, purga documentos sin vínculo y re-envuelve claves. `off` lo apaga (solo pruebas). No agrega consumidores ni conexiones (job secuencial).',
+    default: '*/10 * * * *',
+  }),
+  DOCUMENT_CONTENTS_RESTORE_MAX_BYTES: variable(positiveInt, {
+    group: 'Documentos adjuntos',
+    description:
+      'Tamaño máximo del archivo de contenidos de documentos que se restaura sobre un workspace importado (por defecto la cuota de un workspace, 5 GiB; D315).',
+    default: '5368709120',
+  }),
 } as const satisfies Record<string, VariableSpec>;
 
 export type VariableName = keyof typeof VARIABLES;
@@ -1066,6 +1238,29 @@ const EXPORT_PORTABILITY = [
   'EXPORT_ENCRYPTION_KEYS',
   'EXPORT_ENCRYPTION_ACTIVE_KEY_ID',
   'EXPORT_RETENTION',
+] as const;
+const DOCUMENTS = [
+  'DOCUMENT_MAX_BYTES',
+  'DOCUMENT_IMPORT_SOURCE_MAX_BYTES',
+  'DOCUMENT_WORKSPACE_QUOTA_BYTES',
+  'DOCUMENT_MAX_PENDING_UPLOADS',
+  'DOCUMENT_MAX_LINKS_PER_TARGET',
+  'DOCUMENT_UPLOAD_URL_TTL',
+  'DOCUMENT_UPLOAD_GRACE',
+  'DOCUMENT_UNLINKED_RETENTION',
+  'DOCUMENT_VERIFY_MAX_CONCURRENCY',
+  'DOCUMENT_INSPECTION_TIMEOUT',
+  'DOCUMENT_XLSX_MAX_ENTRIES',
+  'DOCUMENT_ARCHIVE_MAX_UNCOMPRESSED_BYTES',
+  'DOCUMENT_ARCHIVE_MAX_RATIO',
+  'DOCUMENT_JSON_MAX_DEPTH',
+  'DOCUMENT_ENCRYPTION_KEYS',
+  'DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID',
+  'DOCUMENT_MALWARE_SCANNER',
+  'CLAMAV_HOST',
+  'CLAMAV_PORT',
+  'DOCUMENT_MALWARE_SCAN_TIMEOUT',
+  'OBJECT_STORAGE_QUARANTINE_BUCKET',
 ] as const;
 const FX_PROVIDERS = [
   'FX_PROVIDER_PRIMARY',
@@ -1144,6 +1339,10 @@ export const APP_VARIABLES = {
     ...EXPORT_PORTABILITY,
     'REAUTH_MAX_AGE',
     'WORKSPACE_IMPORT_MAX_BYTES',
+    // add-document-attachments: la API firma las subidas, verifica la confirmación y descarga descifrando.
+    ...DOCUMENTS,
+    'OBJECT_STORAGE_PUBLIC_ENDPOINT',
+    'DOCUMENT_CONTENTS_RESTORE_MAX_BYTES',
   ],
   // El worker se conecta como pf_worker (relay del outbox entre workspaces, add-event-outbox design §4).
   worker: [
@@ -1188,6 +1387,10 @@ export const APP_VARIABLES = {
     'NOTIFY_RETENTION',
     // add-workspace-export: el worker genera el export, importa y expira los archivos vencidos.
     ...EXPORT_PORTABILITY,
+    // add-document-attachments: mantenimiento de documentos (expiración, cuarentena, huérfanos, purga y rotación).
+    ...DOCUMENTS,
+    'DOCUMENT_MAINTENANCE_CRON',
+    'DOCUMENT_CONTENTS_RESTORE_MAX_BYTES',
     ...FX_PROVIDERS,
     'FX_PROVIDER_PARALELO_BO_URL',
     'FX_PROVIDER_DOLARAPI_BO_URL',
@@ -1206,6 +1409,7 @@ export const APP_VARIABLES = {
     'OBJECT_STORAGE_ENSURE_BUCKET',
     'OBJECT_STORAGE_CORS_ORIGINS',
     'OBJECT_STORAGE_EXPORTS_BUCKET',
+    'OBJECT_STORAGE_QUARANTINE_BUCKET',
   ],
   // `seed` lee OIDC_ISSUER_URL para sembrar las identidades de la Minimal Seed (usuarios del realm de desarrollo).
   seed: [...GENERAL, ...PRODUCT, ...DATABASE, 'OIDC_ISSUER_URL', 'DEMO_DATA_ENABLED'],

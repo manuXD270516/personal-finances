@@ -330,13 +330,13 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | ID | Requerimiento | Prioridad | Fase | Capability |
 |----|---------------|-----------|------|------------|
 | FR-DOCUMENTS-001 | Subida de archivos mediante **presigned URL** (PUT/POST directo al object storage) con registro previo `pending` y confirmación `uploaded`; el backend nunca recibe el binario en el request de la API. | Must | 6 | documents/attachments |
-| FR-DOCUMENTS-002 | Validación de **MIME** real (magic bytes), **extensión** en allowlist (pdf, png, jpg/jpeg, webp, heic, csv, ofx, qif, json, xlsx), **tamaño** máximo configurable (default 15 MB) y **checksum SHA-256**; un archivo que no pasa queda `rejected` y se elimina del bucket de cuarentena. | Must | 6 | security/file-upload-security |
+| FR-DOCUMENTS-002 | Validación de **MIME** real (magic bytes), **extensión** en allowlist (pdf, png, jpg/jpeg, webp, heic, csv, ofx, **qfx**, qif, json, xlsx), **tamaño** máximo configurable (default 15 MiB para documentos y 20 MiB para extractos a importar, tope duro 25 MiB; D317) y **checksum SHA-256**; un archivo que no pasa queda `rejected` y se elimina del bucket de cuarentena. | Must | 6 | security/file-upload-security |
 | FR-DOCUMENTS-003 | Un documento DEBE poder adjuntarse a transacciones, conversiones, préstamos, suscripciones, cuentas, imports y cierres de mes (relación N:M). | Must | 6 | documents/attachments |
-| FR-DOCUMENTS-004 | Descarga mediante presigned GET de corta duración (default 5 min) previa autorización por workspace. | Must | 6 | documents/attachments |
+| FR-DOCUMENTS-004 | Descarga **solo a través de la API**, en streaming y siempre como adjunto, previa autorización por workspace y con auditoría; sin presigned GET (el contenido está cifrado por la aplicación, ADR-0030, D313). | Must | 6 | documents/attachments |
 | FR-DOCUMENTS-005 | Las claves de objeto NO DEBEN contener datos personales ni nombres originales (se usa UUID; el nombre original se guarda como metadato). | Must | 6 | security/file-upload-security |
 | FR-DOCUMENTS-006 | Deduplicación por checksum dentro del workspace (mismo archivo → mismo documento). | Should | 6 | documents/attachments |
 | FR-DOCUMENTS-007 | Archivar documentos; documentos no referenciados se purgan tras retención configurable. | Should | 6 | documents/attachments |
-| FR-DOCUMENTS-008 | Hook de **escaneo de malware** (estado `scanning` → `clean/infected`) antes de habilitar la descarga. | Could | 9 | security/file-upload-security |
+| FR-DOCUMENTS-008 | Hook de **escaneo de malware** antes de habilitar la descarga. El puerto `MalwareScanner` y el adapter ClamAV se adelantan a Phase 6 (apagados en producción, encendidos en la suite del nightly, D314); la UI de estados `scanning`/`clean`/`infected` sigue en Phase 9. | Could | 6/9 | security/file-upload-security |
 | FR-DOCUMENTS-009 | **OCR** de recibos/extractos para sugerir datos de transacción (nunca crea transacciones sin confirmación). | Could | 11 | documents/attachments |
 
 ## 14. IMPORTS — Imports & Banking Integrations

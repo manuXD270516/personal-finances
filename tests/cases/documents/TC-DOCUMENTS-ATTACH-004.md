@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Confirmar la subida y verificar el archivo"
 scenario: "Confirmación sin haber subido"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-001"
 nfr: []
@@ -13,8 +13,9 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/application/uploads.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

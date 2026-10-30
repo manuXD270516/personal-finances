@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Deduplicación por contenido dentro del workspace"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-006"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/application/uploads.service.test.ts", "packages/contexts/documents/test/integration/pg-documents.int.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

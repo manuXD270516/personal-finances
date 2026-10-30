@@ -251,6 +251,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Subscription: 'Suscripción',
       Loan: 'Préstamo',
       SavingsGoal: 'Meta de ahorro',
+      Document: 'Documento',
     },
     states: {
       Transaction: {
@@ -284,6 +285,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         ACHIEVED: 'Alcanzada',
         CLOSED: 'Cerrada',
         CANCELLED: 'Cancelada',
+      },
+      Document: {
+        PENDING_UPLOAD: 'Pendiente de subida',
+        UPLOADED: 'Subido',
+        AVAILABLE: 'Disponible',
+        CONTENT_PENDING: 'Contenido pendiente de restaurar',
+        REJECTED: 'Rechazado',
+        DELETED: 'Eliminado',
       },
     },
     transitions: {
@@ -348,6 +357,16 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CLOSE: 'Cerrar',
         CANCEL: 'Cancelar',
       },
+      Document: {
+        REQUEST_UPLOAD: 'Solicitar subida',
+        CONFIRM: 'Confirmar',
+        ACCEPT: 'Aceptar',
+        REJECT: 'Rechazar',
+        EXPIRE: 'Expirar',
+        DELETE: 'Eliminar',
+        PURGE: 'Purgar',
+        RESTORE_CONTENT: 'Restaurar contenido',
+      },
     },
     element: 'Elemento',
     currentState: 'Estado actual',
@@ -391,6 +410,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Subscription: 'Subscription',
       Loan: 'Loan',
       SavingsGoal: 'Savings goal',
+      Document: 'Document',
     },
     states: {
       Transaction: {
@@ -424,6 +444,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         ACHIEVED: 'Achieved',
         CLOSED: 'Closed',
         CANCELLED: 'Cancelled',
+      },
+      Document: {
+        PENDING_UPLOAD: 'Pending upload',
+        UPLOADED: 'Uploaded',
+        AVAILABLE: 'Available',
+        CONTENT_PENDING: 'Content pending restore',
+        REJECTED: 'Rejected',
+        DELETED: 'Deleted',
       },
     },
     transitions: {
@@ -488,6 +516,16 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CLOSE: 'Close',
         CANCEL: 'Cancel',
       },
+      Document: {
+        REQUEST_UPLOAD: 'Request upload',
+        CONFIRM: 'Confirm',
+        ACCEPT: 'Accept',
+        REJECT: 'Reject',
+        EXPIRE: 'Expire',
+        DELETE: 'Delete',
+        PURGE: 'Purge',
+        RESTORE_CONTENT: 'Restore content',
+      },
     },
     element: 'Item',
     currentState: 'Current state',
@@ -531,6 +569,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Subscription: 'Assinatura',
       Loan: 'Empréstimo',
       SavingsGoal: 'Meta de poupança',
+      Document: 'Documento',
     },
     states: {
       Transaction: {
@@ -564,6 +603,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         ACHIEVED: 'Alcançada',
         CLOSED: 'Encerrada',
         CANCELLED: 'Cancelada',
+      },
+      Document: {
+        PENDING_UPLOAD: 'Envio pendente',
+        UPLOADED: 'Enviado',
+        AVAILABLE: 'Disponível',
+        CONTENT_PENDING: 'Conteúdo pendente de restauração',
+        REJECTED: 'Rejeitado',
+        DELETED: 'Excluído',
       },
     },
     transitions: {
@@ -627,6 +674,16 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REOPEN: 'Reabrir',
         CLOSE: 'Encerrar',
         CANCEL: 'Cancelar',
+      },
+      Document: {
+        REQUEST_UPLOAD: 'Solicitar envio',
+        CONFIRM: 'Confirmar',
+        ACCEPT: 'Aceitar',
+        REJECT: 'Rejeitar',
+        EXPIRE: 'Expirar',
+        DELETE: 'Excluir',
+        PURGE: 'Limpar',
+        RESTORE_CONTENT: 'Restaurar conteúdo',
       },
     },
     element: 'Item',

@@ -628,10 +628,16 @@ export async function buildW1(h: Harness, label: string): Promise<W1> {
 }
 
 /** Solicita el export, espera a la operación y devuelve el export terminado. */
-export async function exportAndWait(h: Harness, u: User, ws: string): Promise<Json> {
+export async function exportAndWait(
+  h: Harness,
+  u: User,
+  ws: string,
+  body?: { includeDocumentContents?: boolean },
+): Promise<Json> {
   const requested = await h.call('POST', `/api/v1/workspaces/${ws}/exports`, {
     token: u.token,
     headers: { 'idempotency-key': randomUUID() },
+    ...(body ? { body } : {}),
   });
   if (requested.status !== 202)
     throw new Error(`export ${requested.status} ${JSON.stringify(requested.body)}`);

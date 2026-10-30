@@ -151,5 +151,14 @@
   "LOAN_SCHEDULE_IS_CUSTOM": "This loan has a custom schedule: load the new bank table instead of recalculating it.",
   "LOAN_INSTALLMENTS_PENDING": "Pay or complete the overdue or partially paid installments before recalculating the schedule.",
   "LOAN_RATE_FIXED": "Only a variable-rate loan admits rate changes.",
-  "LOAN_CHANGE_DATE_INVALID": "The effective date is before the start of the first unpaid period."
+  "LOAN_CHANGE_DATE_INVALID": "The effective date is before the start of the first unpaid period.",
+  "UPLOAD_TYPE_NOT_ALLOWED": "This file type is not allowed. Accepted: PDF, images (PNG, JPG, WebP, HEIC), CSV, OFX, QFX, QIF, JSON and XLSX.",
+  "DOCUMENT_QUOTA_EXCEEDED": "There is not enough document storage left in this workspace. Delete documents you no longer need.",
+  "DOCUMENT_PENDING_UPLOADS_EXCEEDED": "There are too many pending uploads. Wait for them to finish or expire before uploading another file.",
+  "DOCUMENT_UPLOAD_MISSING": "The file has not reached the storage yet. Upload it again and confirm.",
+  "DOCUMENT_NOT_AVAILABLE": "The document is not available yet.",
+  "DOCUMENT_REJECTED": "The document was rejected by the file security checks.",
+  "DOCUMENT_DELETED": "The document was deleted.",
+  "DOCUMENT_CONTENT_CORRUPTED": "The stored content is corrupted or was altered. The file was not delivered.",
+  "ATTACHMENT_LIMIT_EXCEEDED": "This item already has the maximum number of attachments. Remove one to add another."
 }

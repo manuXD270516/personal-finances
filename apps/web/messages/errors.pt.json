@@ -151,5 +151,14 @@
   "LOAN_SCHEDULE_IS_CUSTOM": "Este empréstimo tem cronograma próprio: carregue a nova tabela do banco em vez de recalculá-lo.",
   "LOAN_INSTALLMENTS_PENDING": "Pague ou complete as parcelas vencidas ou parciais antes de recalcular o cronograma.",
   "LOAN_RATE_FIXED": "Só um empréstimo de taxa variável admite mudanças de taxa.",
-  "LOAN_CHANGE_DATE_INVALID": "A data de vigência é anterior ao início do primeiro período não pago."
+  "LOAN_CHANGE_DATE_INVALID": "A data de vigência é anterior ao início do primeiro período não pago.",
+  "UPLOAD_TYPE_NOT_ALLOWED": "Este tipo de arquivo não é permitido. Aceitos: PDF, imagens (PNG, JPG, WebP, HEIC), CSV, OFX, QFX, QIF, JSON e XLSX.",
+  "DOCUMENT_QUOTA_EXCEEDED": "Não há espaço suficiente para documentos neste espaço de trabalho. Exclua documentos de que não precisa mais.",
+  "DOCUMENT_PENDING_UPLOADS_EXCEEDED": "Há muitos envios pendentes. Aguarde que terminem ou expirem antes de enviar outro arquivo.",
+  "DOCUMENT_UPLOAD_MISSING": "O arquivo ainda não chegou ao armazenamento. Envie-o novamente e confirme.",
+  "DOCUMENT_NOT_AVAILABLE": "O documento ainda não está disponível.",
+  "DOCUMENT_REJECTED": "O documento foi rejeitado pela verificação de segurança de arquivos.",
+  "DOCUMENT_DELETED": "O documento foi excluído.",
+  "DOCUMENT_CONTENT_CORRUPTED": "O conteúdo armazenado está corrompido ou foi alterado. O arquivo não foi entregue.",
+  "ATTACHMENT_LIMIT_EXCEEDED": "Este item já tem o número máximo de anexos. Remova um para adicionar outro."
 }

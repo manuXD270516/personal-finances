@@ -5,7 +5,7 @@ spec: audit/lifecycle-timeline
 related_specs: []
 requirement: "Recorrido de un documento"
 scenario: "Recorrido de un comprobante adjuntado y eliminado"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-AUDIT-009"
   - "FR-AUDIT-010"
@@ -14,8 +14,9 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/domain/document.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

@@ -6,6 +6,11 @@ import { ACCOUNTS_PORTABILITY_SECTIONS } from '@pf/accounts/contracts';
 import { AUDIT_PORTABILITY_SECTIONS } from '@pf/audit/contracts';
 import { CLASSIFICATION_PORTABILITY_SECTIONS } from '@pf/classification/contracts';
 import { COMMITMENTS_PORTABILITY_SECTIONS } from '@pf/commitments/contracts';
+import { DOCUMENTS_IMPORT_HOOKS, DOCUMENTS_PORTABILITY_SECTIONS } from '@pf/documents/contracts';
+import {
+  documentsContentPendingHook,
+  documentsUsageRecomputeHook,
+} from '@pf/documents/interface/documents.module';
 import { FX_PORTABILITY_SECTIONS } from '@pf/fx/contracts';
 import { DEBT_PORTABILITY_SECTIONS } from '@pf/debt/contracts';
 import { GOALS_PORTABILITY_SECTIONS } from '@pf/goals/contracts';
@@ -24,6 +29,7 @@ import {
   PgExportArchiveBuilder,
   PgWorkspaceImporter,
   S3ExportObjectStore,
+  type DocumentContentsExporter,
   type ExportArchiveBuilder,
   type PortabilityJobPort,
   type WorkspaceImporter,
@@ -64,6 +70,8 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   // add-loans: préstamos, cronogramas, pagos y tablas del banco (orden 780–787, después de IMPORTS 770–771).
   ...DEBT_PORTABILITY_SECTIONS,
   ...NOTIFICATIONS_PORTABILITY_SECTIONS,
+  // add-document-attachments: metadatos de documentos y vínculos, sin claves ni objetos (orden 810–812).
+  ...DOCUMENTS_PORTABILITY_SECTIONS,
   ...AUDIT_PORTABILITY_SECTIONS,
 ].sort((a, b) => a.order - b.order);
 
@@ -145,6 +153,8 @@ export interface PortabilityWiringInput {
   /** `APP_DEFAULT_LOCALE`: respaldo del importer para un locale del archivo no soportado. */
   readonly defaultLocale?: string;
   readonly queue: JobQueue;
+  /** Contenidos de documentos del export (D315); sin él, pedirlos responde 503. */
+  readonly contents?: DocumentContentsExporter;
   /** Solo el worker construye e importa (rol `pf_worker`); la API recibe versiones que fallan si se invocan. */
   readonly pool?: Pool;
   readonly builderOverride?: Pick<ConstructorParameters<typeof PgExportArchiveBuilder>[0], 'afterSnapshot'>;
@@ -178,12 +188,17 @@ export function portabilityOptions(input: PortabilityWiringInput): PortabilityOp
     importer: input.pool
       ? new PgWorkspaceImporter({
           sections: PORTABILITY_SECTIONS,
-          hooks: { [PLANNING_CLOSE_SNAPSHOT_HASH_HOOK]: closeSnapshotRestoreHook },
+          hooks: {
+            [PLANNING_CLOSE_SNAPSHOT_HASH_HOOK]: closeSnapshotRestoreHook,
+            [DOCUMENTS_IMPORT_HOOKS.contentPending]: documentsContentPendingHook,
+            [DOCUMENTS_IMPORT_HOOKS.usageRecompute]: documentsUsageRecomputeHook,
+          },
           schemaDir: resolveExportContractsDir(),
           random: (n) => randomBytes(n),
           ...(input.defaultLocale ? { defaultLocale: input.defaultLocale } : {}),
         })
       : unavailableImporter,
+    ...(input.contents ? { contents: input.contents } : {}),
     inspector: archiveInspector(sectionNames),
     jobs: portabilityJobsPort(input.queue),
     reauthMaxAgeMs: input.reauthMaxAgeMs,

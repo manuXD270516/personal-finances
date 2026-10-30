@@ -22,6 +22,31 @@
 	reverse_proxy finance-web:3000
 }
 
+# Subida directa de documentos (openspec add-document-attachments, D316): hostname propio que SOLO deja pasar `PUT` y
+# `OPTIONS` sobre el bucket de cuarentena con la firma presignada en la query (`X-Amz-Signature`). Sin `GET`, `LIST` ni acceso
+# a otros buckets: todo lo demás responde 404. La descarga de documentos pasa siempre por la API (cifrado de la aplicación).
+{$PF_DOMAIN_FILES} {
+	import security_headers
+	@signed_put {
+		method PUT
+		path /{$PF_QUARANTINE_BUCKET}/ws/*
+		query X-Amz-Signature=*
+	}
+	@preflight {
+		method OPTIONS
+		path /{$PF_QUARANTINE_BUCKET}/ws/*
+	}
+	handle @signed_put {
+		reverse_proxy object-storage:8333
+	}
+	handle @preflight {
+		reverse_proxy object-storage:8333
+	}
+	handle {
+		respond 404
+	}
+}
+
 # Keycloak (issuer OIDC = https://{$PF_DOMAIN_AUTH}/realms/pfos).
 {$PF_DOMAIN_AUTH} {
 	import security_headers

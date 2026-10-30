@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Aislamiento de documentos por workspace"
 scenario: "Descarga de un documento ajeno"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
   - "NFR-SEC-003"
@@ -15,8 +15,9 @@ invariants:
 priority: critical
 type: security
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

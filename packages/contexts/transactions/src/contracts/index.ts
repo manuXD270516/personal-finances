@@ -688,3 +688,14 @@ export const TRANSACTIONS_AUDIT_POLICY = {
 } as const satisfies AuditFieldPoliciesDto;
 
 export * from './portability.js';
+
+// ───────────────────────────────────────────── add-document-attachments (DOCUMENTS)
+
+/**
+ * Existencia de transacciones y conversiones del workspace (consulta aditiva para los adjuntos de DOCUMENTS). Una
+ * transacción anulada también existe: un comprobante de una transacción anulada sigue siendo evidencia.
+ */
+export interface TransactionExistenceQuery {
+  existingTransactions(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
+  existingConversions(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
+}

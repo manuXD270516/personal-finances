@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Hojas de cálculo sin macros ni bombas de compresión"
 scenario: "Libro con macros renombrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-002"
   - "FR-IMPORTS-017"
@@ -15,8 +15,9 @@ invariants: []
 priority: critical
 type: security
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/infrastructure/inspection/inspectors.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

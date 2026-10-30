@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Archivar documentos"
 scenario: "Archivar un contrato"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-007"
 nfr: []
@@ -13,8 +13,9 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/application/documents.service.test.ts", "packages/contexts/documents/src/domain/document.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

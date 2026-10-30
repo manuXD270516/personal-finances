@@ -74,6 +74,7 @@ export {
   isRetryableConflict,
 } from './db/command-transaction.js';
 export { unitOfWorkKysely } from './db/uow-kysely.js';
+export { pgExistingIds } from './db/existence.js';
 export {
   CursorCodec,
   DEFAULT_PAGE_LIMIT,

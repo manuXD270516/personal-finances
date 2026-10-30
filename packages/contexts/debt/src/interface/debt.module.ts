@@ -14,7 +14,7 @@ import type {
   AccountBalancesQuery,
   LedgerOpeningEntriesQuery,
 } from '@pf/ledger/contracts';
-import { runWithRequestContext } from '@pf/platform/api';
+import { pgExistingIds, runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -53,7 +53,12 @@ import type {
 } from '../application/ports/index.js';
 import { ReferencesService } from '../application/references.service.js';
 import { LOAN_LIFECYCLE } from '../domain/index.js';
-import { DEBT_CARD_DAILY_JOB, DEBT_CONSUMERS, type DebtSummaryQuery } from '../contracts/index.js';
+import {
+  DEBT_CARD_DAILY_JOB,
+  DEBT_CONSUMERS,
+  type DebtSummaryQuery,
+  type LoanExistenceQuery,
+} from '../contracts/index.js';
 import {
   PgCardRepository,
   PgInstallmentPlanRepository,
@@ -498,3 +503,8 @@ export {
   LOAN_PORTFOLIO_QUERY,
 } from '../contracts/index.js';
 export type { OutboxPort } from '../application/ports/index.js';
+
+/** LoanExistenceQuery: ids existentes en el workspace (`debt.loan`, bajo RLS en la unidad de trabajo en curso). */
+export const loanExistenceQuery: LoanExistenceQuery = {
+  existing: pgExistingIds('debt.loan'),
+};

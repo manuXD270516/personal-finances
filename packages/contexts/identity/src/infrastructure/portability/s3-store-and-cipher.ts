@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { type Readable, Transform, type TransformCallback } from 'node:stream';
+import { PassThrough, type Readable, Transform, type TransformCallback } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import { putStreamMultipart } from '@pf/platform/storage';
 import { DomainError } from '@pf/shared-kernel';
 import {
   ObjectMissingError,
@@ -13,12 +14,13 @@ import {
 } from '../../application/portability/ports.js';
 import {
   DecryptStream,
+  EncryptStream,
   EnvelopeIntegrityError,
+  KeyUnwrapError,
   decryptEnvelope,
   encryptEnvelope,
   newDataKey,
-} from './envelope.js';
-import { KeyUnwrapError } from './key-provider.js';
+} from '@pf/platform/crypto';
 
 const status = (err: unknown): number | undefined =>
   (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
@@ -44,6 +46,10 @@ export class S3ExportObjectStore implements ExportObjectStore {
         ContentType: 'application/octet-stream',
       }),
     );
+  }
+
+  async putStream(key: string, source: AsyncIterable<Buffer | Uint8Array>): Promise<void> {
+    await putStreamMultipart(this.client, this.bucket, key, source);
   }
 
   async openStream(key: string): Promise<Readable> {
@@ -91,6 +97,41 @@ export class KeyringEnvelopeCipher implements EnvelopeCipher {
     const encrypted = encryptEnvelope(plain, dataKey);
     const wrapped = await this.keys.wrap(dataKey, context);
     return { encrypted, keyId: wrapped.keyId, wrappedKey: wrapped.wrappedKey };
+  }
+
+  async sealStream(
+    plain: Readable,
+    context: string,
+  ): Promise<{
+    encrypted: Readable;
+    keyId: string;
+    wrappedKey: Uint8Array;
+    stats(): { sha256: string; size: number };
+  }> {
+    const dataKey = newDataKey();
+    const wrapped = await this.keys.wrap(dataKey, context);
+    const hash = createHash('sha256');
+    let size = 0;
+    const tap = new Transform({
+      transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback) {
+        hash.update(chunk);
+        size += chunk.length;
+        cb(null, chunk);
+      },
+    });
+    const out = new PassThrough();
+    // `pipeline` propaga un fallo de la fuente al flujo cifrado: quien lo consume ve el error y aborta la subida.
+    pipeline(plain, tap, new EncryptStream(dataKey), out).catch((err: unknown) => out.destroy(err as Error));
+    let digest: string | undefined;
+    return {
+      encrypted: out,
+      keyId: wrapped.keyId,
+      wrappedKey: wrapped.wrappedKey,
+      stats: () => {
+        digest ??= hash.digest('hex');
+        return { sha256: digest, size };
+      },
+    };
   }
 
   async open(encrypted: Buffer, wrapped: WrappedDataKey, context: string): Promise<Buffer> {

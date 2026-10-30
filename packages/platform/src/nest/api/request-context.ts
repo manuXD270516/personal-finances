@@ -35,6 +35,8 @@ export interface ApiRequestState {
   idempotencyPayload?: unknown;
   /** Archivo ya leído por el guard de una operación multipart, para que el handler no vuelva a leer el stream. */
   upload?: Buffer;
+  /** Resultado opaco de un guard que dejó el archivo subido en el almacenamiento (streaming) en lugar de en memoria. */
+  stagedUpload?: unknown;
   /** Metadatos del multipart leído por el guard: nombre original del archivo y campos de texto (`accountId`…). */
   uploadMeta?: { readonly fileName: string | null; readonly fields: Readonly<Record<string, string>> };
 }

@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Descarga a través de la API"
 scenario: "Descargar un comprobante"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-004"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: critical
 type: integration
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/application/documents.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

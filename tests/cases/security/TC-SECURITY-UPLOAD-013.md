@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Cuarentena hasta la verificación"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-002"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: high
 type: security
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/application/uploads.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

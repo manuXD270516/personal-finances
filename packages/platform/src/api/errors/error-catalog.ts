@@ -134,6 +134,19 @@ export const ERROR_CATALOG = {
   EXPORT_FORMAT_UNSUPPORTED: { status: 422, title: 'The export format is not supported' },
   EXPORT_VERIFICATION_FAILED: { status: 422, title: 'The imported data does not match the export manifest' },
   UPLOAD_TOO_LARGE: { status: 413, title: 'The uploaded file exceeds the maximum size' },
+  // documents / attachments (Phase 6, add-document-attachments)
+  UPLOAD_TYPE_NOT_ALLOWED: { status: 422, title: 'The file type is not allowed' },
+  DOCUMENT_QUOTA_EXCEEDED: { status: 422, title: 'The workspace document storage quota would be exceeded' },
+  DOCUMENT_PENDING_UPLOADS_EXCEEDED: { status: 409, title: 'Too many uploads are pending in the workspace' },
+  DOCUMENT_UPLOAD_MISSING: { status: 409, title: 'The file was not uploaded to the storage yet' },
+  DOCUMENT_NOT_AVAILABLE: { status: 409, title: 'The document is not available' },
+  DOCUMENT_REJECTED: { status: 409, title: 'The document was rejected by the file security checks' },
+  DOCUMENT_DELETED: { status: 410, title: 'The document was deleted' },
+  DOCUMENT_CONTENT_CORRUPTED: { status: 422, title: 'The stored document is corrupted or was altered' },
+  ATTACHMENT_LIMIT_EXCEEDED: {
+    status: 409,
+    title: 'The element already has the maximum number of attachments',
+  },
   // imports / basic CSV import (Phase 3)
   IMPORT_UNSUPPORTED_FORMAT: { status: 422, title: 'The file is not readable delimited text' },
   IMPORT_TOO_MANY_ROWS: { status: 422, title: 'The file has more data rows than allowed' },

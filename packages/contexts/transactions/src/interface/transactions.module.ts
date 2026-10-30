@@ -1,3 +1,4 @@
+import { pgExistingIds } from '@pf/platform/api';
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountsQueryPort } from '@pf/accounts/contracts';
 import type {
@@ -41,7 +42,7 @@ import {
   PgTransactionStatusQuery,
 } from '../infrastructure/pg-imported.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
-import { LOAN_TRANSACTIONS_PORT } from '../contracts/index.js';
+import { LOAN_TRANSACTIONS_PORT, type TransactionExistenceQuery } from '../contracts/index.js';
 import type {
   AccountMovementsQuery,
   CounterpartyCategoryUsageQuery,
@@ -256,3 +257,9 @@ export const TRANSACTION_LIFECYCLE_MACHINE: LifecycleMachineDto = TRANSACTION_LI
 /** Máquina de estados `Reconciliation` (add-reconciliation), para AUDIT en el composition root. */
 export const RECONCILIATION_LIFECYCLE_MACHINE: LifecycleMachineDto = RECONCILIATION_LIFECYCLE.definition;
 export type { OutboxPort };
+
+/** Existencia de transacciones y conversiones (`txn.transaction`, bajo RLS en la unidad de trabajo en curso). */
+export const transactionExistenceQuery: TransactionExistenceQuery = {
+  existingTransactions: pgExistingIds('txn.transaction', "kind <> 'CONVERSION'"),
+  existingConversions: pgExistingIds('txn.transaction', "kind = 'CONVERSION'"),
+};

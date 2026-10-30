@@ -251,3 +251,8 @@ Diferencias aceptadas y su mitigación: CPU arch (tests multi-arch nightly), S3 
 4. ¿Firmar imágenes con cosign keyless desde Phase 1 o basta con attestations de BuildKit/GitHub?
 5. Runners arm64 nativos: confirmar disponibilidad y coste para el plan de GitHub del owner; si no, ¿arm64 vía QEMU solo en `main` o desplegar amd64 en Fargate (≈ +25 % coste)?
 6. Registro: ¿solo ECR (cuenta `shared`) o GHCR para PR + ECR para despliegue? As-built: GHCR para `main` (sha-<commit>); PR no publica. ECR se decide con el despliegue.
+
+
+## Almacenamiento de documentos (add-document-attachments)
+
+Tres buckets en SeaweedFS: documentos (versionado, contenido cifrado por la aplicación), exports (sin versioning) y **cuarentena** (sin versioning; efímero: ningún objeto permanece más de 24 h). La inspección de PDF y XLSX usa un `worker_thread` dentro del contenedor de la API (límite de heap de 128 MB por inspección) y no agrega procesos ni consumidores. ClamAV (`clamav/clamav`) es un perfil opcional de Compose y no corre en el VPS de 2 GB (D314).

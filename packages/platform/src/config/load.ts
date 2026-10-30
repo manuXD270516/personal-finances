@@ -193,6 +193,44 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
       });
     }
   }
+  if (names.includes('DOCUMENT_ENCRYPTION_KEYS')) {
+    const rawKeys = values['DOCUMENT_ENCRYPTION_KEYS'];
+    if (cloud && rawKeys === undefined && !problems.some((p) => p.variable === 'DOCUMENT_ENCRYPTION_KEYS')) {
+      problems.push({
+        variable: 'DOCUMENT_ENCRYPTION_KEYS',
+        reason: 'falta (obligatoria con PFOS_ENV=staging|production)',
+      });
+    }
+    if (typeof rawKeys === 'string') {
+      const ids = rawKeys.split(',').map((entry) => entry.slice(0, entry.indexOf(':')));
+      if (new Set(ids).size !== ids.length) {
+        problems.push({ variable: 'DOCUMENT_ENCRYPTION_KEYS', reason: 'identificadores de clave repetidos' });
+      }
+      const active = values['DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID'];
+      if (typeof active === 'string' && !ids.includes(active)) {
+        problems.push({
+          variable: 'DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID',
+          reason: 'no figura en DOCUMENT_ENCRYPTION_KEYS',
+        });
+      }
+    } else if (values['DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID'] !== undefined) {
+      problems.push({
+        variable: 'DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID',
+        reason: 'requiere DOCUMENT_ENCRYPTION_KEYS',
+      });
+    }
+  }
+  if (
+    names.includes('DOCUMENT_MALWARE_SCANNER') &&
+    values['DOCUMENT_MALWARE_SCANNER'] === 'clamav' &&
+    values['CLAMAV_HOST'] === undefined &&
+    !problems.some((p) => p.variable === 'CLAMAV_HOST')
+  ) {
+    problems.push({
+      variable: 'CLAMAV_HOST',
+      reason: 'falta (obligatoria con DOCUMENT_MALWARE_SCANNER=clamav)',
+    });
+  }
   if (names.includes('CURSOR_SIGNING_KEY') && cloud && values['CURSOR_SIGNING_KEY'] === undefined) {
     if (!problems.some((p) => p.variable === 'CURSOR_SIGNING_KEY')) {
       problems.push({

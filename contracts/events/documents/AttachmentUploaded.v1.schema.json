@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/documents/AttachmentUploaded.v1.schema.json",
+  "title": "documents.AttachmentUploaded.v1",
+  "description": "Un documento quedó disponible: superó la verificación síncrona de la confirmación (suma, tipo real por contenido, controles por formato y, si está habilitado, antimalware) o se restauró su contenido desde el archivo de contenidos de un export. Un hecho por cada vez que pasa a AVAILABLE. Productor: DOCUMENTS. Sin consumidores obligatorios (IMPORTS exige AVAILABLE al crear el job y no lo consume). Idempotencia: documentId + aggregateVersion. NUNCA lleva el nombre original del archivo (dato que puede llevar PII) ni claves.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "documents.AttachmentUploaded"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Document"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentId",
+        "purpose",
+        "contentType",
+        "format",
+        "sizeBytes",
+        "sha256",
+        "scanStatus"
+      ],
+      "properties": {
+        "documentId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "Conjunto abierto: RECEIPT, INVOICE, STATEMENT, CONTRACT, IMPORT_SOURCE, OTHER.",
+          "pattern": "^[A-Z][A-Z_]{1,31}$"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Tipo canónico del formato detectado por contenido.",
+          "minLength": 3,
+          "maxLength": 127
+        },
+        "format": {
+          "type": "string",
+          "description": "Formato detectado. Conjunto abierto: PDF, PNG, JPEG, WEBP, HEIC, CSV, OFX, QIF, JSON, XLSX.",
+          "pattern": "^[A-Z][A-Z0-9_]{1,31}$"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 26214400
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scanStatus": {
+          "enum": [
+            "NOT_SCANNED",
+            "CLEAN"
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000d01",
+      "eventType": "documents.AttachmentUploaded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-29T14:00:03.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Document",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000d0001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "documentId": "01928c4e-0000-7000-8000-0000000d0001",
+        "purpose": "IMPORT_SOURCE",
+        "contentType": "text/csv",
+        "format": "CSV",
+        "sizeBytes": 18874368,
+        "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "scanStatus": "NOT_SCANNED"
+      }
+    }
+  ]
+}

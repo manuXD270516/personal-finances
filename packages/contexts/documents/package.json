@@ -1,0 +1,50 @@
+{
+  "name": "@pf/documents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded context DOCUMENTS: adjuntos de documentos con subida directa a cuarentena, verificación por contenido, cifrado de sobre, cuota y descarga por la API (openspec add-document-attachments).",
+  "exports": {
+    "./contracts": {
+      "@pf/source": "./src/contracts/index.ts",
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./interface/documents.module": {
+      "@pf/source": "./src/interface/documents.module.ts",
+      "types": "./dist/interface/documents.module.d.ts",
+      "default": "./dist/interface/documents.module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@pf/audit": "workspace:*",
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
+    "busboy": "1.6.0",
+    "kysely": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/busboy": "^1.5.4",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "fast-check": "4.10.2",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Auditoría de documentos"
 scenario: "Descarga auditada"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-AUDIT-001"
   - "FR-AUDIT-005"
@@ -16,8 +16,9 @@ invariants:
 priority: critical
 type: integration
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/application/uploads.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

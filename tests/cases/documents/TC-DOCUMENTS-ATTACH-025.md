@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Archivo de contenidos de documentos del export"
 scenario: "Contenido alterado en el archivo"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-IDENTITY-010"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: medium
 type: integration
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents-portability.api.test.ts", "packages/contexts/documents/src/application/contents-archive.test.ts", "packages/contexts/documents/src/application/contents.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

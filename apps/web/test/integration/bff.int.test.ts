@@ -122,6 +122,19 @@ function fakeApi(userId: () => string) {
         ? new Response(null, { status: 204 })
         : Response.json({ code: 'INTERNAL_ERROR' }, { status: state.sessionEventsStatus });
     }
+    if (url.includes('/documents/') && url.endsWith('/download')) {
+      return new Response(Buffer.from('%PDF-1.7 contenido original'), {
+        headers: {
+          'content-type': 'application/pdf',
+          'content-disposition': `attachment; filename="factura.pdf"; filename*=UTF-8''factura.pdf`,
+          'x-content-type-options': 'nosniff',
+          'content-security-policy': "sandbox; default-src 'none'",
+          'cache-control': 'private, no-store',
+          'repr-digest': 'sha-256=:AAAA:',
+          'x-interno': 'no-debe-salir',
+        },
+      });
+    }
     if (url.includes('/lifecycle/export')) {
       return new Response('\uFEFFsequence,kind\r\n1,TRANSITION\r\n', {
         headers: {
@@ -511,6 +524,28 @@ describe('[TC-AUDIT-LIFECYCLE-020] descarga del recorrido por el BFF (docs/31 D5
     expect(call.url).toBe(`${API}/api/v1/${path.join('/')}?format=csv`);
     expect(call.headers.get('accept-language')).toBe('es-BO,es;q=0.9');
     expect(call.authorization).toMatch(/^Bearer /);
+  });
+});
+
+describe('[TC-SECURITY-UPLOAD-015] descarga de documentos por el BFF (add-document-attachments)', () => {
+  it('reenvía en streaming el contenido con las cabeceras de entrega segura y nada más de finance-api', async () => {
+    const { bff, api } = setup();
+    const { sid } = await login(bff);
+    const path = ['workspaces', randomUUID(), 'documents', randomUUID(), 'download'];
+    const r = await bff.proxy(
+      new Request(`${APP}/api/bff/v1/${path.join('/')}`, { headers: withSid(sid) }),
+      path,
+    );
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toBe('application/pdf');
+    expect(r.headers.get('content-disposition')).toMatch(/^attachment; filename="factura\.pdf"/u);
+    expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(r.headers.get('content-security-policy')).toBe("sandbox; default-src 'none'");
+    expect(r.headers.get('repr-digest')).toBe('sha-256=:AAAA:');
+    expect(r.headers.get('cache-control')).toBe('no-store');
+    expect(r.headers.get('x-interno')).toBeNull();
+    expect(new TextDecoder().decode(await r.arrayBuffer())).toBe('%PDF-1.7 contenido original');
+    expect(api.calls.at(-1)?.url).toBe(`${API}/api/v1/${path.join('/')}`);
   });
 });
 

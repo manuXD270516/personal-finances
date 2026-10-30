@@ -31,6 +31,7 @@ import { StepIndicator } from './StepIndicator';
 import { UploadStep } from './UploadStep';
 import { useAccounts } from './useAccounts';
 import type { ImportCreated, ImportJob, ImportMapped, ImportPreviewSummary } from './types';
+import { AttachmentsSection } from '../documents/AttachmentsSection';
 
 const STEP_TITLE_KEY: Readonly<Record<WizardStep, string>> = {
   1: 'steps.upload',
@@ -396,6 +397,7 @@ export function ImportWizard({
           onAccept={() => void act('accept-errors')}
         />
       ) : null}
+      {job ? <AttachmentsSection targetType="IMPORT_JOB" targetId={job.id} purpose="IMPORT_SOURCE" /> : null}
     </section>
   );
 }

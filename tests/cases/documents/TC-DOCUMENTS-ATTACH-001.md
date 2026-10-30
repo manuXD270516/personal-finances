@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Solicitar la subida de un documento"
 scenario: "Solicitud de subida de un comprobante"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-001"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/application/uploads.service.test.ts", "packages/contexts/documents/src/domain/file-policy.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

@@ -204,3 +204,11 @@ Acceso a backups restringido por políticas de vault/bucket (solo roles de backu
 5. ¿Replicación S3 de `documents` desde el día 1 o al haber documentos reales?
 6. Formato de export: ¿se requiere además un formato estándar (p. ej. *Ledger/hledger journal*, OFX) para portabilidad hacia otras herramientas?
 7. Backups locales con datos reales: ¿cifrado `age` obligatorio por defecto?
+
+
+## Documentos adjuntos: llavero, réplica y borrado (add-document-attachments, ADR-0030)
+
+- **El llavero de documentos (`DOCUMENT_ENCRYPTION_KEYS`) debe respaldarse FUERA del host** (gestor de contraseñas del owner o el secreto de despliegue), igual que la clave de pgBackRest: perderlo implica perder todos los documentos de forma irreversible. Rotar = agregar la clave nueva sin quitar la anterior; el arranque falla nombrando una clave en uso que falte.
+- La réplica nocturna a B2 cubre **solo el bucket de documentos** (contenido ya cifrado por la aplicación); la cuarentena y los exports nunca se replican.
+- **Límite del crypto-shredding:** eliminar un documento destruye su clave envuelta y borra el objeto con sus versiones, así que las copias de la réplica quedan ilegibles; pero los backups de la base (pgBackRest, fulls mensuales × 12) conservan el envoltorio hasta 12 meses, de modo que frente a una restauración completa de la base el borrado efectivo es ≤ 12 meses.
+- Tras restaurar la base sin los objetos, los documentos quedan referenciados sin contenido: el barrido de huérfanos los detecta y el export del workspace permite restaurar los contenidos de forma idempotente.

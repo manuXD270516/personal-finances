@@ -16,6 +16,7 @@ import { createApiResources, type ApiResources } from '../runtime/platform-resou
 import { ApiModule } from './api.module.js';
 import { createApiConventions, type ApiConventionsOverrides } from './api-conventions.js';
 import { identityImports } from '../identity/identity-wiring.js';
+import type { DocumentsRuntime } from '@pf/documents/interface/documents.module';
 import type { JwtVerifierOptions } from '@pf/platform/api';
 import type { AuditPort, AuthorizationDenialPort, LifecyclePort } from '@pf/audit/interface/audit.module';
 
@@ -69,6 +70,7 @@ export async function createApiRuntime(
   await resources.queue.start();
 
   const conventions = createApiConventions(config, resources.pool, logger, options);
+  let documents: DocumentsRuntime | undefined;
 
   const app = await NestFactory.create<NestExpressApplication>(
     ApiModule.register({
@@ -87,6 +89,9 @@ export async function createApiRuntime(
               logger,
               queue: resources.queue,
               storage: resources.storage,
+              onDocuments: (runtime) => {
+                documents = runtime;
+              },
               ...(options.identity?.jwt ? { jwt: options.identity.jwt } : {}),
               ...(options.identity?.audit ? { audit: options.identity.audit } : {}),
               ...(options.identity?.lifecycle ? { lifecycle: options.identity.lifecycle } : {}),
@@ -97,6 +102,16 @@ export async function createApiRuntime(
     }),
     { logger: new PinoNestLogger(logger), abortOnError: false, bodyParser: false },
   );
+  // Toda clave maestra en uso por documentos debe seguir en el llavero: si no, el arranque falla nombrándola.
+  if (documents) {
+    try {
+      await documents.maintenance.assertKeysAvailable();
+    } catch (err) {
+      await app.close();
+      await resources.close();
+      throw err;
+    }
+  }
   app.use(httpContextMiddleware(logger));
   // Contexto ambiental (origen, user agent, IP para su HMAC, Idempotency-Key) que usa la auditoría (add-audit-trail).
   app.use(requestContextMiddleware());

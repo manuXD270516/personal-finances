@@ -64,6 +64,67 @@ export function encryptEnvelope(plain: Buffer, dataKey: Buffer): Buffer {
 }
 
 /**
+ * Cifrado en streaming (openspec add-document-attachments, decisión 6): produce exactamente el mismo formato que
+ * `encryptEnvelope`. Como la marca de último bloque va en el AAD, un registro completo solo se cifra cuando se sabe si
+ * hay más datos (el siguiente fragmento o el cierre del flujo). Memoria O(64 KiB).
+ */
+export class EncryptStream extends Transform {
+  private pending: Buffer = Buffer.alloc(0);
+  private readonly header: Buffer;
+  private readonly prefix: Buffer;
+  private index = 0;
+  private started = false;
+
+  constructor(private readonly dataKey: Buffer) {
+    super();
+    assertKey(dataKey);
+    this.prefix = randomBytes(PREFIX_BYTES);
+    this.header = Buffer.concat([ENVELOPE_MAGIC, Buffer.from([ENVELOPE_VERSION]), this.prefix]);
+  }
+
+  private seal(chunk: Buffer, last: boolean): Buffer {
+    const cipher = createCipheriv('aes-256-gcm', this.dataKey, nonceOf(this.prefix, this.index));
+    cipher.setAAD(aadOf(this.header, this.index, last));
+    const out = Buffer.concat([cipher.update(chunk), cipher.final(), cipher.getAuthTag()]);
+    this.index += 1;
+    return out;
+  }
+
+  private start(): void {
+    if (!this.started) {
+      this.started = true;
+      this.push(this.header);
+    }
+  }
+
+  override _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
+    try {
+      this.start();
+      this.pending = Buffer.concat([this.pending, chunk]);
+      // Un bloque completo con datos detrás no es el último.
+      while (this.pending.length > ENVELOPE_CHUNK_BYTES) {
+        this.push(this.seal(this.pending.subarray(0, ENVELOPE_CHUNK_BYTES), false));
+        this.pending = this.pending.subarray(ENVELOPE_CHUNK_BYTES);
+      }
+      cb();
+    } catch (err) {
+      cb(err as Error);
+    }
+  }
+
+  override _flush(cb: TransformCallback): void {
+    try {
+      this.start();
+      this.push(this.seal(this.pending, true));
+      this.pending = Buffer.alloc(0);
+      cb();
+    } catch (err) {
+      cb(err as Error);
+    }
+  }
+}
+
+/**
  * Descifrado en streaming: valida el tag de CADA bloque antes de emitirlo. Un bloque completo se procesa solo cuando
  * se sabe si es el último (hay datos posteriores o el flujo terminó), porque la marca de último bloque va en el AAD.
  */

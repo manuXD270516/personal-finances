@@ -28,7 +28,7 @@ Imports **NO**:
 | Categorías, counterparties | `CLASSIFICATION` | Queries `ResolveCounterparty`, `ListCategories` |
 | Cuentas, instituciones | `ACCOUNTS` | Query `GetAccount`, `GetInstitution` |
 | Tasas de referencia (exchange trades) | `FX` | Query `GetReferenceRate` (solo para metadatos) |
-| Archivo original | `DOCUMENTS` + `ObjectStorage` | `RegisterDocument`, presigned upload |
+| Archivo original | `DOCUMENTS` (subida a cuarentena, verificación, cifrado, retención) | La UI sube el extracto por `POST W/documents/uploads` (`purpose = IMPORT_SOURCE`) y luego crea el job con `documentId`; IMPORTS lee el contenido por `DocumentContentReader` y lo vincula con `AttachmentCommand` (`@pf/documents/contracts`) |
 | Bitácora | `AUDIT` | `AuditLog` en la misma transacción de cada comando mutante |
 
 ## 2. Lenguaje ubicuo
@@ -142,7 +142,7 @@ flowchart LR
 
 | # | Etapa | Responsabilidad | Puertos (application) | Fallos y manejo |
 |---|---|---|---|---|
-| 1 | **Upload** | Recibir el archivo vía **presigned PUT** a Object Storage (bucket `imports-raw`, key `ws/{workspaceId}/imports/{jobId}/{uuid}`), validar tamaño, media type por magic bytes (no por extensión), calcular SHA-256, escaneo antimalware (cuando exista, ver 12-security.md). Para APIs: fijar `syncWindow`. | `ObjectStorage`, `FileScanner`, `DocumentRegistryPort` | Archivo > límite → `IMPORT_FILE_TOO_LARGE`. Media type no soportado → `IMPORT_UNSUPPORTED_FORMAT`. Checksum ya importado en la misma cuenta → advertencia `IMPORT_FILE_ALREADY_IMPORTED` (no bloqueante, ver §7.1). |
+| 1 | **Upload** | El archivo ya está en DOCUMENTS (`AVAILABLE`, `purpose = IMPORT_SOURCE`, ≤ 20 MiB): tamaño, tipo real por magic bytes, estructura de XLSX/PDF, cifrado y SHA-256 los garantiza DOCUMENTS (add-document-attachments); el job se crea con `documentId` y se vincula en la misma unidad de trabajo. IMPORTS NO emite presigned URLs ni toca la cuarentena. Para APIs: fijar `syncWindow`. | `ObjectStorage`, `FileScanner`, `DocumentRegistryPort` | Archivo > límite → `IMPORT_FILE_TOO_LARGE`. Media type no soportado → `IMPORT_UNSUPPORTED_FORMAT`. Checksum ya importado en la misma cuenta → advertencia `IMPORT_FILE_ALREADY_IMPORTED` (no bloqueante, ver §7.1). |
 | 2 | **Parse** | Leer **en streaming** y producir `RawRecord[]` (strings + nº de línea). Detectar encoding y delimitador. Extraer `StatementBalance` si el formato lo trae (OFX `LEDGERBAL`, cabeceras de CSV). | `FileParser` (adapter por formato), `EncodingDetector` | Error estructural (OFX inválido, CSV sin cabecera esperada) → `PARSE_FAILED` con línea y causa. Filas sueltas mal formadas → `RawRecord` marcado `parseError`, el job continúa. |
 | 3 | **Normalize** | Aplicar `MappingProfile`: columnas → campos; parseo de **decimales con coma**, miles, signos (columna débito/crédito vs columna única con signo, sufijo `-`, paréntesis `(1.234,56)`); **fechas** `dd/mm/yyyy` y variantes; timezone del workspace; limpieza de descripción (trim, colapsar espacios, quitar prefijos bancarios conocidos como `POS `, `COMPRA `, nº de tarjeta enmascarado); `Money` con `currency.scale` del destino. Calcular `RowFingerprint`. | `MappingProfileRepository`, `CurrencyCatalogPort`, `Clock` | Valor no parseable → fila `INVALID` con código (`IMPORT_INVALID_AMOUNT`, `IMPORT_INVALID_DATE`, `IMPORT_AMBIGUOUS_DATE`). **Nunca** se usa `number`: el parser produce string → `Decimal`. |
 | 4 | **Validate** | Reglas de negocio: moneda de la fila = moneda de la cuenta (o fila de conversión explícita); escala válida; fecha no futura más allá de tolerancia (+3 días); fecha no en periodo `closed` (se marca `REQUIRES_PERIOD_REOPEN`, bloqueante para esa fila); monto ≠ 0; duplicado **intra-archivo** por fingerprint. | `PeriodStatusPort` (Planning), `AccountsQueryPort` | Filas inválidas quedan en staging con motivo; el usuario puede corregir, excluir o reintentar. |
@@ -462,7 +462,7 @@ difference       = statement.closingBalance − expected_closing
 
 ## 13. Seguridad y auditoría
 
-- Upload solo por presigned URL con expiración 10 min, `Content-Length` máximo y content-type fijado; bucket privado, SSE habilitado. Ver 12-security.md (`security/file-upload-security`).
+- Upload solo por la URL presignada de DOCUMENTS con expiración de 5 min (máx. 10), `Content-Length` exacto, content-type y suma SHA-256 firmados; cuarentena aparte, contenido cifrado por la aplicación y descarga solo por la API. Ver 12-security.md (`security/file-upload-security`).
 - Prohibido ejecutar macros o fórmulas: XLSX se lee como datos; **CSV injection**: al **exportar** de vuelta cualquier texto importado que empiece con `= + - @` se escapa (relevante para 14-reporting.md exports).
 - Las descripciones importadas son **datos no confiables**: se escapan en UI y se marcan como tales para el asistente IA (riesgo de prompt injection, ver 27-ai-assistant-roadmap.md).
 - `AuditLog` (misma transacción) para: crear job, aprobar, cancelar, revertir, fusionar duplicado, crear ajuste de reconciliación, crear/editar MappingProfile, crear/revocar Connection.

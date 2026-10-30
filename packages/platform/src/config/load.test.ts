@@ -178,6 +178,7 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
         ...mailpit,
         PFOS_ENV: 'production',
         EXPORT_ENCRYPTION_KEYS: `k1:${'0'.repeat(64)}`,
+        DOCUMENT_ENCRYPTION_KEYS: `k1:${'1'.repeat(64)}`,
       }).EMAIL_DRIVER,
     ).toBe('none');
     // smtp explícito exige servidor y URL pública.

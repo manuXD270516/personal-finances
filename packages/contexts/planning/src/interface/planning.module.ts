@@ -16,7 +16,7 @@ import type {
   LedgerPeriodLockPort,
   LedgerPostingPort,
 } from '@pf/ledger/contracts';
-import { runWithRequestContext } from '@pf/platform/api';
+import { pgExistingIds, runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -71,6 +71,7 @@ import {
   type PeriodCreatedHook,
   type PeriodQuery,
   type PlanningEditGuard,
+  type FinancialPeriodExistenceQuery,
 } from '../contracts/index.js';
 import { FINANCIAL_PERIOD_LIFECYCLE } from '../domain/index.js';
 import {
@@ -673,3 +674,8 @@ export function closeSnapshotRestoreHook(ctx: {
     row['content_sha256'] = snapshotContentSha256(content);
   }
 }
+
+/** FinancialPeriodExistenceQuery: ids existentes en el workspace (`planning.financial_period`, bajo RLS en la unidad de trabajo en curso). */
+export const financialPeriodExistenceQuery: FinancialPeriodExistenceQuery = {
+  existing: pgExistingIds('planning.financial_period'),
+};

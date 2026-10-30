@@ -1414,7 +1414,7 @@ erDiagram
 
 Catálogo inicial de monedas globales (`BOB`, `USD`, `USDT`, `USDC`, `EUR`, `BTC`, `ETH`, …) se carga como **migración de datos de referencia**, no como seed (§12). Pregunta abierta: códigos de monedas `CUSTOM` globalmente únicos.
 
-### 5.11 `documents` — Documents & attachments (Phase 6)
+### 5.11 `documents` — Documents & attachments (Phase 6, as-built `add-document-attachments`)
 
 ```mermaid
 erDiagram
@@ -1422,39 +1422,50 @@ erDiagram
   DOCUMENT {
     uuid id PK
     uuid workspace_id FK
-    text storage_area "QUARANTINE DOCUMENTS"
-    text object_key "ws/doc-id sin nombre original"
-    text original_filename
+    text purpose "RECEIPT INVOICE STATEMENT CONTRACT IMPORT_SOURCE OTHER"
+    text status "PENDING_UPLOAD UPLOADED AVAILABLE REJECTED DELETED CONTENT_PENDING"
+    text original_name "normalizado; PII potencial, nunca en logs ni claves"
     text declared_content_type
     text detected_content_type
+    text detected_format "PDF PNG JPEG WEBP HEIC CSV OFX QIF JSON XLSX"
     bigint size_bytes
     bytea sha256
-    text purpose "RECEIPT INVOICE STATEMENT CONTRACT IMPORT_SOURCE EXPORT OTHER"
-    text status "PENDING_UPLOAD UPLOADED AVAILABLE REJECTED DELETED"
+    text quarantine_key "ws/workspace/documento"
+    text object_key "ws/workspace/documents/documento"
+    text key_id "clave maestra que envuelve"
+    bytea wrapped_key "clave de datos envuelta (NULL tras eliminar)"
+    text scan_status "NOT_SCANNED CLEAN"
     text rejection_reason
     timestamptz upload_expires_at
-    timestamptz uploaded_at
     timestamptz archived_at
     timestamptz deleted_at
+    timestamptz last_unlinked_at
     int version
   }
   ATTACHMENT_LINK {
     uuid id PK
     uuid workspace_id FK
     uuid document_id FK
-    text target_type "TRANSACTION CONVERSION ACCOUNT LOAN CREDIT_CARD_STATEMENT GOAL RECURRING_DEFINITION RECONCILIATION MONTH_CLOSING"
+    text target_type "TRANSACTION CONVERSION LOAN SUBSCRIPTION ACCOUNT IMPORT_JOB MONTH_CLOSING"
     uuid target_id "ref polimorfico"
     timestamptz created_at
     uuid created_by
+  }
+  STORAGE_USAGE {
+    uuid workspace_id PK
+    bigint used_bytes
+    bigint reserved_bytes
+    int pending_uploads
   }
 ```
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `document` | `(workspace_id, object_key)`; `(workspace_id, sha256) WHERE status='AVAILABLE'` (dedupe opcional, advertencia, no error) | `size_bytes > 0 AND size_bytes <= 26214400` (25 MiB); `declared_content_type IN (allowlist)`; `status='REJECTED'` ⇒ `rejection_reason IS NOT NULL` | `(workspace_id, status) WHERE status IN ('PENDING_UPLOAD','UPLOADED')` (limpieza); `(workspace_id, purpose, uploaded_at DESC)` | WS | `version`, `archived_at`; `deleted_at` = borrado del binario a pedido del usuario (metadatos permanecen) |
-| `attachment_link` | `(document_id, target_type, target_id)` | `target_type IN (...)` | `(workspace_id, target_type, target_id)` | WS | Desvincular = fila borrada (no es dato financiero) + audit |
+| `document` | `(workspace_id, id)`; `(workspace_id, object_key)`; **parcial** `(workspace_id, sha256) WHERE status='AVAILABLE'` (deduplicación: devuelve el existente, FR-DOCUMENTS-006) | `size_bytes > 0 AND size_bytes <= 26214400` (25 MiB); `REJECTED ⇒ rejection_reason`; `AVAILABLE ⇒ object_key, key_id, wrapped_key`; `DELETED ⇒ wrapped_key IS NULL`; `(key_id IS NULL) = (wrapped_key IS NULL)` | `(workspace_id, status) WHERE status IN ('PENDING_UPLOAD','UPLOADED')`; `(workspace_id, purpose, available_at DESC)`; `(workspace_id, created_at DESC, id DESC)`; `(key_id) WHERE wrapped_key IS NOT NULL` (rotación) | WS forzada fail-closed + `retention_scan` de `pf_maintenance` (solo columnas operativas, sin `object_key`, `wrapped_key` ni nombre) | `version`; `archived_at` es un atributo (anotación del recorrido); eliminar destruye la clave y conserva los metadatos |
+| `attachment_link` | `(workspace_id, document_id, target_type, target_id)` | `target_type IN (7 tipos)`; FK compuesta al documento | `(workspace_id, target_type, target_id)` | WS | Desvincular = fila borrada (no es dato financiero) + auditoría |
+| `storage_usage` | `workspace_id` PK | contadores ≥ 0 | — | WS | Se actualiza en la misma unidad de trabajo que la transición; se bloquea la fila para serializar las solicitudes concurrentes |
 
-**Justificación del link polimórfico:** los targets viven en otros schemas, así que ninguna FK física sería posible de todos modos (ARCHITECTURE §2). Una tabla de enlace por target multiplicaría tablas sin ganar integridad. Se compensa con: (1) `target_type` cerrado por CHECK; (2) validación en `application` vía `contracts` del dueño del target; (3) job de verificación de huérfanos.
+**Justificación del link polimórfico:** los targets viven en otros schemas, así que ninguna FK física sería posible de todos modos (ARCHITECTURE §2). Se compensa con: (1) `target_type` cerrado por CHECK (se amplía con una migración expand cuando haya un uso: `CREDIT_CARD_STATEMENT`, `GOAL`, `RECONCILIATION`; D321); (2) validación en `application` vía el `*ExistenceQuery` del contexto dueño del target; (3) la métrica `documents_orphan_links_total`.
 
 ### 5.12 `imports` — Import pipeline & banking providers (Phase 6; subconjunto CSV implementado en Phase 3)
 
@@ -2269,6 +2280,8 @@ Las purgas las ejecuta un job del worker con rol `pf_maintenance` (DELETE acotad
 ### 13.2 Exportación del workspace (portabilidad)
 
 As-built (`add-workspace-export`): operación asíncrona (`POST /workspaces/{id}/exports` → `202` + `platform.operation` de tipo `EXPORT`, tablas `iam.workspace_export` e `iam.workspace_import`, `iam.workspace.restored_from_export`, estado `RESTORING` mientras se importa). El ZIP `pfos-export` v1 (manifiesto + JSON Lines validado con `contracts/export/v1/*.schema.json` + CSV neutralizado) se guarda cifrado en el bucket `exports` (`exports/{ws}/{exportId}.pfxe`, cifrado de sobre) y expira en 7 días. Cubre TODAS las tablas de `platform.workspace_scoped_table` (o una exclusión declarada con motivo). Exportar e importar son acciones auditadas; importar crea siempre un workspace nuevo.
+
+**Documentos (add-document-attachments, D315):** el ZIP principal incluye las secciones `documents` (orden 810), `attachment-links` (811) y `document-storage-usage` (812) con los metadatos y los vínculos, **sin** claves de datos, claves envueltas, identificador de clave maestra ni claves de objeto; al importar, un documento disponible en el origen queda `CONTENT_PENDING` y los eliminados y rechazados conservan su estado (las subidas sin terminar no viajan). El contenido de los documentos viaja en un **archivo aparte, opcional** (`includeDocumentContents`), cifrado con su propia clave y restaurable de forma idempotente; las columnas `contents_*` de `iam.workspace_export` lo describen. D100 (importación ≤ 200 MB en una transacción) no cambia.
 
 ### 13.3 Eliminación del workspace (derecho al olvido)
 

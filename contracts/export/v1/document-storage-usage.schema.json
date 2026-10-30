@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/document-storage-usage.schema.json",
+  "title": "pfos-export v1 — document-storage-usage",
+  "description": "Registro de la sección «document-storage-usage» (tabla documents.storage_usage, contexto documents). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "used_bytes",
+    "reserved_bytes",
+    "pending_uploads",
+    "updated_at"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "used_bytes": {
+      "type": "string",
+      "pattern": "^-?[0-9]+$"
+    },
+    "reserved_bytes": {
+      "type": "string",
+      "pattern": "^-?[0-9]+$"
+    },
+    "pending_uploads": {
+      "type": "integer"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "documents.storage_usage",
+  "x-pfos-context": "documents"
+}

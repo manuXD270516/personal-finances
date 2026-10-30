@@ -1,6 +1,28 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import type { ExportKeyProvider, WrappedDataKey } from '../../application/portability/ports.js';
 import { DATA_KEY_BYTES } from './envelope.js';
+
+/** Clave de datos envuelta con una clave maestra identificada (cifrado de sobre). */
+export interface WrappedDataKey {
+  readonly keyId: string;
+  readonly wrappedKey: Uint8Array;
+}
+
+/**
+ * Proveedor de claves maestras rotables. Local/CI: llavero (`EXPORT_ENCRYPTION_KEYS`, `DOCUMENT_ENCRYPTION_KEYS`);
+ * cloud: adapter KMS (`GenerateDataKey`/`Decrypt`). La clave maestra nunca viaja a la base ni al bucket. `context`
+ * (workspace + objeto) va como dato autenticado: un envoltorio copiado a otro registro no descifra.
+ */
+export interface DataKeyProvider {
+  readonly activeKeyId: string;
+  wrap(dataKey: Buffer, context: string): Promise<WrappedDataKey>;
+  unwrap(wrapped: WrappedDataKey, context: string): Promise<Buffer>;
+}
+
+/** Nombres de las variables de configuración que alimentan un llavero (solo para los mensajes de error). */
+export interface KeyringVariableNames {
+  readonly keys: string;
+  readonly activeKeyId: string;
+}
 
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
@@ -23,11 +45,18 @@ export class KeyUnwrapError extends Error {
  * Adapter para cloud (KMS `GenerateDataKey`/`Decrypt`): mismo puerto `ExportKeyProvider`; se cablea con el change de
  * despliegue cloud (pendiente, design § Riesgos).
  */
-export class LocalKeyringProvider implements ExportKeyProvider {
+export class LocalKeyringProvider implements DataKeyProvider {
   private readonly keys = new Map<string, Buffer>();
   readonly activeKeyId: string;
 
-  constructor(spec: string, activeKeyId?: string) {
+  constructor(
+    spec: string,
+    activeKeyId?: string,
+    names: KeyringVariableNames = {
+      keys: 'EXPORT_ENCRYPTION_KEYS',
+      activeKeyId: 'EXPORT_ENCRYPTION_ACTIVE_KEY_ID',
+    },
+  ) {
     for (const entry of spec.split(',')) {
       const cut = entry.indexOf(':');
       const id = entry.slice(0, cut);
@@ -35,16 +64,14 @@ export class LocalKeyringProvider implements ExportKeyProvider {
       // 32 bytes en hexadecimal (64 caracteres, `openssl rand -hex 32`) o en base64url (43 caracteres).
       const key = /^[0-9a-f]{64}$/u.test(raw) ? Buffer.from(raw, 'hex') : Buffer.from(raw, 'base64url');
       if (id.length === 0 || key.length !== DATA_KEY_BYTES) {
-        throw new Error(
-          'EXPORT_ENCRYPTION_KEYS: cada clave maestra debe ser de 32 bytes (base64url o hexadecimal)',
-        );
+        throw new Error(`${names.keys}: cada clave maestra debe ser de 32 bytes (base64url o hexadecimal)`);
       }
       this.keys.set(id, key);
     }
     const first = this.keys.keys().next().value as string | undefined;
     const active = activeKeyId ?? first;
     if (!active || !this.keys.has(active)) {
-      throw new Error('EXPORT_ENCRYPTION_ACTIVE_KEY_ID no figura en EXPORT_ENCRYPTION_KEYS');
+      throw new Error(`${names.activeKeyId} no figura en ${names.keys}`);
     }
     this.activeKeyId = active;
   }

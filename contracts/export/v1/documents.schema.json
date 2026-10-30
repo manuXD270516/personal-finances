@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/documents.schema.json",
+  "title": "pfos-export v1 — documents",
+  "description": "Registro de la sección «documents» (tabla documents.document, contexto documents). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "purpose",
+    "status",
+    "original_name",
+    "extension",
+    "declared_content_type",
+    "declared_format",
+    "detected_content_type",
+    "detected_format",
+    "size_bytes",
+    "sha256",
+    "scan_status",
+    "scan_engine",
+    "rejection_reason",
+    "upload_expires_at",
+    "verification_started_at",
+    "uploaded_at",
+    "available_at",
+    "rejected_at",
+    "archived_at",
+    "archived_by",
+    "deleted_at",
+    "deleted_by",
+    "last_unlinked_at",
+    "restored_from",
+    "created_by",
+    "created_at",
+    "updated_at",
+    "version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "original_name": {
+      "type": "string"
+    },
+    "extension": {
+      "type": "string"
+    },
+    "declared_content_type": {
+      "type": "string"
+    },
+    "declared_format": {
+      "type": "string"
+    },
+    "detected_content_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "detected_format": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "size_bytes": {
+      "type": "string",
+      "pattern": "^-?[0-9]+$"
+    },
+    "sha256": {
+      "type": "string",
+      "contentEncoding": "base64"
+    },
+    "scan_status": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scan_engine": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rejection_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "upload_expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "verification_started_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "uploaded_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "available_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "rejected_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "archived_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "archived_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "deleted_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "deleted_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_unlinked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "restored_from": {},
+    "created_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "version": {
+      "type": "integer"
+    }
+  },
+  "x-pfos-table": "documents.document",
+  "x-pfos-context": "documents"
+}

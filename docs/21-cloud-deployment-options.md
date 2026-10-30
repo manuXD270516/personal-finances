@@ -327,3 +327,8 @@ flowchart LR
 6. ¿WAF desde el día 1 en producción (+6–10 USD/mes) o rate limiting en app + CloudFront?
 7. RDS Multi-AZ en producción: ¿desde el inicio (+≈14 USD/mes) o cuando RTO lo requiera?
 8. Validar en SPIKE-09: ECS Express Mode y API Gateway HTTP API como sustitutos baratos del ALB; BullMQ sobre ElastiCache Serverless (compatibilidad de comandos y latencia).
+
+
+## Nota: subida directa de documentos (add-document-attachments, D316)
+
+En el VPS N1 la subida de documentos entra por un hostname propio (`PF_DOMAIN_FILES`) de Caddy limitado a `PUT`/`OPTIONS` firmados sobre el bucket de cuarentena; un registro DNS más y certificado automático. En cloud gestionado equivale a una URL presignada de S3 con CORS acotado a la app.
