@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Aplicación del dry-run como edición masiva auditada"
 scenario: "Una transacción cambió después del dry-run"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-008"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/rules/src/application/evaluation.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +34,7 @@ expected_result:
   - "409 RULE_DRY_RUN_STALE"
   - "Ninguno de los 4 cambia"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-030 — Un cambio posterior al dry-run rechaza toda la aplicación

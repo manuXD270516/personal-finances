@@ -44,7 +44,8 @@
     "recurringPending": "{count, plural, one {# payment to approve} other {# payments to approve}}",
     "debt": "Debts",
     "goals": "Goals",
-    "documents": "Documents"
+    "documents": "Documents",
+    "rules": "Rules"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -826,7 +827,9 @@
       "save": "Save changes",
       "record": "Record",
       "cancel": "Cancel",
-      "duplicating": "Duplicating a movement: check the date and status before recording."
+      "duplicating": "Duplicating a movement: check the date and status before recording.",
+      "applyRules": "Apply my classification rules",
+      "applyRulesHint": "They only fill the fields you leave empty; they never replace what you choose."
     },
     "counterparty": {
       "created": "Counterparty “{name}” created and selected.",
@@ -887,7 +890,8 @@
       "select": "Select “{name}”",
       "loading": "Loading transactions…",
       "more": "Load more",
-      "origin": "Origin: {source}"
+      "origin": "Origin: {source}",
+      "needsReviewBadge": "To review"
     },
     "bulk": {
       "selected": "{n} selected",
@@ -947,7 +951,10 @@
       "withoutStatement": "Reconciled without a statement",
       "withoutStatementHint": "Transactions marked as reconciled without a statement.",
       "withoutStatementOnly": "Only those pending review",
-      "source": "Origin"
+      "source": "Origin",
+      "needsReview": "Review",
+      "needsReviewHint": "Transactions marked by a rule or by a person.",
+      "needsReviewOnly": "Pending review"
     },
     "detail": {
       "recorded": "Movement recorded.",
@@ -5512,6 +5519,312 @@
       "deleteBody": "Delete “{name}”? Its content becomes unrecoverable and its links are removed. This cannot be undone.",
       "contentPendingNotice": "Some documents have their content pending restore from the export contents file. Until then they cannot be downloaded or attached.",
       "purgeNotice": "Documents with no links that are not archived are deleted automatically after 30 days. Archive them to keep them."
+    }
+  },
+  "Rules": {
+    "title": "Classification rules",
+    "intro": "They classify imported and new transactions for you: WHEN the conditions are met, THEN the actions apply. They never change amounts, accounts, dates or balances.",
+    "loading": "Loading…",
+    "viewerNotice": "Your role is read-only: you can view, test and check the coverage, but not create or change rules.",
+    "tabs": {
+      "label": "Rules sections",
+      "rules": "Rules",
+      "run": "Run on history",
+      "coverage": "Coverage"
+    },
+    "list": {
+      "new": "New rule",
+      "includeArchived": "Include archived",
+      "orderHint": "They are evaluated from top to bottom (lower priority number first). In each field the first rule that sets it wins; a rule with “stop” cuts the chain. Use the arrows to reorder.",
+      "empty": "There are no rules yet. Create the first one to classify your imports automatically.",
+      "region": "Rules table",
+      "caption": "Classification rules in evaluation order",
+      "priority": "Priority",
+      "name": "Rule",
+      "status": "Status and triggers",
+      "summary": "What it does",
+      "stats": "Usage",
+      "actions": "Actions",
+      "version": "Version {version}",
+      "attention": "Needs attention: a target of its actions was archived",
+      "conditionsCount": "{count, plural, one {# condition} other {# conditions}}",
+      "classified": "{count, plural, one {# transaction classified} other {# transactions classified}}",
+      "lastApplied": "Last applied: {date}",
+      "neverApplied": "No applications",
+      "unused": "No applications in 90 days",
+      "moveUp": "Move rule {name} up",
+      "moveDown": "Move rule {name} down",
+      "moved": "Rule {name} is now in position {position}.",
+      "enable": "Enable",
+      "disable": "Disable",
+      "archive": "Archive",
+      "cancel": "Cancel",
+      "archiveTitle": "Archive the rule “{name}”?",
+      "archiveBody": "It stops being evaluated and frees its name. The transactions it classified keep showing its name and version.",
+      "archived": "Rule {name} was archived."
+    },
+    "status": {
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "ARCHIVED": "Archived"
+    },
+    "triggers": {
+      "IMPORT": "On import",
+      "MANUAL_CREATE": "On manual creation",
+      "RETROACTIVE": "On history"
+    },
+    "match": {
+      "ALL": "All conditions",
+      "ANY": "Any condition"
+    },
+    "kinds": {
+      "EXPENSE": "Expense",
+      "INCOME": "Income",
+      "REFUND": "Refund"
+    },
+    "weekdays": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "fields": {
+      "DESCRIPTION": "Description",
+      "COUNTERPARTY": "Counterparty",
+      "AMOUNT": "Amount",
+      "CURRENCY": "Currency",
+      "ACCOUNT": "Account",
+      "KIND": "Transaction type",
+      "DATE": "Date",
+      "WEEKDAY": "Day of the week",
+      "DAY_OF_MONTH": "Day of the month",
+      "CATEGORY": "Current category",
+      "TAG": "Tag",
+      "EXTERNAL_SOURCE": "External source",
+      "CUSTOM_FIELD": "Custom field"
+    },
+    "operators": {
+      "equals": "equals",
+      "not_equals": "is not",
+      "contains": "contains",
+      "not_contains": "does not contain",
+      "starts_with": "starts with",
+      "ends_with": "ends with",
+      "matches_regex": "matches the regular expression",
+      "gt": "is greater than",
+      "gte": "is greater than or equal to",
+      "lt": "is less than",
+      "lte": "is less than or equal to",
+      "between": "is between",
+      "in": "is any of",
+      "is_empty": "is empty",
+      "is_not_empty": "is not empty"
+    },
+    "actionTypes": {
+      "SET_CATEGORY": "Set the category",
+      "ADD_TAG": "Add tag",
+      "REMOVE_TAG": "Remove tag",
+      "SET_COUNTERPARTY": "Set the counterparty",
+      "SET_CUSTOM_FIELD": "Set a custom field",
+      "MARK_FOR_REVIEW": "Mark for review",
+      "SET_DESCRIPTION": "Replace the description",
+      "APPEND_NOTE": "Append to the notes",
+      "EXCLUDE_FROM_IMPORT": "Exclude from the import"
+    },
+    "skip": {
+      "RULE_ACTION_TARGET_ARCHIVED": "the target is archived",
+      "CATEGORY_KIND_MISMATCH": "the category does not match the transaction type",
+      "MULTI_SPLIT": "the transaction has several splits",
+      "NOT_EMPTY": "the field already has a value",
+      "ALREADY_APPLIED": "it is already applied",
+      "TRANSACTION_MANAGED_EXTERNALLY": "it is managed by another module",
+      "TRANSACTION_RECONCILED": "it is reconciled",
+      "PERIOD_CLOSED": "the period is closed"
+    },
+    "editor": {
+      "back": "Back to rules",
+      "newTitle": "New rule",
+      "editTitle": "Rule: {name}",
+      "versionInfo": "Definition version {version}",
+      "notFound": "The rule was not found.",
+      "seedNotice": "Rule prefilled from a transaction: review and test it. Nothing is saved until you press “Save rule”.",
+      "name": "Name",
+      "description": "Description (optional)",
+      "priority": "Priority",
+      "priorityHint": "A lower number is evaluated first.",
+      "triggers": "When it applies",
+      "triggersHint": "By default on import and on history; enable manual creation if you want it to fill empty categories when you record by hand.",
+      "matchMode": "Combine the conditions",
+      "stopProcessing": "Stop processing when this rule matches",
+      "stopProcessingHint": "Rules of lower priority are not evaluated for that transaction.",
+      "choose": "Choose…",
+      "save": "Save rule",
+      "saving": "Saving…",
+      "saved": "Rule saved.",
+      "errorsTitle": "Review this before saving:"
+    },
+    "errors": {
+      "nameRequired": "The name is required (up to 80 characters).",
+      "priorityInvalid": "The priority is an integer between 0 and 1,000,000.",
+      "conditionsRequired": "Add at least one condition.",
+      "actionsRequired": "Add at least one action.",
+      "triggersRequired": "Choose at least one trigger.",
+      "operandRequired": "Fill in the value of the condition.",
+      "targetRequired": "Fill in the target of the action.",
+      "tooManyConditions": "A rule admits up to 20 conditions.",
+      "tooManyActions": "A rule admits up to 10 actions."
+    },
+    "conditions": {
+      "title": "WHEN (conditions)",
+      "item": "Condition {n}",
+      "field": "Field",
+      "operator": "Operator",
+      "value": "Value",
+      "from": "From",
+      "to": "To",
+      "values": "Values",
+      "valuesHint": "One per line.",
+      "currency": "Currency",
+      "customField": "Custom field",
+      "regexHint": "Linear-time regular expression: up to 200 characters, no back-references or lookaround.",
+      "remove": "Remove condition {n}",
+      "add": "Add condition",
+      "addGroup": "Add group",
+      "group": "Group {n}",
+      "groupMatch": "Combine the conditions of the group",
+      "addToGroup": "Add condition to the group",
+      "removeGroup": "Remove group {n}"
+    },
+    "actions": {
+      "title": "THEN (actions)",
+      "item": "Action {n}",
+      "type": "Action",
+      "category": "Category",
+      "tag": "Tag",
+      "counterparty": "Counterparty",
+      "customField": "Custom field",
+      "customValue": "Value",
+      "text": "Text",
+      "descriptionHint": "In an import the original text of the row is kept.",
+      "excludeHint": "It only acts on import: the row is proposed as excluded and you can revert it in the preview.",
+      "remove": "Remove action {n}",
+      "add": "Add action"
+    },
+    "preview": {
+      "title": "Preview",
+      "intro": "Test the rule as written (unsaved) against an example.",
+      "description": "Example description",
+      "amount": "Example amount",
+      "currency": "Currency",
+      "kind": "Type",
+      "empty": "Type the description of an example to see the result.",
+      "matched": "The rule matches the example.",
+      "notMatched": "The rule does not match the example.",
+      "conditionMet": "Condition met",
+      "conditionNotMet": "Condition not met",
+      "actual": "current value: {value}",
+      "noValue": "no value",
+      "noActions": "No action applies to the example."
+    },
+    "versions": {
+      "title": "Version history",
+      "item": "Version {version} — {date}: {conditions} conditions, {actions} actions"
+    },
+    "run": {
+      "intro": "Run the rules over existing transactions without changing anything: review the result and apply it afterwards as an audited bulk edit.",
+      "from": "From",
+      "to": "To",
+      "mode": "Mode",
+      "mode_FILL_EMPTY": "Fill only empty fields",
+      "mode_OVERWRITE": "Also replace what is already classified",
+      "modeHint": {
+        "FILL_EMPTY": "The safe mode: it does not touch what already has a value.",
+        "OVERWRITE": "It changes categories, counterparties and fields that already had a value."
+      },
+      "submit": "Run (changes nothing)",
+      "counts": "{scanned} transactions evaluated; {changed} would change.",
+      "truncated": "The range has more than 5,000 transactions: only the first ones were evaluated. Narrow the range to see the rest.",
+      "overwriteWarning": "Replace mode: review each change before applying.",
+      "none": "No transaction would change with these rules.",
+      "region": "Proposed changes",
+      "caption": "Proposed changes per transaction",
+      "select": "Apply",
+      "selectOne": "Apply the changes of transaction {id}",
+      "transaction": "Transaction",
+      "changes": "Changes (current → proposed)",
+      "empty": "(empty)",
+      "yes": "yes",
+      "no": "no",
+      "byRule": "by rule {name} (v{version})",
+      "fields": {
+        "categoryId": "Category",
+        "counterpartyId": "Counterparty",
+        "tagAdded": "Tag added",
+        "tagRemoved": "Tag removed",
+        "customField": "Custom field",
+        "description": "Description",
+        "notes": "Notes",
+        "needsReview": "Pending review"
+      },
+      "apply": "{count, plural, one {Apply # transaction} other {Apply # transactions}}",
+      "pages": "Applied in pages of {size}.",
+      "progress": "Application progress",
+      "summary": "{applied} transactions were applied; {notApplicable} could not be applied (closed period, reconciled or managed by another module).",
+      "stale": "A rule or a transaction changed after the run and nothing of that page was applied. Run it again to see the current result."
+    },
+    "coverage": {
+      "intro": "Measures how many imported transactions hold today a category set by a rule. A category you corrected by hand afterwards does not count. Phase target: 70%.",
+      "from": "From",
+      "to": "To",
+      "load": "Check coverage",
+      "empty": "There are no imported transactions in that range.",
+      "target": "target {target}",
+      "meets": "Meets the target",
+      "notMeets": "Does not meet the target",
+      "total": "{count, plural, one {# imported transaction} other {# imported transactions}} in the range (no voided, transfers or conversions).",
+      "originRegion": "Coverage by origin",
+      "originCaption": "Imported transactions by origin of their category",
+      "origin": "Category origin",
+      "count": "Transactions",
+      "origins": {
+        "rule": "By a rule",
+        "counterpartyDefault": "By the counterparty default",
+        "manual": "By the user",
+        "systemDefault": "Uncategorized",
+        "unknown": "Before the rule engine"
+      },
+      "ruleRegion": "Coverage by rule",
+      "ruleCaption": "Transactions classified by each rule",
+      "rule": "Rule",
+      "archived": "archived"
+    },
+    "origin": {
+      "byRule": "by rule {name} (v{version})",
+      "byRuleArchived": "by rule {name} (v{version}, archived)",
+      "MANUAL": "chosen by the user",
+      "RULE": "set by a rule",
+      "COUNTERPARTY_DEFAULT": "default category of the counterparty",
+      "SYSTEM_DEFAULT": "no category assigned",
+      "UNKNOWN": "recorded before the rule engine",
+      "tag": "Tag {name}",
+      "field": {
+        "COUNTERPARTY": "Counterparty",
+        "DESCRIPTION": "Description",
+        "NOTES": "Notes"
+      }
+    },
+    "review": {
+      "pending": "Pending review.",
+      "byRule": "Marked by rule {name} (v{version}).",
+      "byUser": "Marked by a person.",
+      "resolve": "Clear the review mark",
+      "mark": "Mark for review",
+      "resolved": "The review mark was cleared.",
+      "marked": "The transaction is pending review.",
+      "createRule": "Create a rule from this transaction"
     }
   }
 }

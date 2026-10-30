@@ -6,7 +6,7 @@ import {
   type ImportedTransactionRowDto,
   type ImportedTransactionsCommand,
 } from '../contracts/index.js';
-import { Transaction } from '../domain/index.js';
+import { splitKindOf, Transaction, type CustomFieldValue, type SplitInput } from '../domain/index.js';
 import { createdAuditChanges, createdEventPayload } from './created-support.js';
 import { journalCommandOf, publishEvent, publishPosted, transactionSteps } from './posting-support.js';
 import type { ImportedRefReader, OutboxEvent, TransactionsDeps } from './ports/index.js';
@@ -114,15 +114,19 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
       }
       scales.set(code, scale);
     }
-    // Campos personalizados obligatorios (FR-TRANSACTIONS-026): el mismo resultado para todas las filas (ninguna
-    // trae valores), así que se valida una vez con la forma de un split sin valores.
-    await classification.validateCustomFieldValues({
-      userId: input.actorUserId,
-      workspaceId,
-      target: 'TRANSACTION',
-      requireMandatory: true,
-      items: [{ pointer: '/splits/0/customFields', values: [], existingFieldIds: [] }],
-    });
+    // Campos personalizados obligatorios (FR-TRANSACTIONS-026): el mismo resultado para todas las filas sin valores, así
+    // que se valida una vez con la forma de un split sin valores.
+    if (rows.some((r) => !r.classification)) {
+      await classification.validateCustomFieldValues({
+        userId: input.actorUserId,
+        workspaceId,
+        target: 'TRANSACTION',
+        requireMandatory: true,
+        items: [{ pointer: '/splits/0/customFields', values: [], existingFieldIds: [] }],
+      });
+    }
+    // Clasificación decidida de las filas (add-rule-engine decisión 4): referencias validadas UNA vez por lote.
+    const customFieldsOf = await this.validateClassifications(input, rows);
     // Categorías de sistema (D9): una lectura por tipo presente en el lote.
     const defaults = new Map<'EXPENSE' | 'INCOME', string | null>();
     for (const kind of new Set<'EXPENSE' | 'INCOME'>(
@@ -130,7 +134,7 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
     )) {
       defaults.set(kind, await categories.uncategorized(workspaceId, kind));
     }
-    return rows.map((row) => {
+    return rows.map((row, index) => {
       const eligibility = eligibilityOf.get(row.amount.currency)!;
       const kind = row.direction === 'OUT' ? 'EXPENSE' : 'INCOME';
       let amount: Money;
@@ -141,6 +145,52 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
         );
       } catch (err) {
         throw err instanceof DomainError ? err.at('/amount/amount') : err;
+      }
+      const c = row.classification;
+      if (c) {
+        const categoryId = c.categoryId ?? defaults.get(kind) ?? null;
+        if (!categoryId) {
+          throw new DomainError('REFERENCE_NOT_FOUND', 'system category Uncategorized is not provisioned').at(
+            `/rows/${index}/classification/categoryId`,
+          );
+        }
+        const split: SplitInput = {
+          id: ids.next(),
+          amount,
+          categoryId,
+          tagIds: c.tagIds,
+          customFields: customFieldsOf.get(index) ?? [],
+          categoryOrigin: c.categoryOrigin,
+          categoryRule: c.categoryOrigin === 'RULE' ? (c.categoryRule ?? null) : null,
+          ruleRefs: c.ruleRefs,
+        };
+        return Transaction.record({
+          id: ids.next(),
+          workspaceId,
+          kind,
+          status: 'POSTED',
+          businessDate: row.date,
+          accountId,
+          accountNature: eligibility.nature,
+          accountCurrency: eligibility.currency,
+          amount,
+          description: c.description ?? row.description ?? null,
+          notes: c.notes ?? null,
+          counterpartyId: c.counterpartyId,
+          source: 'IMPORT',
+          externalRef: row.externalRef,
+          importJobId: input.importJobId,
+          splits: [split],
+          ...(c.needsReview
+            ? {
+                review: {
+                  reason: 'RULE' as const,
+                  rule: c.needsReview,
+                  at: this.deps.clock.now().toString(),
+                },
+              }
+            : {}),
+        });
       }
       return Transaction.record({
         id: ids.next(),
@@ -160,6 +210,84 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
         defaultSplitId: ids.next(),
       });
     });
+  }
+
+  /**
+   * Valida por CONJUNTO las referencias de la clasificación de todas las filas (una llamada de categorías y etiquetas,
+   * una por contraparte distinta y una de campos personalizados) y devuelve los valores de campos de cada fila (por
+   * índice). Un error de dominio rechaza el lote con el mismo código que el camino individual.
+   */
+  private async validateClassifications(
+    input: Parameters<ImportedTransactionsCommand['recordBatch']>[0],
+    rows: readonly ImportedTransactionRowDto[],
+  ): Promise<Map<number, readonly CustomFieldValue[]>> {
+    const { classification } = this.deps;
+    const { workspaceId, actorUserId: userId } = input;
+    const classified = rows.flatMap((row, index) =>
+      row.classification ? [{ row, index, c: row.classification }] : [],
+    );
+    const out = new Map<number, readonly CustomFieldValue[]>();
+    if (classified.length === 0) return out;
+    for (const { c, index } of classified) {
+      if (c.categoryId === null && c.categoryOrigin !== 'SYSTEM_DEFAULT') {
+        throw new DomainError('VALIDATION_FAILED', 'a classified category needs its categoryId').at(
+          `/rows/${index}/classification/categoryId`,
+        );
+      }
+      if (c.categoryId !== null && c.categoryOrigin === 'SYSTEM_DEFAULT') {
+        throw new DomainError('VALIDATION_FAILED', 'SYSTEM_DEFAULT means no category').at(
+          `/rows/${index}/classification/categoryOrigin`,
+        );
+      }
+      if (c.categoryOrigin === 'RULE' && !c.categoryRule) {
+        throw new DomainError('VALIDATION_FAILED', 'a rule category needs its rule and version').at(
+          `/rows/${index}/classification/categoryRule`,
+        );
+      }
+    }
+    const categories = new Map<string, { categoryId: string; splitKind: 'EXPENSE' | 'INCOME' }>();
+    for (const { row, c } of classified) {
+      if (c.categoryId === null) continue;
+      const splitKind = splitKindOf(row.direction === 'OUT' ? 'EXPENSE' : 'INCOME') as 'EXPENSE' | 'INCOME';
+      categories.set(`${c.categoryId}:${splitKind}`, { categoryId: c.categoryId, splitKind });
+    }
+    const tagIds = [...new Set(classified.flatMap(({ c }) => c.tagIds))];
+    if (categories.size > 0 || tagIds.length > 0) {
+      await classification.validate({
+        userId,
+        workspaceId,
+        ...(categories.size > 0 ? { categoryIds: [...categories.values()] } : {}),
+        ...(tagIds.length > 0 ? { tagIds } : {}),
+      });
+    }
+    for (const counterpartyId of new Set(
+      classified.flatMap(({ c }) => (c.counterpartyId ? [c.counterpartyId] : [])),
+    )) {
+      await classification.validate({ userId, workspaceId, counterpartyId });
+    }
+    const results = await classification.validateCustomFieldValues({
+      userId,
+      workspaceId,
+      target: 'TRANSACTION',
+      requireMandatory: true,
+      items: classified.map(({ index, c }) => ({
+        pointer: `/rows/${index}/classification/customFields`,
+        values: c.customFields,
+        existingFieldIds: [],
+      })),
+    });
+    classified.forEach(({ index }, i) => {
+      out.set(
+        index,
+        (results[i]?.set ?? []).map((v): CustomFieldValue => ({
+          fieldId: v.fieldId,
+          key: v.key,
+          valueType: v.valueType,
+          value: v.value,
+        })),
+      );
+    });
+    return out;
   }
 
   private async persist(txs: readonly Transaction[]): Promise<void> {

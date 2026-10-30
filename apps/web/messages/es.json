@@ -44,7 +44,8 @@
     "recurringPending": "{count, plural, one {# pago por aprobar} other {# pagos por aprobar}}",
     "debt": "Deudas",
     "goals": "Metas",
-    "documents": "Documentos"
+    "documents": "Documentos",
+    "rules": "Reglas"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -826,7 +827,9 @@
       "save": "Guardar cambios",
       "record": "Registrar",
       "cancel": "Cancelar",
-      "duplicating": "Duplicando un movimiento: revisa la fecha y el estado antes de registrar."
+      "duplicating": "Duplicando un movimiento: revisa la fecha y el estado antes de registrar.",
+      "applyRules": "Aplicar mis reglas de clasificación",
+      "applyRulesHint": "Solo completan los campos que dejes vacíos; nunca reemplazan lo que elijas."
     },
     "counterparty": {
       "created": "Contraparte «{name}» creada y seleccionada.",
@@ -887,7 +890,8 @@
       "select": "Seleccionar «{name}»",
       "loading": "Cargando transacciones…",
       "more": "Cargar más",
-      "origin": "Origen: {source}"
+      "origin": "Origen: {source}",
+      "needsReviewBadge": "Por revisar"
     },
     "bulk": {
       "selected": "{n} seleccionadas",
@@ -947,7 +951,10 @@
       "withoutStatement": "Conciliación sin extracto",
       "withoutStatementHint": "Transacciones marcadas como conciliadas sin extracto.",
       "withoutStatementOnly": "Solo las pendientes de revisión",
-      "source": "Origen"
+      "source": "Origen",
+      "needsReview": "Revisión",
+      "needsReviewHint": "Transacciones marcadas por una regla o por una persona.",
+      "needsReviewOnly": "Pendientes de revisión"
     },
     "detail": {
       "recorded": "Movimiento registrado.",
@@ -5512,6 +5519,312 @@
       "deleteBody": "¿Eliminar «{name}»? Su contenido se vuelve irrecuperable y se quitan sus vínculos. Esta acción no se puede deshacer.",
       "contentPendingNotice": "Hay documentos con el contenido pendiente de restaurar desde el archivo de contenidos del export. Hasta entonces no se pueden descargar ni adjuntar.",
       "purgeNotice": "Los documentos sin vínculo y sin archivar se eliminan automáticamente a los 30 días. Archívalos para conservarlos."
+    }
+  },
+  "Rules": {
+    "title": "Reglas de clasificación",
+    "intro": "Clasifican por ti las transacciones importadas y las nuevas: CUANDO se cumplen las condiciones, ENTONCES se aplican las acciones. Nunca cambian montos, cuentas, fechas ni saldos.",
+    "loading": "Cargando…",
+    "viewerNotice": "Tu rol es de lectura: puedes ver, probar y consultar la cobertura, pero no crear ni cambiar reglas.",
+    "tabs": {
+      "label": "Secciones de reglas",
+      "rules": "Reglas",
+      "run": "Ejecutar sobre el historial",
+      "coverage": "Cobertura"
+    },
+    "list": {
+      "new": "Nueva regla",
+      "includeArchived": "Incluir archivadas",
+      "orderHint": "Se evalúan de arriba hacia abajo (número de prioridad menor primero). En cada campo gana la primera regla que lo fija; una regla con «detener» corta la cadena. Usa las flechas para reordenar.",
+      "empty": "Aún no hay reglas. Crea la primera para clasificar tus importaciones automáticamente.",
+      "region": "Tabla de reglas",
+      "caption": "Reglas de clasificación en orden de evaluación",
+      "priority": "Prioridad",
+      "name": "Regla",
+      "status": "Estado y disparadores",
+      "summary": "Qué hace",
+      "stats": "Uso",
+      "actions": "Acciones",
+      "version": "Versión {version}",
+      "attention": "Requiere atención: un destino de sus acciones fue archivado",
+      "conditionsCount": "{count, plural, one {# condición} other {# condiciones}}",
+      "classified": "{count, plural, one {# transacción clasificada} other {# transacciones clasificadas}}",
+      "lastApplied": "Última aplicación: {date}",
+      "neverApplied": "Sin aplicaciones",
+      "unused": "Sin aplicaciones en 90 días",
+      "moveUp": "Subir la regla {name}",
+      "moveDown": "Bajar la regla {name}",
+      "moved": "La regla {name} quedó en la posición {position}.",
+      "enable": "Activar",
+      "disable": "Desactivar",
+      "archive": "Archivar",
+      "cancel": "Cancelar",
+      "archiveTitle": "¿Archivar la regla «{name}»?",
+      "archiveBody": "Deja de evaluarse y libera su nombre. Las transacciones que clasificó siguen mostrando su nombre y versión.",
+      "archived": "La regla {name} se archivó."
+    },
+    "status": {
+      "ACTIVE": "Activa",
+      "INACTIVE": "Inactiva",
+      "ARCHIVED": "Archivada"
+    },
+    "triggers": {
+      "IMPORT": "Al importar",
+      "MANUAL_CREATE": "Al crear a mano",
+      "RETROACTIVE": "Sobre el historial"
+    },
+    "match": {
+      "ALL": "Todas las condiciones",
+      "ANY": "Alguna condición"
+    },
+    "kinds": {
+      "EXPENSE": "Gasto",
+      "INCOME": "Ingreso",
+      "REFUND": "Reembolso"
+    },
+    "weekdays": {
+      "1": "Lunes",
+      "2": "Martes",
+      "3": "Miércoles",
+      "4": "Jueves",
+      "5": "Viernes",
+      "6": "Sábado",
+      "7": "Domingo"
+    },
+    "fields": {
+      "DESCRIPTION": "Descripción",
+      "COUNTERPARTY": "Contraparte",
+      "AMOUNT": "Monto",
+      "CURRENCY": "Moneda",
+      "ACCOUNT": "Cuenta",
+      "KIND": "Tipo de transacción",
+      "DATE": "Fecha",
+      "WEEKDAY": "Día de la semana",
+      "DAY_OF_MONTH": "Día del mes",
+      "CATEGORY": "Categoría actual",
+      "TAG": "Etiqueta",
+      "EXTERNAL_SOURCE": "Fuente externa",
+      "CUSTOM_FIELD": "Campo personalizado"
+    },
+    "operators": {
+      "equals": "es igual a",
+      "not_equals": "es distinto de",
+      "contains": "contiene",
+      "not_contains": "no contiene",
+      "starts_with": "empieza con",
+      "ends_with": "termina con",
+      "matches_regex": "coincide con la expresión regular",
+      "gt": "es mayor que",
+      "gte": "es mayor o igual que",
+      "lt": "es menor que",
+      "lte": "es menor o igual que",
+      "between": "está entre",
+      "in": "es alguno de",
+      "is_empty": "está vacío",
+      "is_not_empty": "no está vacío"
+    },
+    "actionTypes": {
+      "SET_CATEGORY": "Fijar la categoría",
+      "ADD_TAG": "Agregar etiqueta",
+      "REMOVE_TAG": "Quitar etiqueta",
+      "SET_COUNTERPARTY": "Fijar la contraparte",
+      "SET_CUSTOM_FIELD": "Fijar un campo personalizado",
+      "MARK_FOR_REVIEW": "Marcar para revisión",
+      "SET_DESCRIPTION": "Reemplazar la descripción",
+      "APPEND_NOTE": "Agregar a las notas",
+      "EXCLUDE_FROM_IMPORT": "Excluir del import"
+    },
+    "skip": {
+      "RULE_ACTION_TARGET_ARCHIVED": "el destino está archivado",
+      "CATEGORY_KIND_MISMATCH": "la categoría no corresponde al tipo de la transacción",
+      "MULTI_SPLIT": "la transacción tiene varios splits",
+      "NOT_EMPTY": "el campo ya tiene valor",
+      "ALREADY_APPLIED": "ya está aplicado",
+      "TRANSACTION_MANAGED_EXTERNALLY": "la administra otro módulo",
+      "TRANSACTION_RECONCILED": "está conciliada",
+      "PERIOD_CLOSED": "el periodo está cerrado"
+    },
+    "editor": {
+      "back": "Volver a las reglas",
+      "newTitle": "Nueva regla",
+      "editTitle": "Regla: {name}",
+      "versionInfo": "Versión {version} de la definición",
+      "notFound": "No se encontró la regla.",
+      "seedNotice": "Regla prellenada desde una transacción: revísala y pruébala. No se guarda nada hasta que pulses «Guardar regla».",
+      "name": "Nombre",
+      "description": "Descripción (opcional)",
+      "priority": "Prioridad",
+      "priorityHint": "Número menor se evalúa primero.",
+      "triggers": "Cuándo se aplica",
+      "triggersHint": "Por defecto al importar y sobre el historial; actívala al crear a mano si quieres que complete categorías vacías en el registro manual.",
+      "matchMode": "Combinar las condiciones",
+      "stopProcessing": "Detener el procesamiento si esta regla coincide",
+      "stopProcessingHint": "Las reglas de prioridad posterior no se evalúan para esa transacción.",
+      "choose": "Elegir…",
+      "save": "Guardar regla",
+      "saving": "Guardando…",
+      "saved": "Regla guardada.",
+      "errorsTitle": "Revisa estos datos antes de guardar:"
+    },
+    "errors": {
+      "nameRequired": "El nombre es obligatorio (hasta 80 caracteres).",
+      "priorityInvalid": "La prioridad es un número entero entre 0 y 1 000 000.",
+      "conditionsRequired": "Agrega al menos una condición.",
+      "actionsRequired": "Agrega al menos una acción.",
+      "triggersRequired": "Elige al menos un momento de aplicación.",
+      "operandRequired": "Completa el valor de la condición.",
+      "targetRequired": "Completa el destino de la acción.",
+      "tooManyConditions": "Una regla admite hasta 20 condiciones.",
+      "tooManyActions": "Una regla admite hasta 10 acciones."
+    },
+    "conditions": {
+      "title": "CUANDO (condiciones)",
+      "item": "Condición {n}",
+      "field": "Campo",
+      "operator": "Operador",
+      "value": "Valor",
+      "from": "Desde",
+      "to": "Hasta",
+      "values": "Valores",
+      "valuesHint": "Uno por línea.",
+      "currency": "Moneda",
+      "customField": "Campo personalizado",
+      "regexHint": "Expresión regular de tiempo lineal: hasta 200 caracteres, sin referencias hacia atrás ni lookaround.",
+      "remove": "Quitar la condición {n}",
+      "add": "Agregar condición",
+      "addGroup": "Agregar grupo",
+      "group": "Grupo {n}",
+      "groupMatch": "Combinar las condiciones del grupo",
+      "addToGroup": "Agregar condición al grupo",
+      "removeGroup": "Quitar el grupo {n}"
+    },
+    "actions": {
+      "title": "ENTONCES (acciones)",
+      "item": "Acción {n}",
+      "type": "Acción",
+      "category": "Categoría",
+      "tag": "Etiqueta",
+      "counterparty": "Contraparte",
+      "customField": "Campo personalizado",
+      "customValue": "Valor",
+      "text": "Texto",
+      "descriptionHint": "En una importación el texto original de la fila se conserva.",
+      "excludeHint": "Solo actúa al importar: la fila queda propuesta como excluida y puedes revertirlo en la vista previa.",
+      "remove": "Quitar la acción {n}",
+      "add": "Agregar acción"
+    },
+    "preview": {
+      "title": "Vista previa",
+      "intro": "Prueba la regla tal como está escrita (sin guardar) contra un ejemplo.",
+      "description": "Descripción del ejemplo",
+      "amount": "Monto del ejemplo",
+      "currency": "Moneda",
+      "kind": "Tipo",
+      "empty": "Escribe la descripción de un ejemplo para ver el resultado.",
+      "matched": "La regla coincide con el ejemplo.",
+      "notMatched": "La regla no coincide con el ejemplo.",
+      "conditionMet": "Condición cumplida",
+      "conditionNotMet": "Condición no cumplida",
+      "actual": "valor actual: {value}",
+      "noValue": "sin valor",
+      "noActions": "Ninguna acción aplicable al ejemplo."
+    },
+    "versions": {
+      "title": "Historial de versiones",
+      "item": "Versión {version} — {date}: {conditions} condiciones, {actions} acciones"
+    },
+    "run": {
+      "intro": "Ejecuta las reglas sobre transacciones que ya existen, sin cambiar nada: revisa el resultado y aplícalo después como edición masiva auditada.",
+      "from": "Desde",
+      "to": "Hasta",
+      "mode": "Modo",
+      "mode_FILL_EMPTY": "Completar solo campos vacíos",
+      "mode_OVERWRITE": "Reemplazar también lo ya clasificado",
+      "modeHint": {
+        "FILL_EMPTY": "Es el modo seguro: no toca lo que ya tiene valor.",
+        "OVERWRITE": "Cambia categorías, contrapartes y campos que ya tenían valor."
+      },
+      "submit": "Ejecutar (sin cambiar nada)",
+      "counts": "{scanned} transacciones evaluadas; {changed} cambiarían.",
+      "truncated": "El rango tiene más de 5 000 transacciones: solo se evaluaron las primeras. Acota el rango para ver el resto.",
+      "overwriteWarning": "Modo de reemplazo: revisa cada cambio antes de aplicar.",
+      "none": "Ninguna transacción cambiaría con estas reglas.",
+      "region": "Cambios propuestos",
+      "caption": "Cambios propuestos por transacción",
+      "select": "Aplicar",
+      "selectOne": "Aplicar los cambios de la transacción {id}",
+      "transaction": "Transacción",
+      "changes": "Cambios (actual → propuesto)",
+      "empty": "(vacío)",
+      "yes": "sí",
+      "no": "no",
+      "byRule": "por la regla {name} (v{version})",
+      "fields": {
+        "categoryId": "Categoría",
+        "counterpartyId": "Contraparte",
+        "tagAdded": "Etiqueta agregada",
+        "tagRemoved": "Etiqueta quitada",
+        "customField": "Campo personalizado",
+        "description": "Descripción",
+        "notes": "Notas",
+        "needsReview": "Pendiente de revisión"
+      },
+      "apply": "{count, plural, one {Aplicar # transacción} other {Aplicar # transacciones}}",
+      "pages": "Se aplican por páginas de {size}.",
+      "progress": "Progreso de la aplicación",
+      "summary": "Se aplicaron {applied} transacciones; {notApplicable} no se pudieron aplicar (periodo cerrado, conciliadas o administradas por otro módulo).",
+      "stale": "Una regla o una transacción cambió después de la ejecución y no se aplicó nada de esa página. Vuelve a ejecutar para ver el resultado actual."
+    },
+    "coverage": {
+      "intro": "Mide cuántas transacciones importadas tienen hoy su categoría fijada por una regla. Una categoría que corregiste a mano después no cuenta. Meta de la fase: 70 %.",
+      "from": "Desde",
+      "to": "Hasta",
+      "load": "Consultar cobertura",
+      "empty": "No hay transacciones importadas en ese rango.",
+      "target": "meta {target}",
+      "meets": "Cumple la meta",
+      "notMeets": "No cumple la meta",
+      "total": "{count, plural, one {# transacción importada} other {# transacciones importadas}} en el rango (sin anuladas, transferencias ni conversiones).",
+      "originRegion": "Cobertura por origen",
+      "originCaption": "Transacciones importadas por origen de su categoría",
+      "origin": "Origen de la categoría",
+      "count": "Transacciones",
+      "origins": {
+        "rule": "Por una regla",
+        "counterpartyDefault": "Por la categoría de la contraparte",
+        "manual": "Por el usuario",
+        "systemDefault": "Sin categoría",
+        "unknown": "Anteriores al motor de reglas"
+      },
+      "ruleRegion": "Cobertura por regla",
+      "ruleCaption": "Transacciones clasificadas por cada regla",
+      "rule": "Regla",
+      "archived": "archivada"
+    },
+    "origin": {
+      "byRule": "por la regla {name} (v{version})",
+      "byRuleArchived": "por la regla {name} (v{version}, archivada)",
+      "MANUAL": "elegida por el usuario",
+      "RULE": "fijada por una regla",
+      "COUNTERPARTY_DEFAULT": "categoría por defecto de la contraparte",
+      "SYSTEM_DEFAULT": "sin categoría asignada",
+      "UNKNOWN": "registrada antes del motor de reglas",
+      "tag": "Etiqueta {name}",
+      "field": {
+        "COUNTERPARTY": "Contraparte",
+        "DESCRIPTION": "Descripción",
+        "NOTES": "Notas"
+      }
+    },
+    "review": {
+      "pending": "Pendiente de revisión.",
+      "byRule": "La marcó la regla {name} (v{version}).",
+      "byUser": "La marcó una persona.",
+      "resolve": "Quitar la marca de revisión",
+      "mark": "Marcar para revisión",
+      "resolved": "Se quitó la marca de revisión.",
+      "marked": "La transacción quedó pendiente de revisión.",
+      "createRule": "Crear regla desde esta transacción"
     }
   }
 }

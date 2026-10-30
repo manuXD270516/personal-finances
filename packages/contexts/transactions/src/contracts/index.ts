@@ -369,6 +369,45 @@ export interface ImportedTransactionRowDto {
   readonly amount: { readonly amount: string; readonly currency: string };
   readonly description: string | null;
   readonly externalRef: { readonly namespace: string; readonly id: string };
+  /**
+   * Clasificación aprobada de la fila con su origen (openspec add-rule-engine). Ausente ⇒ el comportamiento de
+   * Phase 3: «sin categoría» con origen `SYSTEM_DEFAULT`.
+   */
+  readonly classification?: ImportedClassificationDto;
+}
+
+/** Referencia de una regla a un campo del split (`field`: `TAG:<id>`, `COUNTERPARTY`, `CUSTOM_FIELD:<id>`, `DESCRIPTION`, `NOTES`). */
+export interface RuleRefDto {
+  readonly field: string;
+  readonly ruleId: string;
+  readonly ruleVersion: number;
+}
+
+/** Origen de la categoría de un split; `UNKNOWN` para lo registrado antes de add-rule-engine. */
+export type CategoryOriginDto = 'MANUAL' | 'RULE' | 'COUNTERPARTY_DEFAULT' | 'SYSTEM_DEFAULT' | 'UNKNOWN';
+
+/**
+ * Clasificación decidida de una fila importada (la vista previa del import la entrega ya resuelta, con su origen).
+ * `categoryId = null` ⇒ la categoría de sistema «sin categoría» del tipo. Se valida con `ClassificationValidator` UNA vez
+ * por lote (set-based).
+ */
+export interface ImportedClassificationDto {
+  readonly categoryId: string | null;
+  readonly categoryOrigin: 'RULE' | 'COUNTERPARTY_DEFAULT' | 'MANUAL' | 'SYSTEM_DEFAULT';
+  /** Regla y versión cuando `categoryOrigin = RULE`. */
+  readonly categoryRule?: { readonly ruleId: string; readonly ruleVersion: number } | null;
+  readonly counterpartyId: string | null;
+  readonly tagIds: readonly string[];
+  readonly customFields: readonly {
+    readonly fieldId?: string;
+    readonly key?: string;
+    readonly value: string | boolean | null;
+  }[];
+  /** Reemplazo visible de la descripción; el texto original queda en el staging. */
+  readonly description?: string;
+  readonly notes?: string;
+  readonly needsReview: { readonly ruleId: string; readonly ruleVersion: number } | null;
+  readonly ruleRefs: readonly RuleRefDto[];
 }
 
 /**
@@ -616,6 +655,130 @@ export interface ConversionDetailQuery {
 
 export const CONVERSION_DETAIL_QUERY = Symbol.for('pf.transactions.ConversionDetailQuery');
 
+// ───────────────────────────────────────────── add-rule-engine (RULES)
+
+/** Sujeto de clasificación: una transacción de ingreso, gasto o reembolso no anulada, con lo que las reglas evalúan. */
+export interface ClassificationSubjectDto {
+  readonly transactionId: string;
+  /** Versión de la transacción (control optimista de la aplicación). */
+  readonly version: number;
+  readonly status: string;
+  /** Contexto que administra la transacción (`TRANSACTION_MANAGED_EXTERNALLY`), o `null`. */
+  readonly managedBy: 'DEBT' | 'GOAL' | null;
+  /** Fecha de negocio `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly kind: 'INCOME' | 'EXPENSE' | 'REFUND';
+  readonly accountId: string;
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly description: string | null;
+  readonly notes: string | null;
+  readonly counterpartyId: string | null;
+  /** `null` ⇒ «sin categoría» (categoría de sistema). */
+  readonly categoryId: string | null;
+  readonly categoryOrigin: CategoryOriginDto;
+  readonly tagIds: readonly string[];
+  /** `source` y espacio de nombres de la referencia externa (`IMPORT`, `imports.csv-row`…). */
+  readonly externalSource: string | null;
+  readonly customFields: readonly { readonly fieldId: string; readonly value: string | boolean }[];
+  readonly splitCount: number;
+  readonly needsReview: boolean;
+}
+
+/**
+ * Sujetos de clasificación para RULES (dry-run, aplicación y vista previa). Sin efectos; en la unidad de trabajo del
+ * llamador si existe. `list` recorre por keyset `(fecha, id)`, hasta 5 000, solo `INCOME`/`EXPENSE`/`REFUND` no anuladas.
+ */
+export interface ClassificationSubjectsQuery {
+  list(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly accountIds?: readonly string[];
+    readonly limit: number;
+    /** Cursor opaco devuelto por la llamada anterior. */
+    readonly after?: string;
+  }): Promise<{ readonly items: readonly ClassificationSubjectDto[]; readonly next: string | null }>;
+  /** Por id (las inexistentes, anuladas o de otro tipo no figuran). */
+  byIds(input: {
+    readonly workspaceId: string;
+    readonly transactionIds: readonly string[];
+  }): Promise<readonly ClassificationSubjectDto[]>;
+}
+
+export const CLASSIFICATION_SUBJECTS_QUERY = Symbol.for('pf.transactions.ClassificationSubjectsQuery');
+
+export interface RuleAppliedChangesDto {
+  readonly categoryId?: string;
+  readonly addTagIds?: readonly string[];
+  readonly removeTagIds?: readonly string[];
+  readonly counterpartyId?: string;
+  readonly customFields?: readonly { readonly fieldId: string; readonly value: string | boolean }[];
+  readonly description?: string;
+  readonly appendNotes?: readonly string[];
+  readonly markForReview?: boolean;
+}
+
+export interface RuleClassificationItemDto {
+  readonly transactionId: string;
+  readonly expectedVersion: number;
+  readonly changes: RuleAppliedChangesDto;
+  /** Regla y versión de la categoría (si cambia). */
+  readonly categoryRule?: { readonly ruleId: string; readonly ruleVersion: number };
+  /** Regla y versión de cada otro campo cambiado. */
+  readonly ruleRefs: readonly RuleRefDto[];
+  /** Regla y versión que marca la revisión (si `markForReview`). */
+  readonly reviewRule?: { readonly ruleId: string; readonly ruleVersion: number };
+}
+
+/**
+ * Aplicación atómica de clasificación por reglas (dry-run, openspec add-rule-engine decisión 10). Reutiliza el dominio de
+ * la edición masiva: versión por ítem, periodos cerrados no aplicables (`PERIOD_CLOSED`), un `bulkOperationId` común en
+ * la auditoría y origen `RULE`. Lanza `CONCURRENCY_CONFLICT` si la versión de un ítem no coincide (todo o nada).
+ */
+export interface RuleClassificationCommand {
+  applyBatch(input: {
+    readonly workspaceId: string;
+    readonly actorUserId: string;
+    readonly operationId: string;
+    readonly items: readonly RuleClassificationItemDto[];
+  }): Promise<{
+    readonly applied: readonly string[];
+    readonly notApplicable: readonly { readonly transactionId: string; readonly reason: string }[];
+  }>;
+}
+
+export const RULE_CLASSIFICATION_COMMAND = Symbol.for('pf.transactions.RuleClassificationCommand');
+
+export interface ClassificationCoverageRuleDto {
+  readonly ruleId: string;
+  readonly ruleVersion: number | null;
+  readonly count: number;
+  /** Instante ISO de la última transacción clasificada (por `updated_at`). */
+  readonly lastAppliedAt: string | null;
+}
+
+/**
+ * Cobertura de clasificación (D334): universo = `INCOME`/`EXPENSE`/`REFUND` con `source = IMPORT` no anuladas, por rango
+ * de fecha de negocio o por import; cuenta cada origen VIGENTE del split (una corrección manual saca la transacción del
+ * numerador `RULE`). Una consulta agregada.
+ */
+export interface ClassificationCoverageQuery {
+  coverage(input: {
+    readonly workspaceId: string;
+    readonly from?: string;
+    readonly to?: string;
+    readonly importJobId?: string;
+  }): Promise<{
+    readonly count: number;
+    readonly byOrigin: Readonly<Record<CategoryOriginDto, number>>;
+    readonly byRule: readonly ClassificationCoverageRuleDto[];
+  }>;
+  /** Estadísticas por regla en todo el workspace (clasificadas hoy y última aplicación). */
+  ruleStats(input: { readonly workspaceId: string }): Promise<readonly ClassificationCoverageRuleDto[]>;
+}
+
+export const CLASSIFICATION_COVERAGE_QUERY = Symbol.for('pf.transactions.ClassificationCoverageQuery');
+
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
  * nunca se copia a `audit.audit_log`.
@@ -663,6 +826,15 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     principal: 'money',
     // Custom fields de los splits (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
     'customFields.*': 'plain',
+    // Origen de la clasificación y marca de revisión (add-rule-engine): `ruleRefs` viaja como texto JSON.
+    categoryOrigin: 'plain',
+    categoryRuleId: 'plain',
+    categoryRuleVersion: 'plain',
+    ruleRefs: 'plain',
+    needsReview: 'plain',
+    reviewReason: 'plain',
+    reviewRuleId: 'plain',
+    reviewRuleVersion: 'plain',
   },
   // Operación de edición masiva (add-bulk-edit): registro agregado; `requestedChanges` viaja como texto JSON.
   TransactionBulkOperation: {

@@ -1601,43 +1601,43 @@ El nivel proveedor (`external_id` estable) se garantiza en `txn.transaction` con
 
 ```mermaid
 erDiagram
-  RULE ||--o{ RULE_EXECUTION : "ejecuciones"
+  RULE ||--o{ RULE_VERSION : "versiones inmutables"
   RULE {
     uuid id PK
     uuid workspace_id FK
     text name
+    text description
     int priority
-    text trigger "ON_IMPORT ON_CREATE MANUAL"
+    text_array triggers "IMPORT MANUAL_CREATE RETROACTIVE"
     text match_mode "ALL ANY"
     jsonb conditions "JSON Schema rules.conditions.v1"
     jsonb actions "JSON Schema rules.actions.v1"
     smallint schema_version
     boolean stop_processing
     boolean enabled
-    bigint match_count
-    timestamptz last_matched_at
+    boolean needs_attention
     timestamptz archived_at
-    int version
+    int version "de la definición"
+    int row_version "ETag"
   }
-  RULE_EXECUTION {
-    uuid id PK
-    uuid workspace_id FK
-    uuid rule_id FK
-    int rule_version
-    text target_type "TRANSACTION STAGED_TRANSACTION"
-    uuid target_id
-    boolean dry_run
-    jsonb applied_actions
-    timestamptz executed_at
+  RULE_VERSION {
+    uuid workspace_id PK
+    uuid rule_id PK
+    int version PK
+    jsonb snapshot
+    timestamptz created_at
+    uuid created_by
   }
 ```
 
+> **As-built (`add-rule-engine`, migraciones `20261030100000`–`20261030100300`):** `rules.rule_execution` se **descartó** (una fila por aplicación serían 5 000 inserts más en el camino crítico del import de D152 y desde un schema ajeno). La fuente de verdad de «qué regla clasificó qué» es el propio split: `txn.transaction_split` gana `category_origin` (`MANUAL`, `RULE`, `COUNTERPARTY_DEFAULT`, `SYSTEM_DEFAULT`; `NULL` ⇒ `UNKNOWN`), `category_rule_id`, `category_rule_version` y `rule_refs jsonb` (`{field, ruleId, ruleVersion}` de etiquetas, contraparte, campos personalizados, descripción y nota), con índice parcial `(workspace_id, category_rule_id)`; `txn.transaction` gana la marca de revisión (`review_status`, `review_reason`, `review_rule_id`, `review_rule_version`, `review_marked_at`) con índice parcial de pendientes. `rules.rule_version` guarda la instantánea inmutable de cada versión de la definición (WS-RO, `platform.forbid_mutation()`). Los dry-run no se persisten. Export del workspace: secciones `rules` y `rule-versions` (orden 360–361) y las columnas nuevas de `txn.*`.
+
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `rule` | `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `jsonb_typeof(conditions)='array' AND jsonb_array_length(conditions) BETWEEN 1 AND 20`; `jsonb_typeof(actions)='array' AND jsonb_array_length(actions) BETWEEN 1 AND 10` | `(workspace_id, trigger, priority) WHERE enabled AND archived_at IS NULL`; `gin (actions jsonb_path_ops)` ("¿qué reglas usan la categoría X?") | WS | `version`, `archived_at` |
-| `rule_execution` | — | — | `(workspace_id, target_type, target_id)`; `(rule_id, executed_at DESC)` | **WS-RO** | Retención 180 días |
+| `rule` | `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `jsonb_typeof(conditions)='array' AND jsonb_array_length(conditions) BETWEEN 1 AND 20`; `jsonb_typeof(actions)='array' AND jsonb_array_length(actions) BETWEEN 1 AND 10`; `triggers` subconjunto no vacío; archivada ⇒ desactivada | `(workspace_id, priority, created_at, id) WHERE enabled AND archived_at IS NULL`; `gin (actions jsonb_path_ops)` ("¿qué reglas usan la categoría X?") | WS | `version` (definición), `row_version` (ETag), `archived_at` |
+| `rule_version` | PK `(workspace_id, rule_id, version)` | `snapshot` objeto | — | **WS-RO** (SELECT, INSERT; `forbid_mutation`) | Inmutable |
 
-**Decisión JSONB vs tablas `rule_condition`/`rule_action`:** se elige **JSONB con JSON Schema versionado**. Razones: (1) la regla es un agregado que siempre se carga y evalúa completo en memoria — nunca se consultan condiciones sueltas por SQL; (2) operandos heterogéneos (texto, regex, rango de montos, moneda, cuenta, día de la semana) obligarían a columnas `value_text/value_num/...` o EAV; (3) evolución del DSL vía `schema_version` + migración en lectura, sin DDL; (4) el orden de condiciones/acciones es intrínseco al array. Costes aceptados: sin FK hacia categorías (ya imposibles por ser cross-schema), validación en dominio + CHECK estructural, índice GIN para búsquedas inversas. Esquemas en `contracts/rules/` (a definir en Phase 6).
+**Decisión JSONB vs tablas `rule_condition`/`rule_action`:** se elige **JSONB con JSON Schema versionado**. Razones: (1) la regla es un agregado que siempre se carga y evalúa completo en memoria — nunca se consultan condiciones sueltas por SQL; (2) operandos heterogéneos (texto, regex, rango de montos, moneda, cuenta, día de la semana) obligarían a columnas `value_text/value_num/...` o EAV; (3) evolución del DSL vía `schema_version` + migración en lectura, sin DDL; (4) el orden de condiciones/acciones es intrínseco al array. Costes aceptados: sin FK hacia categorías (ya imposibles por ser cross-schema), validación en dominio + CHECK estructural, índice GIN para búsquedas inversas. Esquemas en `contracts/rules/` (`conditions.v1.schema.json`, `actions.v1.schema.json`; las acciones no tienen propiedades de monto, moneda, cuenta, fecha, tipo ni estado).
 
 ### 5.14 `reporting` — Read models **DERIVADOS** (Phase 1 básico / Phase 7)
 

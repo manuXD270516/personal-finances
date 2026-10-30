@@ -16,11 +16,14 @@ export default function Page({
   const kind = one(q['tipo']);
   // `?sinExtracto=1`: filtro "conciliadas sin extracto — pendientes de revisión" (docs/33 D111).
   const withoutStatement = one(q['sinExtracto']) === '1';
+  // `?pendientes=1`: transacciones pendientes de revisión (marcadas por una regla o por el usuario, add-rule-engine).
+  const needsReview = one(q['pendientes']) === '1';
   return (
     <TransactionsPage
       {...(accountId ? { accountId } : {})}
       {...(kind ? { kind } : {})}
       {...(withoutStatement ? { withoutStatement: true } : {})}
+      {...(needsReview ? { needsReview: true } : {})}
     />
   );
 }

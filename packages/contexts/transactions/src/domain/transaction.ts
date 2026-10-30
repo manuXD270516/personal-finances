@@ -91,6 +91,34 @@ export interface CustomFieldValue {
   readonly value: string | boolean;
 }
 
+/**
+ * Origen de la categoría de un split (openspec add-rule-engine): `MANUAL` (el usuario), `RULE`, `COUNTERPARTY_DEFAULT`
+ * (categoría por defecto de la contraparte) o `SYSTEM_DEFAULT` («sin categoría»). Ausente/`null` ⇒ `UNKNOWN` (registrado
+ * antes de este cambio). No afecta al ledger (INV-033).
+ */
+export const CATEGORY_ORIGINS = ['MANUAL', 'RULE', 'COUNTERPARTY_DEFAULT', 'SYSTEM_DEFAULT'] as const;
+export type CategoryOrigin = (typeof CATEGORY_ORIGINS)[number];
+
+/** Regla y versión que fijó un campo (`field`: `TAG:<id>`, `COUNTERPARTY`, `CUSTOM_FIELD:<id>`, `DESCRIPTION`, `NOTES`). */
+export interface RuleRef {
+  readonly field: string;
+  readonly ruleId: string;
+  readonly ruleVersion: number;
+}
+
+export interface RuleOriginRef {
+  readonly ruleId: string;
+  readonly ruleVersion: number;
+}
+
+/** Marca de revisión pendiente de una transacción (sin efecto en el ledger ni en el estado). */
+export interface ReviewMark {
+  readonly reason: 'RULE' | 'USER';
+  readonly ruleId: string | null;
+  readonly ruleVersion: number | null;
+  readonly markedAt: string;
+}
+
 /** Porción nominal de la transacción (FR-TRANSACTIONS-026): magnitud positiva; la dirección la da `kind`. */
 export interface Split {
   readonly id: string;
@@ -101,6 +129,12 @@ export interface Split {
   readonly memo: string | null;
   /** Ordenados por clave. Solo las porciones de ingresos, gastos y reembolsos los llevan (D97). */
   readonly customFields: readonly CustomFieldValue[];
+  /** Origen de la categoría; ausente/`null` ⇒ `UNKNOWN`. */
+  readonly categoryOrigin?: CategoryOrigin | null;
+  /** Regla y versión de la categoría (solo con origen `RULE`). */
+  readonly categoryRule?: RuleOriginRef | null;
+  /** Regla y versión de los demás campos fijados por reglas (etiquetas, contraparte, campos, descripción y nota). */
+  readonly ruleRefs?: readonly RuleRef[];
 }
 
 export interface SplitInput {
@@ -115,6 +149,17 @@ export interface SplitInput {
    * edición ⇒ se conservan los del split actual en la misma posición (copia al regenerar, design decisión 2).
    */
   readonly customFields?: readonly CustomFieldValue[];
+  /**
+   * Origen de la categoría. Ausente ⇒ `MANUAL` (el usuario la eligió) si la categoría cambia o el split es nuevo.
+   * Con `RULE` exige `categoryRule`.
+   */
+  readonly categoryOrigin?: CategoryOrigin;
+  readonly categoryRule?: RuleOriginRef | null;
+  /**
+   * Referencias de reglas que se FUSIONAN con las vigentes (reemplazan las del mismo `field`). Ausente ⇒ el cambio es del
+   * usuario: se descartan las referencias de los campos que cambió.
+   */
+  readonly ruleRefs?: readonly RuleRef[];
 }
 
 const byKey = (a: CustomFieldValue, b: CustomFieldValue) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
@@ -184,6 +229,8 @@ export interface TransactionState {
   readonly reconciliationId: string | null;
   /** Importación que creó la transacción (`source = IMPORT`, add-basic-csv-import); `null` en el resto. */
   readonly importJobId: string | null;
+  /** Marca de revisión pendiente (add-rule-engine); `null`/ausente si no hay. */
+  readonly review?: ReviewMark | null;
   readonly legs: readonly Leg[];
   readonly splits: readonly Split[];
   readonly revision: number;
@@ -253,6 +300,10 @@ export interface RecordTransactionInput {
   readonly splits?: readonly SplitInput[];
   readonly defaultCategoryId?: string | null;
   readonly defaultSplitId?: string;
+  /** Origen de la categoría del split por defecto (`SYSTEM_DEFAULT` por omisión; `COUNTERPARTY_DEFAULT` si aplica). */
+  readonly defaultCategoryOrigin?: CategoryOrigin;
+  /** Marca de revisión inicial (reglas de la creación manual o de la importación). */
+  readonly review?: { readonly reason: 'RULE' | 'USER'; readonly rule?: RuleOriginRef; readonly at: string };
 }
 
 /** Cambios de `AmendTransaction` (merge-patch: ausente = sin cambio). */
@@ -273,6 +324,15 @@ export interface TransactionChanges {
   readonly paymentMethod?: PaymentMethod | null;
   /** Reemplazo completo de la lista; los ids los asigna la aplicación (se reutilizan si solo cambia clasificación). */
   readonly splits?: readonly SplitInput[];
+  /** Marca o quita la revisión pendiente (add-rule-engine); sin efecto en el ledger. */
+  readonly review?:
+    | {
+        readonly mark: true;
+        readonly reason: 'RULE' | 'USER';
+        readonly rule?: RuleOriginRef;
+        readonly at: string;
+      }
+    | { readonly mark: false };
 }
 
 export type ChangedField =
@@ -288,7 +348,11 @@ export type ChangedField =
   | 'toAccountId'
   | 'splits'
   | 'customFields'
-  | 'reconciliationMode';
+  | 'reconciliationMode'
+  // add-rule-engine: origen de la clasificación, referencias de reglas y marca de revisión (sin efecto en el ledger).
+  | 'categoryOrigin'
+  | 'ruleRefs'
+  | 'needsReview';
 
 /** Cambio de clasificación de un split (payload de `TransactionCategorized.v1`). */
 export interface SplitClassificationChange {
@@ -350,11 +414,51 @@ export function legAmount(
 /** ¿El kind lleva splits nominales? (ADJUSTMENT no, en Phase 1: va contra EQUITY:ADJUSTMENTS). */
 export const hasNominalSplits = (kind: TransactionKind): boolean => kind !== 'ADJUSTMENT';
 
+/**
+ * Referencias de reglas de un split tras una edición. Con `ruleRefs` en la entrada (cambio hecho por una regla) se
+ * FUSIONAN con las vigentes: las del mismo campo se reemplazan y las demás se conservan. Sin ellas (cambio del usuario)
+ * se descartan las referencias de los campos que cambió. Una etiqueta quitada siempre pierde su referencia.
+ */
+function nextRuleRefs(
+  old: Split,
+  n: SplitInput,
+  tagIds: readonly string[],
+  customFields: readonly CustomFieldValue[],
+  header: {
+    readonly counterpartyChanged: boolean;
+    readonly descriptionChanged: boolean;
+    readonly notesChanged: boolean;
+  },
+): RuleRef[] {
+  const given = n.ruleRefs;
+  const overwritten = new Set((given ?? []).map((r) => r.field));
+  const kept = (old.ruleRefs ?? []).filter((r) => {
+    if (overwritten.has(r.field)) return false;
+    if (r.field.startsWith('TAG:')) return tagIds.includes(r.field.slice('TAG:'.length));
+    if (given !== undefined) return true;
+    if (r.field === 'COUNTERPARTY') return !header.counterpartyChanged;
+    if (r.field === 'DESCRIPTION') return !header.descriptionChanged;
+    if (r.field === 'NOTES') return !header.notesChanged;
+    if (r.field.startsWith('CUSTOM_FIELD:')) {
+      const id = r.field.slice('CUSTOM_FIELD:'.length);
+      const before = old.customFields.find((v) => v.fieldId === id)?.value ?? null;
+      const after = customFields.find((v) => v.fieldId === id)?.value ?? null;
+      return before === after;
+    }
+    return true;
+  });
+  return [...kept, ...(given ?? [])];
+}
+
 function buildSplits(
   kind: TransactionKind,
   amount: Money,
   input: readonly SplitInput[] | undefined,
-  defaults: { readonly categoryId: string | null | undefined; readonly splitId: string | undefined },
+  defaults: {
+    readonly categoryId: string | null | undefined;
+    readonly splitId: string | undefined;
+    readonly origin?: CategoryOrigin | undefined;
+  },
 ): Split[] {
   if (!hasNominalSplits(kind)) {
     if (input !== undefined) throw validation('ADJUSTMENT does not accept splits in Phase 1', '/splits');
@@ -373,6 +477,9 @@ function buildSplits(
         tagIds: [],
         memo: null,
         customFields: [],
+        categoryOrigin: defaults.origin ?? 'SYSTEM_DEFAULT',
+        categoryRule: null,
+        ruleRefs: [],
       },
     ];
   }
@@ -391,6 +498,10 @@ function buildSplits(
       );
     }
     assertText(s.memo, 500, `/splits/${i}/memo`);
+    const origin = s.categoryOrigin ?? 'MANUAL';
+    if (origin === 'RULE' && !s.categoryRule) {
+      throw validation('a category set by a rule needs its rule and version', `/splits/${i}/categoryRule`);
+    }
     return {
       id: s.id,
       amount: s.amount,
@@ -399,6 +510,9 @@ function buildSplits(
       tagIds: [...new Set(s.tagIds ?? [])],
       memo: s.memo ?? null,
       customFields: sortedValues(s.customFields),
+      categoryOrigin: origin,
+      categoryRule: origin === 'RULE' ? (s.categoryRule ?? null) : null,
+      ruleRefs: s.ruleRefs ?? [],
     };
   });
   assertSplitsSum(amount, splits);
@@ -852,6 +966,7 @@ export class Transaction {
     const splits = buildSplits(kind, amount, input.splits, {
       categoryId: input.defaultCategoryId,
       splitId: input.defaultSplitId,
+      origin: input.defaultCategoryOrigin,
     });
     const status = input.status ?? 'POSTED';
     return new Transaction(
@@ -877,6 +992,14 @@ export class Transaction {
         reconciliationMode: null,
         reconciliationId: input.reconciliationId ?? null,
         importJobId: input.importJobId ?? null,
+        review: input.review
+          ? {
+              reason: input.review.reason,
+              ruleId: input.review.rule?.ruleId ?? null,
+              ruleVersion: input.review.rule?.ruleVersion ?? null,
+              markedAt: input.review.at,
+            }
+          : null,
         legs: [
           {
             accountId: input.accountId,
@@ -1430,13 +1553,36 @@ export class Transaction {
         const reclassified = changes.splits.map((n, i) => {
           const old = s.splits[i] as Split;
           assertText(n.memo, 500, `/splits/${i}/memo`);
+          const categoryChanged = n.categoryId !== old.categoryId;
+          const origin: CategoryOrigin | null = categoryChanged
+            ? (n.categoryOrigin ?? 'MANUAL')
+            : (old.categoryOrigin ?? null);
+          if (categoryChanged && origin === 'RULE' && !n.categoryRule) {
+            throw validation(
+              'a category set by a rule needs its rule and version',
+              `/splits/${i}/categoryRule`,
+            );
+          }
+          const tagIds = [...new Set(n.tagIds ?? [])];
+          const customFields = n.customFields === undefined ? old.customFields : sortedValues(n.customFields);
           return {
             ...old,
             categoryId: n.categoryId,
             counterpartyId: n.counterpartyId ?? null,
-            tagIds: [...new Set(n.tagIds ?? [])],
+            tagIds,
             memo: n.memo ?? null,
-            customFields: n.customFields === undefined ? old.customFields : sortedValues(n.customFields),
+            customFields,
+            categoryOrigin: origin,
+            categoryRule: categoryChanged
+              ? origin === 'RULE'
+                ? (n.categoryRule ?? null)
+                : null
+              : (old.categoryRule ?? null),
+            ruleRefs: nextRuleRefs(old, n, tagIds, customFields, {
+              counterpartyChanged: (changes.counterpartyId ?? s.counterpartyId) !== s.counterpartyId,
+              descriptionChanged: changes.description !== undefined && changes.description !== s.description,
+              notesChanged: changes.notes !== undefined && changes.notes !== s.notes,
+            }),
           };
         });
         classificationChanges = reclassified.flatMap((n, i) => {
@@ -1461,6 +1607,20 @@ export class Transaction {
             n.counterpartyId !== (s.splits[i] as Split).counterpartyId,
         );
         if (classificationChanges.length > 0 || memoOrCounterparty) changed.push('splits');
+        const originChanged = reclassified.some((n, i) => {
+          const old = s.splits[i] as Split;
+          return (
+            (n.categoryOrigin ?? null) !== (old.categoryOrigin ?? null) ||
+            (n.categoryRule?.ruleId ?? null) !== (old.categoryRule?.ruleId ?? null) ||
+            (n.categoryRule?.ruleVersion ?? null) !== (old.categoryRule?.ruleVersion ?? null)
+          );
+        });
+        const refsChanged = reclassified.some(
+          (n, i) =>
+            JSON.stringify(n.ruleRefs ?? []) !== JSON.stringify((s.splits[i] as Split).ruleRefs ?? []),
+        );
+        if (originChanged) changed.push('categoryOrigin');
+        if (refsChanged) changed.push('ruleRefs');
         next = { ...next, splits: reclassified };
       } else if (isTransfer || s.kind === 'CONVERSION') {
         throw validation(
@@ -1478,6 +1638,16 @@ export class Transaction {
             changes.splits.map((n, i) => ({
               ...n,
               customFields: n.customFields === undefined ? (s.splits[i]?.customFields ?? []) : n.customFields,
+              // El origen de la categoría se conserva si la posición mantiene su categoría; si no, la fijó el usuario.
+              ...(n.categoryOrigin === undefined &&
+              s.splits[i]?.categoryId === n.categoryId &&
+              s.splits[i]?.categoryOrigin
+                ? {
+                    categoryOrigin: s.splits[i].categoryOrigin,
+                    categoryRule: s.splits[i].categoryRule ?? null,
+                    ruleRefs: n.ruleRefs ?? s.splits[i].ruleRefs ?? [],
+                  }
+                : {}),
             })),
             { categoryId: null, splitId: undefined },
           ),
@@ -1497,6 +1667,24 @@ export class Transaction {
     // Custom fields: metadatos sin impacto contable (INV-033); un cambio es una edición descriptiva.
     const customFieldChanges = diffCustomFields(s.splits, next.splits);
     if (customFieldChanges.length > 0) changed.push('customFields');
+    // Marca de revisión (add-rule-engine): sin efecto en el ledger ni en el estado.
+    if (changes.review !== undefined) {
+      if (changes.review.mark && !s.review) {
+        next = {
+          ...next,
+          review: {
+            reason: changes.review.reason,
+            ruleId: changes.review.rule?.ruleId ?? null,
+            ruleVersion: changes.review.rule?.ruleVersion ?? null,
+            markedAt: changes.review.at,
+          },
+        };
+        changed.push('needsReview');
+      } else if (!changes.review.mark && !!s.review) {
+        next = { ...next, review: null };
+        changed.push('needsReview');
+      }
+    }
     if (changed.length === 0) {
       return {
         changedFields: [],

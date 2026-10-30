@@ -5,16 +5,17 @@ spec: transactions/transaction-recording
 related_specs: ["rules/rule-engine"]
 requirement: "Origen de la clasificación de cada split"
 scenario: "Orígenes de un import"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-010", "FR-CLASSIFICATION-011"]
 nfr: []
 invariants: ["INV-004"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +33,7 @@ expected_result:
   - "Orígenes RULE (Supermercado, 1), COUNTERPARTY_DEFAULT y SYSTEM_DEFAULT"
   - "El saldo de Banco BOB baja 545.40 BOB"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-055 — Cada split importado registra el origen de su categoría

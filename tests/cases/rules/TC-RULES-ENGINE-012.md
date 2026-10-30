@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Combinación de condiciones con ALL y ANY"
 scenario: "Grupo ANY dentro de una regla ALL"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-004"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/rules/logic.test.ts
+  - packages/contexts/rules/src/domain/condition.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +34,7 @@ expected_result:
   - "Solo el gasto cumple"
   - "El segundo nivel se rechaza con VALIDATION_FAILED"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-012 — Un grupo ANY de un nivel dentro de una regla ALL

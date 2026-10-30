@@ -62,6 +62,8 @@ export interface TransactionFilters {
   readonly customField: CustomFieldFilter;
   /** Solo las conciliadas sin extracto, pendientes de revisión (`systemFlag=RECONCILED_WITHOUT_STATEMENT`, D111). */
   readonly withoutStatement: boolean;
+  /** Solo las pendientes de revisión (`needsReview=true`, add-rule-engine). */
+  readonly needsReview: boolean;
 }
 
 export const EMPTY_TRANSACTION_FILTERS: TransactionFilters = {
@@ -76,6 +78,7 @@ export const EMPTY_TRANSACTION_FILTERS: TransactionFilters = {
   dateTo: '',
   customField: EMPTY_CUSTOM_FIELD_FILTER,
   withoutStatement: false,
+  needsReview: false,
 };
 
 /**
@@ -93,6 +96,7 @@ export function transactionsQuery(
   if (f.kind) q.append('kind', f.kind);
   if (f.status) q.append('status', f.status);
   if (f.withoutStatement) q.append('systemFlag', 'RECONCILED_WITHOUT_STATEMENT');
+  if (f.needsReview) q.set('needsReview', 'true');
   if (f.paymentMethod) q.set('paymentMethod', f.paymentMethod);
   if (f.source) q.append('source', f.source);
   if (f.categoryId) q.append('categoryId', f.categoryId);

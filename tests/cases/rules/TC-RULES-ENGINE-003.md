@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Definición de reglas WHEN/THEN"
 scenario: "Nombre repetido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/rules/src/application/rules.service.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "409 NAME_TAKEN"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-003 — El nombre de regla es único sin distinguir mayúsculas

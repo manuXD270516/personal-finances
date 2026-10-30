@@ -4,6 +4,7 @@ import type { Transaction } from '../common/types';
 import { badgeStyle, mutedStyle } from '../common/ui';
 import { displayValue, valuesOf, type CustomFieldDefinition } from '../custom-fields/logic';
 import { isWithoutStatement } from '../reconciliation/logic';
+import { NeedsReviewBadge } from '../rules/TransactionRules';
 import { amountFor } from './logic';
 import type { NameResolver } from './TransactionTimeline';
 
@@ -151,6 +152,7 @@ export function TransactionsListView({
             </strong>
             <StatusBadge status={tx.status} f={f} />
             <WithoutStatementBadge tx={tx} f={f} />
+            {tx.needsReview ? <NeedsReviewBadge f={f} /> : null}
             <span style={{ ...mutedStyle, flexBasis: '100%' }}>
               {t(`kinds.${tx.kind}`)}
               {tx.source !== 'MANUAL' && f.has(`sources.${tx.source}`) ? (

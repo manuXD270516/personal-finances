@@ -1,6 +1,10 @@
 import type { AuditChangeInput, AuditEntry, LifecycleEventRefDto } from '@pf/audit/contracts';
 import { DomainError, type FieldViolation } from '@pf/shared-kernel';
-import { TRANSACTION_EVENTS } from '../contracts/index.js';
+import {
+  TRANSACTION_EVENTS,
+  type RuleClassificationCommand,
+  type RuleClassificationItemDto,
+} from '../contracts/index.js';
 import {
   applyBulkToSplits,
   BULK_EDIT_MAX_ITEMS,
@@ -10,7 +14,9 @@ import {
   Transaction,
   type BulkEditChanges,
   type ChangedField,
+  type CustomFieldValue,
   type ResolvedCustomFieldPatch,
+  type SplitInput,
   type TransactionState,
 } from '../domain/index.js';
 import { buildEvent, transactionSteps } from './posting-support.js';
@@ -236,7 +242,7 @@ class BulkContext {
  * agregada con el mismo `bulkOperationId` (que es el `correlation_id` de todos los registros). Nunca toca montos,
  * cuentas, fechas ni el ledger (INV-033) y respeta los periodos cerrados con el alcance único de docs/33 D65.
  */
-export class BulkEditService {
+export class BulkEditService implements RuleClassificationCommand {
   constructor(
     private readonly deps: TransactionsDeps,
     private readonly transactions: TransactionsService,
@@ -317,6 +323,214 @@ export class BulkEditService {
         return (fresh.get(tx.id) ?? tx).snapshot;
       });
       return { bulkOperationId, data };
+    });
+  }
+
+  // ------------------------------------------------------------------ aplicación de reglas
+
+  /**
+   * `RuleClassificationCommand.applyBatch` (openspec add-rule-engine decisión 10): aplica en forma atómica la
+   * clasificación que propuso un dry-run, reutilizando el dominio de la edición masiva. Versión por ítem (una distinta ⇒
+   * `CONCURRENCY_CONFLICT` y NADA se escribe); lo que no se puede aplicar (periodo cerrado, administradas, tipo, categoría
+   * archivada entre el dry-run y ahora) se informa en `notApplicable[]` sin impedir el resto. Origen `RULE` y regla y
+   * versión por campo; auditoría con el `bulkOperationId` común y origen `rule`.
+   */
+  async applyBatch(input: Parameters<RuleClassificationCommand['applyBatch']>[0]) {
+    const { workspaceId, actorUserId, operationId, items } = input;
+    if (items.length === 0 || items.length > BULK_EDIT_MAX_ITEMS) {
+      throw new DomainError('VALIDATION_FAILED', `between 1 and ${BULK_EDIT_MAX_ITEMS} items`).at('/items');
+    }
+    return this.deps.uow.run(workspaceId, async () => {
+      const loaded = await this.deps.transactions.findMany(
+        workspaceId,
+        items.map((x) => x.transactionId),
+        { forUpdate: true },
+      );
+      for (const item of items) {
+        const tx = loaded.get(item.transactionId);
+        if (!tx || tx.version !== item.expectedVersion) {
+          throw new DomainError('CONCURRENCY_CONFLICT', `transaction ${item.transactionId} changed`);
+        }
+      }
+      const cache = new Map<string, Promise<DomainError | null>>();
+      const once = (key: string, run: () => Promise<void>): Promise<DomainError | null> => {
+        let hit = cache.get(key);
+        if (!hit) {
+          hit = run().then(
+            () => null,
+            (err: unknown) => {
+              if (err instanceof DomainError) return err;
+              throw err;
+            },
+          );
+          cache.set(key, hit);
+        }
+        return hit;
+      };
+      const notApplicable: { transactionId: string; reason: string }[] = [];
+      const evaluations: Evaluation[] = [];
+      const ruleOf = new Map<string, string | null>();
+      for (const item of items) {
+        const tx = loaded.get(item.transactionId) as Transaction;
+        const before = tx.snapshot;
+        const skip = (reason: string) => notApplicable.push({ transactionId: item.transactionId, reason });
+        const c = item.changes;
+        if (before.status === 'VOIDED') {
+          skip('INVALID_STATUS_TRANSITION');
+          continue;
+        }
+        if (isManagedSource(before)) {
+          skip('TRANSACTION_MANAGED_EXTERNALLY');
+          continue;
+        }
+        const splitChanges =
+          c.categoryId !== undefined ||
+          (c.addTagIds?.length ?? 0) + (c.removeTagIds?.length ?? 0) > 0 ||
+          (c.customFields?.length ?? 0) > 0;
+        const applicable = bulkApplicability(before, {
+          ...(c.categoryId !== undefined ? { categoryId: c.categoryId } : {}),
+          ...((c.addTagIds?.length ?? 0) > 0 ? { addTagIds: c.addTagIds as string[] } : {}),
+          ...((c.removeTagIds?.length ?? 0) > 0 ? { removeTagIds: c.removeTagIds as string[] } : {}),
+          ...((c.customFields?.length ?? 0) > 0 ? { customFields: [{ fieldId: 'x', value: null }] } : {}),
+        });
+        if (applicable.length > 0 || (splitChanges && before.splits.length !== 1)) {
+          skip('BULK_EDIT_NOT_APPLICABLE');
+          continue;
+        }
+        try {
+          const splitKind = splitKindOf(before.kind);
+          const checks: (DomainError | null)[] = [];
+          if (c.categoryId !== undefined) {
+            checks.push(
+              await once(`category:${c.categoryId}:${splitKind}`, () =>
+                this.deps.classification.validate({
+                  userId: actorUserId,
+                  workspaceId,
+                  categoryIds: [{ categoryId: c.categoryId as string, splitKind }],
+                }),
+              ),
+            );
+          }
+          if ((c.addTagIds?.length ?? 0) > 0) {
+            checks.push(
+              await once(`tags:${(c.addTagIds as string[]).join(',')}`, () =>
+                this.deps.classification.validate({
+                  userId: actorUserId,
+                  workspaceId,
+                  tagIds: c.addTagIds as string[],
+                }),
+              ),
+            );
+          }
+          if (c.counterpartyId !== undefined) {
+            checks.push(
+              await once(`counterparty:${c.counterpartyId}`, () =>
+                this.deps.classification.validate({
+                  userId: actorUserId,
+                  workspaceId,
+                  counterpartyId: c.counterpartyId as string,
+                }),
+              ),
+            );
+          }
+          const failed = checks.find((e) => e !== null);
+          if (failed) {
+            skip(failed.code);
+            continue;
+          }
+          let patch: ResolvedCustomFieldPatch | undefined;
+          if ((c.customFields?.length ?? 0) > 0) {
+            const existing = before.splits.map((s) => s.customFields.map((v) => v.fieldId));
+            const validated = await this.deps.classification.validateCustomFieldValues({
+              userId: actorUserId,
+              workspaceId,
+              target: 'TRANSACTION',
+              requireMandatory: true,
+              items: existing.map((ids, i) => ({
+                pointer: `/splits/${i}/customFields`,
+                values: (c.customFields ?? []).map((v) => ({ fieldId: v.fieldId, value: v.value })),
+                existingFieldIds: ids,
+              })),
+            });
+            patch = { set: validated[0]?.set ?? [], removeFieldIds: validated[0]?.removeFieldIds ?? [] };
+          }
+          const split = before.splits[0];
+          const splits: SplitInput[] | undefined =
+            split && (splitChanges || (item.ruleRefs.length > 0 && before.splits.length === 1))
+              ? [ruleSplit(split, item, patch)]
+              : undefined;
+          const notes =
+            (c.appendNotes?.length ?? 0) > 0
+              ? [before.notes ?? '', ...(c.appendNotes as string[])].filter((t) => t.length > 0).join('\n')
+              : undefined;
+          const outcome = tx.bulkEdit({
+            ...(c.counterpartyId !== undefined ? { counterpartyId: c.counterpartyId } : {}),
+            ...(c.description !== undefined ? { description: c.description } : {}),
+            ...(notes !== undefined ? { notes } : {}),
+            ...(splits ? { splits } : {}),
+            ...(c.markForReview
+              ? {
+                  review: {
+                    mark: true as const,
+                    reason: 'RULE' as const,
+                    ...(item.reviewRule ? { rule: item.reviewRule } : {}),
+                    at: this.deps.clock.now().toString(),
+                  },
+                }
+              : {}),
+          });
+          if (outcome.changedFields.length === 0) continue;
+          const classifies =
+            outcome.classificationChanges.some((x) => x.previousCategoryId !== x.newCategoryId) ||
+            outcome.customFieldChanges.length > 0 ||
+            outcome.classificationChanges.some((x) => x.addedTagIds.length + x.removedTagIds.length > 0) ||
+            before.counterpartyId !== tx.snapshot.counterpartyId;
+          if (classifies) {
+            const closed = await once(`period:${before.businessDate}`, () =>
+              this.deps.ledger.assertPeriodOpen({ workspaceId, date: before.businessDate }),
+            );
+            if (closed) {
+              skip(closed.code);
+              continue;
+            }
+          }
+          evaluations.push({
+            id: item.transactionId,
+            tx,
+            before,
+            problems: [],
+            outcome,
+            changedFields: [...outcome.changedFields],
+          });
+          ruleOf.set(
+            item.transactionId,
+            item.categoryRule?.ruleId ?? item.reviewRule?.ruleId ?? item.ruleRefs[0]?.ruleId ?? null,
+          );
+        } catch (err) {
+          if (!(err instanceof DomainError)) throw err;
+          skip(err.code);
+        }
+      }
+      if (evaluations.length > 0) {
+        if (
+          !(await this.deps.transactions.updateClassificationBatch(
+            evaluations.map((e) => e.tx as Transaction),
+          ))
+        ) {
+          throw new DomainError('CONCURRENCY_CONFLICT', 'a transaction was modified concurrently');
+        }
+        const prepared = evaluations.map((e) =>
+          this.prepare(e, operationId, { ruleId: ruleOf.get(e.id) ?? null }),
+        );
+        const events = prepared.flatMap((p) => p.events);
+        const { outbox, lifecycle } = this.deps;
+        if (outbox.appendMany) await outbox.appendMany(events);
+        else for (const ev of events) await outbox.append(ev);
+        const records = prepared.map((p) => ({ entry: p.entry, steps: p.steps }));
+        if (lifecycle.recordMany) await lifecycle.recordMany(records);
+        else for (const it of records) await lifecycle.record(it.entry, it.steps);
+      }
+      return { applied: evaluations.map((e) => e.id), notApplicable };
     });
   }
 
@@ -515,6 +729,7 @@ export class BulkEditService {
   private prepare(
     e: Evaluation,
     bulkOperationId: string,
+    rule?: { readonly ruleId: string | null },
   ): {
     readonly events: OutboxEvent[];
     readonly entry: AuditEntry;
@@ -567,8 +782,8 @@ export class BulkEditService {
         transactionId: after.id,
         status: after.status,
         businessDate: after.businessDate,
-        appliedBy: 'USER',
-        ruleId: null,
+        appliedBy: rule ? 'RULE' : 'USER',
+        ruleId: rule?.ruleId ?? null,
         bulkOperationId,
         changes: outcome.classificationChanges.map((c) => ({ ...c, amount: c.amount.toJSON() })),
       });
@@ -586,6 +801,7 @@ export class BulkEditService {
         aggregateId: after.id,
         aggregateVersion: after.version,
         correlationId: bulkOperationId,
+        ...(rule ? { origin: 'rule' as const } : {}),
         changes,
       },
       steps: transactionSteps(tx, {
@@ -608,4 +824,44 @@ function bulkError(problems: readonly Problem[]): DomainError {
   return new DomainError(top.code, `${problems.length} item(s) cannot be edited: ${top.detail}`, {
     violations,
   });
+}
+
+/** Transacciones que administra otro contexto (préstamos, metas): la clasificación por reglas no las toca. */
+const isManagedSource = (s: Pick<TransactionState, 'source' | 'kind'>): boolean =>
+  s.source === 'DEBT' || s.source === 'GOAL';
+
+/**
+ * Split final de una transacción de un solo split tras aplicar lo que propuso la regla: categoría con origen `RULE`,
+ * etiquetas, valores de campos personalizados y las referencias de regla por campo (fusionadas con las vigentes).
+ */
+function ruleSplit(
+  split: TransactionState['splits'][number],
+  item: RuleClassificationItemDto,
+  patch: ResolvedCustomFieldPatch | undefined,
+): SplitInput {
+  const c = item.changes;
+  const removed = new Set(c.removeTagIds ?? []);
+  const tagIds = [...new Set([...split.tagIds, ...(c.addTagIds ?? [])])]
+    .filter((t) => !removed.has(t))
+    .sort();
+  let customFields: readonly CustomFieldValue[] = split.customFields;
+  if (patch) {
+    const merged = new Map(split.customFields.map((v) => [v.fieldId, v]));
+    for (const id of patch.removeFieldIds) merged.delete(id);
+    for (const v of patch.set) merged.set(v.fieldId, v);
+    customFields = [...merged.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  }
+  return {
+    id: split.id,
+    amount: split.amount,
+    categoryId: c.categoryId ?? split.categoryId,
+    counterpartyId: split.counterpartyId,
+    tagIds,
+    memo: split.memo,
+    customFields,
+    ...(c.categoryId !== undefined && item.categoryRule
+      ? { categoryOrigin: 'RULE' as const, categoryRule: item.categoryRule }
+      : {}),
+    ruleRefs: item.ruleRefs,
+  };
 }

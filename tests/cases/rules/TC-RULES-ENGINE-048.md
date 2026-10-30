@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Estadísticas por regla"
 scenario: "Regla sin uso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001", "FR-RULES-010"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/rules/rules.test.tsx
+  - packages/contexts/rules/src/application/rules.service.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +32,7 @@ steps:
 expected_result:
   - "Gimnasio con stats.classifiedTransactions = 0 y unusedFor90Days = true"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-048 — El listado señala reglas activas sin aplicaciones en 90 días

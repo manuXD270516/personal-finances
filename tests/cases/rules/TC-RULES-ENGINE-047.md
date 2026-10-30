@@ -5,7 +5,7 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Cobertura de clasificación por reglas"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-010", "FR-IMPORTS-008"]
 nfr: []
 invariants: []
@@ -14,7 +14,7 @@ type: e2e
 level: e2e
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 6
 tags: ["rules", "exit-criterion", "owner"]
@@ -30,7 +30,7 @@ steps:
 expected_result:
   - "ruleCoverage ≥ 0.7000"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-047 — Criterio de salida de Phase 6 con los extractos reales del owner

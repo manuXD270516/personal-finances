@@ -5,16 +5,20 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Operadores y comparación de texto"
 scenario: "Operador incompatible"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-003"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/logic.test.ts
+  - packages/contexts/rules/src/domain/condition.test.ts
+  - packages/contexts/rules/src/infrastructure/dsl-schema.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +34,7 @@ steps:
 expected_result:
   - "422 VALIDATION_FAILED con puntero /conditions/items/0/operator"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-009 — Un operador incompatible con el campo se rechaza al guardar

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/rules/actions.v1.schema.json",
+  "title": "rules.actions.v1",
+  "description": "Acciones (ENTONCES) de una regla de clasificación (openspec add-rule-engine, decisión 8; docs/08 §5.13, schema_version 1): entre 1 y 10. El esquema NO tiene propiedades para el monto, la moneda, la cuenta, la fecha, el tipo ni el estado de una transacción (`additionalProperties: false` en cada variante): una regla nunca cambia datos financieros ni genera asientos.",
+  "type": "array",
+  "minItems": 1,
+  "maxItems": 10,
+  "items": {
+    "oneOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "categoryId"],
+        "properties": { "type": { "const": "SET_CATEGORY" }, "categoryId": { "$ref": "#/$defs/Id" } }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "tagId"],
+        "properties": { "type": { "enum": ["ADD_TAG", "REMOVE_TAG"] }, "tagId": { "$ref": "#/$defs/Id" } }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "counterpartyId"],
+        "properties": { "type": { "const": "SET_COUNTERPARTY" }, "counterpartyId": { "$ref": "#/$defs/Id" } }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "fieldId", "value"],
+        "properties": {
+          "type": { "const": "SET_CUSTOM_FIELD" },
+          "fieldId": { "$ref": "#/$defs/Id" },
+          "value": { "oneOf": [{ "type": "string", "maxLength": 500 }, { "type": "boolean" }] }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "text"],
+        "properties": {
+          "type": { "enum": ["SET_DESCRIPTION", "APPEND_NOTE"] },
+          "text": { "type": "string", "minLength": 1, "maxLength": 500 }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": { "type": { "enum": ["MARK_FOR_REVIEW", "EXCLUDE_FROM_IMPORT"] } }
+      }
+    ]
+  },
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1, "maxLength": 100 }
+  },
+  "examples": [
+    [
+      { "type": "SET_CATEGORY", "categoryId": "0192f3c4-0000-7000-9000-000000000010" },
+      { "type": "ADD_TAG", "tagId": "0192f3c4-0000-7000-9000-000000000020" },
+      { "type": "MARK_FOR_REVIEW" }
+    ],
+    [{ "type": "SET_DESCRIPTION", "text": "Netflix" }]
+  ]
+}

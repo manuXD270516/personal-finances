@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Las reglas no cambian datos financieros"
 scenario: "Recategorizar un gasto posteado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-005", "FR-TRANSACTIONS-028"]
 nfr: []
 invariants: ["INV-004"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +34,7 @@ expected_result:
   - "Saldo de Banco BOB = 4000.00 BOB"
   - "Cantidad de asientos sin cambio"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-018 — Recategorizar por regla no cambia saldos ni crea asientos

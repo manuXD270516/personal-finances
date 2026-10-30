@@ -895,6 +895,42 @@ export const VARIABLES = {
       default: '50',
     },
   ),
+  RULES_MAX_PER_WORKSPACE: variable(
+    positiveInt.refine((n) => n <= 5000, 'hasta 5000 reglas'),
+    {
+      group: 'Rules',
+      description:
+        'Máximo de reglas no archivadas por workspace (docs/57 D339, 500): más ⇒ 422 `RULE_LIMIT_EXCEEDED`. Archivar libera un cupo.',
+      default: '500',
+    },
+  ),
+  RULES_DRY_RUN_MAX_DAYS: variable(
+    positiveInt.refine((n) => n <= 3660, 'hasta 3660 días'),
+    {
+      group: 'Rules',
+      description:
+        'Rango máximo en días de un dry-run de reglas (366): más ⇒ 422 `VALIDATION_FAILED`. Acota el tiempo de la evaluación retroactiva.',
+      default: '366',
+    },
+  ),
+  RULES_DRY_RUN_MAX_TRANSACTIONS: variable(
+    positiveInt.refine((n) => n <= 20_000, 'hasta 20000 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Máximo de transacciones que evalúa un dry-run (5000): si el rango tiene más, la respuesta se marca `truncated`.',
+      default: '5000',
+    },
+  ),
+  RULES_APPLY_MAX_ITEMS: variable(
+    positiveInt.refine((n) => n <= 500, 'hasta 500 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Transacciones máximas por aplicación de un dry-run (500, igual que la edición masiva): la interfaz aplica por páginas.',
+      default: '500',
+    },
+  ),
   IMPORT_PERSIST_BATCH_SIZE: variable(
     positiveInt.refine((n) => n <= 1000, 'hasta 1000 filas por lote'),
     {
@@ -1335,6 +1371,11 @@ export const APP_VARIABLES = {
     'IMPORT_PERSIST_BATCH_SIZE',
     'IMPORT_REVIEW_TTL',
     'IMPORT_FUTURE_DATE_TOLERANCE_DAYS',
+    // add-rule-engine: límites de reglas, dry-run y aplicación (la API los aplica; el worker no evalúa reglas aún).
+    'RULES_MAX_PER_WORKSPACE',
+    'RULES_DRY_RUN_MAX_DAYS',
+    'RULES_DRY_RUN_MAX_TRANSACTIONS',
+    'RULES_APPLY_MAX_ITEMS',
     // add-workspace-export: la API solicita, descarga (descifra en streaming) e importa.
     ...EXPORT_PORTABILITY,
     'REAUTH_MAX_AGE',

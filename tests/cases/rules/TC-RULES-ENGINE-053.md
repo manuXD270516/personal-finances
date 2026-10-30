@@ -5,16 +5,19 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Permisos y auditoría de las reglas"
 scenario: "Aislamiento entre workspaces"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: critical
 type: security
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/rules/test/integration/pg-rules.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +34,7 @@ expected_result:
   - "Fila de W2 sin categoría"
   - "Sin contexto: PF002 (fail-closed)"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-053 — Las reglas de un workspace no se ven ni se evalúan en otro

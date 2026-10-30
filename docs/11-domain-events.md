@@ -340,3 +340,6 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 2. Retención de `outbox` publicados (7 vs 30 días) y si sirve como fuente de replay o sólo las tablas fuente.
 3. ¿`TransactionCreated` debe emitirse además de `TransactionPosted` cuando una transacción nace `posted`? Propuesto: sí (dos eventos, semánticas distintas); evaluar ruido.
 4. ¿Se necesita un evento de dominio específico para `Reconciliation` en Phase 1 (`ReconciliationCompleted`) o basta con Audit? → **Resuelta (2026-10-08, `add-reconciliation`)**: se publica `transactions.ReconciliationCompleted.v1` (Phase 2) y el hecho dedicado `transactions.TransactionCleared.v1` (D47).
+
+
+> **Reglas de clasificación (`add-rule-engine`, Phase 6):** RULES no publica ni consume eventos (D338: sin aplicación asíncrona posterior ni consumidores nuevos). La aplicación de un dry-run reutiliza los eventos de la edición masiva: `transactions.TransactionCategorized.v1` con `appliedBy = RULE`, `ruleId` y el `bulkOperationId`, y `transactions.TransactionUpdated.v1`, sin cambio de esquema.

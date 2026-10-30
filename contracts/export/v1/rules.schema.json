@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/rules.schema.json",
+  "title": "pfos-export v1 — rules",
+  "description": "Registro de la sección «rules» (tabla rules.rule, contexto rules). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "name",
+    "description",
+    "priority",
+    "triggers",
+    "match_mode",
+    "conditions",
+    "actions",
+    "schema_version",
+    "stop_processing",
+    "enabled",
+    "needs_attention",
+    "archived_at",
+    "version",
+    "row_version",
+    "created_at",
+    "created_by",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "priority": {
+      "type": "integer"
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "match_mode": {
+      "type": "string"
+    },
+    "conditions": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "actions": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "schema_version": {
+      "type": "integer"
+    },
+    "stop_processing": {
+      "type": "boolean"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "needs_attention": {
+      "type": "boolean"
+    },
+    "archived_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "row_version": {
+      "type": "integer"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "rules.rule",
+  "x-pfos-context": "rules"
+}

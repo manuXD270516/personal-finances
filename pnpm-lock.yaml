@@ -388,6 +388,9 @@ importers:
       '@pf/reporting':
         specifier: workspace:*
         version: link:../../packages/contexts/reporting
+      '@pf/rules':
+        specifier: workspace:*
+        version: link:../../packages/contexts/rules
       '@pf/shared-kernel':
         specifier: workspace:*
         version: link:../../packages/shared-kernel
@@ -1308,6 +1311,61 @@ importers:
         specifier: 'catalog:'
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/contexts/rules:
+    dependencies:
+      '@nestjs/common':
+        specifier: 'catalog:'
+        version: 12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
+      '@pf/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@pf/classification':
+        specifier: workspace:*
+        version: link:../classification
+      '@pf/platform':
+        specifier: workspace:*
+        version: link:../../platform
+      '@pf/shared-kernel':
+        specifier: workspace:*
+        version: link:../../shared-kernel
+      '@pf/transactions':
+        specifier: workspace:*
+        version: link:../transactions
+      kysely:
+        specifier: 'catalog:'
+        version: 0.29.6
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
+      fast-check:
+        specifier: 4.10.2
+        version: 4.10.2
+      reflect-metadata:
+        specifier: 'catalog:'
+        version: 0.2.2
+      rxjs:
+        specifier: 'catalog:'
+        version: 7.8.2
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/contexts/transactions:
     dependencies:
       '@nestjs/common':
@@ -1462,6 +1520,9 @@ importers:
       decimal.js:
         specifier: 10.6.0
         version: 10.6.0
+      re2js:
+        specifier: 2.8.8
+        version: 2.8.8
     devDependencies:
       '@stryker-mutator/core':
         specifier: 10.0.0
@@ -5326,6 +5387,10 @@ packages:
   raw-body@3.0.2:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
+
+  re2js@2.8.8:
+    resolution: {integrity: sha512-E2FVgqD2mzJ+ZmMSHLnkOvZ7PiZ4FgMdfVCA3YsJWs9gtyoaKmUMxyVPCXS1yK209/mz3XkdT7kr3OlMWW2Fww==}
+    engines: {node: '>=20.0.0'}
 
   react-dom@19.3.0:
     resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
@@ -9839,6 +9904,8 @@ snapshots:
       http-errors: 2.0.1
       iconv-lite: 0.7.3
       unpipe: 1.0.0
+
+  re2js@2.8.8: {}
 
   react-dom@19.3.0(react@19.3.0):
     dependencies:

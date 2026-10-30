@@ -160,5 +160,8 @@
   "DOCUMENT_REJECTED": "The document was rejected by the file security checks.",
   "DOCUMENT_DELETED": "The document was deleted.",
   "DOCUMENT_CONTENT_CORRUPTED": "The stored content is corrupted or was altered. The file was not delivered.",
-  "ATTACHMENT_LIMIT_EXCEEDED": "This item already has the maximum number of attachments. Remove one to add another."
+  "ATTACHMENT_LIMIT_EXCEEDED": "This item already has the maximum number of attachments. Remove one to add another.",
+  "RULE_INVALID_REGEX": "The regular expression is invalid or uses constructs without linear-time evaluation (back-references, lookaround or more than 200 characters).",
+  "RULE_LIMIT_EXCEEDED": "The workspace reached the maximum number of rules. Archive one to create another.",
+  "RULE_DRY_RUN_STALE": "A rule or a transaction changed after the run. Nothing was applied: run it again."
 }

@@ -32,6 +32,7 @@
     "@pf/debt": "workspace:*",
     "@pf/documents": "workspace:*",
     "@pf/goals": "workspace:*",
+    "@pf/rules": "workspace:*",
     "@pf/imports": "workspace:*",
     "@pf/planning": "workspace:*",
     "@pf/platform": "workspace:*",

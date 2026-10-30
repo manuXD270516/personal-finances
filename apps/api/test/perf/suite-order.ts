@@ -6,7 +6,7 @@
  *  1. `nightly`: siembra el Large Seed y mide los NFR sobre él; las suites siguientes miden con ese volumen de base
  *     (el escenario de TC-PLATFORM-PIPELINE-024) y la purga de D291 elimina el backlog que deja (eventos pendientes y
  *     ~1,39 M de trabajos `events.*`).
- *  2. Suites de latencia (`spendable`, `goals`, `loan-simulator`, `upcoming-payments`, `subscriptions`): sensibles a la
+ *  2. Suites de latencia (`spendable`, `goals`, `rules`, `loan-simulator`, `upcoming-payments`, `subscriptions`): sensibles a la
  *     carga del host; corren primero tras `nightly`, con la purga y la espera de quietud.
  *  3. `commitments`: mide el throughput del matcher y deja su inbox y sus ocurrencias.
  *  4. `throughput`: ráfaga del import y costo por consumidor (informativo); deja backlog consumido y carga alta.
@@ -17,6 +17,7 @@ export const PERF_SUITE_ORDER: readonly string[] = [
   'nightly.perf.ts',
   'spendable.perf.ts',
   'goals.perf.ts',
+  'rules.perf.ts',
   'loan-simulator.perf.ts',
   'upcoming-payments.perf.ts',
   'subscriptions.perf.ts',

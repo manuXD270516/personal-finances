@@ -23,6 +23,10 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/instituciones')).toBe('accounts');
     expect(activeNav('/fx/conversiones/nueva')).toBe('fx');
     expect(activeNav('/clasificacion')).toBe('classification');
+    // Phase 6 (add-rule-engine): reglas de clasificación y su editor.
+    expect(activeNav('/reglas')).toBe('rules');
+    expect(activeNav('/en/reglas/nueva')).toBe('rules');
+    expect(activeNav('/pt/reglas/0198f0aa')).toBe('rules');
     expect(activeNav('/planificacion/periodos')).toBe('planning');
     expect(activeNav('/en/planificacion')).toBe('planning');
     expect(activeNav('/pt/configuracion')).toBe('settings');

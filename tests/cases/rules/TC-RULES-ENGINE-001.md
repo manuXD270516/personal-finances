@@ -5,16 +5,22 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Definición de reglas WHEN/THEN"
 scenario: "Crear una regla de supermercado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001", "FR-RULES-009"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - apps/web/src/ui/rules/logic.test.ts
+  - packages/contexts/rules/src/application/rules.service.test.ts
+  - packages/contexts/rules/src/domain/condition.test.ts
+  - packages/contexts/rules/src/domain/rule.test.ts
+  - tests/e2e/specs/rules.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +38,7 @@ expected_result:
   - "triggers = [IMPORT, RETROACTIVE] (sin MANUAL_CREATE)"
   - "Registro de auditoría de la creación"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-001 — Crear una regla nace activa en la versión 1 con disparadores por defecto

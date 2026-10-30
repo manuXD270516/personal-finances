@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Las reglas no cambian datos financieros"
 scenario: "Acción sobre el monto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-005"]
 nfr: []
 invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/condition.test.ts
+  - packages/contexts/rules/src/infrastructure/dsl-schema.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +32,7 @@ steps:
 expected_result:
   - "422 VALIDATION_FAILED en los seis casos"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-017 — Una acción sobre monto, moneda, cuenta, fecha, tipo o estado se rechaza

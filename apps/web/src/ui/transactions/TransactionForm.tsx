@@ -105,6 +105,8 @@ export function TransactionForm({
   const customFields = useCustomFields(ctx);
   const txFields = customFields.active('TRANSACTION');
   const [fieldErrors, setFieldErrors] = useState<Record<number, Record<string, CustomFieldError>>>({});
+  // add-rule-engine: las reglas con disparador de creación manual completan los campos vacíos salvo que se pida no aplicarlas.
+  const [applyRules, setApplyRules] = useState(true);
   const { t, locale } = f;
   const editing = Boolean(original);
   const today = todayIn(ctx.timeZone);
@@ -297,6 +299,7 @@ export function TransactionForm({
             : {}),
           ...(s.kind === 'ADJUSTMENT' ? { direction: s.direction, reason: s.reason.trim() } : {}),
           ...(v.splits ? { splits: v.splits } : {}),
+          ...(s.kind !== 'ADJUSTMENT' && !applyRules ? { applyRules: false } : {}),
         };
         const r = await ctx.api.command<Transaction>('POST', `${ctx.base}/transactions`, body, {
           idempotencyKey: attemptKey.current,
@@ -619,6 +622,20 @@ export function TransactionForm({
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+      {!editing && s.kind !== 'ADJUSTMENT' ? (
+        <div>
+          <label style={{ display: 'flex', gap: 'var(--pf-space-1)', alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={applyRules}
+              data-testid="tx-apply-rules"
+              onChange={(e) => setApplyRules(e.target.checked)}
+            />
+            {t('form.applyRules')}
+          </label>
+          <small style={mutedStyle}>{t('form.applyRulesHint')}</small>
         </div>
       ) : null}
       <div style={rowStyle}>

@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: ["transactions/transaction-recording"]
 requirement: "Aplicación al crear una transacción manual"
 scenario: "Creación sin reglas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-009"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +31,7 @@ steps:
 expected_result:
   - "Split sin categoría con categoryOrigin SYSTEM_DEFAULT y sin ruleRefs"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-036 — applyRules false evita aplicar reglas

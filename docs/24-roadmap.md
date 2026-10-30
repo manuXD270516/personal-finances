@@ -169,7 +169,7 @@ flowchart LR
 - **Objetivo:** reducir la captura manual mediante imports confiables y clasificación automática.
 - **Alcance:** ([13-import-architecture.md](./13-import-architecture.md)) documentos (presigned upload, validaciones, adjuntos N:M), pipeline de import completo (CSV/OFX/QIF/JSON/XLSX, perfiles de mapeo, dedupe, preview, idempotencia, undo), BankingProvider port + adapter de exchange, rules engine (WHEN/THEN, prioridad, preview, dry-run).
 - **Capabilities:** `documents/attachments`, `security/file-upload-security`, `imports/import-pipeline`, `imports/banking-providers`, `rules/rule-engine`, `transactions/duplicate-detection` (imports).
-- **Exit criteria:** importar 3 meses de extractos reales del owner sin duplicados y con ≥ 70 % de transacciones clasificadas por reglas; re-import del mismo archivo crea 0 transacciones; uploads maliciosos de prueba rechazados.
+- **Exit criteria:** importar 3 meses de extractos reales del owner sin duplicados y con ≥ 70 % de transacciones clasificadas por reglas (**definición exacta, D334 / `add-rule-engine`:** de las transacciones `INCOME`/`EXPENSE`/`REFUND` creadas por imports y no anuladas del rango, el cociente «con `category_origin = RULE` vigente ÷ total» a 4 decimales HALF_EVEN, medido con `GET W/rules/coverage?from=…&to=…`; una categoría de regla que el usuario corrigió después no cuenta, y el owner registra la cifra sin montos ni descripciones, TC-RULES-ENGINE-047); re-import del mismo archivo crea 0 transacciones; uploads maliciosos de prueba rechazados.
 - **Dependencias:** Phase 1 (TRANSACTIONS/CLASSIFICATION), Phase 3 (matching con ocurrencias), Phase 5 (conversiones importadas con tasas de referencia).
 - **Riesgos clave:** RISK-016, RISK-010 (archivos sensibles), RISK-006.
 

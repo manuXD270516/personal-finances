@@ -30,6 +30,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "decimal.js": "10.6.0"
+    "decimal.js": "10.6.0",
+    "re2js": "2.8.8"
   }
 }

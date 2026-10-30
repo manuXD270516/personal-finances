@@ -93,3 +93,10 @@ export {
   type WeekdaySpec,
   type WeekendAdjustmentMode,
 } from './recurrence/index.js';
+export { normalizeText } from './text/normalize.js';
+export {
+  InvalidLinearRegexError,
+  LINEAR_REGEX_MAX_PATTERN,
+  LINEAR_REGEX_MAX_TEXT,
+  LinearRegex,
+} from './text/linear-regex.js';

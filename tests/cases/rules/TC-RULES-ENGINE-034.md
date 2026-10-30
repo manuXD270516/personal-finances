@@ -5,16 +5,19 @@ spec: rules/rule-engine
 related_specs: ["transactions/transaction-recording"]
 requirement: "Aplicación al crear una transacción manual"
 scenario: "Gasto manual sin categoría"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-009"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+  - packages/contexts/transactions/src/application/rule-classification.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "Split en Telefonía con categoryOrigin RULE y ruleRefs Telefonía v1"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-034 — Una regla con disparador de creación completa la categoría vacía

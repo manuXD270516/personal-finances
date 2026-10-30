@@ -41,6 +41,7 @@ import {
   NOTIFICATIONS_PORTABILITY_SECTIONS,
 } from '@pf/notifications/contracts';
 import { PLANNING_CLOSE_SNAPSHOT_HASH_HOOK, PLANNING_PORTABILITY_SECTIONS } from '@pf/planning/contracts';
+import { RULES_PORTABILITY_SECTIONS } from '@pf/rules/contracts';
 import { closeSnapshotRestoreHook } from '@pf/planning/interface/planning.module';
 import { requireSqlExecutor } from '@pf/platform/api';
 import { currentCorrelation, uuidv7 } from '@pf/platform/logging';
@@ -58,6 +59,8 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   ...IDENTITY_PORTABILITY_SECTIONS,
   ...FX_PORTABILITY_SECTIONS,
   ...CLASSIFICATION_PORTABILITY_SECTIONS,
+  // add-rule-engine: reglas y versiones inmutables (orden 360–361, después de CLASSIFICATION y antes de las cuentas).
+  ...RULES_PORTABILITY_SECTIONS,
   ...ACCOUNTS_PORTABILITY_SECTIONS,
   ...LEDGER_PORTABILITY_SECTIONS,
   ...TRANSACTIONS_PORTABILITY_SECTIONS,

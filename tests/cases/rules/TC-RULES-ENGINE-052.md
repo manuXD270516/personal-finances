@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Permisos y auditoría de las reglas"
 scenario: "VIEWER intenta crear una regla"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +33,7 @@ expected_result:
   - "403 INSUFFICIENT_ROLE en las escrituras"
   - "200 en las lecturas y la vista previa"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-052 — VIEWER no escribe reglas pero puede leer, probar y ver la cobertura

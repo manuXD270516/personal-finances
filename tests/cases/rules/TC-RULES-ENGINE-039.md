@@ -5,16 +5,20 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Activar, desactivar y archivar reglas"
 scenario: "Regla desactivada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-001"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/evaluation.test.ts
+  - packages/contexts/rules/src/application/rules.service.test.ts
+  - packages/contexts/rules/src/domain/rule-evaluator.test.ts
+  - packages/contexts/rules/src/domain/rule.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -32,7 +36,7 @@ steps:
 expected_result:
   - "Fila sin categoría y sin regla"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-039 — Una regla inactiva no se evalúa

@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Cobertura de clasificación por reglas"
 scenario: "Cobertura de un import"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-010", "FR-IMPORTS-008"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules.api.test.ts
+  - packages/contexts/rules/src/application/evaluation.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["rules", "rule-engine"]
@@ -30,7 +32,7 @@ steps:
 expected_result:
   - "total 57; RULE 41; ruleCoverage \"0.7193\""
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-RULES-ENGINE-046 — La cobertura por import usa solo sus transacciones

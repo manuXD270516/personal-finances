@@ -154,9 +154,9 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 - **Propósito:** automatizar la clasificación.
 - **Responsabilidades:** definición, prioridad y evaluación determinista de reglas; preview; ejecución sobre transacciones nuevas/importadas o retroactiva.
 - **NO responsabilidades:** modificar montos/cuentas/fechas/estado; detección de duplicados (Transactions).
-- **API pública:** cmd `CreateRule`, `UpdateRule`, `ReorderRules`, `DisableRule`, `RunRules`, `PreviewRule`; qry `ListRules`, `PreviewRuleMatches`.
-- **Eventos publicados:** ninguno en v1. **Consumidos:** `transactions.TransactionCreated` (trigger ON_CREATE/ON_IMPORT).
-- **Dependencias:** Transactions (`ApplyClassification`, sync desde el handler async), Classification (query).
+- **API pública:** cmd `CreateRule`, `UpdateRule`, `ReorderRules`, `EnableRule`/`DisableRule`/`ArchiveRule`, `DryRunRules`, `ApplyRuleDryRun`, `PreviewRule`; qry `ListRules`, `ListRuleVersions`, `GetRuleCoverage` y el puerto público `RuleEvaluationQuery` (evaluación síncrona sin efectos, ≤ 5 000 sujetos, que consume Imports).
+- **Eventos publicados:** ninguno en v1. **Consumidos:** **ninguno** (as-built `add-rule-engine`, D338): sin consumidor asíncrono ni cola nueva (presupuesto de conexiones, D249); la clasificación viaja ya decidida en la creación (import) o se completa en la misma operación (registro manual), y la aplicación retroactiva es el dry-run auditado.
+- **Dependencias:** por contratos públicos, Classification (`@pf/classification/contracts`: validar y resolver destinos) y Transactions (`@pf/transactions/contracts`: `ClassificationSubjectsQuery`, `RuleClassificationCommand`, `ClassificationCoverageQuery`). Transactions NO importa RULES: define el puerto `RuleSuggestionPort` (creación manual) y la composición de `apps/api` lo adapta a `RuleEvaluationQuery`.
 - **Extracción:** Alta.
 
 ### 2.14 REPORTING — Reporting & Analytics (`reporting`, `@pf/reporting`)

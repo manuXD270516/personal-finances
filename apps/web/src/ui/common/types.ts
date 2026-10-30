@@ -191,6 +191,16 @@ export interface TransactionSplit {
   readonly memo?: string | null;
   /** Valores de custom fields del split por clave de campo (add-custom-fields). */
   readonly customFields?: CustomFieldValues;
+  /** Origen de la categoría (add-rule-engine); `UNKNOWN` para lo anterior al motor de reglas. */
+  readonly categoryOrigin?: 'MANUAL' | 'RULE' | 'COUNTERPARTY_DEFAULT' | 'SYSTEM_DEFAULT' | 'UNKNOWN';
+  /** Regla y versión que fijaron la categoría (`CATEGORY`) y cada otro campo; las archivadas se siguen resolviendo. */
+  readonly ruleRefs?: readonly {
+    readonly field: string;
+    readonly ruleId: string;
+    readonly ruleVersion: number;
+    readonly ruleName?: string | null;
+    readonly ruleArchived?: boolean;
+  }[];
 }
 
 export interface Rate {
@@ -271,6 +281,15 @@ export interface Transaction {
   readonly paymentMethod?: PaymentMethod | null;
   readonly notes?: string | null;
   readonly counterpartyId?: string | null;
+  /** Pendiente de revisión (add-rule-engine); sin efecto en el ledger ni en el estado. */
+  readonly needsReview?: boolean;
+  readonly review?: {
+    readonly reason: 'RULE' | 'USER';
+    readonly ruleId?: string | null;
+    readonly ruleVersion?: number | null;
+    readonly ruleName?: string | null;
+    readonly markedAt: string;
+  } | null;
   readonly legs: readonly TransactionLeg[];
   readonly splits: readonly TransactionSplit[];
   readonly conversion?: ConversionDetail | null;
