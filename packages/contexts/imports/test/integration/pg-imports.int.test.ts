@@ -595,6 +595,11 @@ describe('RLS, permisos y catálogo de purga', () => {
     const { rows } = await migrator.query<{ table_name: string; purge_order: number }>(
       `SELECT table_name, purge_order FROM platform.workspace_scoped_table WHERE schema_name = 'imports' ORDER BY purge_order`,
     );
-    expect(rows.map((r) => r.table_name)).toEqual(['row_link', 'staged_transaction', 'import_job']);
+    expect(rows.map((r) => r.table_name)).toEqual([
+      'row_link',
+      'staged_transaction',
+      'import_job',
+      'mapping_profile',
+    ]);
   });
 });

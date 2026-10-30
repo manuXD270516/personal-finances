@@ -1,4 +1,4 @@
-import type { AuditEntry } from '@pf/audit/contracts';
+import type { AuditEntry, LifecycleStepInput } from '@pf/audit/contracts';
 import { DomainError, FixedClock, Instant, LocalDate, dec } from '@pf/shared-kernel';
 import type {
   DuplicateCandidatesQuery,
@@ -12,19 +12,32 @@ import {
   type CsvMapping,
   type Decision,
   type ImportJobState,
+  type MappingProfileVersion,
+  type OccurrenceCandidateEntry,
 } from '../../domain/index.js';
 import type {
   AccountView,
+  BulkEditSet,
+  DocumentForImport,
   ImportJobFilter,
   ImportJobRepository,
   ImportsDeps,
   ImportsSettings,
+  MappingProfileRepository,
+  PipelineRowResult,
+  PreviewFilter,
+  RevertLink,
   RowLinkInsert,
   RowLinkRepository,
   RowNormalization,
+  RuleOutcome,
+  RuleSubject,
+  StagedInsert,
   StagedRow,
   StagingRepository,
+  StatementReaderPort,
   StagingSummary,
+  StoredProfileVersion,
   UnitOfWork,
 } from '../ports/index.js';
 
@@ -44,6 +57,10 @@ export interface MemTransaction {
   readonly externalRef: { namespace: string; id: string } | null;
   readonly importJobId: string | null;
   readonly categoryName: string | null;
+  readonly counterpartyId?: string | null;
+  readonly categoryOrigin?: string | null;
+  readonly transfer?: string | null;
+  readonly conversion?: unknown;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -58,6 +75,8 @@ interface MemLink {
   stagedTransactionId: string | null;
   kind: 'CREATED' | 'SKIPPED_AS_DUPLICATE';
   status: 'ACTIVE' | 'SUPERSEDED';
+  importJobId?: string | null | undefined;
+  externalRef?: { namespace: string; id: string } | null | undefined;
 }
 
 const dayNumber = (date: string): number =>
@@ -79,6 +98,44 @@ export class MemoryWorld {
   /** Falla transitoria inyectada en `recordBatch` (no es un error de dominio). */
   transientFailureAt: number | null = null;
   recordBatchCalls = 0;
+  // ── Phase 6 (add-import-pipeline)
+  /** Pasos del recorrido registrados (transiciones y anotaciones) por agregado. */
+  lifecycle: { entry: AuditEntry; steps: readonly LifecycleStepInput[] }[] = [];
+  /** Documentos disponibles para importar (id ⇒ contenido y metadatos). */
+  documents = new Map<string, DocumentForImport & { bytes: Uint8Array; linkedTo: string[] }>();
+  profileVersions: StoredProfileVersion[] = [];
+  /** Institución de cada cuenta (perfiles por institución). */
+  institutions = new Map<string, string | null>();
+  /** Alias de contraparte: descripción exacta ⇒ contraparte. */
+  aliases = new Map<string, string>();
+  /** Categoría por defecto de cada contraparte. */
+  counterpartyDefaults = new Map<string, string>();
+  /** Reglas del doble: salida por descripción (substring en minúsculas) o función libre. */
+  ruleOutcomes: ((subject: RuleSubject) => Partial<RuleOutcome> | null)[] = [];
+  /** La evaluación de reglas falla (RULES caído). */
+  rulesFail = false;
+  rulesCalls = 0;
+  /** Ocurrencias de compromisos candidatas por descripción de ocurrencia (rowRef se resuelve por fecha y monto). */
+  occurrences: (OccurrenceCandidateEntry & {
+    amount: string;
+    kind: 'EXPENSE' | 'INCOME' | 'TRANSFER';
+    resolved?: boolean;
+  })[] = [];
+  occurrenceLinks: { occurrenceId: string; transactionId: string; userId: string }[] = [];
+  /** Cuentas válidas como categorías: id ⇒ tipo. */
+  categories = new Map<string, 'EXPENSE' | 'INCOME'>();
+  counterparties = new Set<string>();
+  tags = new Set<string>();
+  /** Saldo dinámico: suma al saldo base lo que los imports crearon (reconciliación y vista previa). */
+  dynamicBalance = false;
+  /** Transacciones que el ledger no deja anular (reconciliadas o en periodo cerrado). */
+  reconciled = new Set<string>();
+  voidCalls = 0;
+  /** Lectores por formato (los de producción; se inyectan para no depender de infraestructura desde application). */
+  readers: StatementReaderPort = {
+    sniff: () => null,
+    read: () => ({ kind: 'FAILED', failure: { code: 'IMPORT_PARSE_FAILED', pointer: null } }),
+  };
   private seq = 0;
   readonly clock = new FixedClock(Instant.parse('2026-10-20T14:00:00.000Z'));
 
@@ -239,8 +296,238 @@ class MemoryJobs implements ImportJobRepository {
   }
 }
 
+const blankStaged = (id: string, jobId: string, rowNumber: number, raw: readonly string[]): MemStaged => ({
+  id,
+  jobId,
+  rowNumber,
+  raw,
+  bookingDate: null,
+  amount: null,
+  currency: null,
+  direction: null,
+  description: null,
+  occurrenceIndex: null,
+  fingerprint: null,
+  classification: null,
+  decision: null,
+  issues: [],
+  matchedTransactionId: null,
+  transactionId: null,
+  batchNo: null,
+  batchError: null,
+  externalId: null,
+  bookingTime: null,
+  valueDate: null,
+  runningBalance: null,
+  reference: null,
+  counterpartyText: null,
+  kind: null,
+  proposal: null,
+  edits: {},
+  candidates: [],
+  occurrenceCandidates: [],
+  occurrenceLink: null,
+  duplicateOfRow: null,
+  decidedBy: null,
+  decidedAt: null,
+  decidedScore: null,
+  warnings: [],
+});
+
+const categoryOf = (r: StagedRow): string | null =>
+  r.edits.categoryId !== undefined ? r.edits.categoryId : (r.proposal?.category?.value ?? null);
+
+function matchesFilter(r: StagedRow, f: PreviewFilter): boolean {
+  if (f.classification && r.classification !== f.classification) return false;
+  if (f.decision && r.decision !== f.decision) return false;
+  if (f.needsCategory !== undefined && (categoryOf(r) === null) !== f.needsCategory) return false;
+  if (f.ruleId && !JSON.stringify(r.proposal ?? {}).includes(`"ruleId":"${f.ruleId}"`)) return false;
+  if (f.candidateConfidence && r.candidates[0]?.confidence !== f.candidateConfidence) return false;
+  return true;
+}
+
 class MemoryStaging implements StagingRepository {
   constructor(private readonly w: MemoryWorld) {}
+
+  async insertRecords(_ws: string, jobId: string, rows: readonly StagedInsert[]) {
+    for (const r of rows) {
+      if (this.w.staged.some((s) => s.jobId === jobId && s.rowNumber === r.rowNumber)) continue;
+      const row = blankStaged(r.id, jobId, r.rowNumber, r.raw);
+      if (r.record) {
+        const signed = r.record.signedAmount;
+        Object.assign(row, {
+          bookingDate: r.record.bookingDate,
+          bookingTime: r.record.bookingTime,
+          valueDate: r.record.valueDate,
+          amount: signed === null ? null : dec(signed).abs().toFixed(2),
+          direction:
+            signed === null ? null : dec(signed).isNegative() ? 'OUT' : dec(signed).isZero() ? null : 'IN',
+          description: r.record.description,
+          externalId: r.record.externalId,
+          reference: r.record.reference,
+          counterpartyText: r.record.counterpartyText,
+          runningBalance: r.record.runningBalance,
+          issues: r.record.issues,
+        });
+      }
+      this.w.staged.push(row);
+    }
+  }
+
+  async countRows(_ws: string, jobId: string) {
+    return this.rowsOf(jobId).length;
+  }
+
+  async loadAll(_ws: string, jobId: string) {
+    return [...this.rowsOf(jobId)].sort((a, b) => a.rowNumber - b.rowNumber);
+  }
+
+  async applyPipeline(
+    _ws: string,
+    jobId: string,
+    items: readonly PipelineRowResult[],
+    resetIds: readonly string[],
+  ) {
+    const byId = new Map(this.rowsOf(jobId).map((s) => [s.id, s] as const));
+    for (const i of items) {
+      Object.assign(byId.get(i.id) as MemStaged, {
+        bookingDate: i.bookingDate,
+        bookingTime: i.bookingTime,
+        valueDate: i.valueDate,
+        amount: i.amount,
+        currency: i.currency,
+        direction: i.direction,
+        description: i.description,
+        externalId: i.externalId,
+        reference: i.reference,
+        counterpartyText: i.counterpartyText,
+        runningBalance: i.runningBalance,
+        occurrenceIndex: i.occurrenceIndex,
+        fingerprint: i.fingerprint,
+        classification: i.classification,
+        decision: i.decision,
+        issues: i.issues,
+        matchedTransactionId: i.matchedTransactionId,
+        proposal: i.proposal,
+        candidates: i.candidates,
+        occurrenceCandidates: i.occurrenceCandidates,
+        duplicateOfRow: i.duplicateOfRow,
+        decidedScore: i.decidedScore,
+        decidedBy: null,
+        decidedAt: null,
+        occurrenceLink: null,
+        warnings: i.warnings,
+        kind: i.kind,
+        transactionId: null,
+        batchNo: null,
+        batchError: null,
+      });
+    }
+    for (const id of resetIds) {
+      const row = byId.get(id) as MemStaged;
+      Object.assign(row, blankStaged(row.id, jobId, row.rowNumber, row.raw));
+    }
+  }
+
+  async applyProposals(
+    _ws: string,
+    jobId: string,
+    items: readonly { id: string; proposal: StagedRow['proposal']; warnings: StagedRow['warnings'] }[],
+  ) {
+    const byId = new Map(this.rowsOf(jobId).map((s) => [s.id, s] as const));
+    for (const i of items)
+      Object.assign(byId.get(i.id) as MemStaged, { proposal: i.proposal, warnings: i.warnings });
+  }
+
+  async applyEdit(
+    _ws: string,
+    jobId: string,
+    rowId: string,
+    change: {
+      edits: StagedRow['edits'];
+      kind: StagedRow['kind'];
+      decision?: Decision | undefined;
+      decidedBy: string;
+      decidedAt: string;
+      occurrenceLink: StagedRow['occurrenceLink'];
+      matchedTransactionId?: string | undefined;
+      decidedScore?: string | null | undefined;
+    },
+  ) {
+    const row = this.rowsOf(jobId).find((r) => r.id === rowId);
+    if (!row) return;
+    row.edits = change.edits;
+    row.kind = change.kind;
+    row.occurrenceLink = change.occurrenceLink;
+    if (change.decision !== undefined) {
+      row.decision = change.decision;
+      row.decidedBy = change.decidedBy;
+      row.decidedAt = change.decidedAt;
+      row.decidedScore = change.decidedScore ?? null;
+    }
+    if (change.matchedTransactionId !== undefined) row.matchedTransactionId = change.matchedTransactionId;
+  }
+
+  async bulkEdit(
+    _ws: string,
+    jobId: string,
+    filter: PreviewFilter,
+    set: BulkEditSet,
+    by: { userId: string; at: string },
+  ) {
+    let n = 0;
+    for (const row of this.rowsOf(jobId)) {
+      if (row.classification !== 'NEW' && row.classification !== 'DUPLICATE_PROBABLE') continue;
+      if (!matchesFilter(row, filter)) continue;
+      const edits: Record<string, unknown> = { ...row.edits };
+      if (set.categoryId !== undefined) edits['categoryId'] = set.categoryId;
+      if (set.counterpartyId !== undefined) edits['counterpartyId'] = set.counterpartyId;
+      if (set.tagIds !== undefined) edits['tagIds'] = set.tagIds;
+      row.edits = edits as StagedRow['edits'];
+      if (set.decision !== undefined) {
+        row.decision = set.decision;
+        row.decidedBy = by.userId;
+        row.decidedAt = by.at;
+      }
+      n += 1;
+    }
+    return n;
+  }
+
+  async confirmHighConfidenceMatches(_ws: string, jobId: string) {
+    let n = 0;
+    for (const row of this.rowsOf(jobId)) {
+      if (row.decision !== 'CREATE' || row.occurrenceLink) continue;
+      const high = row.occurrenceCandidates.filter((c) => c.confidence === 'HIGH' && !c.ambiguous);
+      if (high.length !== 1) continue;
+      row.occurrenceLink = { occurrenceId: (high[0] as OccurrenceCandidateEntry).occurrenceId };
+      n += 1;
+    }
+    return n;
+  }
+
+  async markOccurrenceOutcome(
+    _ws: string,
+    items: readonly { rowId: string; outcome: 'LINKED' | 'SKIPPED' }[],
+  ) {
+    for (const i of items) {
+      const row = this.w.staged.find((r) => r.id === i.rowId);
+      if (!row || !row.occurrenceLink) continue;
+      row.occurrenceLink = { ...row.occurrenceLink, outcome: i.outcome };
+      if (i.outcome === 'SKIPPED') {
+        row.warnings = [...row.warnings, { code: 'IMPORT_OCCURRENCE_LINK_SKIPPED', severity: 'WARNING' }];
+      }
+    }
+  }
+
+  async rulesCoverage(_ws: string, jobId: string) {
+    const created = this.rowsOf(jobId).filter((r) => r.transactionId !== null);
+    const byRule = created.filter(
+      (r) => r.edits.categoryId === undefined && r.proposal?.category?.origin.type === 'RULE',
+    ).length;
+    const withoutCategory = created.filter((r) => categoryOf(r) === null).length;
+    return { created: created.length, byRule, withoutCategory };
+  }
 
   private rowsOf(jobId: string) {
     return this.w.staged.filter((s) => s.jobId === jobId);
@@ -252,26 +539,7 @@ class MemoryStaging implements StagingRepository {
     rows: readonly { id: string; rowNumber: number; raw: readonly string[] }[],
   ) {
     for (const r of rows) {
-      this.w.staged.push({
-        id: r.id,
-        jobId,
-        rowNumber: r.rowNumber,
-        raw: r.raw,
-        bookingDate: null,
-        amount: null,
-        currency: null,
-        direction: null,
-        description: null,
-        occurrenceIndex: null,
-        fingerprint: null,
-        classification: null,
-        decision: null,
-        issues: [],
-        matchedTransactionId: null,
-        transactionId: null,
-        batchNo: null,
-        batchError: null,
-      });
+      this.w.staged.push(blankStaged(r.id, jobId, r.rowNumber, r.raw));
     }
   }
 
@@ -372,13 +640,13 @@ class MemoryStaging implements StagingRepository {
   async page(
     _ws: string,
     jobId: string,
-    o: { classification?: Classification | undefined; afterRowNumber?: number | undefined; limit: number },
+    o: PreviewFilter & { afterRowNumber?: number | undefined; limit: number },
   ) {
     return this.rowsOf(jobId)
       .filter(
         (r) =>
           r.classification !== null &&
-          (!o.classification || r.classification === o.classification) &&
+          matchesFilter(r, o) &&
           (o.afterRowNumber === undefined || r.rowNumber > o.afterRowNumber),
       )
       .sort((a, b) => a.rowNumber - b.rowNumber)
@@ -426,6 +694,9 @@ class MemoryStaging implements StagingRepository {
         rowId: r.id,
         fingerprint: r.fingerprint as string,
         matchedTransactionId: r.matchedTransactionId as string,
+        lineNumber: r.rowNumber,
+        decidedScore: r.decidedScore,
+        externalId: r.externalId,
       }));
   }
 
@@ -512,6 +783,58 @@ class MemoryLinks implements RowLinkRepository {
         l.status = 'SUPERSEDED';
   }
 
+  async mergedTransactionIds(_ws: string, accountId: string, transactionIds: readonly string[]) {
+    const wanted = new Set(transactionIds);
+    return new Set(
+      this.w.links
+        .filter(
+          (l) =>
+            l.accountId === accountId &&
+            l.status === 'ACTIVE' &&
+            l.kind === 'SKIPPED_AS_DUPLICATE' &&
+            wanted.has(l.transactionId),
+        )
+        .map((l) => l.transactionId),
+    );
+  }
+
+  async findActiveByExternal(_ws: string, accountId: string, externalIds: readonly string[]) {
+    const wanted = new Set(externalIds);
+    return this.w.links
+      .filter(
+        (l) =>
+          l.accountId === accountId && l.status === 'ACTIVE' && l.externalRef && wanted.has(l.externalRef.id),
+      )
+      .map((l) => ({ externalId: (l.externalRef as { id: string }).id, transactionId: l.transactionId }));
+  }
+
+  async activeByJob(_ws: string, jobId: string): Promise<readonly RevertLink[]> {
+    return this.w.links
+      .filter((l) => l.importJobId === jobId && l.status === 'ACTIVE')
+      .map((l) => {
+        const staged = this.w.staged.find((s) => s.id === l.stagedTransactionId);
+        return {
+          linkId: l.id,
+          transactionId: l.transactionId,
+          rowId: l.stagedTransactionId,
+          lineNumber: staged?.rowNumber ?? null,
+          bookingDate: staged?.bookingDate ?? null,
+          kind: l.kind,
+        };
+      });
+  }
+
+  async supersedeByJob(_ws: string, jobId: string, _now: string, keep: readonly string[] = []) {
+    let n = 0;
+    for (const l of this.w.links) {
+      if (l.importJobId === jobId && l.status === 'ACTIVE' && !keep.includes(l.transactionId)) {
+        l.status = 'SUPERSEDED';
+        n += 1;
+      }
+    }
+    return n;
+  }
+
   async linkedTransactionIds(_ws: string, accountId: string, transactionIds: readonly string[]) {
     const wanted = new Set(transactionIds);
     return new Set(
@@ -522,7 +845,7 @@ class MemoryLinks implements RowLinkRepository {
   }
 }
 
-/** Doble de `ImportedTransactionsCommand` (registro en lote) sobre el mundo en memoria. */
+/** Doble de `ImportedTransactionsCommand` (registro en lote y deshacer) sobre el mundo en memoria. */
 function memoryImported(w: MemoryWorld): ImportedTransactionsCommand {
   return {
     async recordBatch(input) {
@@ -545,30 +868,67 @@ function memoryImported(w: MemoryWorld): ImportedTransactionsCommand {
         if (w.lockedDates.has(row.date) || w.closed.some((p) => p.start <= row.date && row.date <= p.end)) {
           throw new DomainError('PERIOD_CLOSED', `${row.date} is in a closed period`);
         }
+        const kind = row.kind ?? (row.direction === 'OUT' ? 'EXPENSE' : 'INCOME');
         const tx = w.addTransaction({
           accountId: input.accountId,
           date: row.date,
           signed: row.direction === 'OUT' ? `-${row.amount.amount}` : row.amount.amount,
           currency: row.amount.currency,
-          description: row.description,
+          description: row.classification?.description ?? row.description,
           source: 'IMPORT',
           externalRef: row.externalRef,
           importJobId: input.importJobId,
-          categoryName: row.direction === 'OUT' ? 'UNCATEGORIZED' : 'UNCATEGORIZED_INCOME',
+          kind,
+          categoryName:
+            row.classification?.categoryId ??
+            (kind === 'TRANSFER' || kind === 'CONVERSION'
+              ? null
+              : row.direction === 'OUT'
+                ? 'UNCATEGORIZED'
+                : 'UNCATEGORIZED_INCOME'),
+          counterpartyId: row.classification?.counterpartyId ?? null,
+          categoryOrigin: row.classification?.categoryOrigin ?? null,
+          transfer: row.transfer?.counterAccountId ?? null,
+          conversion: row.conversion ?? null,
         });
         created.push({ rowRef: row.rowRef, transactionId: tx.id });
       }
       return { created, alreadyExisting };
     },
+    async voidBatch(input) {
+      w.voidCalls += 1;
+      const voided: string[] = [];
+      const alreadyVoided: string[] = [];
+      const blocked: { transactionId: string; code: string }[] = [];
+      for (const id of input.transactionIds) {
+        const t = w.transactions.find((x) => x.id === id && x.importJobId === input.importJobId);
+        if (!t) continue;
+        if (t.status === 'VOIDED') {
+          alreadyVoided.push(id);
+        } else if (w.reconciled.has(id)) {
+          if (!input.allowBlocked) throw new DomainError('TRANSACTION_RECONCILED', 'reconciled');
+          blocked.push({ transactionId: id, code: 'TRANSACTION_RECONCILED' });
+        } else if (w.closed.some((p) => p.start <= t.date && t.date <= p.end)) {
+          if (!input.allowBlocked) throw new DomainError('PERIOD_CLOSED', 'closed period');
+          blocked.push({ transactionId: id, code: 'PERIOD_CLOSED' });
+        } else {
+          t.status = 'VOIDED';
+          voided.push(id);
+        }
+      }
+      return { voided, alreadyVoided, blocked };
+    },
   };
 }
 
+const SIGNAL_DATE: Record<number, string> = { 0: '1', 1: '0.8', 2: '0.5', 3: '0.3' };
+
+/** Candidatos con el puntaje de docs/13 §8.2 (0.40 monto + 0.20 fecha + 0.20 descripción + 0.05 + 0.05). */
 function memoryCandidates(w: MemoryWorld): DuplicateCandidatesQuery {
   return {
     async findForImport(input) {
-      return input.rows.map((row) => ({
-        rowRef: row.rowRef,
-        candidates: w.transactions
+      return input.rows.map((row) => {
+        const candidates = w.transactions
           .filter(
             (t) =>
               t.accountId === input.accountId &&
@@ -580,16 +940,69 @@ function memoryCandidates(w: MemoryWorld): DuplicateCandidatesQuery {
                 input.windowDays &&
               !(input.excludeTransactionIds ?? []).includes(t.id),
           )
-          .map((t) => ({
-            transactionId: t.id,
-            kind: t.kind,
-            status: t.status,
-            date: t.date,
-            amount: { amount: row.amount.amount, currency: t.currency },
-            description: t.description,
-            counterpartyId: null,
-          })),
-      }));
+          .map((t) => {
+            const dayDistance = Math.abs(dayNumber(t.date) - dayNumber(row.date));
+            const sDate = SIGNAL_DATE[dayDistance] ?? '0';
+            const a = (row.description ?? '').toLowerCase().trim();
+            const b = (t.description ?? '').toLowerCase().trim();
+            const sDesc =
+              a !== '' && a === b
+                ? '1'
+                : a !== '' && b !== '' && (a.startsWith(b) || b.startsWith(a))
+                  ? '0.75'
+                  : '0';
+            const sCp =
+              row.counterpartyId === undefined || row.counterpartyId === null
+                ? t.counterpartyId
+                  ? '0.5'
+                  : '1'
+                : t.counterpartyId === row.counterpartyId
+                  ? '1'
+                  : t.counterpartyId
+                    ? '0'
+                    : '0.5';
+            const sOrigin =
+              row.externalId &&
+              t.externalRef &&
+              t.externalRef.id !== row.externalId &&
+              t.externalRef.namespace.startsWith('imports.ext:')
+                ? '0'
+                : '1';
+            const score = dec('0.40')
+              .plus(dec('0.20').times(sDate))
+              .plus(dec('0.20').times(sDesc))
+              .plus(dec('0.05').times(sCp))
+              .plus(dec('0.05').times(sOrigin))
+              .toFixed(4);
+            return {
+              transactionId: t.id,
+              kind: t.kind,
+              status: t.status,
+              date: t.date,
+              amount: { amount: row.amount.amount, currency: t.currency },
+              description: t.description,
+              counterpartyId: t.counterpartyId ?? null,
+              score,
+              signals: {
+                amount: '1.0000',
+                date: dec(sDate).toFixed(4),
+                description: dec(sDesc).toFixed(4),
+                counterparty: dec(sCp).toFixed(4),
+                origin: dec(sOrigin).toFixed(4),
+              },
+              hasBankExternalRef: !!t.externalRef?.namespace.startsWith('imports.ext:'),
+              _distance: dayDistance,
+            };
+          })
+          .sort(
+            (x, y) =>
+              (dec(y.score).comparedTo(x.score) as number) ||
+              x._distance - y._distance ||
+              x.transactionId.localeCompare(y.transactionId),
+          )
+          .map(({ _distance, ...rest }) => rest);
+        return { rowRef: row.rowRef, candidates };
+      });
     },
   };
 }
@@ -599,9 +1012,74 @@ function memoryStatuses(w: MemoryWorld): TransactionStatusQuery {
     async statusOf(input) {
       return w.transactions
         .filter((t) => input.transactionIds.includes(t.id))
-        .map((t) => ({ transactionId: t.id, status: t.status }));
+        .map((t) => ({
+          transactionId: t.id,
+          status: w.reconciled.has(t.id) && t.status !== 'VOIDED' ? 'RECONCILED' : t.status,
+        }));
     },
   };
+}
+
+class MemoryProfiles implements MappingProfileRepository {
+  constructor(private readonly w: MemoryWorld) {}
+
+  async insertVersion(v: MappingProfileVersion) {
+    this.w.profileVersions.push({ ...v, updatedAt: v.createdAt, archivedAt: null });
+  }
+
+  async versionsOf(_ws: string, profileId: string) {
+    return this.w.profileVersions.filter((v) => v.id === profileId).sort((a, b) => a.version - b.version);
+  }
+
+  async archive(_ws: string, profileId: string, at: string) {
+    this.w.profileVersions = this.w.profileVersions.map((v) =>
+      v.id === profileId ? { ...v, archivedAt: at } : v,
+    );
+  }
+
+  private latest() {
+    const byId = new Map<string, StoredProfileVersion>();
+    for (const v of this.w.profileVersions) {
+      const cur = byId.get(v.id);
+      if (!cur || cur.version < v.version) byId.set(v.id, v);
+    }
+    return [...byId.values()];
+  }
+
+  async latestForMatching(
+    _ws: string,
+    input: { accountId: string; institutionId: string | null; format: StoredProfileVersion['format'] },
+  ) {
+    return this.latest().filter(
+      (v) =>
+        v.archivedAt === null &&
+        v.format === input.format &&
+        (v.accountId === input.accountId ||
+          (v.accountId === null && input.institutionId !== null && v.institutionId === input.institutionId)),
+    );
+  }
+
+  async list(
+    _ws: string,
+    f: {
+      institutionId?: string | undefined;
+      accountId?: string | undefined;
+      format?: StoredProfileVersion['format'] | undefined;
+      includeArchived: boolean;
+      limit: number;
+    },
+  ) {
+    return this.latest()
+      .filter(
+        (v) =>
+          (f.includeArchived || v.archivedAt === null) &&
+          (!f.institutionId || v.institutionId === f.institutionId) &&
+          (!f.accountId || v.accountId === f.accountId) &&
+          (!f.format || v.format === f.format),
+      )
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id))
+      .slice(0, f.limit);
+  }
 }
 
 export const TEST_SETTINGS: ImportsSettings = {
@@ -613,6 +1091,10 @@ export const TEST_SETTINGS: ImportsSettings = {
   stagingRetentionMs: 90 * 86_400_000,
   futureToleranceDays: 3,
   duplicateWindowDays: 3,
+  processingTimeoutMs: 600_000,
+  duplicateHighScore: '0.9000',
+  duplicateLowScore: '0.6000',
+  documentMaxBytes: 20 * 1024 * 1024,
 };
 
 export function createMemoryDeps(world: MemoryWorld, settings: Partial<ImportsSettings> = {}): ImportsDeps {
@@ -634,8 +1116,18 @@ export function createMemoryDeps(world: MemoryWorld, settings: Partial<ImportsSe
       },
     },
     balances: {
-      async presentedBalance() {
-        return world.balance;
+      async presentedBalance(_ws, accountId, asOf) {
+        if (!world.dynamicBalance) return world.balance;
+        const delta = world.transactions
+          .filter(
+            (t) =>
+              t.accountId === accountId &&
+              t.source === 'IMPORT' &&
+              t.status !== 'VOIDED' &&
+              (asOf === undefined || t.date <= asOf),
+          )
+          .reduce((acc, t) => acc.plus(dec(t.signed)), dec('0'));
+        return dec(world.balance).plus(delta).toFixed(2);
       },
     },
     currencies: {
@@ -665,5 +1157,107 @@ export function createMemoryDeps(world: MemoryWorld, settings: Partial<ImportsSe
     ids: { next: () => world.nextId() },
     clock: world.clock,
     settings: { ...TEST_SETTINGS, ...settings },
+    lifecycle: {
+      async record(entry, steps) {
+        world.audit.push(entry);
+        world.lifecycle.push({ entry, steps });
+      },
+    },
+    profiles: new MemoryProfiles(world),
+    documents: {
+      async getForProcessing(_ws, documentId) {
+        const d = world.documents.get(documentId);
+        return d ? { ...d } : null;
+      },
+      async readBytes(_ws, documentId) {
+        const d = world.documents.get(documentId);
+        if (!d) throw new DomainError('REFERENCE_NOT_FOUND', 'document not found');
+        return d.bytes;
+      },
+      async linkToImport(input) {
+        world.documents.get(input.documentId)?.linkedTo.push(input.importJobId);
+      },
+    },
+    rules: {
+      async evaluate(input) {
+        world.rulesCalls += 1;
+        if (world.rulesFail) throw new Error('rules unavailable');
+        return input.subjects.map((subject): RuleOutcome => {
+          const merged: Partial<RuleOutcome> = {};
+          for (const rule of world.ruleOutcomes) Object.assign(merged, rule(subject) ?? {});
+          return {
+            ref: subject.ref,
+            category: null,
+            counterparty: null,
+            addTags: [],
+            removeTags: [],
+            description: null,
+            appendNotes: [],
+            markForReview: null,
+            exclude: null,
+            matched: [],
+            ...merged,
+          };
+        });
+      },
+    },
+    counterparties: {
+      async resolveAliases(_ws, descriptions) {
+        return new Map(descriptions.map((d) => [d, world.aliases.get(d) ?? null] as const));
+      },
+      async defaultCategories(_ws, ids) {
+        return new Map(ids.map((id) => [id, world.counterpartyDefaults.get(id) ?? null] as const));
+      },
+    },
+    matching: {
+      async findCandidates(input) {
+        return input.rows.map((row) => ({
+          rowRef: row.rowRef,
+          candidates: world.occurrences.filter(
+            (o) =>
+              !o.resolved &&
+              o.kind === row.kind &&
+              o.amount === row.amount.amount &&
+              Math.abs(dayNumber(o.dueDate) - dayNumber(row.businessDate)) <= 3,
+          ),
+        }));
+      },
+    },
+    occurrenceLinks: {
+      async link(input) {
+        const o = world.occurrences.find((x) => x.occurrenceId === input.occurrenceId);
+        if (!o || o.resolved)
+          throw new DomainError('OCCURRENCE_ALREADY_RESOLVED', 'the occurrence is resolved');
+        o.resolved = true;
+        world.occurrenceLinks.push({
+          occurrenceId: input.occurrenceId,
+          transactionId: input.transactionId,
+          userId: input.userId,
+        });
+      },
+    },
+    institutions: { institutionOf: async (_ws, accountId) => world.institutions.get(accountId) ?? null },
+    conversions: {
+      async recordBatch() {
+        return { created: [], alreadyExisting: [] };
+      },
+    },
+    readers: world.readers,
+    refs: {
+      async assertCategory(_ws, id, kind, pointer) {
+        const k = world.categories.get(id);
+        if (!k) throw new DomainError('REFERENCE_NOT_FOUND', 'category not found').at(pointer);
+        if (kind !== null && k !== kind)
+          throw new DomainError('VALIDATION_FAILED', 'wrong category type').at(pointer);
+      },
+      async assertCounterparty(_ws, id, pointer) {
+        if (!world.counterparties.has(id))
+          throw new DomainError('REFERENCE_NOT_FOUND', 'counterparty not found').at(pointer);
+      },
+      async assertTags(_ws, ids, pointer) {
+        if (ids.some((id) => !world.tags.has(id)))
+          throw new DomainError('REFERENCE_NOT_FOUND', 'tag not found').at(pointer);
+      },
+    },
   };
 }

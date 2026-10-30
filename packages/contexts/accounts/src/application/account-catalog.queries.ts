@@ -33,6 +33,7 @@ export class AccountCatalogQueries implements AccountCatalogQuery {
           liquidity: s.liquidity,
           includeInNetWorth: s.includeInNetWorth,
           displayOrder: s.displayOrder,
+          institutionId: s.institutionId,
         })),
     );
   }

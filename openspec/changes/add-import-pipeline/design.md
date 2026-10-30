@@ -184,3 +184,23 @@ Migraciones con timestamp posterior a la última de `main` al implementar; ningu
 - **docs/03 §7:** orden de Phase 6 (`optimize-consumer-throughput` → `add-bulk-imported-transactions` → `add-document-attachments` y `add-rule-engine` → `add-import-pipeline` → `add-banking-providers` → parser de PDF).
 - **docs/config-reference.md:** variables de la sección Plan de migración.
 - **docs/runbooks/importar-extracto-csv.md:** ampliarlo a documentos, perfiles y deshacer.
+
+## Verificación cruzada de contratos y diferencias registradas (tarea 1.3, 2026-10-30)
+
+Contratos verificados contra el código de `main` (changes 51–53) y el árbol de `add-rule-engine` (aún sin fusionar):
+
+- **`add-document-attachments`:** coinciden `DocumentQuery.getForProcessing`, `DocumentContentReader.open` y `AttachmentCommand.link` (`targetType = IMPORT_JOB`); IMPORTS los consume por `DocumentSourcePort`, cuyo adaptador vive en `apps/api/src/imports/imports-wiring.ts` y usa `runtime.download` y `runtime.attachments.asCommand()`. `ImportJobExistenceQuery` ya existe (lo agregó el change 53).
+- **`add-rule-engine`:** `RulesEvaluationPort` reproduce de forma estructural `RuleEvaluationQuery.evaluate` (`RuleSubjectDto`/`RuleOutcomeDto`, `trigger = IMPORT`, `mode = FILL_EMPTY`, ≤ 5 000 sujetos). El motor ya está en `main` (change 55) y el adaptador de la composición lo usa; si falla, las filas quedan con `IMPORT_RULES_UNAVAILABLE`. `ImportedClassificationDto` de TRANSACTIONS es un tipo estructural mínimo (campos opcionales y sin `customFields`): quien fusione segundo reconcilia con el de RULES.
+- **`add-banking-providers`:** `ImportedConversionsCommand.recordBatch` quedó implementado en TRANSACTIONS (change 54); el otro change lo reutiliza.
+
+Diferencias respecto del texto original del diseño:
+
+1. **`proposal` en lugar de `classification`.** La fila ya tiene `classification` (`NEW`, `DUPLICATE_*`, `INVALID`); la propuesta con origen por campo viaja como `proposal` (y `edits`), en la API y en la columna `staged_transaction.proposal`.
+2. **Versión vencida = 412.** `docs/10` §6 define `PRECONDITION_FAILED` (412) para un `If-Match` que no coincide; `CONCURRENCY_CONFLICT` (409) queda para la pérdida de una carrera. Decisión del lead (2026-10-30): manda `docs/10` §6; la spec y TC-IMPORTS-PIPELINE-043 se corrigieron a 412 `PRECONDITION_FAILED` y el TC está automatizado.
+3. **Candidatas de duplicado creadas por un import anterior.** El clasificador de Phase 3 excluía todo movimiento ya vinculado; para que los extractos solapados de varios formatos (TC-IMPORTS-PIPELINE-055) fusionen en vez de duplicar, solo se excluyen los movimientos ya **fusionados** con otra fila (`RowLinkRepository.mergedTransactionIds`).
+4. **Alias y categoría por defecto.** Sigue sin existir un contrato de CLASSIFICATION para resolver alias de contraparte ni la categoría por defecto por lote (`CounterpartyResolverPort`; `add-rule-engine` no lo agregó): el adaptador devuelve vacío y ninguna fila trae esa propuesta. Pendiente para un change posterior. El adaptador de reglas ya usa `RuleEvaluationQuery` real (`trigger = IMPORT`, `mode = FILL_EMPTY`) y `ImportedClassificationDto` es el de RULES; los valores de campos personalizados que propongan las reglas aún no se muestran en la vista previa.
+5. **`AccountSummaryDto.institutionId`** (aditivo) para elegir el perfil por institución sin un contrato nuevo de ACCOUNTS.
+6. **Columnas adicionales** de `import_job` (`profile_mapping`, `read_options`) y `row_link.external_ref_*` + índice `row_link_external_ix` (idempotencia entre formatos), además de las del diseño.
+7. **Lector OFX.** Un agregado sin cerrar (archivo truncado) es un error estructural también en SGML; solo las hojas pueden omitir su cierre.
+8. **Actor del worker.** Las transiciones del worker se auditan con el actor de proceso del contexto (`WORKER`), que el recorrido muestra como sistema.
+9. **Validación de la petición.** Una operación con variante JSON y variante multipart valida contra el esquema solo cuando el cuerpo es JSON (cambio en `@pf/platform`).

@@ -41,6 +41,7 @@ import { PgAccountMovementsQuery, systemCategoryCodesFrom } from '../infrastruct
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
 import { GoalTransferAdapter } from '../application/goal-transfer.port.js';
 import { LoanTransactionsAdapter } from '../application/loan-transactions.port.js';
+import { RecordImportedConversions } from '../application/record-imported-conversions.js';
 import { RecordImportedTransactions } from '../application/record-imported-transactions.js';
 import {
   PgDuplicateCandidatesQuery,
@@ -59,6 +60,7 @@ import type {
   GoalTransferPort,
   LoanTransactionsPort,
   DuplicateCandidatesQuery,
+  ImportedConversionsCommand,
   ImportedTransactionsCommand,
   PendingFlowQuery,
   RecurringTransactionPort,
@@ -129,6 +131,8 @@ export interface TransactionsRuntime {
   readonly movements: AccountMovementsQuery;
   /** Registro en lote de filas importadas, en la UoW del llamador (add-basic-csv-import). */
   readonly imported: ImportedTransactionsCommand;
+  /** Conversiones importadas entre cuentas propias (add-import-pipeline; las usa también `add-banking-providers`). */
+  readonly importedConversions: ImportedConversionsCommand;
   /** Candidatos a duplicado de un lote de filas de un extracto (add-basic-csv-import). */
   readonly duplicateCandidates: DuplicateCandidatesQuery;
   /** Estado actual de transacciones por id (add-basic-csv-import: vínculos superados). */
@@ -190,11 +194,13 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
   };
   const service = new TransactionsService(deps);
   const bulkEdit = new BulkEditService(deps, service);
+  const conversionsService = new ConversionsService(deps);
+  const importedRefs = new PgImportedRefReader();
   const reconciliations = new ReconciliationsService(deps, service);
   return {
     service,
     bulkEdit,
-    conversions: new ConversionsService(deps),
+    conversions: conversionsService,
     reconciliations,
     reconciliationStatus: reconciliations,
     flows: new PgNominalFlowQuery(deps.uow, deps.currencies),
@@ -211,7 +217,11 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
       deps.currencies,
       systemCategoryCodesFrom(deps.categories),
     ),
-    imported: new RecordImportedTransactions(deps, new PgImportedRefReader()),
+    imported: new RecordImportedTransactions(deps, importedRefs, {
+      transfers: service,
+      conversions: conversionsService,
+    }),
+    importedConversions: new RecordImportedConversions(deps, importedRefs, conversionsService),
     duplicateCandidates: new PgDuplicateCandidatesQuery(deps.uow, deps.currencies),
     statuses: new PgTransactionStatusQuery(deps.uow),
     classificationSubjects: new PgClassificationSubjects(),

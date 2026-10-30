@@ -133,6 +133,8 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'SavingsGoal',
   // add-document-attachments (Phase 6): documento adjunto de DOCUMENTS.
   'Document',
+  // add-import-pipeline (Phase 6): importación de IMPORTS.
+  'ImportJob',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

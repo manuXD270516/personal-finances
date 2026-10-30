@@ -7,23 +7,37 @@
 import type { Money } from '../common/types';
 
 export type ImportJobStatus =
+  | 'UPLOADED'
+  | 'PROCESSING'
+  | 'PARSE_FAILED'
   | 'AWAITING_MAPPING'
   | 'AWAITING_REVIEW'
   | 'APPROVED'
   | 'PERSISTING'
   | 'COMPLETED'
   | 'PARTIALLY_FAILED'
+  | 'COMPLETED_WITH_DIFFERENCE'
   | 'COMPLETED_WITH_ERRORS'
+  | 'REVERTING'
+  | 'ROLLED_BACK'
+  | 'PARTIALLY_ROLLED_BACK'
   | 'CANCELLED';
 
 export const JOB_STATUSES: readonly ImportJobStatus[] = [
+  'UPLOADED',
+  'PROCESSING',
+  'PARSE_FAILED',
   'AWAITING_MAPPING',
   'AWAITING_REVIEW',
   'APPROVED',
   'PERSISTING',
   'COMPLETED',
   'PARTIALLY_FAILED',
+  'COMPLETED_WITH_DIFFERENCE',
   'COMPLETED_WITH_ERRORS',
+  'REVERTING',
+  'ROLLED_BACK',
+  'PARTIALLY_ROLLED_BACK',
   'CANCELLED',
 ];
 
@@ -93,6 +107,62 @@ export interface ImportProgress {
   readonly attempt: number;
   readonly batchCount: number;
   readonly batchesDone: number;
+  /** Pipeline de documentos (add-import-pipeline): etapa del worker y filas procesadas. */
+  readonly stage?: ImportStage | null;
+  readonly processedRows?: number;
+  readonly totalRows?: number;
+}
+
+export type ImportStage = 'PARSE' | 'NORMALIZE' | 'VALIDATE' | 'CLASSIFY' | 'DEDUPE' | 'MATCH';
+export const IMPORT_STAGES: readonly ImportStage[] = [
+  'PARSE',
+  'NORMALIZE',
+  'VALIDATE',
+  'CLASSIFY',
+  'DEDUPE',
+  'MATCH',
+];
+export type ImportFormat = 'CSV' | 'OFX' | 'QIF' | 'JSON' | 'XLSX';
+
+export interface ImportProfileCandidate {
+  readonly profileId: string;
+  readonly version: number;
+  readonly name: string;
+  readonly missingColumns: readonly string[];
+}
+
+export interface ImportStatement {
+  readonly openingBalance?: Money | null;
+  readonly closingBalance?: Money | null;
+  readonly periodFrom?: string | null;
+  readonly periodTo?: string | null;
+}
+
+export interface ImportReconciliationOffer {
+  readonly accountId: string;
+  readonly statementDate: string;
+  readonly statementBalance: Money;
+}
+
+export interface ImportRevertSummary {
+  readonly voided: number;
+  readonly alreadyVoided: number;
+  readonly blocked: number;
+  readonly revertedAt: string | null;
+  readonly revertedBy: string | null;
+}
+
+export interface ImportRuleCoverage {
+  readonly rows: number;
+  readonly classifiedByRule: number;
+  readonly withoutCategory: number;
+  /** Texto decimal de 4 decimales (0.7193). */
+  readonly ratio: string;
+}
+
+export interface ImportFailure {
+  readonly code: string;
+  readonly pointer: string | null;
 }
 
 export interface ImportErrorGroup {
@@ -133,6 +203,20 @@ export interface ImportJob {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly version: number;
+  // ── Pipeline de documentos: opcionales (la ruta multipart del CSV básico no los trae).
+  readonly source?: string;
+  readonly documentId?: string | null;
+  readonly format?: ImportFormat | null;
+  readonly stage?: ImportStage | null;
+  readonly failure?: ImportFailure | null;
+  readonly mappingProfile?: { readonly id: string; readonly version: number } | null;
+  readonly profileCandidates?: readonly ImportProfileCandidate[];
+  readonly missingColumns?: readonly string[];
+  readonly statement?: ImportStatement | null;
+  readonly statementDifference?: Money | null;
+  readonly reconciliationOffer?: ImportReconciliationOffer | null;
+  readonly revertSummary?: ImportRevertSummary | null;
+  readonly ruleCoverage?: ImportRuleCoverage | null;
 }
 
 export interface ImportCreated extends ImportJob {
@@ -177,6 +261,64 @@ export interface ImportPreviewCandidate {
   readonly description: string | null;
 }
 
+export type ImportRowKind = 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'CONVERSION';
+export type FieldOrigin = 'ALIAS' | 'RULE' | 'DEFAULT' | 'MANUAL';
+export type DuplicateConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface ImportProposedField {
+  /** Un id, una lista de ids o un texto. */
+  readonly value: string | readonly string[] | null;
+  readonly origin: FieldOrigin;
+  readonly ruleId?: string | null;
+  readonly ruleVersion?: number | null;
+}
+
+export interface ImportRowProposal {
+  readonly categoryId?: ImportProposedField;
+  readonly counterpartyId?: ImportProposedField;
+  readonly tagIds?: ImportProposedField;
+  readonly description?: ImportProposedField;
+  readonly excluded?: boolean;
+  readonly needsCategory: boolean;
+}
+
+export interface ImportRowEdits {
+  readonly categoryId?: string | null;
+  readonly counterpartyId?: string | null;
+  readonly tagIds?: readonly string[];
+  readonly description?: string | null;
+  readonly note?: string | null;
+}
+
+export interface ImportDuplicateCandidate extends ImportPreviewCandidate {
+  readonly score: string;
+  readonly confidence: DuplicateConfidence;
+  readonly signals: {
+    readonly amount: string;
+    readonly date: string;
+    readonly description: string;
+    readonly counterparty: string;
+    readonly origin: string;
+  };
+  readonly preselected: boolean;
+}
+
+export interface ImportOccurrenceCandidate {
+  readonly occurrenceId: string;
+  readonly confidence: DuplicateConfidence;
+  readonly dueDate: string;
+  readonly expectedAmount?: Money | null;
+  /** Nombre del compromiso: texto no confiable. */
+  readonly label: string;
+}
+
+export interface ImportRowConversion {
+  readonly counterAccountId: string;
+  readonly counterAmount: Money;
+  readonly fee?: Money;
+  readonly quotedRate?: string;
+}
+
 export interface ImportPreviewRow {
   readonly id: string;
   readonly lineNumber: number;
@@ -190,6 +332,22 @@ export interface ImportPreviewRow {
   readonly candidate: ImportPreviewCandidate | null;
   readonly transactionId: string | null;
   readonly failure: { readonly code: string } | null;
+  // ── Pipeline de documentos (opcionales)
+  readonly kind?: ImportRowKind;
+  readonly externalId?: string | null;
+  readonly time?: string | null;
+  readonly runningBalance?: Money | null;
+  readonly proposal?: ImportRowProposal | null;
+  readonly edits?: ImportRowEdits | null;
+  readonly candidates?: readonly ImportDuplicateCandidate[];
+  readonly decidedBy?: string | null;
+  readonly decidedAt?: string | null;
+  readonly decidedScore?: string | null;
+  readonly duplicateOfRow?: number | null;
+  readonly occurrenceCandidates?: readonly ImportOccurrenceCandidate[];
+  readonly occurrenceLink?: { readonly occurrenceId: string } | null;
+  readonly transfer?: { readonly counterAccountId: string } | null;
+  readonly conversion?: ImportRowConversion | null;
 }
 
 export interface ImportPreview {
@@ -206,4 +364,46 @@ export interface ImportRowDecisionResult extends ImportPreviewRow {
 export interface ImportPage {
   readonly data: readonly ImportJob[];
   readonly page: { readonly hasMore: boolean; readonly nextCursor: string | null };
+}
+
+// ── Perfiles de mapeo (add-import-pipeline)
+
+export interface ImportProfileVersionInfo {
+  readonly version: number;
+  readonly createdAt: string;
+  readonly createdBy: string;
+}
+
+export interface ImportProfile {
+  readonly id: string;
+  readonly name: string;
+  readonly format: ImportFormat;
+  readonly institutionId: string | null;
+  readonly accountId: string | null;
+  readonly version: number;
+  readonly options: Readonly<Record<string, unknown>>;
+  readonly optionsSchemaVersion: number;
+  readonly archivedAt: string | null;
+  readonly versions: readonly ImportProfileVersionInfo[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface ImportProfilePage {
+  readonly data: readonly ImportProfile[];
+  readonly page: { readonly hasMore: boolean; readonly nextCursor: string | null };
+}
+
+export interface ImportRevertBlocked {
+  readonly rowId: string;
+  readonly lineNumber: number;
+  readonly transactionId: string;
+  readonly reason: string;
+}
+
+export interface ImportRevertPreview {
+  readonly toVoid: number;
+  readonly alreadyVoided: number;
+  readonly blocked: readonly ImportRevertBlocked[];
+  readonly editedAfterImport: number;
 }

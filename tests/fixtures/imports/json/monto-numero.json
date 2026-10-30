@@ -1,0 +1,10 @@
+{
+  "schema": "pfos.import-file",
+  "version": 1,
+  "currency": "BOB",
+  "movements": [
+    { "date": "2026-05-02", "amount": "-18.50", "description": "PRIMERO SINTETICO" },
+    { "date": "2026-05-03", "amount": 18.5, "description": "SEGUNDO CON MONTO NUMERICO" },
+    { "date": "2026-05-04", "amount": "-1.00", "description": "TERCERO SINTETICO" }
+  ]
+}

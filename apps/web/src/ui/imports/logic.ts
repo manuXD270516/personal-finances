@@ -64,6 +64,9 @@ export const WIZARD_STEPS: readonly WizardStep[] = [1, 2, 3, 4];
 export function stepOf(status: ImportJobStatus | undefined): WizardStep {
   switch (status) {
     case undefined:
+    case 'UPLOADED':
+    case 'PROCESSING':
+    case 'PARSE_FAILED':
       return 1;
     case 'AWAITING_MAPPING':
       return 2;
@@ -76,21 +79,36 @@ export function stepOf(status: ImportJobStatus | undefined): WizardStep {
 
 /** La persistencia corre en segundo plano: la pantalla consulta el estado cada `POLL_MS`. */
 export const isPolling = (status: ImportJobStatus | undefined): boolean =>
-  status === 'APPROVED' || status === 'PERSISTING';
+  status === 'APPROVED' ||
+  status === 'PERSISTING' ||
+  status === 'UPLOADED' ||
+  status === 'PROCESSING' ||
+  status === 'REVERTING';
 
 export const isFinal = (status: ImportJobStatus): boolean =>
   status === 'COMPLETED' ||
+  status === 'COMPLETED_WITH_DIFFERENCE' ||
   status === 'COMPLETED_WITH_ERRORS' ||
   status === 'CANCELLED' ||
+  status === 'PARSE_FAILED' ||
+  status === 'ROLLED_BACK' ||
+  status === 'PARTIALLY_ROLLED_BACK' ||
   status === 'PARTIALLY_FAILED';
 
-/** Se puede cancelar mientras no esté aprobada. */
+/** Se puede cancelar mientras no esté aprobada (también `UPLOADED` y `PROCESSING`, en el worker). */
 export const isCancellable = (status: ImportJobStatus): boolean =>
-  status === 'AWAITING_MAPPING' || status === 'AWAITING_REVIEW';
+  status === 'UPLOADED' ||
+  status === 'PROCESSING' ||
+  status === 'AWAITING_MAPPING' ||
+  status === 'AWAITING_REVIEW';
 
 /** Se puede retomar desde la lista (todavía requiere acción del usuario). */
 export const isResumable = (status: ImportJobStatus): boolean =>
-  status === 'AWAITING_MAPPING' || status === 'AWAITING_REVIEW' || status === 'PARTIALLY_FAILED';
+  status === 'AWAITING_MAPPING' ||
+  status === 'AWAITING_REVIEW' ||
+  status === 'PARTIALLY_FAILED' ||
+  status === 'UPLOADED' ||
+  status === 'PROCESSING';
 
 /** Enteros de progreso `n / m` y porcentaje acotado (solo presentación; no son importes). */
 export function progressPercent(done: number, batchCount: number): number {
@@ -356,6 +374,12 @@ export const ROW_ISSUE_CODES: readonly string[] = [
   'PERIOD_CLOSED',
   'ACCOUNT_CLOSED',
   'IMPORT_DESCRIPTION_TRUNCATED',
+  'IMPORT_CURRENCY_MISMATCH',
+  'IMPORT_AMBIGUOUS_DATE',
+  'IMPORT_AMBIGUOUS_NUMBER',
+  'IMPORT_RUNNING_BALANCE_GAP',
+  'IMPORT_RULES_UNAVAILABLE',
+  'IMPORT_OCCURRENCE_LINK_SKIPPED',
 ];
 export const issueKey = (code: string): string =>
   `issues.${ROW_ISSUE_CODES.includes(code) ? code : 'UNKNOWN'}`;
@@ -451,10 +475,20 @@ export const lastImportPath = (base: string, accountId: string): string =>
 export function previewPath(
   base: string,
   importId: string,
-  opts: { classification?: ClassificationFilter; cursor?: string | null; limit?: number } = {},
+  opts: {
+    classification?: ClassificationFilter;
+    needsCategory?: boolean;
+    ruleId?: string;
+    candidateConfidence?: 'HIGH' | 'MEDIUM' | 'LOW';
+    cursor?: string | null;
+    limit?: number;
+  } = {},
 ): string {
   const q = new URLSearchParams();
   if (opts.classification) q.set('classification', opts.classification);
+  if (opts.needsCategory) q.set('needsCategory', 'true');
+  if (opts.ruleId) q.set('ruleId', opts.ruleId);
+  if (opts.candidateConfidence) q.set('candidateConfidence', opts.candidateConfidence);
   if (opts.cursor) q.set('cursor', opts.cursor);
   q.set('limit', String(opts.limit ?? PREVIEW_LIMIT));
   return `${importPath(base, importId)}/preview?${q.toString()}`;
@@ -468,6 +502,13 @@ export const summaryPath = (base: string, importId: string): string =>
 
 /** Estado del import con texto + icono (NFR-USAB-104): el icono es decorativo y el color solo refuerza. */
 export const JOB_PRESENTATION: Readonly<Record<ImportJobStatus, StatusPresentation>> = {
+  UPLOADED: { icon: '◔', tone: 'neutral' },
+  PROCESSING: { icon: '⟳', tone: 'neutral' },
+  PARSE_FAILED: { icon: '✕', tone: 'danger' },
+  COMPLETED_WITH_DIFFERENCE: { icon: '⚠', tone: 'warn' },
+  REVERTING: { icon: '⟳', tone: 'neutral' },
+  ROLLED_BACK: { icon: '↶', tone: 'neutral' },
+  PARTIALLY_ROLLED_BACK: { icon: '⚠', tone: 'warn' },
   AWAITING_MAPPING: { icon: '◔', tone: 'neutral' },
   AWAITING_REVIEW: { icon: '⚠', tone: 'warn' },
   APPROVED: { icon: '⟳', tone: 'neutral' },

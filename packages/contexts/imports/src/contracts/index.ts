@@ -11,6 +11,12 @@ export const IMPORTS_CONTEXT = 'imports' as const;
 export const IMPORTS_EVENTS = {
   approved: { eventType: 'imports.ImportApproved', eventVersion: 1 },
   completed: { eventType: 'imports.ImportCompleted', eventVersion: 1 },
+  // add-import-pipeline (Phase 6)
+  fileUploaded: { eventType: 'imports.ImportFileUploaded', eventVersion: 1 },
+  previewReady: { eventType: 'imports.ImportPreviewReady', eventVersion: 1 },
+  failed: { eventType: 'imports.ImportFailed', eventVersion: 1 },
+  revertRequested: { eventType: 'imports.ImportRevertRequested', eventVersion: 1 },
+  reverted: { eventType: 'imports.ImportReverted', eventVersion: 1 },
 } as const;
 
 /** Consumidores idempotentes del worker (clave del inbox y nombre de la cola `events.<consumer>`). */
@@ -34,6 +40,35 @@ export const IMPORTS_AUDIT_POLICY = {
     fileSha256: 'plain',
     counters: 'plain',
     attempt: 'plain',
+    // add-import-pipeline: sin celdas, descripciones ni montos de filas; los compuestos viajan como texto JSON.
+    format: 'plain',
+    documentId: 'plain',
+    mappingProfile: 'plain',
+    stage: 'plain',
+    failure: 'plain',
+    statement: 'plain',
+    reconciliation: 'plain',
+    revert: 'plain',
+    voided: 'plain',
+    blocked: 'plain',
+    allowPartial: 'plain',
+    ruleCount: 'plain',
+    ruleCoverage: 'plain',
+  },
+  ImportProfile: {
+    name: 'plain',
+    format: 'plain',
+    institutionId: 'plain',
+    accountId: 'plain',
+    version: 'plain',
+    archived: 'plain',
+  },
+  ImportRow: {
+    line: 'plain',
+    transactionId: 'plain',
+    occurrenceId: 'plain',
+    score: 'plain',
+    decision: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
 
@@ -50,6 +85,8 @@ export const IMPORTS_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     table: 'imports.import_job',
     order: 770,
     orderBy: ['id'],
+    // El contenido del documento viaja aparte (D315): el vínculo queda en NULL al restaurar.
+    omit: ['document_id'],
   },
   {
     name: 'import-row-links',
@@ -59,6 +96,15 @@ export const IMPORTS_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     orderBy: ['account_id', 'id'],
     // El staging no viaja: el vínculo a la fila de staging queda en NULL al importar.
     omit: ['staged_transaction_id'],
+  },
+  {
+    // add-import-pipeline: perfiles de mapeo versionados (una fila por versión). Los jobs referencian `(id, version)`.
+    name: 'import-mapping-profiles',
+    context: 'imports',
+    table: 'imports.mapping_profile',
+    order: 772,
+    orderBy: ['id', 'version'],
+    idColumns: ['id'],
   },
 ];
 

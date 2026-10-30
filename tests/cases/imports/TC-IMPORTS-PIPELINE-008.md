@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+  - packages/contexts/imports/test/integration/pg-pipeline.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación llega a \"en revisión\" con exactamente 3000 filas, una por línea del archivo"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-008 — Una interrupción del procesamiento se reanuda sin duplicar filas del staging

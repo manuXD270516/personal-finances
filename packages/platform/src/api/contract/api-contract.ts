@@ -11,6 +11,8 @@ const addFormats = ((addFormatsModule as unknown as { default?: unknown }).defau
 const CONTRACT_ID = 'urn:pfos:finance-api';
 const METHODS = ['get', 'put', 'post', 'delete', 'patch'] as const;
 const JSON_MEDIA = /^application\/([a-z0-9.+-]+\+)?json$/;
+const isJson = (contentType: string): boolean =>
+  JSON_MEDIA.test((contentType.split(';')[0] ?? '').trim().toLowerCase());
 
 type Json = Record<string, unknown>;
 
@@ -400,7 +402,9 @@ export class ApiContract {
               detail: `content type must be one of ${mediaTypes.join(', ')}`,
               in: 'body',
             });
-          } else if (bodyValidator && !bodyValidator(body)) {
+          } else if (bodyValidator && isJson(input.contentType) && !bodyValidator(body)) {
+            // Una operación con variante JSON y variante multipart (createImport) valida solo el cuerpo JSON: el multipart
+            // lo lee y valida su guard.
             fields.push(...ajvErrorsToFields(bodyValidator.errors, 'body'));
           }
         } else if (input.hasBody) {

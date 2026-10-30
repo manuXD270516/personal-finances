@@ -110,7 +110,7 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 8 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Desembolso/pago de préstamo y pago de tarjeta: la cuota marcada como pagada y la transacción deben confirmarse juntas (INV-016). As-built `add-loans`: Debt llama a `LoanTransactionsPort` (`recordDisbursement`, `recordPayment`, `voidManaged`) dentro de su UoW y las transacciones `LOAN_*` quedan administradas (`TRANSACTION_MANAGED_EXTERNALLY`). |
 | 9 | TRANSACTIONS | GOALS | C/S | SYNC-TX | Aporte REAL = transferencia (`GoalTransferPort.recordTransfer`, `source = GOAL`, `externalRef = {goals.movement, movementId}`) + `GoalMovement` atómicos (INV-018). Transactions no conoce a Goals; anular o revisar la transferencia llega a Goals por eventos y genera el movimiento inverso. |
 | 10 | TRANSACTIONS | COMMITMENTS | C/S | SYNC-TX | Materializar ocurrencia = crear transacción + marcar ocurrencia atómicamente (INV-013). |
-| 11 | TRANSACTIONS | IMPORTS | C/S | SYNC-TX (por lote) | `ImportTransactions` batch con fingerprints; fila marcada `IMPORTED` en la misma tx (INV-014). |
+| 11 | TRANSACTIONS | IMPORTS | C/S | SYNC-TX (por lote) | `ImportTransactions` batch con fingerprints; fila marcada `IMPORTED` en la misma tx (INV-014). | Phase 6: `recordBatch` admite tipos de movimiento (transferencia, conversión) y clasificación; `voidBatch` para deshacer; `DuplicateCandidatesQuery.findForImport` devuelve puntaje y señales.
 | 12 | TRANSACTIONS | RULES | C/S | ASYNC trigger + SYNC comando | Rules reacciona a `TransactionCreated` (async) y aplica `ApplyClassification` (sync dentro de su handler). |
 | 13 | TRANSACTIONS | DEBT / GOALS / COMMITMENTS | OHS/PL | ASYNC | `TransferCompleted`, `TransactionCreated`, `TransactionVoided` para matching/reconciliación de compromisos hechos fuera de esos contextos. |
 | 14 | LEDGER | PLANNING | C/S | SYNC-TX | `LedgerPeriodLockPort`: cerrar mes y bloquear ledger en la misma tx (INV-015). **Requiere ampliar ARCHITECTURE §7.** |
@@ -119,7 +119,7 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 17 | FX | REPORTING | Conformist | SYNC-Q | Reporting usa `RateResolver` tal cual para valorar. |
 | 18 | AUDIT | Todos los contextos que mutan | C/S | SYNC-TX | ARCHITECTURE §7: audit en la misma transacción (INV-029). |
 | 19 | IDENTITY | Todos | Conformist | SYNC-Q | Autorización por workspace; nadie redefine roles. |
-| 20 | DOCUMENTS | IMPORTS, TRANSACTIONS, DEBT | C/S | SYNC-Q / referencias por ID | Vínculos por ID; Imports lee el archivo vía puerto. |
+| 20 | DOCUMENTS | IMPORTS, TRANSACTIONS, DEBT | C/S | SYNC-Q / referencias por ID | Vínculos por ID; Imports lee el archivo vía `DocumentSourcePort` (`DocumentQuery`, `DocumentContentReader`, `AttachmentCommand.link`; add-import-pipeline). |
 | 21 | PLANNING, COMMITMENTS, DEBT, GOALS, IMPORTS, FORECAST | NOTIFY | OHS/PL | ASYNC | Notify sólo traduce hechos publicados a mensajes. |
 | 22 | REPORTING | FORECAST | C/S | SYNC-Q | Dataset de entrenamiento/inferencia. |
 | 23 | REPORTING (+ queries públicas) | ASSISTANT | C/S | SYNC-Q | Tools de solo lectura (ADR-0021). |

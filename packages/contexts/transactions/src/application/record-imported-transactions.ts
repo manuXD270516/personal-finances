@@ -1,15 +1,26 @@
 import type { AuditEntry, LifecycleEventRefDto, LifecycleStepInput } from '@pf/audit/contracts';
 import { currency as makeCurrency, DomainError, Money } from '@pf/shared-kernel';
 import {
-  IMPORT_ROW_NAMESPACE,
+  isImportRefNamespace,
   TRANSACTION_EVENTS,
   type ImportedTransactionRowDto,
   type ImportedTransactionsCommand,
 } from '../contracts/index.js';
 import { splitKindOf, Transaction, type CustomFieldValue, type SplitInput } from '../domain/index.js';
+import type { ConversionsService } from './conversions.service.js';
 import { createdAuditChanges, createdEventPayload } from './created-support.js';
-import { journalCommandOf, publishEvent, publishPosted, transactionSteps } from './posting-support.js';
+import {
+  buildEvent,
+  journalCommandOf,
+  legsPayload,
+  linkEntry,
+  publishEvent,
+  publishPosted,
+  splitsPayload,
+  transactionSteps,
+} from './posting-support.js';
 import type { ImportedRefReader, OutboxEvent, TransactionsDeps } from './ports/index.js';
+import type { TransactionsService } from './transactions.service.js';
 
 /** Tope de filas por lote (la persistencia de IMPORTS usa 200). */
 const MAX_BATCH_ROWS = 1000;
@@ -33,10 +44,19 @@ const MAX_BATCH_ROWS = 1000;
  * (`ImportedRefReader.lockAccount`): el segundo ve las referencias del primero (TC-TRANSACTIONS-BULKIMPORT-004); el
  * índice único parcial `transaction_import_ref_uk` sigue como barrera.
  */
+/** Servicios que crean transferencias y conversiones dentro del lote (add-import-pipeline decisión 12). */
+export interface ImportedMovementServices {
+  readonly transfers?: Pick<TransactionsService, 'recordTransfer'>;
+  readonly conversions?: Pick<ConversionsService, 'recordConversion'>;
+}
+
+const refKey = (ref: { readonly namespace: string; readonly id: string }) => `${ref.namespace}|${ref.id}`;
+
 export class RecordImportedTransactions implements ImportedTransactionsCommand {
   constructor(
     private readonly deps: TransactionsDeps,
     private readonly refs: ImportedRefReader,
+    private readonly services: ImportedMovementServices = {},
   ) {}
 
   async recordBatch(input: Parameters<ImportedTransactionsCommand['recordBatch']>[0]) {
@@ -45,44 +65,260 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
     }
     const { workspaceId, accountId } = input;
     return await this.deps.uow.run(workspaceId, async () => {
-      for (const row of input.rows) {
-        if (row.externalRef.namespace !== IMPORT_ROW_NAMESPACE) {
-          throw new DomainError('VALIDATION_FAILED', 'externalRef.namespace must be imports.csv-row').at(
-            '/externalRef/namespace',
-          );
-        }
-      }
+      for (const [i, row] of input.rows.entries()) this.assertRow(row, `/rows/${i}`);
       await this.refs.lockAccount({ workspaceId, accountId });
-      const existing = await this.refs.existingByRefs({
-        workspaceId,
-        accountId,
-        namespace: IMPORT_ROW_NAMESPACE,
-        ids: input.rows.map((r) => r.externalRef.id),
-      });
+      // Una lectura por espacio de nombres distinto (`imports.csv-row`, `imports.ext:<FORMAT>`).
+      const existing = new Map<string, string>();
+      for (const namespace of new Set(input.rows.map((r) => r.externalRef.namespace))) {
+        const found = await this.refs.existingByRefs({
+          workspaceId,
+          accountId,
+          namespace,
+          ids: input.rows.filter((r) => r.externalRef.namespace === namespace).map((r) => r.externalRef.id),
+        });
+        for (const [id, transactionId] of found) existing.set(`${namespace}|${id}`, transactionId);
+      }
       const alreadyExisting: { rowRef: string; transactionId: string }[] = [];
       const fresh: ImportedTransactionRowDto[] = [];
       const seen = new Set<string>();
       for (const row of input.rows) {
-        const known = existing.get(row.externalRef.id);
+        const key = refKey(row.externalRef);
+        const known = existing.get(key);
         if (known !== undefined) {
           alreadyExisting.push({ rowRef: row.rowRef, transactionId: known });
           continue;
         }
-        // Dos filas del mismo lote con la misma huella no existen (el ordinal de ocurrencia las distingue).
-        if (seen.has(row.externalRef.id)) {
+        // Dos filas del mismo lote con la misma referencia no existen (el ordinal de ocurrencia las distingue).
+        if (seen.has(key)) {
           throw new DomainError('VALIDATION_FAILED', 'the batch repeats a row reference').at('/rows');
         }
-        seen.add(row.externalRef.id);
+        seen.add(key);
         fresh.push(row);
       }
       if (fresh.length === 0) return { created: [], alreadyExisting };
 
-      const txs = await this.build(input, fresh);
-      await this.persist(txs);
+      const simple = fresh.filter((r) => r.kind !== 'TRANSFER' && r.kind !== 'CONVERSION');
+      const txs = simple.length > 0 ? await this.build(input, simple) : [];
+      if (txs.length > 0) await this.persist(txs);
+      const createdOf = new Map(simple.map((row, i) => [row.rowRef, (txs[i] as Transaction).id] as const));
+      // Transferencias y conversiones: por los servicios existentes, dentro de la misma unidad de trabajo.
+      for (const row of fresh) {
+        if (row.kind === 'TRANSFER') createdOf.set(row.rowRef, await this.recordTransfer(input, row));
+        else if (row.kind === 'CONVERSION')
+          createdOf.set(row.rowRef, await this.recordConversion(input, row));
+      }
       return {
-        created: fresh.map((row, i) => ({ rowRef: row.rowRef, transactionId: (txs[i] as Transaction).id })),
+        created: fresh.map((row) => ({
+          rowRef: row.rowRef,
+          transactionId: createdOf.get(row.rowRef) as string,
+        })),
         alreadyExisting,
       };
+    });
+  }
+
+  private assertRow(row: ImportedTransactionRowDto, pointer: string): void {
+    if (!isImportRefNamespace(row.externalRef.namespace)) {
+      throw new DomainError(
+        'VALIDATION_FAILED',
+        'externalRef.namespace must be imports.csv-row or imports.ext:<FORMAT>',
+      ).at(`${pointer}/externalRef/namespace`);
+    }
+    const kind = row.kind;
+    if (kind === undefined) return;
+    if (kind === 'EXPENSE' && row.direction !== 'OUT') {
+      throw new DomainError('VALIDATION_FAILED', 'an EXPENSE row must be an outflow').at(`${pointer}/kind`);
+    }
+    if (kind === 'INCOME' && row.direction !== 'IN') {
+      throw new DomainError('VALIDATION_FAILED', 'an INCOME row must be an inflow').at(`${pointer}/kind`);
+    }
+    if (kind === 'TRANSFER' && !row.transfer) {
+      throw new DomainError('VALIDATION_FAILED', 'a TRANSFER row needs transfer.counterAccountId').at(
+        `${pointer}/transfer`,
+      );
+    }
+    if (kind === 'CONVERSION' && !row.conversion) {
+      throw new DomainError('VALIDATION_FAILED', 'a CONVERSION row needs conversion data').at(
+        `${pointer}/conversion`,
+      );
+    }
+  }
+
+  private async recordTransfer(
+    input: Parameters<ImportedTransactionsCommand['recordBatch']>[0],
+    row: ImportedTransactionRowDto,
+  ): Promise<string> {
+    const transfers = this.services.transfers;
+    if (!transfers) throw new DomainError('INTERNAL_ERROR', 'transfers are not wired for imports');
+    const counter = (row.transfer as { counterAccountId: string }).counterAccountId;
+    const out = row.direction === 'OUT';
+    const created = await transfers.recordTransfer({
+      workspaceId: input.workspaceId,
+      userId: input.actorUserId,
+      status: 'POSTED',
+      transactionDate: row.date,
+      fromAccountId: out ? input.accountId : counter,
+      toAccountId: out ? counter : input.accountId,
+      amount: row.amount,
+      description: row.classification?.description ?? row.description,
+      ...(row.classification?.notes !== undefined ? { notes: row.classification.notes } : {}),
+      source: 'IMPORT',
+      externalRef: row.externalRef,
+      importJobId: input.importJobId,
+    });
+    return created.id;
+  }
+
+  private async recordConversion(
+    input: Parameters<ImportedTransactionsCommand['recordBatch']>[0],
+    row: ImportedTransactionRowDto,
+  ): Promise<string> {
+    const conversions = this.services.conversions;
+    if (!conversions) throw new DomainError('INTERNAL_ERROR', 'conversions are not wired for imports');
+    const conv = row.conversion as NonNullable<ImportedTransactionRowDto['conversion']>;
+    const out = row.direction === 'OUT';
+    const view = await conversions.recordConversion({
+      workspaceId: input.workspaceId,
+      userId: input.actorUserId,
+      status: 'POSTED',
+      transactionDate: row.date,
+      sourceAccountId: out ? input.accountId : conv.counterAccountId,
+      targetAccountId: out ? conv.counterAccountId : input.accountId,
+      sourceAmount: out ? row.amount : conv.counterAmount,
+      targetAmount: out ? conv.counterAmount : row.amount,
+      ...(conv.quotedRate ? { quotedRate: conv.quotedRate } : {}),
+      ...(conv.fee ? { fees: [{ type: 'PROVIDER' as const, amount: conv.fee }] } : {}),
+      executedAt: conv.executedAt,
+      externalRef: row.externalRef.id,
+      description: row.classification?.description ?? row.description,
+      ...(row.classification?.notes !== undefined ? { notes: row.classification.notes } : {}),
+      origin: 'IMPORT',
+      transactionRef: row.externalRef,
+      importJobId: input.importJobId,
+    });
+    return view.transaction.id;
+  }
+
+  /**
+   * Deshacer (add-import-pipeline decisión 15): anula por conjunto las transacciones del import. Las ya anuladas se
+   * informan; las reconciliadas, en periodo cerrado o de cuenta cerrada quedan `blocked` (con `allowBlocked`) o
+   * rechazan el conjunto con el primer error. La reversa de los asientos es exacta y por conjunto (INV-008).
+   */
+  async voidBatch(input: Parameters<ImportedTransactionsCommand['voidBatch']>[0]) {
+    if (input.transactionIds.length > MAX_BATCH_ROWS) {
+      throw new DomainError('VALIDATION_FAILED', `a batch has at most ${MAX_BATCH_ROWS} transactions`);
+    }
+    const { workspaceId } = input;
+    return await this.deps.uow.run(workspaceId, async () => {
+      const { transactions, ledger, accounts, outbox, lifecycle } = this.deps;
+      const found = await transactions.findMany(workspaceId, input.transactionIds);
+      const alreadyVoided: string[] = [];
+      const blocked: { transactionId: string; code: string }[] = [];
+      const candidates: Transaction[] = [];
+      const block = (transactionId: string, code: string) => {
+        if (!input.allowBlocked) throw new DomainError(code, `transaction ${transactionId} cannot be voided`);
+        blocked.push({ transactionId, code });
+      };
+      for (const id of input.transactionIds) {
+        const tx = found.get(id);
+        if (!tx || tx.snapshot.importJobId !== input.importJobId) {
+          throw new DomainError('REFERENCE_NOT_FOUND', `transaction ${id} does not belong to the import`);
+        }
+        if (tx.snapshot.status === 'VOIDED') alreadyVoided.push(id);
+        else if (tx.snapshot.status === 'RECONCILED') block(id, 'TRANSACTION_RECONCILED');
+        else candidates.push(tx);
+      }
+      // Cuentas activas (INV-026) y periodos abiertos: una comprobación por cuenta y por fecha distintas.
+      const closedAccounts = new Map<string, string>();
+      for (const accountId of new Set(candidates.flatMap((t) => t.snapshot.legs.map((l) => l.accountId)))) {
+        try {
+          await accounts.assertCanPost({ workspaceId, accounts: [{ accountId }] });
+        } catch (err) {
+          if (!(err instanceof DomainError)) throw err;
+          closedAccounts.set(accountId, err.code);
+        }
+      }
+      const closedDates = new Set<string>();
+      for (const date of new Set(candidates.map((t) => t.snapshot.businessDate))) {
+        try {
+          await ledger.assertPeriodOpen({ workspaceId, date });
+        } catch (err) {
+          if (!(err instanceof DomainError) || err.code !== 'PERIOD_CLOSED') throw err;
+          closedDates.add(date);
+        }
+      }
+      const toVoid: Transaction[] = [];
+      for (const tx of candidates) {
+        const s = tx.snapshot;
+        const accountCode = s.legs.map((l) => closedAccounts.get(l.accountId)).find((c) => c !== undefined);
+        if (accountCode) block(s.id, accountCode);
+        else if (closedDates.has(s.businessDate)) block(s.id, 'PERIOD_CLOSED');
+        else toVoid.push(tx);
+      }
+      if (toVoid.length === 0) return { voided: [], alreadyVoided, blocked };
+
+      const reason = input.reason.trim();
+      const now = this.deps.clock.now().toString();
+      const outcomes = toVoid.map((tx) => ({ tx, ...tx.void(reason, now) }));
+      const withEntry = outcomes.filter((o) => o.entryToReverse !== null);
+      const reversals = await ledger.reverseJournalEntries(
+        withEntry.map((o) => ({
+          workspaceId,
+          journalEntryId: o.entryToReverse as string,
+          reverseDate: o.tx.snapshot.businessDate,
+          reason,
+        })),
+      );
+      const reversalOf = new Map(
+        withEntry.map((o, i) => [o.tx.id, (reversals[i] as { journalEntryId: string }).journalEntryId]),
+      );
+      const collected: OutboxEvent[] = [];
+      const items: { entry: AuditEntry; steps: LifecycleStepInput[] }[] = [];
+      for (const o of outcomes) {
+        const reversalId = reversalOf.get(o.tx.id) ?? null;
+        if (!(await transactions.update(o.tx))) {
+          throw new DomainError('CONCURRENCY_CONFLICT', 'the transaction was modified concurrently');
+        }
+        if (reversalId) await linkEntry(this.deps, o.tx, reversalId, 'REVERSAL');
+        const s = o.tx.snapshot;
+        const built = buildEvent(this.deps, o.tx, TRANSACTION_EVENTS.voided, {
+          transactionId: s.id,
+          kind: s.kind,
+          businessDate: s.businessDate,
+          previousStatus: o.previousStatus,
+          reversalJournalEntryId: reversalId,
+          reason: s.voidReason,
+          legs: legsPayload(s),
+          splits: splitsPayload(s),
+          transition: 'VOID',
+        });
+        collected.push(built.record);
+        items.push({
+          entry: {
+            workspaceId,
+            action: 'transactions.transaction.voided',
+            aggregateType: 'Transaction',
+            aggregateId: s.id,
+            aggregateVersion: s.version,
+            reason: s.voidReason,
+            changes: [
+              { field: 'status', before: o.previousStatus, after: 'VOIDED' },
+              ...(reversalId
+                ? [{ field: 'journalEntryId', before: o.entryToReverse, after: reversalId }]
+                : []),
+            ],
+          },
+          steps: transactionSteps(o.tx, {
+            events: [built.ref],
+            journalEntries: { reversed: reversalId ? o.entryToReverse : null, reversal: reversalId },
+          }),
+        });
+      }
+      if (outbox.appendMany) await outbox.appendMany(collected);
+      else for (const e of collected) await outbox.append(e);
+      if (lifecycle.recordMany) await lifecycle.recordMany(items);
+      else for (const item of items) await lifecycle.record(item.entry, item.steps);
+      return { voided: toVoid.map((t) => t.id), alreadyVoided, blocked };
     });
   }
 

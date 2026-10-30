@@ -10,3 +10,4 @@ export * from './reconciliation-lifecycle.js';
 export * from './reconciliation.js';
 export * from './reconciliation-calculator.js';
 export * from './loan-payment-breakdown.js';
+export * from './duplicate-score.js';

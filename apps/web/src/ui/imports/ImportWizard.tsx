@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
@@ -32,6 +33,23 @@ import { UploadStep } from './UploadStep';
 import { useAccounts } from './useAccounts';
 import type { ImportCreated, ImportJob, ImportMapped, ImportPreviewSummary } from './types';
 import { AttachmentsSection } from '../documents/AttachmentsSection';
+import { reasonKey } from '../documents/logic';
+import { LifecycleTab } from '../lifecycle/LifecycleTab';
+import { DocumentUploadStep } from './DocumentUploadStep';
+import { MappingHelp, SaveAsProfile } from './MappingHelp';
+import { ParseFailedPanel, ProcessingPanel } from './ProcessingPanel';
+import { RevertPanel } from './RevertPanel';
+import { uploadStatementDocument, type UploadPhase } from './document-upload';
+import {
+  canRevert,
+  createFromDocumentBody,
+  listProfilesPath,
+  profilesPath,
+  qifDateOrderBody,
+  reconciliationHref,
+  type DateOrder,
+} from './pipeline-logic';
+import type { ImportProfile, ImportProfileCandidate, ImportProfilePage } from './types';
 
 const STEP_TITLE_KEY: Readonly<Record<WizardStep, string>> = {
   1: 'steps.upload',
@@ -80,6 +98,13 @@ export function ImportWizard({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [reviewRev, setReviewRev] = useState(0);
   const [tick, setTick] = useState(0);
+  const td = useTranslations('Documents');
+  const [phase, setPhase] = useState<{ phase: UploadPhase; percent: number } | undefined>();
+  const [profiles, setProfiles] = useState<readonly ImportProfile[]>([]);
+  const [saveProfile, setSaveProfile] = useState({ enabled: false, name: '' });
+  const [profileNote, setProfileNote] = useState<'saved' | undefined>();
+  const [showLegacy, setShowLegacy] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const etag = useRef<string | undefined>(undefined);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const firstStep = useRef(true);
@@ -106,6 +131,21 @@ export function ImportWizard({
       cancelled = true;
     };
   }, [ctx.api, ctx.base, importId]);
+
+  // Perfiles vigentes (opcionales en la subida): un fallo no bloquea la importación.
+  useEffect(() => {
+    if (importId || !ctx.canEdit) return;
+    let cancelled = false;
+    ctx.api
+      .get<ImportProfilePage>(listProfilesPath(ctx.base))
+      .then((r) => {
+        if (!cancelled) setProfiles(r.data?.data ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx.api, ctx.base, ctx.canEdit, importId]);
 
   const viewStep: WizardStep = job ? (editingMapping ? 2 : stepOf(job.status)) : 1;
 
@@ -187,6 +227,92 @@ export function ImportWizard({
     }
   }
 
+  /** Sube el extracto como documento (`IMPORT_SOURCE`) y crea la importación con su `documentId`. */
+  async function uploadDocument(input: { file: File; accountId: string; mappingProfileId?: string }) {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      const outcome = await uploadStatementDocument({
+        api: ctx.api,
+        base: ctx.base,
+        file: input.file,
+        onPhase: (p, percent) => setPhase({ phase: p, percent: percent ?? 0 }),
+      });
+      if (outcome.kind === 'rejected') {
+        setProblem({
+          code: 'VALIDATION_FAILED',
+          detail: td(reasonKey(outcome.document.rejectionReason)),
+        });
+        return;
+      }
+      const r = await ctx.api.command<ImportJob>(
+        'POST',
+        importsPath(ctx.base),
+        createFromDocumentBody({
+          accountId: input.accountId,
+          documentId: outcome.document.id,
+          mappingProfileId: input.mappingProfileId,
+        }),
+      );
+      if (r.data) {
+        etag.current = r.etag;
+        setJob(r.data);
+        setErrors({});
+      }
+    } catch (err) {
+      setProblem(problemOf(err));
+    } finally {
+      setPhase(undefined);
+      setBusy(false);
+    }
+  }
+
+  /** `PUT .../mapping` con un cuerpo cualquiera (mapeo, perfil guardado u opciones de QIF). */
+  async function putMapping(body: unknown) {
+    if (!job) return;
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      const r = await ctx.api.command<ImportMapped | ImportJob>(
+        'PUT',
+        `${importPath(ctx.base, job.id)}/mapping`,
+        body,
+        { ifMatch: job.version },
+      );
+      if (r.data) {
+        const { previewSummary, ...next } = r.data as ImportMapped;
+        etag.current = r.etag;
+        setJob(next);
+        setSummary(previewSummary);
+        setEditingMapping(false);
+        setReviewRev((n) => n + 1);
+      }
+      return true;
+    } catch (err) {
+      setProblem(problemOf(err));
+      if (err instanceof FinanceApiError && err.status === 412) await resync();
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const applyProfile = (c: ImportProfileCandidate) =>
+    void putMapping({ mappingProfileId: c.profileId, version: c.version });
+  const applyQifOrder = (order: DateOrder) => void putMapping(qifDateOrderBody(order));
+
+  async function saveAsProfile(importJobId: string) {
+    try {
+      await ctx.api.command('POST', profilesPath(ctx.base), {
+        fromImportId: importJobId,
+        name: saveProfile.name.trim(),
+      });
+      setProfileNote('saved');
+    } catch (err) {
+      setProblem(problemOf(err));
+    }
+  }
+
   async function applyMapping() {
     if (!job) return;
     const built = buildMapping(form, job.columnCount);
@@ -213,6 +339,7 @@ export function ImportWizard({
         setSummary(previewSummary);
         setEditingMapping(false);
         setReviewRev((n) => n + 1);
+        if (saveProfile.enabled && saveProfile.name.trim() !== '') await saveAsProfile(job.id);
       }
     } catch (err) {
       setProblem(problemOf(err));
@@ -317,17 +444,36 @@ export function ImportWizard({
       ) : null}
 
       {viewStep === 1 ? (
-        ctx.canEdit ? (
+        job ? null : ctx.canEdit ? (
           !accounts.loaded ? (
             <p aria-busy="true">{f.t('loading')}</p>
           ) : (
-            <UploadStep
-              f={f}
-              accounts={accounts.active}
-              initialAccountId={accountId}
-              busy={busy}
-              onSubmit={(input) => void upload(input)}
-            />
+            <>
+              <DocumentUploadStep
+                f={f}
+                accounts={accounts.active}
+                profiles={profiles}
+                initialAccountId={accountId}
+                busy={busy}
+                phase={phase?.phase}
+                percent={phase?.percent ?? 0}
+                onSubmit={(input) => void uploadDocument(input)}
+              />
+              <details open={showLegacy} onToggle={(e) => setShowLegacy(e.currentTarget.open)}>
+                <summary data-testid="import-legacy-toggle">{f.t('legacy.summary')}</summary>
+                <p style={mutedStyle} data-testid="import-legacy-note">
+                  {f.t('legacy.note')}
+                </p>
+                <UploadStep
+                  f={f}
+                  accounts={accounts.active}
+                  initialAccountId={accountId}
+                  busy={busy}
+                  testPrefix="import-legacy"
+                  onSubmit={(input) => void upload(input)}
+                />
+              </details>
+            </>
           )
         ) : (
           <p style={mutedStyle} data-testid="import-viewer-note">
@@ -336,6 +482,40 @@ export function ImportWizard({
         )
       ) : null}
 
+      {job && viewStep === 1 && (job.status === 'UPLOADED' || job.status === 'PROCESSING') ? (
+        <>
+          <ProcessingPanel job={job} f={f} />
+          {cancelButton}
+        </>
+      ) : null}
+      {job && viewStep === 1 && job.status === 'PARSE_FAILED' ? (
+        <ParseFailedPanel
+          job={job}
+          f={f}
+          message={(code) => problemMessage({ code }, ctx.uiLocale)}
+          newHref={ctx.href(`/imports/nueva?cuenta=${job.accountId}`)}
+        />
+      ) : null}
+
+      {job && viewStep === 2 ? (
+        <MappingHelp
+          job={job}
+          f={f}
+          busy={busy}
+          canEdit={ctx.canEdit}
+          onApplyProfile={applyProfile}
+          onQifDateOrder={applyQifOrder}
+        />
+      ) : null}
+      {job && viewStep === 2 && ctx.canEdit ? (
+        <SaveAsProfile
+          f={f}
+          enabled={saveProfile.enabled}
+          name={saveProfile.name}
+          disabled={busy}
+          onChange={(patch) => setSaveProfile((prev) => ({ ...prev, ...patch }))}
+        />
+      ) : null}
       {job && viewStep === 2 ? (
         <MappingStep
           f={f}
@@ -395,7 +575,37 @@ export function ImportWizard({
           listHref={ctx.href('/imports')}
           onRetry={() => void act('retry')}
           onAccept={() => void act('accept-errors')}
+          reconcileHref={
+            job.reconciliationOffer ? reconciliationHref(ctx.href, job.reconciliationOffer) : undefined
+          }
+          extras={
+            <>
+              {canRevert(job.status, ctx.canEdit) ? (
+                <RevertPanel ctx={ctx} f={f} job={job} onJobChange={setJob} />
+              ) : null}
+              {job.documentId ? (
+                <details open={showTimeline} onToggle={(e) => setShowTimeline(e.currentTarget.open)}>
+                  <summary data-testid="import-timeline-toggle">{f.t('timeline.summary')}</summary>
+                  {showTimeline ? (
+                    <LifecycleTab
+                      ctx={ctx}
+                      path={`imports/${job.id}`}
+                      refreshKey={job.version}
+                      stateLabel={(code) => (f.has(`status.${code}`) ? f.t(`status.${code}`) : code)}
+                      accountName={(id) => accounts.byId(id)?.name}
+                      idPrefix="import-lifecycle"
+                    />
+                  ) : null}
+                </details>
+              ) : null}
+            </>
+          }
         />
+      ) : null}
+      {profileNote === 'saved' ? (
+        <p role="status" data-testid="profile-saved">
+          {f.t('saveProfile.saved')}
+        </p>
       ) : null}
       {job ? <AttachmentsSection targetType="IMPORT_JOB" targetId={job.id} purpose="IMPORT_SOURCE" /> : null}
     </section>

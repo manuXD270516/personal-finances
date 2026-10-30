@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -455,4 +455,102 @@ describe('import CSV de 5 000 filas', () => {
   it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-008][TC-PLATFORM-THROUGHPUT-014] ${HOST_CONFIG.title}: vista previa ≤ 30 s, persistencia ≤ 20 s y cada consumidor drena en ≤ 120 s`, async () => {
     await runImportBenchmark(HOST_CONFIG);
   }, 1_800_000);
+});
+
+/** OFX 1.x SGML sintético de `count` movimientos nuevos (SINTETICO; el archivo no se versiona). */
+function ofxOf(count: number): Buffer {
+  const rows: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const day = String((i % 28) + 1).padStart(2, '0');
+    const month = String((Math.floor(i / 28) % 3) + 8).padStart(2, '0');
+    const cents = String(i % 100).padStart(2, '0');
+    rows.push(
+      `<STMTTRN>\n<TRNTYPE>DEBIT\n<DTPOSTED>2026${month}${day}\n<TRNAMT>-${(i % 250) + 1}.${cents}\n<FITID>PERF${String(i).padStart(8, '0')}\n<NAME>COMPRA COMERCIO ${i}\n</STMTTRN>`,
+    );
+  }
+  return Buffer.from(
+    [
+      'OFXHEADER:100',
+      'DATA:OFXSGML',
+      'VERSION:102',
+      '',
+      '<OFX>',
+      '<BANKMSGSRSV1>',
+      '<STMTTRNRS>',
+      '<STMTRS>',
+      '<CURDEF>BOB',
+      '<BANKTRANLIST>',
+      ...rows,
+      '</BANKTRANLIST>',
+      '</STMTRS>',
+      '</STMTTRNRS>',
+      '</BANKMSGSRSV1>',
+      '</OFX>',
+    ].join('\n'),
+    'latin1',
+  );
+}
+
+describe('import por documento OFX de 5 000 movimientos', () => {
+  it('[TC-IMPORTS-PIPELINE-066] llega a revisión en ≤ 30 s con el pipeline completo (lectura, normalización, validación, clasificación con 200 reglas activas, duplicados y coincidencias)', async () => {
+    await prepare(HOST_CONFIG);
+    // 200 reglas activas del disparador IMPORT (add-rule-engine): la evaluación entra en el presupuesto (TC-066).
+    const categories = await h.call('GET', `${W()}/categories?kind=EXPENSE&limit=1`, { token: owner.token });
+    const categoryId = (categories.body['data'] as { id: string }[])[0]!.id;
+    await asAdmin(h, async (c) => {
+      await c.query(
+        `INSERT INTO rules.rule (id, workspace_id, name, priority, triggers, match_mode, conditions, actions, created_by, created_at, updated_at)
+         SELECT gen_random_uuid(), $1, 'Regla ' || n, n, ARRAY['IMPORT']::text[], 'ALL',
+                jsonb_build_array(jsonb_build_object('field', 'DESCRIPTION', 'operator', 'contains', 'value', 'comercio ' || n)),
+                $2::jsonb, $3, now() + (n || ' milliseconds')::interval, now()
+           FROM generate_series(1, 200) n`,
+        [owner.ws, JSON.stringify([{ type: 'SET_CATEGORY', categoryId }]), owner.id],
+      );
+    });
+    const content = ofxOf(ROWS);
+    const requested = await h.call('POST', `${W()}/documents/uploads`, {
+      token: owner.token,
+      body: {
+        fileName: 'extracto-5000.ofx',
+        contentType: 'application/x-ofx',
+        sizeBytes: content.length,
+        sha256: createHash('sha256').update(content).digest('hex'),
+        purpose: 'IMPORT_SOURCE',
+      },
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    expect(requested.status, JSON.stringify(requested.body)).toBe(201);
+    const target = requested.body['upload'] as {
+      url: string;
+      method: string;
+      headers: Record<string, string>;
+    };
+    const put = await fetch(target.url, { method: target.method, headers: target.headers, body: content });
+    expect(put.status).toBe(200);
+    const documentId = (requested.body['document'] as { id: string }).id;
+    const done = await h.call('POST', `${W()}/documents/${documentId}/complete`, {
+      token: owner.token,
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+
+    const started = performance.now();
+    const created = await h.call('POST', `${W()}/imports`, {
+      token: owner.token,
+      body: { accountId, documentId },
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(202);
+    const importId = created.body['id'] as string;
+    const review = await until(async () => {
+      const r = await h.call('GET', `${W()}/imports/${importId}`, { token: owner.token });
+      const status = r.body['status'] as string;
+      if (status === 'PARSE_FAILED') throw new Error(JSON.stringify(r.body['failure']));
+      return status === 'AWAITING_REVIEW' ? r.body : undefined;
+    }, 120_000);
+    const reviewMs = performance.now() - started;
+    console.log(`[imports-pipeline] ${ROWS} movimientos OFX hasta la revisión: ${Math.round(reviewMs)} ms`);
+    expect((review['counters'] as Record<string, number>)['rows']).toBe(ROWS);
+    expect(reviewMs).toBeLessThanOrEqual(PREVIEW_BUDGET_MS);
+  }, 600_000);
 });

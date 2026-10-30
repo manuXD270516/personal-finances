@@ -244,7 +244,12 @@ export function StartForm({
   busy,
   error,
   onSubmit,
+  initialDate,
+  initialBalance,
 }: {
+  /** Valores precargados (p. ej. la oferta de reconciliación de una importación con saldo final del extracto). */
+  initialDate?: string | undefined;
+  initialBalance?: string | undefined;
   f: FormatContext;
   currency: string;
   liability: boolean;
@@ -253,8 +258,8 @@ export function StartForm({
   error?: { readonly balance?: string; readonly date?: string };
   onSubmit: (values: { statementDate: string; statementBalance: string }) => void;
 }) {
-  const [statementDate, setStatementDate] = useState(today);
-  const [statementBalance, setStatementBalance] = useState('');
+  const [statementDate, setStatementDate] = useState(initialDate ?? today);
+  const [statementBalance, setStatementBalance] = useState(initialBalance ?? '');
   return (
     <form
       style={formStyle}

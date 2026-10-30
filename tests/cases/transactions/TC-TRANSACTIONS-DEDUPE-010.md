@@ -12,9 +12,10 @@ invariants: ["INV-014"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.dedupe.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]
@@ -31,7 +32,7 @@ expected_result:
   - "la primera importación crea un gasto de 245.30 BOB y el gasto manual sigue igual"
   - "en la reimportación la fila se clasifica como ya importada"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-TRANSACTIONS-DEDUPE-010 — Conservar ambas crea el gasto importado sin tocar el manual y la reimportación lo reconoce

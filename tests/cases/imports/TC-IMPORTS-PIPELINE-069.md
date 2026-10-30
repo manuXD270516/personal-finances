@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+  - packages/contexts/imports/test/integration/pg-pipeline.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +35,7 @@ steps:
 expected_result:
   - "su resumen muestra 57 creadas y una cobertura por reglas de 0.7193"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-069 — El resumen de un import con 41 de 57 transacciones clasificadas por reglas muestra 0.7193

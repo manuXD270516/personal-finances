@@ -498,3 +498,59 @@ describe('LedgerService — PostJournalEntries (escritura por conjunto, add-bulk
     expect(await svc.postJournalEntries([])).toEqual([]);
   });
 });
+
+describe('LedgerService — reverseJournalEntries (deshacer un import)', () => {
+  const post3 = async () => {
+    const posted = [];
+    for (const amount of ['10.00', '20.00', '30.00']) {
+      posted.push(
+        await svc.postJournalEntry(cmd([system('EXPENSE', amount, 'BOB', S1), asset(BANK_A, `-${amount}`)])),
+      );
+    }
+    return posted;
+  };
+  const rev = (journalEntryId: string, reverseDate = '2026-03-20') => ({
+    workspaceId: W1,
+    journalEntryId,
+    reverseDate,
+    reason: 'IMPORT_REVERTED',
+  });
+
+  it('[TC-IMPORTS-PIPELINE-059] la reversa por conjunto niega exactamente cada asiento y devuelve un resultado por comando', async () => {
+    await svc.postJournalEntry(
+      cmd([asset(BANK_A, '1000.00'), system('OPENING_BALANCE', '-1000.00')], { entryType: 'OPENING' }),
+    );
+    const posted = await post3();
+    expect(balanceOf(userLedgerAccount(BANK_A))).toBe('940.00');
+    const out = await svc.reverseJournalEntries(posted.map((p) => rev(p.journalEntryId)));
+    expect(out).toHaveLength(3);
+    expect(out.every((o) => o.created)).toBe(true);
+    expect(balanceOf(userLedgerAccount(BANK_A))).toBe('1000.00');
+    const reversals = mem.entries.filter((e) => e.entryType === 'REVERSAL');
+    expect(reversals.map((r) => r.reversesEntryId)).toEqual(posted.map((p) => p.journalEntryId));
+    expect(mem.audits.filter((a) => a.action === 'ledger.journal_entry.reversed')).toHaveLength(3);
+  });
+
+  it('[TC-IMPORTS-PIPELINE-059] un asiento ya revertido o repetido rechaza el conjunto completo sin efectos', async () => {
+    const posted = await post3();
+    await svc.reverseJournalEntry(rev((posted[0] as { journalEntryId: string }).journalEntryId));
+    const before = mem.entries.length;
+    expect(await codeOf(svc.reverseJournalEntries(posted.map((p) => rev(p.journalEntryId))))).toBe(
+      'LEDGER_ENTRY_ALREADY_REVERSED',
+    );
+    const twice = (posted[1] as { journalEntryId: string }).journalEntryId;
+    expect(await codeOf(svc.reverseJournalEntries([rev(twice), rev(twice)]))).toBe(
+      'LEDGER_ENTRY_ALREADY_REVERSED',
+    );
+    expect(mem.entries).toHaveLength(before);
+  });
+
+  it('[TC-IMPORTS-PIPELINE-060] un periodo cerrado bloquea la reversa del conjunto', async () => {
+    const posted = await post3();
+    await svc.lockPeriod({ workspaceId: W1, yearMonth: '2026-08', periodId: T1 });
+    expect(
+      await codeOf(svc.reverseJournalEntries(posted.map((p) => rev(p.journalEntryId, '2026-08-10')))),
+    ).toBe('PERIOD_CLOSED');
+    expect(await svc.reverseJournalEntries([])).toEqual([]);
+  });
+});

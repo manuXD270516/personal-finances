@@ -1,20 +1,45 @@
-import type { AuditPort } from '@pf/audit/contracts';
+import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type {
   DuplicateCandidatesQuery,
+  ImportedConversionsCommand,
   ImportedTransactionsCommand,
   TransactionStatusQuery,
 } from '@pf/transactions/contracts';
 import type {
   Classification,
+  ClassificationProposal,
   ClosedPeriodRange,
   CsvMapping,
   Decision,
   Direction,
   ImportJob,
   ImportStatus,
+  OccurrenceCandidateEntry,
+  OccurrenceLinkState,
+  RowCandidate,
+  RowEdits,
   RowIssue,
+  RowKind,
 } from '../../domain/index.js';
+import type {
+  BulkEditSet,
+  CounterpartyResolverPort,
+  DocumentSourcePort,
+  InstitutionOfAccountPort,
+  MappingProfileRepository,
+  OccurrenceLinkingPort,
+  OccurrenceMatchingPort,
+  PipelineRowResult,
+  PreviewFilter,
+  ReferenceCatalogPort,
+  RevertLink,
+  RulesEvaluationPort,
+  StagedInsert,
+  StatementReaderPort,
+} from './pipeline.js';
+
+export * from './pipeline.js';
 
 /**
  * Puertos de IMPORTS (hexagonal). Los repositorios los implementa `infrastructure/` sobre PostgreSQL; los de otros
@@ -74,7 +99,7 @@ export interface AccountsPort {
 
 /** Saldo PRESENTADO de la cuenta (deuda positiva en pasivos); cero si la cuenta no tiene asientos (LEDGER). */
 export interface BalancePort {
-  presentedBalance(workspaceId: string, accountId: string): Promise<string | null>;
+  presentedBalance(workspaceId: string, accountId: string, asOf?: string): Promise<string | null>;
 }
 
 export interface CurrencyCatalogPort {
@@ -135,6 +160,25 @@ export interface StagedRow {
   readonly transactionId: string | null;
   readonly batchNo: number | null;
   readonly batchError: { readonly code: string } | null;
+  // ── Phase 6 (add-import-pipeline)
+  readonly externalId: string | null;
+  readonly bookingTime: string | null;
+  readonly valueDate: string | null;
+  /** Con signo, como lo declara el archivo. */
+  readonly runningBalance: string | null;
+  readonly reference: string | null;
+  readonly counterpartyText: string | null;
+  readonly kind: RowKind | null;
+  readonly proposal: ClassificationProposal | null;
+  readonly edits: RowEdits;
+  readonly candidates: readonly RowCandidate[];
+  readonly occurrenceCandidates: readonly OccurrenceCandidateEntry[];
+  readonly occurrenceLink: OccurrenceLinkState | null;
+  readonly duplicateOfRow: number | null;
+  readonly decidedBy: string | null;
+  readonly decidedAt: string | null;
+  readonly decidedScore: string | null;
+  readonly warnings: readonly RowIssue[];
 }
 
 /** Resultado de normalizar y clasificar una fila de datos (se escribe en el staging al aplicar el mapeo). */
@@ -199,12 +243,73 @@ export interface StagingRepository {
   page(
     workspaceId: string,
     jobId: string,
-    options: {
-      readonly classification?: Classification | undefined;
+    options: PreviewFilter & {
       readonly afterRowNumber?: number | undefined;
       readonly limit: number;
     },
   ): Promise<StagedRow[]>;
+
+  // ── Phase 6: lectura por bloques y etapas del worker (todas idempotentes y reanudables)
+  /** Inserta filas del archivo en el staging; `ON CONFLICT (job, row_number) DO NOTHING` (reanudación sin duplicar). */
+  insertRecords(workspaceId: string, jobId: string, rows: readonly StagedInsert[]): Promise<void>;
+  countRows(workspaceId: string, jobId: string): Promise<number>;
+  /** TODAS las filas del job (celdas crudas incluidas) por línea; ≤ `IMPORT_MAX_ROWS` (+ encabezado). */
+  loadAll(workspaceId: string, jobId: string): Promise<StagedRow[]>;
+  /** Escribe el resultado de las etapas para las filas de datos y deja sin clasificar las de `resetIds`. */
+  applyPipeline(
+    workspaceId: string,
+    jobId: string,
+    items: readonly PipelineRowResult[],
+    resetIds: readonly string[],
+  ): Promise<void>;
+  /** Reescribe solo la propuesta de clasificación (y sus advertencias) de las filas dadas; no toca las ediciones. */
+  applyProposals(
+    workspaceId: string,
+    jobId: string,
+    items: readonly {
+      readonly id: string;
+      readonly proposal: ClassificationProposal | null;
+      readonly warnings: readonly RowIssue[];
+    }[],
+  ): Promise<void>;
+  /** Edición de una fila: ediciones, tipo, decisión (con autor y momento) y vínculo con la ocurrencia. */
+  applyEdit(
+    workspaceId: string,
+    jobId: string,
+    rowId: string,
+    change: {
+      readonly edits: RowEdits;
+      readonly kind: RowKind | null;
+      readonly decision?: Decision | undefined;
+      readonly decidedBy: string;
+      readonly decidedAt: string;
+      readonly occurrenceLink: OccurrenceLinkState | null;
+      /** Candidato elegido al omitir vinculando (por omisión, el asignado). */
+      readonly matchedTransactionId?: string | undefined;
+      /** Puntaje del candidato vinculado al decidir (auditoría). */
+      readonly decidedScore?: string | null | undefined;
+    },
+  ): Promise<void>;
+  /** Mismo cambio para todas las filas del filtro, en una sentencia; devuelve las filas actualizadas. */
+  bulkEdit(
+    workspaceId: string,
+    jobId: string,
+    filter: PreviewFilter,
+    set: BulkEditSet,
+    by: { readonly userId: string; readonly at: string },
+  ): Promise<number>;
+  /** Confirma la candidata única de confianza alta (no ambigua) de cada fila sin vínculo; devuelve cuántas. */
+  confirmHighConfidenceMatches(workspaceId: string, jobId: string): Promise<number>;
+  /** Resultado del vínculo con la ocurrencia tras persistir. */
+  markOccurrenceOutcome(
+    workspaceId: string,
+    items: readonly { readonly rowId: string; readonly outcome: 'LINKED' | 'SKIPPED' }[],
+  ): Promise<void>;
+  /** Cobertura de reglas de las transacciones creadas por el job (`category_origin = RULE`, D334). */
+  rulesCoverage(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<{ readonly created: number; readonly byRule: number; readonly withoutCategory: number }>;
   find(workspaceId: string, jobId: string, rowId: string): Promise<StagedRow | null>;
   setDecision(workspaceId: string, jobId: string, rowId: string, decision: Decision): Promise<void>;
   /** Filas con decisión `CREATE` (nuevas y posibles duplicados decididos a crear), para repartir en lotes. */
@@ -228,6 +333,9 @@ export interface StagingRepository {
       readonly rowId: string;
       readonly fingerprint: string;
       readonly matchedTransactionId: string;
+      readonly lineNumber: number;
+      readonly decidedScore: string | null;
+      readonly externalId: string | null;
     }[]
   >;
   /** Lotes con filas sin transacción y sin fallo registrado, en orden (lo que falta persistir). */
@@ -265,6 +373,10 @@ export interface RowLinkInsert {
   readonly transactionId: string;
   readonly stagedTransactionId: string | null;
   readonly kind: 'CREATED' | 'SKIPPED_AS_DUPLICATE';
+  /** Job que creó el vínculo (deshacer los supera). */
+  readonly importJobId?: string | null;
+  /** Identificador externo del banco (idempotencia entre formatos y rangos solapados). */
+  readonly externalRef?: { readonly namespace: string; readonly id: string } | null;
 }
 
 export interface RowLinkRepository {
@@ -288,6 +400,31 @@ export interface RowLinkRepository {
     accountId: string,
     transactionIds: readonly string[],
   ): Promise<ReadonlySet<string>>;
+  /**
+   * Cuáles de estas transacciones ya fueron FUSIONADAS con otra fila (vínculo `SKIPPED_AS_DUPLICATE` activo): un
+   * movimiento existente se empareja con una sola fila. Las creadas por un import anterior SÍ son candidatas (extractos
+   * solapados de varios formatos, TC-IMPORTS-PIPELINE-055).
+   */
+  mergedTransactionIds(
+    workspaceId: string,
+    accountId: string,
+    transactionIds: readonly string[],
+  ): Promise<ReadonlySet<string>>;
+  /** Vínculos ACTIVOS de la cuenta por identificador externo del banco (con el formato que los creó). */
+  findActiveByExternal(
+    workspaceId: string,
+    accountId: string,
+    externalIds: readonly string[],
+  ): Promise<readonly { readonly externalId: string; readonly transactionId: string }[]>;
+  /** Vínculos ACTIVOS creados por el job (deshacer): transacción, fila y fecha si el staging aún existe. */
+  activeByJob(workspaceId: string, jobId: string): Promise<readonly RevertLink[]>;
+  /** Supera los vínculos activos del job (creados y fusionados) al deshacer, salvo los de las transacciones que siguen vivas. */
+  supersedeByJob(
+    workspaceId: string,
+    jobId: string,
+    now: string,
+    keepTransactionIds?: readonly string[],
+  ): Promise<number>;
 }
 
 /** Puertos hacia otros contextos que coinciden con sus contratos públicos. */
@@ -312,6 +449,14 @@ export interface ImportsSettings {
   readonly futureToleranceDays: number;
   /** Ventana de detección de duplicados (`transactions/duplicate-detection`, ±3 días). */
   readonly duplicateWindowDays: number;
+  // ── Phase 6
+  /** `IMPORT_PROCESSING_TIMEOUT` en ms (por omisión `PT10M`). */
+  readonly processingTimeoutMs: number;
+  /** `IMPORT_DUPLICATE_HIGH_SCORE` / `IMPORT_DUPLICATE_LOW_SCORE` (texto decimal de 4 decimales). */
+  readonly duplicateHighScore: string;
+  readonly duplicateLowScore: string;
+  /** Tope de bytes de un documento a importar (`DOCUMENT_IMPORT_SOURCE_MAX_BYTES`). */
+  readonly documentMaxBytes: number;
 }
 
 export interface ImportsDeps {
@@ -332,4 +477,21 @@ export interface ImportsDeps {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly settings: ImportsSettings;
+  // ── Phase 6 (add-import-pipeline)
+  readonly lifecycle: LifecyclePort;
+  /** Recorrido del job (`GET .../imports/{id}/lifecycle`); ausente en los tests de aplicación. */
+  readonly lifecycleQuery?: LifecycleQuery;
+  readonly profiles: MappingProfileRepository;
+  readonly documents: DocumentSourcePort;
+  readonly rules: RulesEvaluationPort;
+  readonly counterparties: CounterpartyResolverPort;
+  readonly matching: OccurrenceMatchingPort;
+  readonly occurrenceLinks: OccurrenceLinkingPort;
+  readonly institutions: InstitutionOfAccountPort;
+  readonly conversions: ImportedConversionsPort;
+  readonly readers: StatementReaderPort;
+  readonly refs: ReferenceCatalogPort;
 }
+
+/** `ImportedConversionsCommand.recordBatch` (lo implementa TRANSACTIONS; el mismo comando usa `add-banking-providers`). */
+export type ImportedConversionsPort = ImportedConversionsCommand;

@@ -1,6 +1,7 @@
 import { Money, currency as makeCurrency } from '@pf/shared-kernel';
 import type { ImportJobState } from '../domain/index.js';
 import type { AccountView, ImportsDeps, StagedRow, StagingSummary } from './ports/index.js';
+import { toOccurrenceCandidateView, toProposalView } from './views.js';
 import type { PreviewCandidateView, PreviewRowView, PreviewSummaryView } from './views.js';
 
 /**
@@ -48,6 +49,18 @@ export async function buildPreviewSummary(
   };
 }
 
+/** Las ediciones de campos (origen manual); el tipo, la transferencia y la conversión viajan aparte en la fila. */
+function editsView(edits: StagedRow['edits']): PreviewRowView['edits'] {
+  const {
+    kind: _kind,
+    transfer: _transfer,
+    conversion: _conversion,
+    occurrenceLink: _link,
+    ...fields
+  } = edits;
+  return Object.keys(fields).length === 0 ? null : fields;
+}
+
 export function toRowView(
   row: StagedRow,
   candidate: PreviewCandidateView | null,
@@ -62,9 +75,31 @@ export function toRowView(
     direction: row.direction,
     classification: row.classification ?? 'INVALID',
     decision: row.decision,
-    issues: row.issues,
+    // Las advertencias del pipeline (reglas no disponibles, vínculo con la ocurrencia omitido) viajan con las incidencias.
+    issues: row.warnings.length > 0 ? [...row.issues, ...row.warnings] : row.issues,
     candidate,
     transactionId: row.transactionId,
     failure: row.batchError,
+    kind: row.edits.kind ?? row.kind ?? (row.direction === 'IN' ? 'INCOME' : 'EXPENSE'),
+    externalId: row.externalId,
+    time: row.bookingTime,
+    runningBalance:
+      row.runningBalance === null
+        ? null
+        : { amount: row.runningBalance, currency: row.currency ?? currencyCode },
+    proposal:
+      row.proposal === null && Object.keys(row.edits).length === 0
+        ? null
+        : toProposalView(row.proposal, row.edits),
+    edits: editsView(row.edits),
+    candidates: row.candidates,
+    decidedBy: row.decidedBy,
+    decidedAt: row.decidedAt,
+    decidedScore: row.decidedScore,
+    duplicateOfRow: row.duplicateOfRow,
+    occurrenceCandidates: row.occurrenceCandidates.map(toOccurrenceCandidateView),
+    occurrenceLink: row.occurrenceLink,
+    transfer: row.edits.transfer ?? null,
+    conversion: row.edits.conversion ?? null,
   };
 }

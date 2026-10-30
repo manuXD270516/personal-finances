@@ -14,7 +14,10 @@
     "kind",
     "status",
     "created_at",
-    "superseded_at"
+    "superseded_at",
+    "external_ref_namespace",
+    "external_ref_id",
+    "import_job_id"
   ],
   "properties": {
     "id": {
@@ -53,6 +56,25 @@
         "null"
       ],
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "external_ref_namespace": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "external_ref_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "import_job_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
     }
   },
   "x-pfos-table": "imports.row_link",

@@ -1,8 +1,69 @@
+import type { ReactNode } from 'react';
+import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { cardStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
 import { canResolveFailures, errorLines, isPolling, progressPercent, resultSummaryOf } from './logic';
+import { differenceIsZero, ratioPercent } from './pipeline-logic';
 import type { ImportErrorGroup, ImportJob, ImportWarning } from './types';
+
+/**
+ * Reconciliación contra el saldo final del extracto (openspec add-import-pipeline, decisión 14): si el saldo de la cuenta
+ * coincide, ofrece abrir la reconciliación con la fecha y el saldo del extracto; si no, muestra la diferencia. NUNCA hay
+ * un ajuste automático.
+ */
+export function ReconciliationResult({
+  job,
+  f,
+  offerHref,
+}: {
+  job: ImportJob;
+  f: FormatContext;
+  offerHref: string | undefined;
+}) {
+  const offer = job.reconciliationOffer;
+  const diff = job.statementDifference;
+  if (job.status === 'COMPLETED_WITH_DIFFERENCE' && diff) {
+    return (
+      <p role="alert" style={{ ...warningStyle, margin: 0 }} data-testid="import-difference">
+        {f.t('result.difference', { amount: formatMoney(diff, f.locale) })}{' '}
+        <span data-testid="import-difference-zero" data-zero={differenceIsZero(diff.amount)}>
+          {f.t('result.noAdjustment')}
+        </span>
+      </p>
+    );
+  }
+  if (offer && offerHref) {
+    return (
+      <p role="status" style={{ margin: 0 }} data-testid="import-reconcile-offer">
+        {f.t('result.reconcileOffer', {
+          date: formatBusinessDate(offer.statementDate),
+          balance: formatMoney(offer.statementBalance, f.locale),
+        })}{' '}
+        <a href={offerHref} data-testid="import-reconcile-link">
+          {f.t('result.reconcileLink')}
+        </a>
+      </p>
+    );
+  }
+  return null;
+}
+
+/** Cobertura de clasificación por reglas de lo que creó la importación (`0.7193` ⇒ 71.93 %). */
+export function RuleCoveragePanel({ job, f }: { job: ImportJob; f: FormatContext }) {
+  const c = job.ruleCoverage;
+  if (!c) return null;
+  return (
+    <p style={{ margin: 0 }} data-testid="import-rule-coverage" data-ratio={c.ratio}>
+      {f.t('result.coverage', {
+        byRule: c.classifiedByRule,
+        rows: c.rows,
+        percent: ratioPercent(c.ratio),
+        without: c.withoutCategory,
+      })}
+    </p>
+  );
+}
 
 /**
  * Progreso de la persistencia (paso 4): lotes hechos de lotes totales y transacciones creadas. La región es
@@ -154,7 +215,12 @@ export function ResultStep({
   listHref,
   onRetry,
   onAccept,
+  extras,
+  reconcileHref,
 }: {
+  /** Panel de deshacer y recorrido (pipeline de documentos). */
+  extras?: ReactNode;
+  reconcileHref?: string | undefined;
   job: ImportJob;
   f: FormatContext;
   canEdit: boolean;
@@ -173,11 +239,31 @@ export function ResultStep({
       data-testid="import-result"
       data-status={job.status}
     >
-      {running ? <ProgressPanel job={job} f={f} /> : null}
+      {running && job.status !== 'REVERTING' ? <ProgressPanel job={job} f={f} /> : null}
 
       {job.status === 'COMPLETED' ? (
         <p role="status" data-testid="import-done">
           {f.t('result.completed', { count: job.counters.created })}
+        </p>
+      ) : null}
+      {job.status === 'COMPLETED_WITH_DIFFERENCE' ? (
+        <p role="status" data-testid="import-done-difference">
+          {f.t('result.completed', { count: job.counters.created })}
+        </p>
+      ) : null}
+      {job.status === 'REVERTING' ? (
+        <div role="status" aria-live="polite" data-testid="import-reverting">
+          {f.t('result.reverting')}
+        </div>
+      ) : null}
+      {job.status === 'ROLLED_BACK' || job.status === 'PARTIALLY_ROLLED_BACK' ? (
+        <p role="status" data-testid="import-rolled-back" data-status={job.status}>
+          {job.status === 'ROLLED_BACK'
+            ? f.t('result.rolledBack', { count: job.revertSummary?.voided ?? 0 })
+            : f.t('result.partiallyRolledBack', {
+                voided: job.revertSummary?.voided ?? 0,
+                blocked: job.revertSummary?.blocked ?? 0,
+              })}
         </p>
       ) : null}
       {job.status === 'PARTIALLY_FAILED' ? (
@@ -197,6 +283,8 @@ export function ResultStep({
       ) : null}
 
       {!running && job.status !== 'CANCELLED' ? <ResultSummary job={job} f={f} /> : null}
+      {!running ? <RuleCoveragePanel job={job} f={f} /> : null}
+      {!running ? <ReconciliationResult job={job} f={f} offerHref={reconcileHref} /> : null}
       {job.errors.length > 0 && !running ? (
         <ErrorGroups groups={job.errors} f={f} messageOf={messageOf} />
       ) : null}
@@ -212,6 +300,7 @@ export function ResultStep({
         </div>
       ) : null}
 
+      {!running ? extras : null}
       {!running ? (
         <ResultLinks f={f} transactionsHref={transactionsHref} newHref={newHref} listHref={listHref} />
       ) : null}

@@ -12,9 +12,15 @@ invariants: []
 priority: high
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/readers/json-statement-reader.test.ts
+  - packages/contexts/imports/src/infrastructure/readers/ofx-reader.test.ts
+  - packages/contexts/imports/src/infrastructure/readers/qif-reader.test.ts
+  - packages/contexts/imports/src/infrastructure/readers/statement-sniffer.test.ts
+  - packages/contexts/imports/src/infrastructure/readers/xlsx-reader.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +37,7 @@ steps:
 expected_result:
   - "la importación se procesa con el lector de QIF"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-011 — El lector se elige por el formato detectado en el contenido del documento

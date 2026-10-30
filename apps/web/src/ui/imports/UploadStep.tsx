@@ -16,7 +16,10 @@ export function UploadStep({
   initialAccountId,
   busy,
   onSubmit,
+  testPrefix = 'import',
 }: {
+  /** Prefijo de los `data-testid` (la subida directa obsoleta convive con la de documentos: `import-legacy`). */
+  testPrefix?: string;
   f: FormatContext;
   /** Cuentas activas del workspace. */
   accounts: readonly Account[];
@@ -45,7 +48,7 @@ export function UploadStep({
   return (
     <form
       style={formStyle}
-      data-testid="import-upload"
+      data-testid={`${testPrefix}-upload`}
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -61,7 +64,7 @@ export function UploadStep({
               style={inputStyle}
               value={accountId}
               disabled={busy}
-              data-testid="import-account"
+              data-testid={`${testPrefix}-account`}
               onChange={(e) => setAccountId(e.target.value)}
             >
               <option value="">{f.t('upload.accountPlaceholder')}</option>
@@ -82,13 +85,13 @@ export function UploadStep({
               accept=".csv,.txt,.tsv,text/csv,text/plain"
               style={inputStyle}
               disabled={busy}
-              data-testid="import-file"
+              data-testid={`${testPrefix}-file`}
             />
           )}
         </Field>
       </div>
       <div>
-        <button type="submit" disabled={busy} data-testid="import-upload-submit">
+        <button type="submit" disabled={busy} data-testid={`${testPrefix}-upload-submit`}>
           {busy ? f.t('upload.uploading') : f.t('upload.submit')}
         </button>
       </div>

@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/import-job.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación queda cancelada, sin filas y sin transacciones"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-010 — Cancelar una importación en procesamiento la deja cancelada sin filas ni transacciones

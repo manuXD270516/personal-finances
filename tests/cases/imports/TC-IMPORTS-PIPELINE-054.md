@@ -12,9 +12,10 @@ invariants: ["INV-014"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +33,7 @@ steps:
 expected_result:
   - "la fila de \"Banco USD\" no se clasifica como ya importada por ese identificador"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-054 — El mismo identificador externo en otra cuenta no se considera ya importado

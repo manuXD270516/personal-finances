@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/duplicate-score.test.ts
+  - packages/contexts/transactions/test/integration/pg-imported.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]

@@ -359,13 +359,44 @@ export const ACCOUNT_MOVEMENTS_QUERY = Symbol.for('pf.transactions.AccountMoveme
 /** Espacio de nombres de `externalRef` de las transacciones creadas por una fila importada (huella de fila en hex). */
 export const IMPORT_ROW_NAMESPACE = 'imports.csv-row' as const;
 
+/** Formatos cuyo identificador del banco es una referencia externa (`imports.ext:<FORMAT>`, add-import-pipeline). */
+export const IMPORT_EXTERNAL_FORMATS = ['CSV', 'OFX', 'QIF', 'JSON', 'XLSX'] as const;
+export type ImportExternalFormat = (typeof IMPORT_EXTERNAL_FORMATS)[number];
+/** Prefijo del espacio de nombres de las referencias con identificador del banco (FITID, referencia única). */
+export const IMPORT_EXTERNAL_NAMESPACE_PREFIX = 'imports.ext:' as const;
+export type ImportExternalNamespace = `imports.ext:${ImportExternalFormat}`;
+
+export const importExternalNamespace = (format: ImportExternalFormat): ImportExternalNamespace =>
+  `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${format}`;
+
+/** ¿Es un espacio de nombres de referencia importada que `recordBatch` acepta? */
+export function isImportRefNamespace(namespace: string): boolean {
+  if (namespace === IMPORT_ROW_NAMESPACE) return true;
+  return (
+    namespace.startsWith(IMPORT_EXTERNAL_NAMESPACE_PREFIX) &&
+    (IMPORT_EXTERNAL_FORMATS as readonly string[]).includes(
+      namespace.slice(IMPORT_EXTERNAL_NAMESPACE_PREFIX.length),
+    )
+  );
+}
+
+export type ImportedMovementKind = 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'CONVERSION';
+
 export interface ImportedTransactionRowDto {
   /** Identificador de la fila en el llamador (el id del staging): se devuelve tal cual en el resultado. */
   readonly rowRef: string;
   /** Fecha de negocio `YYYY-MM-DD`. */
   readonly date: string;
+  /** Sentido respecto de la cuenta del import: salida (`OUT`) o entrada (`IN`). */
   readonly direction: 'IN' | 'OUT';
-  /** Monto positivo en la moneda de la cuenta. */
+  /**
+   * Tipo de movimiento. Por omisión decide la dirección (`OUT` ⇒ gasto, `IN` ⇒ ingreso). `TRANSFER` y `CONVERSION`
+   * mueven la cuenta del import contra `transfer.counterAccountId` / `conversion.counterAccountId` (con `OUT` la
+   * cuenta del import es el origen; con `IN`, el destino) y se crean por los servicios de transferencias y
+   * conversiones dentro del mismo lote.
+   */
+  readonly kind?: ImportedMovementKind;
+  /** Monto positivo en la moneda de la cuenta (en una conversión, el monto en la moneda de la cuenta del import). */
   readonly amount: { readonly amount: string; readonly currency: string };
   readonly description: string | null;
   readonly externalRef: { readonly namespace: string; readonly id: string };
@@ -374,6 +405,19 @@ export interface ImportedTransactionRowDto {
    * Phase 3: «sin categoría» con origen `SYSTEM_DEFAULT`.
    */
   readonly classification?: ImportedClassificationDto;
+  /** Obligatorio con `kind = 'TRANSFER'`. */
+  readonly transfer?: { readonly counterAccountId: string };
+  /** Obligatorio con `kind = 'CONVERSION'`. */
+  readonly conversion?: {
+    readonly counterAccountId: string;
+    /** Monto en la moneda de la cuenta contraparte (su escala). */
+    readonly counterAmount: { readonly amount: string; readonly currency: string };
+    readonly fee?: { readonly amount: string; readonly currency: string };
+    /** Tasa cotizada por la institución, `base`/`quote`/`value` exactos. */
+    readonly quotedRate?: { readonly base: string; readonly quote: string; readonly value: string };
+    /** Instante de ejecución (ISO 8601 con zona): la referencia de FX se resuelve a este instante. */
+    readonly executedAt: string;
+  };
 }
 
 /** Referencia de una regla a un campo del split (`field`: `TAG:<id>`, `COUNTERPARTY`, `CUSTOM_FIELD:<id>`, `DESCRIPTION`, `NOTES`). */
@@ -411,13 +455,14 @@ export interface ImportedClassificationDto {
 }
 
 /**
- * Registro en lote de transacciones importadas (design decisión 9 y 10 de add-basic-csv-import; el mismo contrato que
- * usará `RecordImportedTransactions` en Phase 6, docs/13 §1). Corre en la unidad de trabajo del llamador (UNA
- * transacción de BD por lote): reutiliza el agregado, el traductor al ledger, la auditoría (`origin = import`, el actor
- * del contexto de la petición), el recorrido y el outbox de Transactions. Cada fila se crea como gasto (`OUT`) o ingreso
- * (`IN`) `POSTED` con la categoría de sistema "sin categoría" (D9), `source = IMPORT` e `import_job_id`. Las filas cuya
- * referencia externa ya tiene una transacción no anulada en la cuenta NO se crean: se informan en `alreadyExisting`.
- * Un error de dominio (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`, …) se propaga y revierte todo el lote.
+ * Registro en lote de transacciones importadas (design decisión 9 y 10 de add-basic-csv-import; add-import-pipeline lo
+ * amplía con tipos de movimiento y clasificación). Corre en la unidad de trabajo del llamador (UNA transacción de BD
+ * por lote): reutiliza el agregado, el traductor al ledger, la auditoría (`origin = import`, el actor del contexto de
+ * la petición), el recorrido y el outbox de Transactions. Cada fila se crea como gasto (`OUT`) o ingreso (`IN`)
+ * `POSTED` —o como transferencia o conversión entre cuentas propias— con `source = IMPORT` e `import_job_id`; sin
+ * `classification` la categoría de sistema es «sin categoría» (D9). Las filas cuya referencia externa ya tiene una
+ * transacción no anulada en la cuenta NO se crean: se informan en `alreadyExisting`. Un error de dominio
+ * (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`, …) se propaga y revierte todo el lote.
  */
 export interface ImportedTransactionsCommand {
   recordBatch(input: {
@@ -430,7 +475,62 @@ export interface ImportedTransactionsCommand {
     readonly created: readonly { readonly rowRef: string; readonly transactionId: string }[];
     readonly alreadyExisting: readonly { readonly rowRef: string; readonly transactionId: string }[];
   }>;
+
+  /**
+   * Anula por conjunto las transacciones de un import (deshacer, add-import-pipeline decisión 15): reversa exacta de
+   * sus asientos con `LedgerPostingPort.reverseJournalEntries` (INV-008), en la unidad de trabajo del llamador.
+   * Idempotente: las ya anuladas se informan en `alreadyVoided`. Las que no se pueden anular (`TRANSACTION_RECONCILED`,
+   * `PERIOD_CLOSED`, cuenta cerrada) se informan en `blocked` con `allowBlocked`; sin él se lanza el primer error.
+   * Tope 1 000 por llamada. Transferencias y conversiones se anulan por el mismo conjunto de asientos.
+   */
+  voidBatch(input: {
+    readonly workspaceId: string;
+    /** Cuenta del import (informativa; el vínculo con el import lo da `importJobId`). */
+    readonly accountId?: string;
+    readonly importJobId: string;
+    readonly actorUserId: string;
+    readonly transactionIds: readonly string[];
+    readonly reason: string;
+    readonly allowBlocked?: boolean;
+  }): Promise<{
+    readonly voided: readonly string[];
+    readonly alreadyVoided: readonly string[];
+    readonly blocked: readonly { readonly transactionId: string; readonly code: string }[];
+  }>;
 }
+
+/**
+ * Conversiones importadas entre cuentas propias (add-import-pipeline decisión 12; el mismo comando lo usa
+ * `add-banking-providers`). Cada conversión corre por `ConversionsService.recordConversion` (referencia de FX resuelta
+ * al instante de ejecución, detalle inmutable, asiento propio) en la unidad de trabajo del llamador; es idempotente por
+ * `externalRef` (INV-014). Para conversiones sueltas; `ImportedTransactionsCommand.recordBatch` con `kind =
+ * 'CONVERSION'` las crea dentro de un lote mixto.
+ */
+export interface ImportedConversionsCommand {
+  recordBatch(input: {
+    readonly workspaceId: string;
+    readonly importJobId: string;
+    readonly actorUserId: string;
+    readonly rows: readonly {
+      readonly rowRef: string;
+      readonly sourceAccountId: string;
+      readonly targetAccountId: string;
+      readonly date: string;
+      readonly sourceAmount: { readonly amount: string; readonly currency: string };
+      readonly targetAmount: { readonly amount: string; readonly currency: string };
+      readonly fee?: { readonly amount: string; readonly currency: string };
+      readonly quotedRate?: { readonly base: string; readonly quote: string; readonly value: string };
+      readonly executedAt: string;
+      readonly description: string | null;
+      readonly externalRef: { readonly namespace: string; readonly id: string };
+    }[];
+  }): Promise<{
+    readonly created: readonly { readonly rowRef: string; readonly transactionId: string }[];
+    readonly alreadyExisting: readonly { readonly rowRef: string; readonly transactionId: string }[];
+  }>;
+}
+
+export const IMPORTED_CONVERSIONS_COMMAND = Symbol.for('pf.transactions.ImportedConversionsCommand');
 
 export const IMPORTED_TRANSACTIONS_COMMAND = Symbol.for('pf.transactions.ImportedTransactionsCommand');
 
@@ -443,13 +543,30 @@ export interface DuplicateCandidateDto {
   readonly amount: { readonly amount: string; readonly currency: string };
   readonly description: string | null;
   readonly counterpartyId: string | null;
+  /**
+   * Puntaje de posible duplicado (texto decimal con 4 decimales, `0.9000`) de la fila contra este candidato; solo si
+   * la fila trae `scoring` (add-import-pipeline). Los candidatos de una fila vienen ordenados por puntaje descendente,
+   * menor diferencia de días e identificador.
+   */
+  readonly score?: string;
+  readonly signals?: {
+    readonly amount: string;
+    readonly date: string;
+    readonly description: string;
+    readonly counterparty: string;
+    readonly origin: string;
+  };
+  /** El candidato tiene un identificador del banco (`imports.ext:*` o `imports.provider:*`). */
+  readonly hasBankExternalRef?: boolean;
 }
 
 /**
  * Candidatos a duplicado para un lote de filas (docs/13 §8; ventana de `transactions/duplicate-detection`). Set-based:
  * movimientos NO anulados de la cuenta —transacciones `INCOME/EXPENSE/REFUND/ADJUSTMENT` y PATAS de `TRANSFER` y
  * `CONVERSION` sobre la cuenta— del mismo monto y moneda, en la misma dirección y con fecha a ±`windowDays`. No exige
- * similitud de descripción. Sin efectos; en la unidad de trabajo del llamador si existe.
+ * similitud de descripción. Con `description`/`counterpartyId`/`externalId` en la fila (add-import-pipeline) cada
+ * candidato trae su `score` y `signals`, y la lista sale ordenada. Sin efectos; en la unidad de trabajo del llamador
+ * si existe.
  */
 export interface DuplicateCandidatesQuery {
   findForImport(input: {
@@ -460,6 +577,12 @@ export interface DuplicateCandidatesQuery {
       readonly date: string;
       readonly direction: 'IN' | 'OUT';
       readonly amount: { readonly amount: string; readonly currency: string };
+      readonly description?: string | null;
+      readonly counterpartyId?: string | null;
+      /** Identificador del banco de la fila (FITID / referencia única). */
+      readonly externalId?: string | null;
+      /** `true` ⇒ calcular `score`/`signals` aunque la fila no traiga descripción. Por omisión, calcula si hay alguno de los campos anteriores. */
+      readonly scoring?: boolean;
     }[];
     readonly windowDays: number;
     readonly excludeTransactionIds?: readonly string[];
@@ -860,6 +983,7 @@ export const TRANSACTIONS_AUDIT_POLICY = {
 } as const satisfies AuditFieldPoliciesDto;
 
 export * from './portability.js';
+export * from './duplicate-confidence.js';
 
 // ───────────────────────────────────────────── add-document-attachments (DOCUMENTS)
 

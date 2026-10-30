@@ -3564,9 +3564,9 @@
     }
   },
   "Imports": {
-    "title": "Import a statement (CSV)",
+    "title": "Import statement",
     "listTitle": "Statement imports",
-    "intro": "Upload your bank statement as a CSV, say which column is each piece of data, review what will be created and approve it. Nothing is created and no balance changes until you approve.",
+    "intro": "Upload your bank statement (CSV, OFX, QIF, JSON or XLSX), review what will be created and approve it. Nothing is created and no balance changes until you approve.",
     "newImport": "New import",
     "backToList": "Back to imports",
     "loading": "Loading…",
@@ -3602,7 +3602,14 @@
       "COMPLETED": "Completed",
       "PARTIALLY_FAILED": "Some rows failed",
       "COMPLETED_WITH_ERRORS": "Completed with errors",
-      "CANCELLED": "Cancelled"
+      "CANCELLED": "Cancelled",
+      "UPLOADED": "Uploaded, queued",
+      "PROCESSING": "Processing",
+      "PARSE_FAILED": "Reading failed",
+      "COMPLETED_WITH_DIFFERENCE": "Completed with a difference",
+      "REVERTING": "Undoing",
+      "ROLLED_BACK": "Undone",
+      "PARTIALLY_ROLLED_BACK": "Partially undone"
     },
     "info": {
       "file": "File",
@@ -3722,7 +3729,13 @@
       "NEW": "New ({count})",
       "DUPLICATE_PROBABLE": "Possible duplicates ({count})",
       "DUPLICATE_EXACT": "Already imported ({count})",
-      "INVALID": "With errors ({count})"
+      "INVALID": "With errors ({count})",
+      "needsCategory": "No category",
+      "confidence": "Candidate confidence",
+      "anyConfidence": "Any",
+      "rule": "Rule",
+      "anyRule": "All rules",
+      "ruleOption": "Rule {id}… (version {version})"
     },
     "classification": {
       "NEW": "New",
@@ -3790,7 +3803,13 @@
       "PERIOD_CLOSED": "The date falls in a closed period.",
       "ACCOUNT_CLOSED": "The account is closed.",
       "IMPORT_DESCRIPTION_TRUNCATED": "The description was too long and was shortened.",
-      "UNKNOWN": "The row has a problem."
+      "UNKNOWN": "The row has a problem.",
+      "IMPORT_CURRENCY_MISMATCH": "The currency of the file is not the account currency.",
+      "IMPORT_AMBIGUOUS_DATE": "The date is ambiguous: choose the day/month order.",
+      "IMPORT_AMBIGUOUS_NUMBER": "The number is ambiguous: choose the decimal separator.",
+      "IMPORT_RUNNING_BALANCE_GAP": "The running balance of the file does not add up at this row.",
+      "IMPORT_RULES_UNAVAILABLE": "Rules were not available: the row has no proposal.",
+      "IMPORT_OCCURRENCE_LINK_SKIPPED": "The commitment was already resolved: the transaction was created without a link."
     },
     "warnings": {
       "IMPORT_FILE_ALREADY_IMPORTED": "This same file was already imported into this account on {date}. You can continue: rows already imported are not duplicated.",
@@ -3838,7 +3857,231 @@
       "accept": "Accept the partial result",
       "linksLabel": "Next steps",
       "viewTransactions": "View the account transactions",
-      "importAnother": "Import another file"
+      "importAnother": "Import another file",
+      "difference": "The import finished with a difference of {amount} against the statement closing balance.",
+      "noAdjustment": "No automatic adjustment was created.",
+      "reconcileOffer": "The balance matches the statement of {date} ({balance}). You can open the prepared reconciliation.",
+      "reconcileLink": "Reconcile with this statement",
+      "coverage": "Classified by rules: {byRule} of {rows} ({percent}%). Without category: {without}.",
+      "reverting": "Undoing the import: voiding its transactions…",
+      "rolledBack": "{count, plural, one {Import undone: # transaction voided.} other {Import undone: # transactions voided.}}",
+      "partiallyRolledBack": "Import partially undone: {voided} transactions voided and {blocked} blocked."
+    },
+    "legacy": {
+      "summary": "Direct CSV upload (deprecated)",
+      "note": "This route only accepts CSV files up to 2 MiB and is kept for compatibility. Upload the statement as a document instead: it supports more formats, institution profiles and undo."
+    },
+    "docUpload": {
+      "intro": "Choose the statement account and its file (up to {max}). The file is stored encrypted as a workspace document and processed in the background; the format is detected from its content.",
+      "file": "Statement",
+      "fileHint": "CSV, OFX, QIF, JSON of the own schema or XLSX.",
+      "profile": "Mapping profile",
+      "profileHint": "Optional: by default the account profile or its institution profile applies by itself.",
+      "profileAuto": "Automatic",
+      "submit": "Upload and process",
+      "errors": {
+        "account": "Choose the destination account.",
+        "none": "Choose a file.",
+        "empty": "The file is empty.",
+        "tooLarge": "The file exceeds the maximum of {max}.",
+        "type": "The file format cannot be imported (use CSV, OFX, QIF, JSON or XLSX)."
+      },
+      "phase": {
+        "hashing": "Computing the checksum…",
+        "requesting": "Requesting the upload…",
+        "uploading": "Uploading the file: {percent}%",
+        "verifying": "Verifying the file…"
+      }
+    },
+    "processing": {
+      "stages": "Processing stages",
+      "bar": "Processing progress",
+      "queued": "The statement is queued; processing starts in a few seconds.",
+      "starting": "Preparing the processing…",
+      "live": "Stage “{stage}”: {processed} of {total} rows.",
+      "stage": {
+        "PARSE": "Reading",
+        "NORMALIZE": "Normalization",
+        "VALIDATE": "Validation",
+        "CLASSIFY": "Classification",
+        "DEDUPE": "Duplicates",
+        "MATCH": "Commitments"
+      }
+    },
+    "parseFailed": {
+      "title": "The file could not be read.",
+      "where": "Location of the error:",
+      "noRows": "The import has no rows and no transaction was created."
+    },
+    "mappingHelp": {
+      "title": "Profiles and columns",
+      "missing": "Columns the profiles need that the file does not have:",
+      "candidates": "Profiles that almost match this file:",
+      "lacks": "missing: {columns}",
+      "applyNamed": "Apply the profile {name}, version {version}",
+      "apply": "Apply",
+      "dateOrder": "Date order",
+      "dateOrderHint": "The QIF file does not say whether the date is day/month or month/day.",
+      "dmy": "Day/month/year",
+      "mdy": "Month/day/year",
+      "applyOrder": "Use this order"
+    },
+    "saveProfile": {
+      "toggle": "Save this mapping as a profile of the account institution",
+      "name": "Profile name",
+      "hint": "It will apply only to the next statements with the same columns.",
+      "saved": "The mapping was saved as a profile."
+    },
+    "confidence": {
+      "HIGH": "High confidence",
+      "MEDIUM": "Medium confidence",
+      "LOW": "Low confidence"
+    },
+    "origin": {
+      "MANUAL": "manual",
+      "RULE": "rule",
+      "ALIAS": "alias",
+      "DEFAULT": "default category",
+      "NONE": "no origin"
+    },
+    "detail": {
+      "none": "not set",
+      "ruleRef": "rule {id}…, version {version}",
+      "score": "Score {score}",
+      "preselected": "Linked up front (preselected)",
+      "linked": "Linked",
+      "ruleExcluded": "A rule proposes excluding this row; you can include it again.",
+      "kind": "Type",
+      "kinds": {
+        "EXPENSE": "Expense",
+        "INCOME": "Income",
+        "TRANSFER": "Transfer",
+        "CONVERSION": "Conversion"
+      },
+      "category": "Category",
+      "counterparty": "Counterparty",
+      "description": "Description",
+      "duplicateOfRow": "Repeats the movement on line {line} of the file (same bank identifier).",
+      "lowConfidence": "Low confidence: no candidate is clearly the same movement. You decide; it is not skipped on its own.",
+      "preselectedNote": "The system linked this row to the only high-confidence candidate. It counts as a decision and you can change it.",
+      "signal": {
+        "amount": "amount",
+        "date": "date",
+        "description": "description",
+        "counterparty": "counterparty",
+        "origin": "origin"
+      },
+      "commitments": "Matches commitments",
+      "confirmed": "Link confirmed.",
+      "confirm": "Confirm link",
+      "unlink": "Remove link",
+      "confirmAria": "Confirm the link of line {line} with {name}",
+      "unlinkAria": "Remove the link of line {line} with {name}",
+      "commitmentsNote": "No occurrence is linked without your confirmation; if it was already resolved another way, the transaction is created anyway, without a link.",
+      "edit": "Edit row",
+      "closeEditor": "Close the editor",
+      "editAria": "Edit line {line}"
+    },
+    "editor": {
+      "fields": "Row data",
+      "description": "Description",
+      "note": "Note",
+      "category": "Category",
+      "noCategory": "No category",
+      "counterparty": "Counterparty",
+      "noCounterparty": "No counterparty",
+      "saveFields": "Save data",
+      "movement": "Movement type",
+      "movementKind": "Record as",
+      "transferTo": "Destination account",
+      "transferFrom": "Source account",
+      "transferHint": "It must be another own account in {currency}.",
+      "counterAmount": "Amount in the other account ({currency})",
+      "fee": "Fee ({currency}, optional)",
+      "quotedRate": "Quoted rate (optional)",
+      "ratePreview": "Approximate effective rate: {rate}",
+      "conversionNote": "The reference rate is resolved at the instant of the movement.",
+      "saveMovement": "Save type",
+      "errors": {
+        "account": "Choose the other account.",
+        "amount": "Enter a positive number."
+      }
+    },
+    "statement": {
+      "title": "Statement balance",
+      "closing": "Statement closing balance",
+      "difference": "Difference with the resulting balance",
+      "matches": "matches",
+      "differs": "does not match",
+      "none": "The file has no closing balance. You can enter it to see the difference.",
+      "closingInput": "Closing balance ({currency})",
+      "dateInput": "Balance date",
+      "save": "Save balance",
+      "cancel": "Cancel",
+      "edit": "Change the balance",
+      "set": "Enter the closing balance",
+      "errors": {
+        "amount": "Enter a number with a decimal point."
+      }
+    },
+    "bulk": {
+      "title": "Bulk actions",
+      "category": "Category for the filtered rows",
+      "hint": "Applies to: {filter}.",
+      "chooseCategory": "Choose a category",
+      "apply": "Assign to the filtered rows",
+      "unsupported": "The confidence filter cannot be used in bulk: remove it to assign the category.",
+      "reevaluate": "Re-evaluate rules",
+      "reevaluateHint": "Recomputes the proposal of the rules; what you edited by hand is kept.",
+      "confirmMatches": "Confirm the high-confidence ones ({count})",
+      "done": "{count, plural, one {# row updated.} other {# rows updated.}}",
+      "reevaluated": "Rules re-evaluated.",
+      "confirmed": "{count, plural, one {# link confirmed.} other {# links confirmed.}}",
+      "currentFilter": "the current filter"
+    },
+    "revert": {
+      "title": "Undo the import",
+      "open": "See what would be voided",
+      "counts": "{toVoid} transactions will be voided; {already} were already voided; {blocked} are blocked.",
+      "edited": "{count, plural, one {# transaction was edited after the import and is voided anyway.} other {# transactions were edited after the import and are voided anyway.}}",
+      "blockedTitle": "{count, plural, one {# blocked row} other {# blocked rows}}",
+      "blockedItem": "Line {line}: {reason}",
+      "reason": {
+        "RECONCILED": "the transaction is reconciled",
+        "PERIOD_CLOSED": "it falls in a closed period",
+        "UNKNOWN": "it cannot be voided"
+      },
+      "partialHint": "The full undo is rejected while there are blocked rows. If you ask for it explicitly, the partial undo voids the rest.",
+      "confirmAllTitle": "Undo the whole import",
+      "confirmAllBody": "{count} transactions are voided with their reversal; nothing is deleted.",
+      "confirmPartialTitle": "Undo only what can be voided",
+      "confirmPartialBody": "{count} transactions are voided; the {blocked} blocked ones stay as they are and the import ends “partially undone”.",
+      "confirm": "Undo",
+      "keep": "Keep the import",
+      "all": "Undo everything",
+      "partial": "Undo partially",
+      "close": "Close"
+    },
+    "timeline": {
+      "summary": "Import timeline"
+    },
+    "profiles": {
+      "link": "Mapping profiles",
+      "title": "Mapping profiles",
+      "intro": "A profile remembers the columns and options of the statements of an institution. Every change creates a new version; earlier imports keep the one they used.",
+      "empty": "There are no profiles yet. They are saved from the columns step of an import.",
+      "includeArchived": "Show archived",
+      "noInstitution": "No institution (account only)",
+      "unknownInstitution": "Institution",
+      "ofAccount": "account {account}",
+      "archived": "Archived",
+      "versions": "{count, plural, one {# version} other {# versions}}",
+      "versionItem": "Version {version}, created on {date}",
+      "archive": "Archive",
+      "archiveNamed": "Archive the profile {name}",
+      "archiveTitle": "Archive the profile “{name}”",
+      "archiveBody": "It stops being suggested and applied to new imports; finished ones do not change.",
+      "keep": "Keep"
     }
   },
   "Debt": {

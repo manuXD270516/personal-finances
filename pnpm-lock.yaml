@@ -1047,6 +1047,9 @@ importers:
       '@pf/transactions':
         specifier: workspace:*
         version: link:../transactions
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
       busboy:
         specifier: 1.6.0
         version: 1.6.0
@@ -1066,9 +1069,6 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
-      ajv:
-        specifier: 8.20.0
-        version: 8.20.0
       ajv-formats:
         specifier: 3.0.1
         version: 3.0.1(ajv@8.20.0)

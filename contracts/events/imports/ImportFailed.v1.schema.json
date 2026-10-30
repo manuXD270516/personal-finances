@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/imports/ImportFailed.v1.schema.json",
+  "title": "imports.ImportFailed.v1",
+  "description": "El procesamiento de la importación falló y quedó en PARSE_FAILED (archivo ilegible, tope de filas o tiempo máximo). Productor: IMPORTS (worker). Sin consumidores obligatorios (NOTIFY podrá suscribirse). Idempotencia natural: (importJobId, code). Sin PII: nunca lleva texto del archivo, solo el código y la etapa.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "imports.ImportFailed"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "ImportJob"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "importJobId",
+        "accountId",
+        "code",
+        "stage"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "importJobId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "code": {
+          "type": "string",
+          "examples": [
+            "IMPORT_PARSE_FAILED",
+            "IMPORT_TOO_MANY_ROWS",
+            "IMPORT_UNSUPPORTED_FORMAT"
+          ],
+          "description": "Código de error del job. Enum abierto."
+        },
+        "stage": {
+          "oneOf": [
+            {
+              "type": "string",
+              "examples": [
+                "PARSE",
+                "NORMALIZE",
+                "VALIDATE",
+                "CLASSIFY",
+                "DEDUPE",
+                "MATCH"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Etapa en la que falló."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a03",
+      "eventType": "imports.ImportFailed",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-20T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ImportJob",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b1001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "importJobId": "01928c4e-0000-7000-8000-0000000b1001",
+        "accountId": "01928c4e-0000-7000-8000-0000000ac001",
+        "code": "IMPORT_PARSE_FAILED",
+        "stage": "PARSE"
+      }
+    }
+  ]
+}

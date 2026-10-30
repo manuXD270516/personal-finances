@@ -255,7 +255,7 @@ Trace: FR-IMPORTS-002, FR-IMPORTS-008, FR-RULES-009 · Priority: Must
 - **Y** la importación llega a "en revisión" y se puede aprobar
 
 ### Requirement: Vista previa editable por fila y en lote
-Antes de aprobar, el OWNER o EDITOR DEBE (MUST) poder cambiar en cada fila la categoría, la contraparte, las etiquetas, la descripción y la nota, y excluirla o volver a incluirla, y DEBE (MUST) poder aplicar el mismo cambio a todas las filas de un filtro de la vista previa; cada edición DEBE (MUST) exigir la versión vigente de la importación (`CONCURRENCY_CONFLICT` si cambió), dejar el campo con origen manual y NO DEBE (MUST NOT) crear ni modificar ninguna transacción.
+Antes de aprobar, el OWNER o EDITOR DEBE (MUST) poder cambiar en cada fila la categoría, la contraparte, las etiquetas, la descripción y la nota, y excluirla o volver a incluirla, y DEBE (MUST) poder aplicar el mismo cambio a todas las filas de un filtro de la vista previa; cada edición DEBE (MUST) exigir la versión vigente de la importación (412 `PRECONDITION_FAILED` si cambió), dejar el campo con origen manual y NO DEBE (MUST NOT) crear ni modificar ninguna transacción.
 Trace: FR-IMPORTS-009 · Priority: Must
 
 #### Scenario: Edición de una fila
@@ -269,7 +269,7 @@ Trace: FR-IMPORTS-009 · Priority: Must
 
 #### Scenario: Edición con una versión vencida
 - **CUANDO** el EDITOR edita una fila con una versión de la importación que otra edición ya cambió
-- **ENTONCES** se rechaza con `CONCURRENCY_CONFLICT` y la fila no cambia
+- **ENTONCES** se rechaza con 412 `PRECONDITION_FAILED` y la fila no cambia
 
 ### Requirement: Filas como transferencia o conversión entre cuentas propias
 El OWNER o EDITOR DEBERÍA (SHOULD) poder marcar en la vista previa una fila como transferencia hacia o desde otra cuenta propia de la misma moneda, o como conversión con otra cuenta propia de otra moneda indicando el monto recibido o entregado en ella; al aprobar, la fila DEBE (MUST) crear esa transferencia o conversión en lugar de un gasto o ingreso, la conversión DEBE (MUST) quedar vinculada a la tasa de referencia vigente al instante del movimiento y la pata creada en la otra cuenta DEBE (MUST) ser candidata de duplicado cuando se importe el extracto de esa cuenta. Una transferencia entre monedas distintas DEBE (MUST) rechazarse con `TRANSFER_CURRENCY_MISMATCH`.

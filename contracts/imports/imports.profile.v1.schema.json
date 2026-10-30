@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/imports/imports.profile.v1.schema.json",
+  "title": "imports.profile.v1",
+  "description": "Opciones de lectura de un perfil de mapeo por institución (superconjunto de imports.mapping.v1). CSV y XLSX exigen `mapping` (fecha, descripción y monto); OFX, JSON y QIF son autodescritos y solo aportan `descriptionCleanup` (prefijos literales, no expresiones regulares) y, en QIF, `dateOrder`. Cada columna se referencia por posición y opcionalmente por el nombre del encabezado, que el sistema compara sin mayúsculas ni acentos.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "imports.profile.v1" },
+    "mapping": { "$ref": "#/$defs/Mapping" },
+    "descriptionCleanup": { "$ref": "#/$defs/Cleanup" },
+    "dateOrder": { "enum": ["DMY", "MDY"] }
+  },
+  "$defs": {
+    "Column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "header": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "Cleanup": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "Mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hasHeader", "dateFormat", "columns"],
+      "properties": {
+        "hasHeader": { "type": "boolean" },
+        "skipRows": { "type": "integer", "minimum": 0, "maximum": 50 },
+        "skipFooterRows": { "type": "integer", "minimum": 0, "maximum": 50 },
+        "dateFormat": { "enum": ["dd/MM/yyyy", "dd-MM-yyyy", "dd/MM/yy", "yyyy-MM-dd", "MM/dd/yyyy"] },
+        "decimalSeparator": { "enum": [",", "."] },
+        "descriptionCleanup": { "$ref": "#/$defs/Cleanup" },
+        "sheet": { "type": "string", "minLength": 1, "maxLength": 31 },
+        "columns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["date", "description", "amount"],
+          "properties": {
+            "date": { "$ref": "#/$defs/Column" },
+            "description": {
+              "type": "object",
+              "properties": {
+                "index": { "type": "integer", "minimum": 0 },
+                "header": { "type": "string" },
+                "indexes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 5,
+                  "items": { "$ref": "#/$defs/Column" }
+                }
+              }
+            },
+            "amount": {
+              "type": "object",
+              "required": ["mode"],
+              "properties": {
+                "mode": { "enum": ["SIGNED", "DEBIT_CREDIT", "INDICATOR"] },
+                "index": { "type": "integer", "minimum": 0 },
+                "header": { "type": "string" },
+                "signConvention": { "enum": ["NEGATIVE_IS_OUTFLOW", "POSITIVE_IS_OUTFLOW"] },
+                "debit": { "$ref": "#/$defs/Column" },
+                "credit": { "$ref": "#/$defs/Column" },
+                "indicator": { "$ref": "#/$defs/Column" },
+                "debitValues": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
+                "creditValues": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1 } }
+              }
+            },
+            "currency": {
+              "type": "object",
+              "required": ["index"],
+              "properties": {
+                "index": { "type": "integer", "minimum": 0 },
+                "header": { "type": "string" },
+                "aliases": {
+                  "type": "object",
+                  "maxProperties": 50,
+                  "additionalProperties": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{1,15}$" }
+                }
+              }
+            },
+            "reference": {
+              "type": "object",
+              "required": ["index", "unique"],
+              "properties": {
+                "index": { "type": "integer", "minimum": 0 },
+                "header": { "type": "string" },
+                "unique": { "type": "boolean" }
+              }
+            },
+            "runningBalance": { "$ref": "#/$defs/Column" },
+            "time": {
+              "type": "object",
+              "required": ["index", "format"],
+              "properties": {
+                "index": { "type": "integer", "minimum": 0 },
+                "header": { "type": "string" },
+                "format": { "enum": ["HH:mm", "HH:mm:ss"] }
+              }
+            },
+            "valueDate": { "$ref": "#/$defs/Column" }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "imports.profile.v1",
+      "mapping": {
+        "hasHeader": true,
+        "skipRows": 1,
+        "skipFooterRows": 2,
+        "dateFormat": "dd/MM/yyyy",
+        "decimalSeparator": ",",
+        "descriptionCleanup": ["COMPRA "],
+        "columns": {
+          "date": { "index": 0, "header": "Fecha" },
+          "description": { "indexes": [{ "index": 1, "header": "Descripción" }, { "index": 2, "header": "Glosa" }] },
+          "amount": {
+            "mode": "INDICATOR",
+            "index": 4,
+            "header": "Importe",
+            "indicator": { "index": 5, "header": "D/C" },
+            "debitValues": ["D"],
+            "creditValues": ["C"]
+          },
+          "currency": { "index": 6, "header": "Moneda", "aliases": { "BS.": "BOB" } },
+          "reference": { "index": 3, "header": "Nro. Doc.", "unique": false }
+        }
+      }
+    },
+    { "version": "imports.profile.v1", "descriptionCleanup": ["COMPRA "] }
+  ]
+}

@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -33,7 +36,7 @@ expected_result:
   - "se crea el gasto de 199.00 BOB y la ocurrencia queda vinculada a él por el EDITOR"
   - "la ocurrencia sale del total comprometido de octubre"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-048 — Una coincidencia confirmada en la vista previa vincula la ocurrencia con la transacción importada

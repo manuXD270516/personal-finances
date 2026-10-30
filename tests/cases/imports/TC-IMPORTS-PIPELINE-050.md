@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+  - packages/contexts/imports/test/integration/pg-pipeline.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "las 5 filas quedan con su vínculo confirmado y las 2 ambiguas sin confirmar"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-050 — Confirmar todas las de confianza alta vincula las 5 únicas y deja sin confirmar las ambiguas

@@ -31,12 +31,14 @@ import {
 import { isDomainError } from '@pf/shared-kernel';
 import Busboy from 'busboy';
 import type { ImportsQueries } from '../application/imports.queries.js';
-import type { ImportsService } from '../application/imports.service.js';
+import type { ImportsService, RowPatch } from '../application/imports.service.js';
+import type { RevertImportService } from '../application/revert-import.service.js';
 import { CLASSIFICATIONS, DECISIONS, IMPORT_STATUSES } from '../domain/index.js';
-import type { Classification, Decision, ImportStatus } from '../domain/index.js';
+import type { Classification, Decision, ImportStatus, RowKind } from '../domain/index.js';
 
 export const IMPORTS_SERVICE = Symbol('IMPORTS_SERVICE');
 export const IMPORTS_QUERIES = Symbol('IMPORTS_QUERIES');
+export const IMPORTS_REVERT = Symbol('IMPORTS_REVERT');
 export const IMPORTS_HTTP_SETTINGS = Symbol('IMPORTS_HTTP_SETTINGS');
 
 /** Ajustes HTTP de IMPORTS: tope del archivo (`IMPORT_CSV_MAX_BYTES`). */
@@ -146,7 +148,15 @@ export class CsvUploadGuard implements CanActivate {
     if (ctx.getType() !== 'http') return true;
     const req = ctx.switchToHttp().getRequest<ApiRequest>();
     if (!principalOf(req) || !req.headers['idempotency-key']) return true;
-    if (!/^multipart\/form-data/i.test(String(req.headers['content-type'] ?? ''))) return true;
+    const contentType = String(req.headers['content-type'] ?? '');
+    if (/^application\/json/i.test(contentType)) {
+      // Variante por documento (decisión 2): la clave de idempotencia se liga a la cuenta y al documento.
+      const body = (req as { body?: unknown }).body;
+      const json = typeof body === 'object' && body !== null ? (body as Json) : {};
+      apiState(req).idempotencyPayload = { accountId: json['accountId'], documentId: json['documentId'] };
+      return true;
+    }
+    if (!/^multipart\/form-data/i.test(contentType)) return true;
     const declared = Number(req.headers['content-length']);
     // Rechazo temprano por tamaño declarado: no se lee el cuerpo.
     if (Number.isFinite(declared) && declared > this.settings.maxBytes + MULTIPART_OVERHEAD) {
@@ -175,9 +185,14 @@ export class ImportsController {
   constructor(
     @Inject(IMPORTS_SERVICE) private readonly service: ImportsService,
     @Inject(IMPORTS_QUERIES) private readonly queries: ImportsQueries,
+    @Inject(IMPORTS_REVERT) private readonly reverts: RevertImportService,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
   ) {}
 
+  /**
+   * Dos variantes del mismo recurso: `multipart/form-data` con el CSV (ruta conservada, 201 con el mapeo pendiente) y
+   * `application/json` `{ accountId, documentId, mappingProfileId? }` (202: el worker procesa el documento).
+   */
   @Post('workspaces/:workspaceId/imports')
   @HttpCode(201)
   @UseGuards(CsvUploadGuard)
@@ -185,13 +200,28 @@ export class ImportsController {
     @Req() req: ApiRequest,
     @Param('workspaceId') workspaceId: string,
     @Res({ passthrough: true }) res: ApiResponse,
+    @Body() body?: Json,
   ) {
     const state = apiState(req);
     const meta = state.uploadMeta;
+    if (!state.upload && body && typeof body['documentId'] === 'string') {
+      const accountId = str(body, 'accountId');
+      if (!accountId) throw new ApiProblem('VALIDATION_FAILED', 'accountId is required');
+      const created = await this.service.createFromDocument({
+        workspaceId,
+        userId: userIdOf(req),
+        accountId,
+        documentId: body['documentId'],
+        mappingProfileId: str(body, 'mappingProfileId'),
+      });
+      res.statusCode = 202;
+      res.setHeader('location', `/api/v1/workspaces/${workspaceId}/imports/${created.id}`);
+      return created;
+    }
     if (!state.upload || !meta) {
       throw new ApiProblem(
         'VALIDATION_FAILED',
-        'the request must be multipart/form-data with "file" and "accountId"',
+        'the request must be multipart/form-data with "file" and "accountId", or JSON with "accountId" and "documentId"',
       );
     }
     const created = await this.service.createImport({
@@ -237,26 +267,43 @@ export class ImportsController {
     return { data: page.data, page: page.page };
   }
 
+  @Get('workspaces/:workspaceId/imports/:importId/lifecycle')
+  getImportLifecycle(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('importId') importId: string,
+  ) {
+    return this.queries.lifecycle({ userId: userIdOf(req), workspaceId, importId });
+  }
+
   @Get('workspaces/:workspaceId/imports/:importId')
   getImport(@Param('workspaceId') workspaceId: string, @Param('importId') importId: string) {
     return this.queries.get(workspaceId, importId);
   }
 
+  /** CSV síncrono: 200 con la vista previa; job de documento: 202 con el job (el worker reanuda las etapas). */
   @Put('workspaces/:workspaceId/imports/:importId/mapping')
-  setImportMapping(
+  async setImportMapping(
     @Req() req: ApiRequest,
     @Param('workspaceId') workspaceId: string,
     @Param('importId') importId: string,
     @ExpectedVersion() expectedVersion: number,
     @Body() body: unknown,
+    @Res({ passthrough: true }) res: ApiResponse,
   ) {
-    return this.service.setMapping({
+    const mapped = await this.service.setMapping({
       workspaceId,
       userId: userIdOf(req),
       importId,
       expectedVersion,
       mapping: body,
     });
+    if (mapped.status === 'PROCESSING') {
+      res.statusCode = 202;
+      const { previewSummary: _summary, ...job } = mapped;
+      return job;
+    }
+    return mapped;
   }
 
   @Get('workspaces/:workspaceId/imports/:importId/preview')
@@ -269,10 +316,23 @@ export class ImportsController {
     if (classification !== undefined && !(CLASSIFICATIONS as readonly string[]).includes(classification)) {
       throw new ApiProblem('VALIDATION_FAILED', 'unknown classification');
     }
+    const confidence = str(query, 'candidateConfidence') as 'HIGH' | 'MEDIUM' | 'LOW' | undefined;
+    if (confidence !== undefined && !['HIGH', 'MEDIUM', 'LOW'].includes(confidence)) {
+      throw new ApiProblem('VALIDATION_FAILED', 'unknown candidateConfidence');
+    }
+    const needsCategory =
+      query['needsCategory'] === undefined ? undefined : String(query['needsCategory']) === 'true';
+    const ruleId = str(query, 'ruleId');
     const scope = {
       resource: 'import-preview',
       workspaceId,
-      filters: { importId, classification: classification ?? null },
+      filters: {
+        importId,
+        classification: classification ?? null,
+        needsCategory: needsCategory ?? null,
+        ruleId: ruleId ?? null,
+        candidateConfidence: confidence ?? null,
+      },
     };
     const cursor = str(query, 'cursor');
     let afterRowNumber: number | undefined;
@@ -285,6 +345,9 @@ export class ImportsController {
     }
     const preview = await this.queries.preview(workspaceId, importId, {
       classification,
+      needsCategory,
+      ruleId,
+      candidateConfidence: confidence,
       afterRowNumber,
       limit: query['limit'] === undefined ? PREVIEW_PAGE_SIZE : limitOf(query),
     });
@@ -306,16 +369,43 @@ export class ImportsController {
     @Body() body: Json,
   ) {
     const decision = str(body, 'decision') as Decision | undefined;
-    if (!decision || !(DECISIONS as readonly string[]).includes(decision)) {
+    if (decision !== undefined && !(DECISIONS as readonly string[]).includes(decision)) {
       throw new ApiProblem('VALIDATION_FAILED', 'decision must be CREATE, SKIP or EXCLUDE');
     }
+    const kind = str(body, 'kind') as RowKind | undefined;
+    if (kind !== undefined && !['EXPENSE', 'INCOME', 'TRANSFER', 'CONVERSION'].includes(kind)) {
+      throw new ApiProblem('VALIDATION_FAILED', 'unknown kind');
+    }
+    const patch: RowPatch = {
+      ...(decision !== undefined ? { decision } : {}),
+      ...(str(body, 'candidateTransactionId') !== undefined
+        ? { candidateTransactionId: str(body, 'candidateTransactionId') as string }
+        : {}),
+      ...(kind !== undefined ? { kind } : {}),
+      ...('categoryId' in body ? { categoryId: (body['categoryId'] as string | null) ?? null } : {}),
+      ...('counterpartyId' in body
+        ? { counterpartyId: (body['counterpartyId'] as string | null) ?? null }
+        : {}),
+      ...('tagIds' in body ? { tagIds: body['tagIds'] as string[] } : {}),
+      ...('description' in body ? { description: (body['description'] as string | null) ?? null } : {}),
+      ...('note' in body ? { note: (body['note'] as string | null) ?? null } : {}),
+      ...('transfer' in body
+        ? { transfer: body['transfer'] as NonNullable<RowPatch['transfer']> | null }
+        : {}),
+      ...('conversion' in body
+        ? { conversion: body['conversion'] as NonNullable<RowPatch['conversion']> | null }
+        : {}),
+      ...('occurrenceLink' in body
+        ? { occurrenceLink: body['occurrenceLink'] as NonNullable<RowPatch['occurrenceLink']> | null }
+        : {}),
+    };
     const decided = await this.service.decideRow({
       workspaceId,
       userId: userIdOf(req),
       importId,
       rowId,
       expectedVersion,
-      decision,
+      patch,
     });
     // El ETag de la respuesta es la versión resultante del job (los conteos de la revisión cambian con la decisión).
     return { ...decided.row, version: decided.version, counters: decided.counters };
@@ -375,5 +465,140 @@ export class ImportsController {
     @Param('importId') importId: string,
   ) {
     return this.service.acceptErrors({ workspaceId, userId: userIdOf(req), importId });
+  }
+
+  // ───────────────────────────────────────────────────────────── Phase 6 (add-import-pipeline)
+
+  /** El mismo cambio para todas las filas de un filtro de la vista previa, en una sentencia (≤ 5 000 filas). */
+  @Post('workspaces/:workspaceId/imports/:importId/rows/bulk-edit')
+  @HttpCode(200)
+  bulkEditImportRows(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('importId') importId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+  ) {
+    const filter = (body['filter'] ?? {}) as Json;
+    const set = (body['set'] ?? {}) as Json;
+    const classification = str(filter, 'classification') as Classification | undefined;
+    if (classification !== undefined && !(CLASSIFICATIONS as readonly string[]).includes(classification)) {
+      throw new ApiProblem('VALIDATION_FAILED', 'unknown classification');
+    }
+    const decision = str(filter, 'decision') as Decision | undefined;
+    const setDecision = str(set, 'decision') as Decision | undefined;
+    for (const d of [decision, setDecision]) {
+      if (d !== undefined && !(DECISIONS as readonly string[]).includes(d)) {
+        throw new ApiProblem('VALIDATION_FAILED', 'unknown decision');
+      }
+    }
+    return this.service.bulkEdit({
+      workspaceId,
+      userId: userIdOf(req),
+      importId,
+      expectedVersion,
+      filter: {
+        classification,
+        decision,
+        needsCategory: typeof filter['needsCategory'] === 'boolean' ? filter['needsCategory'] : undefined,
+        ruleId: str(filter, 'ruleId'),
+      },
+      set: {
+        ...('categoryId' in set ? { categoryId: (set['categoryId'] as string | null) ?? null } : {}),
+        ...('counterpartyId' in set
+          ? { counterpartyId: (set['counterpartyId'] as string | null) ?? null }
+          : {}),
+        ...('tagIds' in set ? { tagIds: set['tagIds'] as string[] } : {}),
+        ...(setDecision !== undefined ? { decision: setDecision } : {}),
+      },
+    });
+  }
+
+  @Post('workspaces/:workspaceId/imports/:importId/reevaluate-rules')
+  @HttpCode(200)
+  reevaluateImportRules(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('importId') importId: string,
+    @ExpectedVersion() expectedVersion: number,
+  ) {
+    return this.service.reevaluateRules({ workspaceId, userId: userIdOf(req), importId, expectedVersion });
+  }
+
+  @Post('workspaces/:workspaceId/imports/:importId/occurrence-matches/confirm')
+  @HttpCode(200)
+  confirmImportOccurrenceMatches(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('importId') importId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+  ) {
+    if (body['scope'] !== 'HIGH_CONFIDENCE_UNIQUE') {
+      throw new ApiProblem('VALIDATION_FAILED', 'scope must be HIGH_CONFIDENCE_UNIQUE');
+    }
+    return this.service.confirmOccurrenceMatches({
+      workspaceId,
+      userId: userIdOf(req),
+      importId,
+      expectedVersion,
+    });
+  }
+
+  @Put('workspaces/:workspaceId/imports/:importId/statement')
+  setImportStatement(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('importId') importId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+  ) {
+    type Money = { amount: string; currency: string };
+    return this.service.setStatement({
+      workspaceId,
+      userId: userIdOf(req),
+      importId,
+      expectedVersion,
+      statement: {
+        ...('openingBalance' in body ? { openingBalance: body['openingBalance'] as Money | null } : {}),
+        ...('closingBalance' in body ? { closingBalance: body['closingBalance'] as Money | null } : {}),
+        ...('periodFrom' in body ? { periodFrom: body['periodFrom'] as string | null } : {}),
+        ...('periodTo' in body ? { periodTo: body['periodTo'] as string | null } : {}),
+      },
+    });
+  }
+
+  @Get('workspaces/:workspaceId/imports/:importId/revert-preview')
+  getImportRevertPreview(@Param('workspaceId') workspaceId: string, @Param('importId') importId: string) {
+    return this.reverts.preview(workspaceId, importId);
+  }
+
+  /** Deshacer: con bloqueadas y sin `allowPartial`, 409 `IMPORT_REVERT_BLOCKED` con la lista y sin cambios. */
+  @Post('workspaces/:workspaceId/imports/:importId/revert')
+  @HttpCode(202)
+  async revertImport(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('importId') importId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body?: Json,
+  ) {
+    try {
+      return await this.reverts.revert({
+        workspaceId,
+        userId: userIdOf(req),
+        importId,
+        expectedVersion,
+        allowPartial: body?.['allowPartial'] === true,
+      });
+    } catch (err) {
+      if (isDomainError(err) && err.code === 'IMPORT_REVERT_BLOCKED') {
+        throw new ApiProblem('IMPORT_REVERT_BLOCKED', err.message, {
+          extensions: { details: { blocked: err.details['blocked'] } },
+          cause: err,
+        });
+      }
+      throw err;
+    }
   }
 }

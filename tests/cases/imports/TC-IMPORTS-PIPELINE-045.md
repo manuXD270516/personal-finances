@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/row-edits.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +35,7 @@ steps:
 expected_result:
   - "se rechaza con `TRANSFER_CURRENCY_MISMATCH` y la fila no cambia"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-045 — Marcar una transferencia hacia una cuenta de otra moneda se rechaza con TRANSFER_CURRENCY_MISMATCH

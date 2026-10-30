@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/domain/mapping-profile.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+  - packages/contexts/imports/test/integration/pg-pipeline.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +35,7 @@ steps:
 expected_result:
   - "ese perfil no se sugiere ni se aplica"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-028 — Un perfil archivado no se sugiere ni se aplica a importaciones nuevas

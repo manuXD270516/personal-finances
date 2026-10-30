@@ -12,9 +12,10 @@ invariants: ["INV-014"]
 priority: critical
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/application/duplicate-matching.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]
@@ -31,7 +32,7 @@ expected_result:
   - "la fila de la línea 95 se clasifica como ya importada con referencia a la línea 40"
   - "al aprobar se crea una sola transacción de 50.00 BOB"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-TRANSACTIONS-DEDUPE-012 — Un identificador repetido dentro del archivo se clasifica como ya importado y crea una sola transacción

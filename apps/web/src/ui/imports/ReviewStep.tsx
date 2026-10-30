@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { problemMessage } from '../../errors/error-messages';
+import { useCatalogs } from '../transactions/catalogs';
 import { ConfirmPanel, mutedStyle } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -14,9 +16,26 @@ import {
   pendingDecisionsOf,
   previewPath,
   summaryPath,
-  type ClassificationFilter,
 } from './logic';
 import { PreviewTable, decisionButtonId } from './PreviewTable';
+import {
+  EMPTY_FILTER,
+  bulkEditPath,
+  bulkFilterBody,
+  bulkSupportsFilter,
+  confirmMatchesPath,
+  filterIsEmpty,
+  filterQuery,
+  hasOccurrenceCandidates,
+  highConfidenceUniqueCount,
+  isDocumentJob,
+  reevaluatePath,
+  ruleOptionsOf,
+  statementPath,
+  type ReviewFilter,
+} from './pipeline-logic';
+import { RowDetail, hasPipelineData, type RowPatch } from './RowDetail';
+import { AdvancedFilters, BulkTools, StatementPanel } from './ReviewTools';
 import {
   ApproveBar,
   ApproveSummary,
@@ -58,7 +77,12 @@ export function ReviewStep({
   actions?: ReactNode;
 }) {
   const { api, base } = ctx;
-  const [filter, setFilter] = useState<ClassificationFilter>('');
+  const [filter, setFilter] = useState<ReviewFilter>(EMPTY_FILTER);
+  const catalogs = useCatalogs(ctx);
+  const [rowErrors, setRowErrors] = useState<Readonly<Record<string, string>>>({});
+  const [busyAll, setBusyAll] = useState(false);
+  const [notice, setNotice] = useState<string | undefined>();
+  const pipeline = isDocumentJob(job);
   const [rows, setRows] = useState<readonly ImportPreviewRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportPreviewSummary | undefined>(initialSummary);
@@ -81,7 +105,7 @@ export function ReviewStep({
     let cancelled = false;
     setLoading(true);
     api
-      .get<ImportPreview>(previewPath(base, job.id, { classification: filter }))
+      .get<ImportPreview>(previewPath(base, job.id, filterQuery(filter)))
       .then((r) => {
         if (cancelled || !r.data) return;
         setRows(r.data.rows);
@@ -106,7 +130,7 @@ export function ReviewStep({
     setLoadingMore(true);
     try {
       const r = await api.get<ImportPreview>(
-        previewPath(base, job.id, { classification: filter, cursor: nextCursor }),
+        previewPath(base, job.id, { ...filterQuery(filter), cursor: nextCursor }),
       );
       if (r.data) {
         const page = r.data;
@@ -164,6 +188,111 @@ export function ReviewStep({
     }
   }
 
+  /** Edición de una fila (`PATCH` con `If-Match`): el resultado trae la fila completa y los conteos nuevos. */
+  async function edit(row: ImportPreviewRow, patch: RowPatch) {
+    setBusyRow(row.id);
+    setProblem(undefined);
+    setRowErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      const r = await api.command<ImportRowDecisionResult>(
+        'PATCH',
+        `${importPath(base, job.id)}/rows/${row.id}`,
+        patch,
+        { ifMatch: job.version, contentType: 'application/json' },
+      );
+      const result = r.data;
+      if (result) {
+        setRows((prev) => applyDecision(prev, result));
+        onJobChange({ ...job, version: result.version, counters: result.counters });
+        const s = await api.get<ImportPreview>(summaryPath(base, job.id));
+        if (s.data) setSummary(s.data.summary);
+      }
+    } catch (err) {
+      const p = problemOf(err);
+      if (
+        err instanceof FinanceApiError &&
+        (err.status === 412 || err.status === 409) &&
+        p.code === 'CONCURRENCY_CONFLICT'
+      ) {
+        setProblem(p);
+        await resync();
+      } else {
+        setRowErrors((prev) => ({ ...prev, [row.id]: problemMessage(p, ctx.uiLocale) }));
+      }
+    } finally {
+      setBusyRow(undefined);
+    }
+  }
+
+  /** Acción de revisión sobre todo el import (lote, reglas, coincidencias, saldo): recarga la lista al terminar. */
+  async function bulkAction<T>(run: () => Promise<T>, after?: (result: T) => string | undefined) {
+    setBusyAll(true);
+    setProblem(undefined);
+    setNotice(undefined);
+    try {
+      const result = await run();
+      setNotice(after?.(result));
+      setReload((n) => n + 1);
+    } catch (err) {
+      setProblem(problemOf(err));
+      if (err instanceof FinanceApiError && (err.status === 412 || err.status === 409)) await resync();
+    } finally {
+      setBusyAll(false);
+    }
+  }
+
+  const bulkCategory = (categoryId: string) =>
+    bulkAction(
+      async () => {
+        const r = await api.command<{ updated: number; version: number }>(
+          'POST',
+          bulkEditPath(base, job.id),
+          { filter: bulkFilterBody(filter), set: { categoryId } },
+          { ifMatch: job.version },
+        );
+        if (r.data) onJobChange({ ...job, version: r.data.version });
+        return r.data?.updated ?? 0;
+      },
+      (n) => f.t('bulk.done', { count: n }),
+    );
+
+  const reevaluate = () =>
+    bulkAction(
+      async () => {
+        const r = await api.command<ImportJob>('POST', reevaluatePath(base, job.id), undefined, {
+          ifMatch: job.version,
+        });
+        if (r.data) onJobChange(r.data);
+      },
+      () => f.t('bulk.reevaluated'),
+    );
+
+  const confirmMatches = () =>
+    bulkAction(
+      async () => {
+        const r = await api.command<{ confirmed: number; version: number }>(
+          'POST',
+          confirmMatchesPath(base, job.id),
+          { scope: 'HIGH_CONFIDENCE_UNIQUE' },
+          { ifMatch: job.version },
+        );
+        if (r.data) onJobChange({ ...job, version: r.data.version });
+        return r.data?.confirmed ?? 0;
+      },
+      (n) => f.t('bulk.confirmed', { count: n }),
+    );
+
+  const saveStatement = (body: {
+    closingBalance: { amount: string; currency: string } | null;
+    periodTo: string | null;
+  }) =>
+    bulkAction(async () => {
+      const r = await api.command<ImportJob>('PUT', statementPath(base, job.id), body, {
+        ifMatch: job.version,
+      });
+      if (r.data) onJobChange(r.data);
+    });
+
   async function approve() {
     setApproving(true);
     setProblem(undefined);
@@ -209,7 +338,61 @@ export function ReviewStep({
           {f.t('review.pendingFromServer', { count: serverPending })}
         </p>
       ) : null}
-      {summary ? <FilterBar summary={summary} f={f} value={filter} onChange={setFilter} /> : null}
+      {pipeline && ctx.canEdit ? (
+        <BulkTools
+          f={f}
+          categories={catalogs.categories}
+          groups={catalogs.groups}
+          filterLabel={
+            filterIsEmpty(filter)
+              ? f.t('filters.all', { count: summary?.counts.rows ?? 0 })
+              : f.t('bulk.currentFilter')
+          }
+          filterSupported={bulkSupportsFilter(filter)}
+          highConfidence={highConfidenceUniqueCount(rows)}
+          busy={busyAll}
+          onBulkCategory={(id) => void bulkCategory(id)}
+          onReevaluate={() => void reevaluate()}
+          onConfirmMatches={() => void confirmMatches()}
+        />
+      ) : null}
+      {pipeline ? (
+        <StatementPanel
+          f={f}
+          job={job}
+          summary={summary}
+          currency={catalogs.accounts.find((a) => a.id === job.accountId)?.currency ?? ctx.ws.baseCurrency}
+          canEdit={ctx.canEdit}
+          busy={busyAll}
+          onSave={(body) => void saveStatement(body)}
+        />
+      ) : null}
+      {notice ? (
+        <p role="status" data-testid="import-notice">
+          {notice}
+        </p>
+      ) : null}
+      {summary ? (
+        <FilterBar
+          summary={summary}
+          f={f}
+          value={filter.classification}
+          onChange={(classification) => setFilter({ ...filter, classification })}
+        />
+      ) : null}
+      {pipeline ? (
+        <AdvancedFilters
+          f={f}
+          value={filter}
+          rules={ruleOptionsOf(rows)}
+          onChange={(patch) => setFilter({ ...filter, ...patch })}
+        />
+      ) : null}
+      {pipeline && hasOccurrenceCandidates(rows) ? (
+        <p style={mutedStyle} data-testid="import-matches-note">
+          {f.t('detail.commitmentsNote')}
+        </p>
+      ) : null}
 
       {loading ? (
         <p aria-busy="true">{f.t('loading')}</p>
@@ -225,6 +408,27 @@ export function ReviewStep({
           canEdit={ctx.canEdit}
           busyRowId={busyRow}
           onDecide={(row, decision) => void decide(row, decision)}
+          renderExtras={
+            pipeline
+              ? (row) =>
+                  hasPipelineData(row) ? (
+                    <RowDetail
+                      row={row}
+                      f={f}
+                      job={job}
+                      canEdit={ctx.canEdit}
+                      catalogs={catalogs}
+                      accountId={job.accountId}
+                      accountCurrency={
+                        catalogs.accounts.find((a) => a.id === job.accountId)?.currency ?? ctx.ws.baseCurrency
+                      }
+                      busy={busyRow === row.id}
+                      error={rowErrors[row.id] || undefined}
+                      onEdit={(r, patch) => void edit(r, patch)}
+                    />
+                  ) : null
+              : undefined
+          }
         />
       )}
       {nextCursor ? (

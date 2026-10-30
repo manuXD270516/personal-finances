@@ -328,3 +328,185 @@ describe('TransactionStatusQuery y referencias de filas importadas (PostgreSQL r
     expect(manual.snapshot.importJobId).toBeNull();
   });
 });
+
+describe('Puntaje de duplicados e identificador del banco (PostgreSQL real, add-import-pipeline)', () => {
+  const scored = (
+    rows: {
+      rowRef: string;
+      date: string;
+      description: string | null;
+      amount: string;
+      externalId?: string | null;
+      counterpartyId?: string | null;
+    }[],
+  ) =>
+    candidates.findForImport({
+      workspaceId: ws,
+      accountId: bank,
+      windowDays: 3,
+      rows: rows.map((r) => ({
+        rowRef: r.rowRef,
+        date: r.date,
+        direction: 'OUT' as const,
+        amount: { amount: r.amount, currency: 'BOB' },
+        description: r.description,
+        ...(r.externalId !== undefined ? { externalId: r.externalId } : {}),
+        ...(r.counterpartyId !== undefined ? { counterpartyId: r.counterpartyId } : {}),
+      })),
+    });
+
+  it('[TC-TRANSACTIONS-DEDUPE-001] el gasto manual del día siguiente con la misma descripción puntúa 0.9000 con sus señales', async () => {
+    const result = await scored([
+      { rowRef: 's1', date: '2026-10-01', description: 'SUPERMERCADO', amount: '245.30' },
+    ]);
+    const candidate = result[0]?.candidates.find((c) => c.transactionId === manualExpense);
+    expect(candidate?.transactionId).toBe(manualExpense);
+    expect(candidate?.score).toBe('0.9000');
+    expect(candidate?.signals).toEqual({
+      amount: '1.0000',
+      date: '0.8000',
+      description: '1.0000',
+      counterparty: '0.5000',
+      origin: '1.0000',
+    });
+    expect(candidate?.hasBankExternalRef).toBe(false);
+  });
+
+  it('[TC-TRANSACTIONS-DEDUPE-002] un candidato con otro identificador del banco puntúa 0.8500 y se marca hasBankExternalRef', async () => {
+    const bankTx = expense({
+      amount: bob('310.10'),
+      businessDate: '2026-10-02',
+      description: 'Supermercado',
+      source: 'IMPORT',
+      externalRef: { namespace: 'imports.ext:OFX', id: 'FIT-A' },
+      importJobId: randomUUID(),
+    });
+    const id = await insert(bankTx);
+    const result = await scored([
+      {
+        rowRef: 's2',
+        date: '2026-10-01',
+        description: 'SUPERMERCADO',
+        amount: '310.10',
+        externalId: 'FIT-B',
+      },
+      {
+        rowRef: 's3',
+        date: '2026-10-01',
+        description: 'SUPERMERCADO',
+        amount: '310.10',
+        externalId: 'FIT-A',
+      },
+    ]);
+    expect(result[0]?.candidates[0]).toMatchObject({
+      transactionId: id,
+      score: '0.8500',
+      hasBankExternalRef: true,
+    });
+    expect(result[1]?.candidates[0]?.score).toBe('0.9000');
+  });
+
+  it('[TC-TRANSACTIONS-DEDUPE-003] dos candidatos se ordenan por puntaje, días e id, y el orden se repite', async () => {
+    const near = await insert(
+      expense({ amount: bob('77.70'), businessDate: '2026-10-02', description: 'Farmacia Demo' }),
+    );
+    const far = await insert(
+      expense({ amount: bob('77.70'), businessDate: '2026-10-03', description: 'Farmacia Demo' }),
+    );
+    const rows = [{ rowRef: 'f', date: '2026-10-01', description: 'FARMACIA DEMO', amount: '77.70' }];
+    const first = await scored(rows);
+    expect(first[0]?.candidates.map((c) => c.transactionId)).toEqual([near, far]);
+    expect(first[0]?.candidates.map((c) => c.score)).toEqual(['0.9000', '0.8250']);
+    expect((await scored(rows))[0]?.candidates.map((c) => c.transactionId)).toEqual([near, far]);
+  });
+
+  it('[TC-TRANSACTIONS-DEDUPE-008] a 3 días sin similitud ni identificador el candidato puntúa 0.5750', async () => {
+    const id = await insert(
+      expense({ amount: bob('412.55'), businessDate: '2026-10-04', description: 'qqq' }),
+    );
+    const result = await scored([
+      { rowRef: 'low', date: '2026-10-01', description: 'zzzz', amount: '412.55' },
+    ]);
+    expect(result[0]?.candidates[0]).toMatchObject({ transactionId: id, score: '0.5750' });
+  });
+});
+
+describe('Índice único por identificador del banco imports.ext:* (PostgreSQL real, add-import-pipeline)', () => {
+  const ofx = (id: string, over: Partial<RecordTransactionInput> = {}) =>
+    expense({
+      source: 'IMPORT',
+      externalRef: { namespace: 'imports.ext:OFX', id },
+      importJobId: randomUUID(),
+      amount: bob('50.00'),
+      description: 'MOV',
+      ...over,
+    });
+
+  it('[TC-TRANSACTIONS-DEDUPE-004] dos importaciones simultáneas con el mismo identificador dejan una sola transacción viva', async () => {
+    const results = await Promise.allSettled([insert(ofx('2026030100017')), insert(ofx('2026030100017'))]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+    expect((rejected.reason as { code?: string }).code).toBe('23505');
+    const found = await inWs(ws, () =>
+      refs.existingByRefs({
+        workspaceId: ws,
+        accountId: bank,
+        namespace: 'imports.ext:OFX',
+        ids: ['2026030100017'],
+      }),
+    );
+    expect(found.size).toBe(1);
+  });
+
+  it('[TC-TRANSACTIONS-DEDUPE-004] el mismo identificador en otra cuenta o en otro formato es otra referencia', async () => {
+    const id = 'FIT-multi';
+    await insert(ofx(id));
+    await insert(ofx(id, { accountId: visa, accountNature: 'LIABILITY' }));
+    await insert(ofx(id, { externalRef: { namespace: 'imports.ext:QIF', id } }));
+    expect(await pgError(insert(ofx(id)))).toBe('23505');
+  });
+
+  it('[TC-TRANSACTIONS-DEDUPE-005] anular la transacción libera el identificador para un import posterior', async () => {
+    const id = 'FIT-liberada';
+    const first = ofx(id);
+    await insert(first);
+    expect(await pgError(insert(ofx(id)))).toBe('23505');
+    await inWs(ws, async () => {
+      await requireSqlExecutor().query(
+        `UPDATE txn.transaction SET status = 'VOIDED', voided_at = now(), active_entry_id = NULL, void_reason = 'x' WHERE id = $1`,
+        [first.id],
+      );
+    });
+    const second = ofx(id);
+    await insert(second);
+    const found = await inWs(ws, () =>
+      refs.existingByRefs({ workspaceId: ws, accountId: bank, namespace: 'imports.ext:OFX', ids: [id] }),
+    );
+    expect([...found]).toEqual([[id, second.id]]);
+  });
+
+  it('existingByRefs también ve una transferencia importada por la pata de la cuenta que no es la principal', async () => {
+    const incoming = Transaction.recordTransfer({
+      id: randomUUID(),
+      workspaceId: ws,
+      businessDate: '2026-10-21',
+      from: { accountId: visa, nature: 'LIABILITY', currency: 'BOB' },
+      to: { accountId: bank, nature: 'ASSET', currency: 'BOB' },
+      amount: bob('12.00'),
+      source: 'IMPORT',
+      externalRef: { namespace: 'imports.ext:OFX', id: 'FIT-transfer' },
+      importJobId: randomUUID(),
+    });
+    incoming.attachEntry(randomUUID());
+    await insert(incoming);
+    const found = await inWs(ws, () =>
+      refs.existingByRefs({
+        workspaceId: ws,
+        accountId: bank,
+        namespace: 'imports.ext:OFX',
+        ids: ['FIT-transfer'],
+      }),
+    );
+    expect([...found]).toEqual([['FIT-transfer', incoming.id]]);
+  });
+});

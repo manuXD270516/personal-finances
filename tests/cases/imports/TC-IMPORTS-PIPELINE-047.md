@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+status: ready
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +33,7 @@ steps:
 expected_result:
   - "esa fila es un posible duplicado con la conversión como candidato"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-047 — La pata de una conversión importada es candidata de duplicado al importar la otra cuenta
@@ -56,4 +57,5 @@ Entonces esa fila es un posible duplicado con la conversión como candidato
 
 ## Notas
 
+- Cobertura (2026-10-30): recorrido completo por API entre dos imports (BOB → conversión hacia una cuenta USD; luego el extracto de la cuenta USD marca el ingreso como posible duplicado con la conversión como candidata); la pata como candidata también se verifica en TRANSACTIONS (TC-TRANSACTIONS-DEDUPE-006..008).
 - Change: `add-import-pipeline` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).

@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/src/identity/import-job-lifecycle-registry.test.ts
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/audit/src/application/lifecycle-import-job.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +36,7 @@ expected_result:
   - "el recorrido muestra en orden subida, procesando, en revisión, aprobada, persistiendo, completada, deshaciendo y deshecha, con \"Ana\" o el sistema como actor de cada transición"
   - "muestra la aplicación del perfil versión 2 como anotación"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-070 — El recorrido de una importación deshecha muestra sus transiciones en orden con actor y la anotación del perfil

@@ -231,6 +231,86 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
     });
   }
 
+  /**
+   * `ReverseJournalEntry` por conjunto (openspec add-import-pipeline, decisión 15): carga los originales, las reversas
+   * existentes y los periodos cerrados con una consulta cada una y escribe asientos, postings, vínculos, eventos y
+   * auditoría con sentencias multi-fila. Mismas reglas de dominio que `reverseJournalEntry` (ReversalFactory).
+   */
+  reverseJournalEntries(commands: readonly ReverseJournalEntryCommand[]): Promise<readonly PostedEntryDto[]> {
+    const first = commands[0];
+    if (!first) return Promise.resolve([]);
+    if (commands.length > MAX_POST_BATCH) {
+      return Promise.reject(
+        new DomainError('VALIDATION_FAILED', `a batch has at most ${MAX_POST_BATCH} journal entries`),
+      );
+    }
+    const workspaceId = first.workspaceId;
+    return this.deps.uow.run(workspaceId, async () => {
+      const { entries, periods, ids, context } = this.deps;
+      if (commands.some((c) => c.workspaceId !== workspaceId)) {
+        throw new DomainError('VALIDATION_FAILED', 'a batch belongs to a single workspace');
+      }
+      const distinct = new Set(commands.map((c) => c.journalEntryId));
+      if (distinct.size !== commands.length) {
+        throw new DomainError('LEDGER_ENTRY_ALREADY_REVERSED', 'an entry appears twice in the batch');
+      }
+      const originals = new Map(
+        (await entries.findManyById(workspaceId, [...distinct])).map((e) => [e.id, e] as const),
+      );
+      const reversed = await entries.reversedAmong(workspaceId, [...distinct]);
+      const dates = new Map(commands.map((c) => [c.reverseDate, LocalDate.parse(c.reverseDate)] as const));
+      const locked = await periods.lockedDates(workspaceId, [...dates.values()]);
+      const built: JournalEntry[] = [];
+      for (const command of commands) {
+        const original = originals.get(command.journalEntryId);
+        if (!original) {
+          throw new DomainError('REFERENCE_NOT_FOUND', `journal entry ${command.journalEntryId} not found`);
+        }
+        if (original.entryType === 'REVERSAL') {
+          throw new DomainError('LEDGER_ENTRY_NOT_REVERSIBLE', `entry ${original.id} is a reversal`);
+        }
+        if (reversed.has(original.id)) {
+          throw new DomainError('LEDGER_ENTRY_ALREADY_REVERSED', `entry ${original.id} was already reversed`);
+        }
+        built.push(
+          ReversalFactory.reverse(
+            original,
+            {
+              id: ids.newId(),
+              entryDate: dates.get(command.reverseDate) as LocalDate,
+              postingIds: original.postings.map(() => ids.newId()),
+              memo: command.reason,
+              correlationId: context.correlationId(),
+              createdBy: context.actorUserId(),
+            },
+            { periodLocked: locked.has(command.reverseDate) },
+          ),
+        );
+      }
+      const saved = await entries.appendMany(built);
+      await entries.recordReversals(
+        workspaceId,
+        saved.map((r, i) => ({
+          originalId: (commands[i] as ReverseJournalEntryCommand).journalEntryId,
+          reversalId: r.id,
+        })),
+      );
+      await this.publishMany(saved);
+      const auditEntries = saved.map((entry, i) => ({
+        workspaceId,
+        action: 'ledger.journal_entry.reversed',
+        aggregateType: 'JournalEntry',
+        aggregateId: (commands[i] as ReverseJournalEntryCommand).journalEntryId,
+        aggregateVersion: null,
+        reason: (commands[i] as ReverseJournalEntryCommand).reason,
+        changes: [{ field: 'reversedByEntryId', before: null, after: entry.id }],
+      }));
+      if (this.audit.appendMany) await this.audit.appendMany(auditEntries);
+      else for (const e of auditEntries) await this.audit.append(e);
+      return saved.map((e) => ({ journalEntryId: e.id, sequence: e.sequence ?? '', created: true }));
+    });
+  }
+
   ledgerAccountForUserAccount(input: {
     readonly workspaceId: string;
     readonly accountId: string;

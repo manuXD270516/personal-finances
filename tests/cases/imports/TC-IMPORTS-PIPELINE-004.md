@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+  - packages/contexts/imports/test/integration/pg-pipeline.int.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +36,7 @@ expected_result:
   - "la importación queda en estado \"subida\" con el documento vinculado y la suma SHA-256 del documento como suma del archivo"
   - "no existe ninguna transacción importada"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-004 — Crear una importación desde un documento disponible la deja subida y vinculada al documento sin transacciones

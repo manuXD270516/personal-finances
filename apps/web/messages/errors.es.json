@@ -119,6 +119,8 @@
   "IMPORT_TOO_MANY_ROWS": "El archivo tiene más filas de las permitidas (5.000). Divídelo en varios archivos e impórtalos por separado.",
   "IMPORT_MAPPING_INVALID": "La asignación de columnas no es válida para este archivo. Revisa la columna de la fecha, la descripción y el monto.",
   "IMPORT_REVIEW_INCOMPLETE": "Aún hay posibles duplicados sin decidir. Decide cada uno (crear, omitir o excluir) antes de aprobar.",
+  "IMPORT_PARSE_FAILED": "No pudimos leer el archivo del extracto. Revisa que el formato sea válido y vuelve a subirlo.",
+  "IMPORT_REVERT_BLOCKED": "No se puede deshacer todo el import: algunas transacciones están reconciliadas o en un periodo cerrado. Revisa la lista o elige deshacer solo las demás.",
   "LOAN_METHOD_NOT_AVAILABLE": "Este método de amortización todavía no está disponible. Por ahora solo se admite el sistema francés (cuota constante).",
   "LOAN_ACCOUNT_INVALID": "La cuenta del préstamo debe ser una cuenta activa de tipo préstamo y en la misma moneda.",
   "LOAN_ACCOUNT_IN_USE": "Esa cuenta ya pertenece a otro préstamo. Elige otra o crea una cuenta nueva.",

@@ -12,9 +12,18 @@ invariants: ["INV-007", "INV-008", "INV-029"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imported-movements.api.test.ts
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/domain/import-job.test.ts
+  - packages/contexts/imports/src/domain/row-edits.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -33,7 +42,7 @@ expected_result:
   - "las 3 transacciones quedan anuladas con su reversa y el saldo de \"Banco BOB\" vuelve a 4000.00 BOB"
   - "la importación queda \"deshecha\" con un registro de auditoría con \"Ana\" como actor"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-059 — Deshacer un import anula sus 3 transacciones con reversa y devuelve el saldo a 4000.00 BOB

@@ -14,7 +14,9 @@ import {
   type ConversionFeeType,
   type ConversionPricing,
   type CurrencyInfo,
+  type ExternalRef,
   type ReferenceRateInfo,
+  type TransactionSource,
   type TransactionState,
   type TransactionStatus,
 } from '../domain/index.js';
@@ -69,6 +71,10 @@ export interface RecordConversionCommand extends ConversionFields {
   readonly userId: string;
   readonly id?: string;
   readonly status?: 'PENDING' | 'POSTED' | 'CLEARED';
+  /** Conversión importada (add-import-pipeline): origen, referencia de la transacción e import que la creó. */
+  readonly origin?: TransactionSource;
+  readonly transactionRef?: ExternalRef | null;
+  readonly importJobId?: string | null;
 }
 
 export interface AmendConversionCommand extends ConversionFields {
@@ -161,6 +167,9 @@ export class ConversionsService {
         workspaceId: cmd.workspaceId,
         status: cmd.status ?? 'POSTED',
         ...data,
+        ...(cmd.origin ? { origin: cmd.origin } : {}),
+        ...(cmd.transactionRef ? { transactionRef: cmd.transactionRef } : {}),
+        ...(cmd.importJobId ? { importJobId: cmd.importJobId } : {}),
       });
       let entryId: string | null = null;
       if (tx.needsEntry) {

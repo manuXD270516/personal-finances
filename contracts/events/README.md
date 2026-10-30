@@ -51,8 +51,13 @@ contracts/events/
 │  ├─ SubscriptionCancelled.v1.schema.json            # add-subscriptions: inmediata o programada
 │  └─ OccurrenceMatchSuggested.v1.schema.json         # add-commitment-matching: sugerencia de coincidencia creada o re-propuesta (nunca vincula sola)
 ├─ imports/                             # add-basic-csv-import (importación CSV; nunca eventos por fila, docs/33 D112)
-│  ├─ ImportApproved.v1.schema.json     # aprobación o reintento: lo consume el worker (imports.persist)
-│  └─ ImportCompleted.v1.schema.json    # fin con COMPLETED, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS (sin consumidores obligatorios en Phase 3)
+│  ├─ ImportApproved.v1.schema.json      # aprobación o reintento: lo consume el worker (imports.persist)
+│  ├─ ImportFileUploaded.v1.schema.json  # add-import-pipeline: importación creada desde un documento; la consume el worker (imports.persist)
+│  ├─ ImportPreviewReady.v1.schema.json  # add-import-pipeline: vista previa lista (solo conteos; sin consumidores por ahora)
+│  ├─ ImportFailed.v1.schema.json        # add-import-pipeline: PARSE_FAILED con código y etapa, sin texto del archivo (sin consumidores por ahora)
+│  ├─ ImportRevertRequested.v1.schema.json  # add-import-pipeline: deshacer solicitado; lo consume el worker (imports.persist)
+│  ├─ ImportReverted.v1.schema.json      # add-import-pipeline: deshacer terminado (ROLLED_BACK o PARTIALLY_ROLLED_BACK; solo conteos)
+│  └─ ImportCompleted.v1.schema.json     # fin con COMPLETED, COMPLETED_WITH_DIFFERENCE, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS; `status` y `sourceType` son enums abiertos (aditivo, add-import-pipeline)
 ├─ debt/                                # add-loans (préstamos) y add-credit-cards (tarjetas; los de tarjeta los consume NOTIFY)
 │  ├─ LoanDisbursed.v1.schema.json      # desembolso: principal, comisión retenida y transacción
 │  ├─ LoanScheduleGenerated.v1.schema.json  # cronograma fijado (v1 INITIAL) con todas sus cuotas
@@ -92,6 +97,7 @@ Ruta: `contracts/events/<context>/<EventName>.v<N>.schema.json` (ARCHITECTURE §
 - **Nulos explícitos**: los campos opcionales están presentes con `null` (todos los campos son `required`), lo que hace el contrato explícito y facilita la detección de cambios. Excepciones documentadas: campos agregados de forma aditiva a un evento ya existente (p. ej. `revision`, `convertedSource`, `grossTarget`, `quotedRateDeviation` en `ConversionRecorded`) y los valores nuevos opcionales de `AccountUpdated` (solo viajan los campos de `changedFields` no sensibles).
 - **Enums compartidos con el OpenAPI** (docs/31 D18): el OpenAPI manda. `TransactionKind`, `TransactionSource` (`GOAL` singular; el pago de tarjeta es `TRANSFER`), `AccountType`, `AccountLiquidity`, `FxRateType`, `FxRateSource`, `ConversionFeeType` y `CategoryKind` se mantienen idénticos en ambos contratos.
 - **Estrictez**: `additionalProperties: false` en envelope y payloads ⇒ el **productor** debe emitir exactamente el contrato. Los **consumidores** NO validan estrictamente (tolerant reader): ignoran campos desconocidos para soportar cambios aditivos.
+- **Enums abiertos**: un campo cuyo catálogo puede crecer (p. ej. `status` y `sourceType` de `imports.ImportCompleted`, `format` y `code` de los eventos de IMPORTS) se declara `type: string` con `examples` y su catálogo en la descripción, no como `enum` cerrado: agregar un valor es un cambio aditivo (MINOR) y los consumidores DEBEN (MUST) tolerar valores desconocidos. (El registro de Ajv es `strict`, por eso no se usa `x-extensible-enum` en estos schemas.)
 - **Invariantes no expresables** (p. ej. Σ postings por moneda = 0 en `JournalEntryPosted`) se documentan en `description` y se verifican en los tests de contrato del productor.
 - **Ejemplos**: cada schema trae `examples` válidos usados por los tests de consumidores.
 

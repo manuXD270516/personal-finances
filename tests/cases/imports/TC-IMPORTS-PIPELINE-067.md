@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: security
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/readers/ofx-reader.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_TOO_MANY_ROWS` y sin filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-067 — Un OFX de 5 001 movimientos falla la lectura con IMPORT_TOO_MANY_ROWS sin filas

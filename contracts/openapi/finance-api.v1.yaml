@@ -7904,9 +7904,21 @@ paths:
     post:
       tags: [Imports]
       operationId: createImport
-      summary: Upload a bank statement CSV for one account (creates an import waiting for its column mapping)
+      summary: Create an import for one account (from an uploaded document, or by uploading a basic CSV)
       description: |
-        `multipart/form-data` with the `file` (CSV, at most `IMPORT_CSV_MAX_BYTES` = 2 MiB: the server stops reading when it
+        **From a document (`application/json`)**: `{ accountId, documentId, mappingProfileId? }` with a document of purpose
+        `IMPORT_SOURCE` and status `AVAILABLE` (uploaded with the documents API). The format (CSV, OFX 1.x/2.x, QIF, JSON
+        `pfos.import-file` v1 or XLSX) is detected from the CONTENT. Not available → 409 `DOCUMENT_NOT_AVAILABLE`; another
+        purpose → 422 `VALIDATION_FAILED`; a format that cannot be imported (a PDF) → 422 `IMPORT_UNSUPPORTED_FORMAT`.
+        Replies 202 with the import in `UPLOADED`; the worker reads it by stages (`PROCESSING` with `stage`) and leaves it
+        in `AWAITING_REVIEW` (or `AWAITING_MAPPING` with `profileCandidates` and `missingColumns`, or `PARSE_FAILED`).
+        The document is linked to the import in the same transaction, `imports.ImportFileUploaded.v1` is published and the
+        warning `IMPORT_FILE_ALREADY_IMPORTED` works the same (same SHA-256). Up to `IMPORT_MAX_ROWS` = 5 000 data rows.
+        The idempotency payload is `{ accountId, documentId }`.
+
+        **By upload (`multipart/form-data`, basic CSV; kept, planned deprecation)**: it will be deprecated when the UI uses only documents
+        (decision D332). OpenAPI `deprecated` is per operation and cannot single out this variant, so the operation is NOT marked
+        `deprecated` yet; this note is the notice. It is not removed. With the `file` (CSV, at most `IMPORT_CSV_MAX_BYTES` = 2 MiB: the server stops reading when it
         is exceeded → 413 `UPLOAD_TOO_LARGE`) and the `accountId` (an active account of the workspace: closed → 409
         `ACCOUNT_CLOSED`, archived → 409 `ACCOUNT_ARCHIVED`). The server detects the encoding (UTF-8 with or without BOM, or
         windows-1252) and the delimiter (`,` `;` tab `|`), reads the records (RFC 4180) and returns the import in
@@ -7927,6 +7939,14 @@ paths:
       requestBody:
         required: true
         content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportCreateFromDocumentRequest' }
+            examples:
+              ofxDocument:
+                summary: OFX statement uploaded as a document
+                value:
+                  accountId: '01928c4e-0000-7000-8000-0000000ac001'
+                  documentId: '01928c4e-0000-7000-8000-0000000d0001'
           multipart/form-data:
             schema:
               type: object
@@ -7952,17 +7972,28 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ImportCreated' }
+        '202':
+          description: Import created from a document (`UPLOADED`); the worker processes it in the background (poll `getImport`).
+          headers:
+            Location:
+              description: URL of the import (`/api/v1/workspaces/{workspaceId}/imports/{importId}`).
+              schema: { type: string }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'ACCOUNT_CLOSED or ACCOUNT_ARCHIVED.'
+          description: 'ACCOUNT_CLOSED, ACCOUNT_ARCHIVED or DOCUMENT_NOT_AVAILABLE.'
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-          description: 'IMPORT_UNSUPPORTED_FORMAT, IMPORT_TOO_MANY_ROWS, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
+          description: 'IMPORT_UNSUPPORTED_FORMAT, IMPORT_TOO_MANY_ROWS, VALIDATION_FAILED, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -8033,6 +8064,34 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/imports/{importId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    get:
+      tags: [Imports]
+      operationId: getImportLifecycle
+      summary: Lifecycle of an import
+      description: |
+        Machine `ImportJob` (docs/31 D37, D151): every transition with its actor (the user, or the system for the
+        stages of the worker and the expiration), instant and reason; the application of a profile and its version, the
+        re-evaluation of rules and the acceptance of errors appear as annotations.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Lifecycle of an import
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/imports/{importId}/mapping:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -8051,6 +8110,9 @@ paths:
         sent again while the import is not approved: the preview is recomputed and the decisions of the rows whose
         fingerprint did not change are kept. A mapping that references missing columns or leaves date, description or
         amount unassigned → 422 `IMPORT_MAPPING_INVALID` and the import stays as it was. Nothing financial is created.
+        Also accepts `{ mappingProfileId, version? }` (apply a saved profile) or a profile mapping of `imports.profile.v1`.
+        For an import created from a document the answer is 202 (`PROCESSING`: the worker reapplies the mapping and leaves
+        it in `AWAITING_REVIEW`); for the basic CSV it stays 200 with the preview summary.
         Costly operation (`x-rate-limit: costly`).
       x-openspec-capability: imports/import-pipeline
       x-required-role: EDITOR
@@ -8061,7 +8123,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ImportMapping' }
+            schema: { $ref: '#/components/schemas/ImportMappingRequest' }
       responses:
         '200':
           description: The import in review with the summary of the preview
@@ -8070,6 +8132,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ImportMapped' }
+        '202':
+          description: Import from a document; the worker applies the mapping in the background (`PROCESSING`).
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -8107,6 +8176,18 @@ paths:
         - name: classification
           in: query
           schema: { $ref: '#/components/schemas/ImportRowClassification' }
+        - name: needsCategory
+          in: query
+          description: Only the rows without a proposed or edited category (`true`) or only those with one (`false`).
+          schema: { type: boolean }
+        - name: ruleId
+          in: query
+          description: Only the rows whose classification came from this rule.
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: candidateConfidence
+          in: query
+          description: Only the possible duplicates whose best candidate has this confidence.
+          schema: { $ref: '#/components/schemas/ImportDuplicateConfidence' }
         - $ref: '#/components/parameters/Cursor'
         - name: limit
           in: query
@@ -8133,13 +8214,21 @@ paths:
     patch:
       tags: [Imports]
       operationId: decideImportRow
-      summary: Decide what to do with one row (create it, skip it as a duplicate or exclude it)
+      summary: Edit one row of an import in review (decision, classification, kind, transfer, conversion or commitment link)
       description: |
+        Every property of the body is optional (at least one). Besides the `decision`, the user can set the `categoryId`,
+        `counterpartyId`, `tagIds`, `description` and `note` (origin `MANUAL`; a rule re-evaluation keeps them), change the
+        `kind` (`TRANSFER` needs `transfer.counterAccountId`, an active account of the same currency → 422
+        `TRANSFER_CURRENCY_MISMATCH`; `CONVERSION` needs `conversion` with the other account, its amount and optionally the
+        fee and the quoted rate) and confirm (`occurrenceLink: { occurrenceId }`) or clear (`null`) the link with a
+        commitment occurrence. Nothing financial is created before the approval.
+
         `CREATE` imports the row; `SKIP` (only for a possible duplicate) does not import it and links it with the existing
         movement when the import is approved, so a later import recognizes it as already imported; `EXCLUDE` neither
         imports nor links it. An invalid or already imported row has a fixed decision → 409
         `INVALID_STATUS_TRANSITION`; `SKIP` on a new row → 422 `VALIDATION_FAILED`. `If-Match` is the version of the
-        IMPORT (every decision changes its counters); the response carries the new version in its ETag.
+        IMPORT (every edit changes its counters); the response carries the new version in its ETag. The decision of the
+        possible duplicates is recorded with who decided it, when and the score (audited when it links an existing movement).
       x-openspec-capability: imports/import-pipeline
       x-required-role: EDITOR
       parameters:
@@ -8165,7 +8254,9 @@ paths:
           $ref: '#/components/responses/Conflict'
           description: 'INVALID_STATUS_TRANSITION (the import is not in review or the decision of the row is fixed).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, TRANSFER_CURRENCY_MISMATCH, TRANSFER_SAME_ACCOUNT, CATEGORY_KIND_MISMATCH, AMOUNT_SCALE_EXCEEDED or REFERENCE_NOT_FOUND.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -8318,6 +8409,479 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/rows/bulk-edit:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: bulkEditImportRows
+      summary: Edit the filtered rows of an import in review in one statement
+      description: |
+        Applies `set` (category, tags, counterparty and/or decision) to every row of the import that matches `filter`
+        (`classification`, `needsCategory`, `ruleId`, `decision`; an empty filter matches all the valid rows), in ONE
+        statement, at most 5 000 rows. Only an import in `AWAITING_REVIEW`; the references are validated (active category of
+        the right kind, active counterparty) and nothing financial is created. A decision `SKIP` only applies to the
+        possible duplicates among the matches. `If-Match` is the version of the import; the response ETag carries the new one.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportBulkEditRequest' }
+            examples:
+              categorize:
+                summary: Assign a category to the rows without one
+                value:
+                  filter: { needsCategory: true }
+                  set: { categoryId: '01928c4e-0000-7000-8000-0000000ca001' }
+      responses:
+        '200':
+          description: Rows updated
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportBulkEditResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is not in review).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, CATEGORY_KIND_MISMATCH or REFERENCE_NOT_FOUND.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/reevaluate-rules:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: reevaluateImportRules
+      summary: Recompute the rule-based classification of the rows of an import in review
+      description: |
+        Recalculates the proposed classification (alias, rules, default category) of every valid row with the rules
+        active now; what the user edited (origin `MANUAL`) is kept. Duplicates and commitment matches are not recomputed.
+        Only an import in `AWAITING_REVIEW`. If the rules cannot be evaluated the rows keep an empty proposal with the
+        warning `IMPORT_RULES_UNAVAILABLE` (it does not block). Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: The import with its refreshed rule coverage
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is not in review).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/occurrence-matches/confirm:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: confirmImportOccurrenceMatches
+      summary: Confirm the commitment matches of the rows in one explicit action
+      description: |
+        `scope = HIGH_CONFIDENCE_UNIQUE` confirms, for every row that has exactly ONE candidate occurrence of high
+        confidence, the link with that occurrence (an explicit user action: matches are never automatic, and the ambiguous
+        ones never enter). The link itself is made when the persistence creates the transaction. One by one, use
+        `decideImportRow` with `occurrenceLink`. Only an import in `AWAITING_REVIEW`.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportOccurrenceMatchesConfirmRequest' }
+            examples:
+              highConfidence:
+                value: { scope: HIGH_CONFIDENCE_UNIQUE }
+      responses:
+        '200':
+          description: Matches confirmed
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportOccurrenceMatchesConfirmResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is not in review).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/statement:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    put:
+      tags: [Imports]
+      operationId: setImportStatement
+      summary: Set the opening and closing balance of the statement (formats that do not carry it)
+      description: |
+        For CSV, XLSX and QIF the user types the balances printed on the statement; OFX and JSON bring them in the file
+        (they can be corrected here). With a `closingBalance` the preview shows `statementDifference` (closing balance
+        minus the resulting balance) and, when the import ends, the balance at `periodTo` is compared with it: equal ->
+        `COMPLETED` with a `reconciliationOffer`; different -> `COMPLETED_WITH_DIFFERENCE`. No adjustment is ever made
+        automatically. Replaces the previous statement. Only an import in `AWAITING_REVIEW`.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportStatement' }
+            examples:
+              closing:
+                value:
+                  openingBalance: { amount: '8036.00', currency: BOB }
+                  closingBalance: { amount: '11964.00', currency: BOB }
+                  periodFrom: '2026-01-01'
+                  periodTo: '2026-01-31'
+      responses:
+        '200':
+          description: The import with its statement and difference
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is not in review).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH or VALIDATION_FAILED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/revert-preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    get:
+      tags: [Imports]
+      operationId: getImportRevertPreview
+      summary: What undoing a finished import would void and what blocks it
+      description: |
+        For an import that ended (`COMPLETED`, `COMPLETED_WITH_DIFFERENCE`, `COMPLETED_WITH_ERRORS` or
+        `PARTIALLY_ROLLED_BACK`): the transactions that would be voided (`toVoid`), those already voided
+        (`alreadyVoided`) and the ones blocked, with the reason (`RECONCILED` or `PERIOD_CLOSED`). `editedAfterImport` counts
+        the transactions the user edited after the import (they are voided all the same). Any other status -> 409
+        `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: The undo preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportRevertPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/revert:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: revertImport
+      summary: Undo a finished import (all or nothing, unless a partial undo is explicit)
+      description: |
+        Voids, with an exact reversal, the transactions the import created. With blocked transactions (reconciled or in a
+        closed period) and `allowPartial = false` -> 409 `IMPORT_REVERT_BLOCKED` (`details.blocked[]`) and nothing changes;
+        with `allowPartial = true` it voids the rest and ends `PARTIALLY_ROLLED_BACK`. Otherwise the import moves to
+        `REVERTING`, is audited and publishes `imports.ImportRevertRequested.v1` in the same transaction; the worker voids
+        in batches of 200 and ends `ROLLED_BACK` or `PARTIALLY_ROLLED_BACK` (poll `getImport`). The links of the import are
+        superseded so the same file can be imported again. Idempotent. Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRevertRequest' }
+            examples:
+              all: { value: { allowPartial: false } }
+              partial: { value: { allowPartial: true } }
+      responses:
+        '202':
+          description: Reverting; the worker voids the transactions in the background
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IMPORT_REVERT_BLOCKED (details.blocked[]) or INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/import-profiles:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Imports]
+      operationId: listImportProfiles
+      summary: List the mapping profiles (latest version of each)
+      description: |
+        Mapping profiles per institution and optionally per account. Filter by `institutionId`, `accountId` and `format`;
+        archived profiles only with `includeArchived`.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: VIEWER
+      parameters:
+        - name: institutionId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: accountId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: format
+          in: query
+          schema: { $ref: '#/components/schemas/ImportFormat' }
+        - $ref: '#/components/parameters/IncludeArchived'
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Profiles page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportProfilePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Imports]
+      operationId: createImportProfile
+      summary: Create a mapping profile (version 1)
+      description: |
+        Either `{ name, format, institutionId, accountId?, options }` with `options` of `imports.profile.v1`, or
+        `{ fromImportId, name }` to save the mapping of an import as a profile (the institution is the one of the import
+        account). Versions are immutable. Invalid options -> 422 `IMPORT_MAPPING_INVALID` (with the JSON pointer). Audited.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportProfileCreateRequest' }
+            examples:
+              fromImport:
+                value:
+                  fromImportId: '01928c4e-0000-7000-8000-0000000b1001'
+                  name: 'Banco Cumbre Demo - cuenta corriente'
+      responses:
+        '201':
+          description: Profile created (version 1)
+          headers:
+            Location:
+              description: URL of the profile (`/api/v1/workspaces/{workspaceId}/import-profiles/{profileId}`).
+              schema: { type: string }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IMPORT_MAPPING_INVALID, VALIDATION_FAILED, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/import-profiles/{profileId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportProfileId'
+    get:
+      tags: [Imports]
+      operationId: getImportProfile
+      summary: Get a mapping profile with its versions
+      description: Returns the requested `version` (the latest by default) and the list of all the versions.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: VIEWER
+      parameters:
+        - name: version
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: The profile
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/import-profiles/{profileId}/versions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportProfileId'
+    post:
+      tags: [Imports]
+      operationId: createImportProfileVersion
+      summary: Edit a profile by creating its next version
+      description: |
+        Versions are immutable: editing creates version N+1 with the given `options` (and optionally a new `name`). Imports
+        already done keep the version they used. `If-Match` is the latest version of the profile. An archived profile ->
+        409 `INVALID_STATUS_TRANSITION`. Audited.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportProfileVersionRequest' }
+      responses:
+        '201':
+          description: Version created
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (archived profile).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IMPORT_MAPPING_INVALID or VALIDATION_FAILED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/import-profiles/{profileId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportProfileId'
+    post:
+      tags: [Imports]
+      operationId: archiveImportProfile
+      summary: Archive a mapping profile (it is no longer applied automatically)
+      description: |
+        The profile and its versions remain for the imports that used them. Archiving an archived profile is idempotent.
+        Audited.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: The archived profile
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -11937,6 +12501,12 @@ components:
       required: true
       description: Staged row UUIDv7 of an import.
       schema: { $ref: '#/components/schemas/Uuid' }
+    ImportProfileId:
+      name: profileId
+      in: path
+      required: true
+      description: Import mapping profile UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     SubscriptionId:
       name: subscriptionId
       in: path
@@ -12425,6 +12995,8 @@ components:
         - IMPORT_TOO_MANY_ROWS                   # 422 (add-basic-csv-import: more data rows than IMPORT_CSV_MAX_ROWS)
         - IMPORT_MAPPING_INVALID                 # 422 (add-basic-csv-import: missing columns or unassigned date, description or amount)
         - IMPORT_REVIEW_INCOMPLETE               # 409 (add-basic-csv-import: possible duplicates without a decision; details.pendingDecisions)
+        - IMPORT_PARSE_FAILED                    # 422 (add-import-pipeline: the statement could not be read; also the code of a PARSE_FAILED job)
+        - IMPORT_REVERT_BLOCKED                  # 409 (add-import-pipeline: transactions reconciled or in a closed period block the undo; details.blocked[])
         - LOAN_METHOD_NOT_AVAILABLE              # 422 (add-loans: only the French method is available)
         - LOAN_ACCOUNT_INVALID                   # 422 (add-loans: the loan account is not an active loan account)
         - LOAN_ACCOUNT_IN_USE                    # 409 (add-loans: the account already backs another non-cancelled loan)
@@ -19612,21 +20184,31 @@ components:
     # ── Imports: importación CSV básica (openspec add-basic-csv-import) ──
     ImportJobStatus:
       type: string
-      # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): Phase 6 agrega los estados del pipeline
-      # completo (CREATED, UPLOADED, PARSING, NORMALIZING, VALIDATING, MATCHING, CLASSIFYING, RECONCILING, …).
+      # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode). add-import-pipeline agrega los estados del
+      # pipeline por documento; las etapas (PARSE … MATCH) son `stage` de PROCESSING, no estados.
       x-extensible-enum:
+        - UPLOADED
+        - PROCESSING
+        - PARSE_FAILED
         - AWAITING_MAPPING
         - AWAITING_REVIEW
         - APPROVED
         - PERSISTING
         - COMPLETED
+        - COMPLETED_WITH_DIFFERENCE
         - PARTIALLY_FAILED
         - COMPLETED_WITH_ERRORS
+        - REVERTING
+        - ROLLED_BACK
+        - PARTIALLY_ROLLED_BACK
         - CANCELLED
       description: |
-        `AWAITING_MAPPING → AWAITING_REVIEW` (the mapping can be sent again) `→ APPROVED → PERSISTING → COMPLETED |
-        PARTIALLY_FAILED`; `PARTIALLY_FAILED → PERSISTING` (retry) `| COMPLETED_WITH_ERRORS` (accept);
-        `AWAITING_* → CANCELLED` (user or expiration).
+        CSV by `multipart`: `AWAITING_MAPPING → AWAITING_REVIEW` (the mapping can be sent again) `→ APPROVED →
+        PERSISTING → COMPLETED | COMPLETED_WITH_DIFFERENCE | PARTIALLY_FAILED`; `PARTIALLY_FAILED → PERSISTING` (retry)
+        `| COMPLETED_WITH_ERRORS` (accept); `AWAITING_* → CANCELLED` (user or expiration).
+        From a document: `UPLOADED → PROCESSING` (the worker, with its `stage`) `→ AWAITING_MAPPING | AWAITING_REVIEW |
+        PARSE_FAILED`; `AWAITING_MAPPING → PROCESSING` when a mapping or profile is applied; `UPLOADED | PROCESSING →
+        CANCELLED`. Undo: `COMPLETED* → REVERTING → ROLLED_BACK | PARTIALLY_ROLLED_BACK`; `PARTIALLY_ROLLED_BACK → REVERTING`.
     ImportRowClassification:
       type: string
       enum: [NEW, DUPLICATE_EXACT, DUPLICATE_PROBABLE, INVALID]
@@ -19646,6 +20228,12 @@ components:
         - PERIOD_CLOSED
         - ACCOUNT_CLOSED
         - IMPORT_DESCRIPTION_TRUNCATED
+        - IMPORT_CURRENCY_MISMATCH
+        - IMPORT_AMBIGUOUS_DATE
+        - IMPORT_AMBIGUOUS_NUMBER
+        - IMPORT_RUNNING_BALANCE_GAP
+        - IMPORT_RULES_UNAVAILABLE
+        - IMPORT_OCCURRENCE_LINK_SKIPPED
     ImportRowIssue:
       type: object
       additionalProperties: false
@@ -19656,6 +20244,9 @@ components:
           type: string
           enum: [ERROR, WARNING]
           description: An `ERROR` makes the row invalid; a `WARNING` (truncated description) does not block it.
+        detail:
+          type: string
+          description: Technical datum without text of the file (for example the difference of a break of the running balance).
     ImportWarning:
       type: object
       additionalProperties: false
@@ -19692,6 +20283,13 @@ components:
         attempt: { type: integer, minimum: 0, description: '0 before the approval, 1 for the first persistence, +1 per retry.' }
         batchCount: { type: integer, minimum: 0 }
         batchesDone: { type: integer, minimum: 0 }
+        stage:
+          oneOf:
+            - $ref: '#/components/schemas/ImportStage'
+            - type: 'null'
+          description: Stage of the worker while the import is `PROCESSING`.
+        processedRows: { type: integer, minimum: 0, description: Rows processed in the current stage. }
+        totalRows: { type: integer, minimum: 0, description: Rows of the file. }
     ImportErrorGroup:
       type: object
       additionalProperties: false
@@ -19860,6 +20458,72 @@ components:
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
         version: { $ref: '#/components/schemas/Version' }
+        source: { $ref: '#/components/schemas/ImportSource' }
+        documentId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+          description: The document the import was created from (`null` for the basic CSV by upload).
+        format:
+          oneOf:
+            - $ref: '#/components/schemas/ImportFormat'
+            - type: 'null'
+        stage:
+          oneOf:
+            - $ref: '#/components/schemas/ImportStage'
+            - type: 'null'
+          description: Current stage while the status is `PROCESSING`.
+        failure:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [code, pointer]
+              properties:
+                code: { type: string, description: '`IMPORT_PARSE_FAILED`, `IMPORT_TOO_MANY_ROWS` or `IMPORT_UNSUPPORTED_FORMAT`.' }
+                pointer:
+                  type: [string, 'null']
+                  description: JSON pointer or technical locator of the first error; never text of the file.
+            - type: 'null'
+          description: Why a `PARSE_FAILED` import failed.
+        mappingProfile:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [id, version]
+              properties:
+                id: { $ref: '#/components/schemas/Uuid' }
+                version: { type: integer, minimum: 1 }
+            - type: 'null'
+          description: The profile applied (the account profile before the institution profile).
+        profileCandidates:
+          type: array
+          items: { $ref: '#/components/schemas/ImportProfileCandidate' }
+          description: With `AWAITING_MAPPING` and no profile that fits, the profiles that almost fit and what they miss.
+        missingColumns:
+          type: array
+          items: { type: string }
+          description: Columns required by the candidate profiles that the header does not have. Untrusted text.
+        statement:
+          oneOf:
+            - $ref: '#/components/schemas/ImportStatement'
+            - type: 'null'
+        statementDifference:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: '`closingBalance` of the statement minus the resulting balance of the account (zero = it matches).'
+        reconciliationOffer:
+          oneOf:
+            - $ref: '#/components/schemas/ImportReconciliationOffer'
+            - type: 'null'
+        revertSummary:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRevertSummary'
+            - type: 'null'
+        ruleCoverage:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRuleCoverage'
+            - type: 'null'
     ImportCreated:
       description: The import just created, with the first rows of the file to build the mapping.
       allOf:
@@ -20011,6 +20675,72 @@ components:
                 code: { type: string }
             - type: 'null'
           description: Why the batch of the row was rejected, if it was.
+        kind: { $ref: '#/components/schemas/ImportRowKind' }
+        externalId:
+          type: [string, 'null']
+          description: Identifier given by the bank (OFX `FITID`, a unique reference). Untrusted text.
+        time:
+          type: [string, 'null']
+          pattern: '^[0-9]{2}:[0-9]{2}:[0-9]{2}$'
+          description: Local time of the movement when the format carries it.
+        runningBalance:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        proposal:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRowProposal'
+            - type: 'null'
+          description: Classification proposed by alias, rules and default category, with the origin of each field.
+        edits:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRowEdits'
+            - type: 'null'
+        candidates:
+          type: array
+          maxItems: 3
+          items: { $ref: '#/components/schemas/ImportDuplicateCandidate' }
+          description: Up to 3 duplicate candidates ordered by score (`candidate` is the first).
+        decidedBy:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        decidedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        decidedScore:
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+          description: Score of the candidate at the moment the user decided.
+        duplicateOfRow:
+          type: [integer, 'null']
+          description: Line of the file this row repeats (same bank identifier twice in the file).
+        occurrenceCandidates:
+          type: array
+          maxItems: 3
+          items: { $ref: '#/components/schemas/ImportOccurrenceCandidate' }
+        occurrenceLink:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [occurrenceId]
+              properties:
+                occurrenceId: { $ref: '#/components/schemas/Uuid' }
+                outcome:
+                  type: string
+                  enum: [LINKED, SKIPPED]
+                  description: After persisting, whether the occurrence was linked or it was already resolved (`IMPORT_OCCURRENCE_LINK_SKIPPED`).
+            - type: 'null'
+        transfer:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRowTransfer'
+            - type: 'null'
+        conversion:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRowConversion'
+            - type: 'null'
     ImportPreview:
       type: object
       additionalProperties: false
@@ -20024,9 +20754,47 @@ components:
     ImportRowDecisionRequest:
       type: object
       additionalProperties: false
-      required: [decision]
+      description: >-
+        Edit of a row of an import in review (at least one property: an empty body -> 422 `VALIDATION_FAILED`). Only the properties present change. Before add-import-pipeline only
+        `decision` existed (and was required); sending just `decision` keeps working.
       properties:
         decision: { $ref: '#/components/schemas/ImportRowDecision' }
+        candidateTransactionId:
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+          description: >-
+            With `decision = SKIP`, the existing movement (one of `candidates`) the row is linked to; by default the assigned candidate.
+        kind: { $ref: '#/components/schemas/ImportRowKind' }
+        categoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        tagIds:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/Uuid' }
+        description: { type: [string, 'null'], maxLength: 500 }
+        note: { type: [string, 'null'], maxLength: 2000 }
+        transfer:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRowTransfer'
+            - type: 'null'
+        conversion:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRowConversion'
+            - type: 'null'
+        occurrenceLink:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [occurrenceId]
+              properties:
+                occurrenceId: { $ref: '#/components/schemas/Uuid' }
+            - type: 'null'
     ImportRowDecisionResult:
       allOf:
         - $ref: '#/components/schemas/ImportPreviewRow'
@@ -20038,6 +20806,417 @@ components:
                 - $ref: '#/components/schemas/Version'
               description: Version of the IMPORT after the decision (the ETag of the response).
             counters: { $ref: '#/components/schemas/ImportCounters' }
+    # ── Imports: pipeline completo (openspec add-import-pipeline) ──
+    ImportFormat:
+      type: string
+      x-extensible-enum: [CSV, OFX, QIF, JSON, XLSX]
+      description: Format of the statement, detected from the CONTENT of the file (never from its name).
+    ImportSource:
+      type: string
+      x-extensible-enum: [FILE_CSV, FILE_OFX, FILE_QIF, FILE_JSON, FILE_XLSX]
+    ImportStage:
+      type: string
+      x-extensible-enum: [PARSE, NORMALIZE, VALIDATE, CLASSIFY, DEDUPE, MATCH]
+      description: Stage of the worker while the import is `PROCESSING`, in this order.
+    ImportCreateFromDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [accountId, documentId]
+      description: >-
+        Creates an import from an uploaded document (purpose `IMPORT_SOURCE`, status `AVAILABLE`). The format is the one
+        detected in the content of the document.
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        documentId: { $ref: '#/components/schemas/Uuid' }
+        mappingProfileId:
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+          description: Optional; forces this profile (latest version) instead of the automatic one.
+    ImportStatement:
+      type: object
+      additionalProperties: false
+      description: Balances and period printed on the statement. Every property is optional.
+      properties:
+        openingBalance:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        closingBalance:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        periodFrom:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        periodTo:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+    ImportProfileCandidate:
+      type: object
+      additionalProperties: false
+      required: [profileId, version, name, missingColumns]
+      properties:
+        profileId: { $ref: '#/components/schemas/Uuid' }
+        version: { type: integer, minimum: 1 }
+        name: { type: string }
+        missingColumns:
+          type: array
+          items: { type: string }
+          description: Required columns of the profile that the header of the file does not have. Untrusted text.
+    ImportReconciliationOffer:
+      type: object
+      additionalProperties: false
+      required: [accountId, statementDate, statementBalance]
+      description: The data to open a reconciliation session pre-filled (it is only an offer; nothing is adjusted).
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        statementDate: { $ref: '#/components/schemas/LocalDate' }
+        statementBalance: { $ref: '#/components/schemas/Money' }
+    ImportRevertSummary:
+      type: object
+      additionalProperties: false
+      required: [voided, alreadyVoided, blocked, revertedAt, revertedBy]
+      properties:
+        voided: { type: integer, minimum: 0 }
+        alreadyVoided: { type: integer, minimum: 0 }
+        blocked: { type: integer, minimum: 0 }
+        revertedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        revertedBy:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    ImportRuleCoverage:
+      type: object
+      additionalProperties: false
+      required: [rows, classifiedByRule, withoutCategory, ratio]
+      description: Final summary of the classification of the created transactions.
+      properties:
+        rows: { type: integer, minimum: 0 }
+        classifiedByRule: { type: integer, minimum: 0, description: Rows whose category came from a rule. }
+        withoutCategory: { type: integer, minimum: 0 }
+        ratio:
+          allOf:
+            - $ref: '#/components/schemas/DecimalString'
+          description: classifiedByRule / rows, four decimals (`0.7193`); `0.0000` when there are no rows.
+    ImportProfileMappingRef:
+      type: object
+      additionalProperties: false
+      required: [mappingProfileId]
+      description: Applies an existing profile (the given version, or the latest).
+      properties:
+        mappingProfileId: { $ref: '#/components/schemas/Uuid' }
+        version: { type: integer, minimum: 1 }
+    ImportProfileOptions:
+      type: object
+      additionalProperties: true
+      description: >-
+        `imports.profile.v1` (contracts/imports/imports.profile.v1.schema.json): a superset of `ImportMapping` with the
+        bank-statement options (`skipFooterRows`, indicator amount mode, multi-column description, currency aliases,
+        unique reference, running balance, time, value date and literal-prefix description cleanup). The server validates it
+        against that JSON Schema (422 `IMPORT_MAPPING_INVALID`).
+    ImportMappingRequest:
+      description: A column mapping (`imports.mapping.v1`), a reference to a saved profile or a profile mapping (`imports.profile.v1`).
+      anyOf:
+        - $ref: '#/components/schemas/ImportMapping'
+        - $ref: '#/components/schemas/ImportProfileMappingRef'
+        - $ref: '#/components/schemas/ImportProfileOptions'
+    ImportRowFieldOrigin:
+      type: string
+      x-extensible-enum: [ALIAS, RULE, DEFAULT, MANUAL]
+    ImportProposedField:
+      type: object
+      additionalProperties: false
+      required: [value, origin]
+      properties:
+        value:
+          description: The proposed value (an id, a list of ids or a text).
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: array
+              items: { $ref: '#/components/schemas/Uuid' }
+            - type: string
+            - type: 'null'
+        origin: { $ref: '#/components/schemas/ImportRowFieldOrigin' }
+        ruleId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        ruleVersion:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+    ImportRowProposal:
+      type: object
+      additionalProperties: false
+      required: [needsCategory]
+      description: >-
+        The classification proposed by the pipeline (alias, rules, default category) with the origin of each field. What
+        applies is `edits` over `proposal`.
+      properties:
+        categoryId: { $ref: '#/components/schemas/ImportProposedField' }
+        counterpartyId: { $ref: '#/components/schemas/ImportProposedField' }
+        tagIds: { $ref: '#/components/schemas/ImportProposedField' }
+        description: { $ref: '#/components/schemas/ImportProposedField' }
+        excluded:
+          type: boolean
+          description: A rule proposed to exclude the row from the import (the user can revert it).
+        needsCategory: { type: boolean }
+    ImportRowEdits:
+      type: object
+      additionalProperties: false
+      description: What the user edited on the row (origin `MANUAL`).
+      properties:
+        categoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        tagIds:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/Uuid' }
+        description: { type: [string, 'null'], maxLength: 500 }
+        note: { type: [string, 'null'], maxLength: 2000 }
+    ImportRowKind:
+      type: string
+      enum: [EXPENSE, INCOME, TRANSFER, CONVERSION]
+      description: By default the direction decides (`OUT` expense, `IN` income).
+    ImportRowTransfer:
+      type: object
+      additionalProperties: false
+      required: [counterAccountId]
+      properties:
+        counterAccountId: { $ref: '#/components/schemas/Uuid' }
+    ImportRowConversion:
+      type: object
+      additionalProperties: false
+      required: [counterAccountId, counterAmount]
+      properties:
+        counterAccountId: { $ref: '#/components/schemas/Uuid' }
+        counterAmount:
+          allOf:
+            - $ref: '#/components/schemas/PositiveMoney'
+          description: Amount of the other account, in ITS currency and scale.
+        fee: { $ref: '#/components/schemas/PositiveMoney' }
+        quotedRate: { $ref: '#/components/schemas/Rate' }
+    ImportDuplicateConfidence:
+      type: string
+      enum: [HIGH, MEDIUM, LOW]
+      description: '`HIGH` from `IMPORT_DUPLICATE_HIGH_SCORE` (0.90), `LOW` under `IMPORT_DUPLICATE_LOW_SCORE` (0.60).'
+    ImportDuplicateCandidate:
+      type: object
+      additionalProperties: false
+      required: [transactionId, kind, date, amount, description, score, confidence, signals, preselected]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        kind: { type: [string, 'null'] }
+        date:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        amount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        description: { type: [string, 'null'] }
+        score:
+          allOf:
+            - $ref: '#/components/schemas/DecimalString'
+          description: 'Deterministic score 0.0000-1.0000 (weights of docs/13 §8.2).'
+        confidence: { $ref: '#/components/schemas/ImportDuplicateConfidence' }
+        signals:
+          type: object
+          additionalProperties: false
+          required: [amount, date, description, counterparty, origin]
+          description: Each signal in 0.0000-1.0000.
+          properties:
+            amount: { $ref: '#/components/schemas/DecimalString' }
+            date: { $ref: '#/components/schemas/DecimalString' }
+            description: { $ref: '#/components/schemas/DecimalString' }
+            counterparty: { $ref: '#/components/schemas/DecimalString' }
+            origin: { $ref: '#/components/schemas/DecimalString' }
+        preselected:
+          type: boolean
+          description: A single candidate of high confidence is preselected as `SKIP`; the decision stays editable and required.
+    ImportOccurrenceCandidate:
+      type: object
+      additionalProperties: false
+      required: [occurrenceId, confidence, dueDate, label]
+      properties:
+        occurrenceId: { $ref: '#/components/schemas/Uuid' }
+        confidence: { $ref: '#/components/schemas/ImportDuplicateConfidence' }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        expectedAmount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        label: { type: string, description: Name of the commitment. Untrusted text. }
+    ImportBulkEditRequest:
+      type: object
+      additionalProperties: false
+      required: [filter, set]
+      properties:
+        filter:
+          type: object
+          additionalProperties: false
+          properties:
+            classification: { $ref: '#/components/schemas/ImportRowClassification' }
+            needsCategory: { type: boolean }
+            ruleId: { $ref: '#/components/schemas/Uuid' }
+            decision: { $ref: '#/components/schemas/ImportRowDecision' }
+        set:
+          type: object
+          additionalProperties: false
+          minProperties: 1
+          properties:
+            categoryId: { $ref: '#/components/schemas/Uuid' }
+            tagIds:
+              type: array
+              maxItems: 50
+              items: { $ref: '#/components/schemas/Uuid' }
+            counterpartyId: { $ref: '#/components/schemas/Uuid' }
+            decision: { $ref: '#/components/schemas/ImportRowDecision' }
+    ImportBulkEditResult:
+      type: object
+      additionalProperties: false
+      required: [updated, version]
+      properties:
+        updated: { type: integer, minimum: 0, maximum: 5000 }
+        version:
+          allOf:
+            - $ref: '#/components/schemas/Version'
+          description: Version of the import (the ETag of the response).
+    ImportOccurrenceMatchesConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [scope]
+      properties:
+        scope:
+          type: string
+          enum: [HIGH_CONFIDENCE_UNIQUE]
+    ImportOccurrenceMatchesConfirmResult:
+      type: object
+      additionalProperties: false
+      required: [confirmed, version]
+      properties:
+        confirmed: { type: integer, minimum: 0 }
+        version: { $ref: '#/components/schemas/Version' }
+    ImportRevertRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        allowPartial:
+          type: boolean
+          default: false
+          description: Void the transactions that can be voided even if some are blocked (ends `PARTIALLY_ROLLED_BACK`).
+    ImportRevertBlocked:
+      type: object
+      additionalProperties: false
+      required: [rowId, lineNumber, transactionId, reason]
+      properties:
+        rowId: { $ref: '#/components/schemas/Uuid' }
+        lineNumber: { type: integer, minimum: 1 }
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        reason:
+          type: string
+          x-extensible-enum: [RECONCILED, PERIOD_CLOSED]
+    ImportRevertPreview:
+      type: object
+      additionalProperties: false
+      required: [toVoid, alreadyVoided, blocked, editedAfterImport]
+      properties:
+        toVoid: { type: integer, minimum: 0 }
+        alreadyVoided: { type: integer, minimum: 0 }
+        blocked:
+          type: array
+          items: { $ref: '#/components/schemas/ImportRevertBlocked' }
+        editedAfterImport:
+          type: integer
+          minimum: 0
+          description: Transactions the user edited after the import (they are voided all the same).
+    ImportProfileVersionInfo:
+      type: object
+      additionalProperties: false
+      required: [version, createdAt, createdBy]
+      properties:
+        version: { type: integer, minimum: 1 }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        createdBy: { $ref: '#/components/schemas/Uuid' }
+    ImportProfile:
+      type: object
+      required:
+        [id, name, format, institutionId, accountId, version, options, optionsSchemaVersion, archivedAt, versions,
+         createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        format: { $ref: '#/components/schemas/ImportFormat' }
+        institutionId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        accountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        version:
+          allOf:
+            - $ref: '#/components/schemas/Version'
+          description: The version shown (the latest unless requested); the ETag of the profile is its latest version.
+        options: { $ref: '#/components/schemas/ImportProfileOptions' }
+        optionsSchemaVersion: { type: integer, minimum: 1 }
+        archivedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/ImportProfileVersionInfo' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+    ImportProfilePage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ImportProfile' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    ImportProfileCreateRequest:
+      description: Either the profile data or the id of an import whose mapping is saved.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [name, format, institutionId, options]
+          properties:
+            name: { type: string, minLength: 1, maxLength: 120 }
+            format: { $ref: '#/components/schemas/ImportFormat' }
+            institutionId: { $ref: '#/components/schemas/Uuid' }
+            accountId: { $ref: '#/components/schemas/Uuid' }
+            options: { $ref: '#/components/schemas/ImportProfileOptions' }
+        - type: object
+          additionalProperties: false
+          required: [fromImportId, name]
+          properties:
+            fromImportId: { $ref: '#/components/schemas/Uuid' }
+            name: { type: string, minLength: 1, maxLength: 120 }
+    ImportProfileVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [options]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        options: { $ref: '#/components/schemas/ImportProfileOptions' }
     # ── Suscripciones (add-subscriptions) ──
     SubscriptionStatus:
       type: string

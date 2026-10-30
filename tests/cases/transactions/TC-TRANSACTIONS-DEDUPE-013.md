@@ -12,9 +12,10 @@ invariants: ["INV-014"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.dedupe.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]
@@ -30,7 +31,7 @@ steps:
 expected_result:
   - "ambas filas son nuevas y al aprobar se crean dos gastos de 18.00 BOB"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-TRANSACTIONS-DEDUPE-013 — Dos filas idénticas sin identificador externo en el mismo archivo crean dos gastos

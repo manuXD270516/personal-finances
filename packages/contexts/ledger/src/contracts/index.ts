@@ -79,6 +79,14 @@ export interface LedgerPostingPort {
    */
   postJournalEntries(commands: readonly PostJournalEntryCommand[]): Promise<readonly PostedEntryDto[]>;
   reverseJournalEntry(command: ReverseJournalEntryCommand): Promise<PostedEntryDto>;
+  /**
+   * Reversa de varios asientos del mismo workspace en la unidad de trabajo del llamador (openspec add-import-pipeline,
+   * decisión 15: deshacer un import). Misma semántica que `reverseJournalEntry` por comando (reversa exacta,
+   * INV-008; `LEDGER_ENTRY_ALREADY_REVERSED`, `LEDGER_ENTRY_NOT_REVERSIBLE`, `PERIOD_CLOSED`) con lecturas y escrituras
+   * por conjunto. Un comando inválido rechaza el conjunto completo con el mismo código. Un resultado por comando, en
+   * el mismo orden; el mismo asiento repetido en el conjunto se rechaza como ya revertido. Tope `MAX_POST_BATCH`.
+   */
+  reverseJournalEntries(commands: readonly ReverseJournalEntryCommand[]): Promise<readonly PostedEntryDto[]>;
   /** Get-or-create idempotente de la cuenta contable 1:1 de una cuenta del usuario (FR-ACCOUNTS-003). */
   ledgerAccountForUserAccount(input: {
     readonly workspaceId: string;

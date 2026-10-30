@@ -829,6 +829,9 @@ describe('Aprobación y persistencia', () => {
       ['imports.import.approved', 'USER', editor.id],
       ['imports.import.completed', 'WORKER', null],
       ['imports.import.created', 'USER', editor.id],
+      // El recorrido de la importación registra también el mapeo y el inicio de la persistencia (máquina `ImportJob`).
+      ['imports.import.mapped', 'USER', editor.id],
+      ['imports.import.persisting', 'WORKER', null],
     ]);
     const txnAudit = await auditRows(
       `action = 'transactions.transaction.created' AND aggregate_id IN (SELECT id FROM txn.transaction WHERE import_job_id = $2::uuid)`,
