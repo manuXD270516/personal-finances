@@ -12,7 +12,7 @@ invariants: []
 priority: high
 type: platform
 level: performance
-automation_status: not_automated
+automation_status: manual
 automated_tests: []
 status: ready
 regression_suite: false
@@ -55,3 +55,5 @@ Entonces cada consumidor termina de procesar sus eventos en 120 segundos o menos
 - Se automatiza al cerrar el change (tarea 6.3): la medición vive en `apps/api/test/perf/imports.perf.ts` (fila del host, bloqueante por D311) y `apps/api/test/perf/throughput.perf.ts`; pasa a `automated` con la evidencia de dos nightlies programados seguidos con la ráfaga ≤ 120 s por consumidor. Mediciones previas a la entrega agrupada en `docs/59-consumer-throughput-findings.md`.
 
 - Change: `optimize-consumer-throughput` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+
+**Evidencia (2026-11-04):** se verifica en el benchmark `apps/api/test/perf/imports.perf.ts`, que el escáner de trazabilidad no cuenta. Nightlies programados 41470065467 (2026-11-02) y 41648631472 (2026-11-03): ráfaga del host drenada en ≤ 9,1 s.
