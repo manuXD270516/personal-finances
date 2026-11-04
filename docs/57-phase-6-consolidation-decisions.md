@@ -42,3 +42,9 @@ El owner respondió las 9 bloqueantes con la recomendación y aceptó en bloque 
 | D344 | Q34 Recompensas y staking | Se acepta (a): ingreso "sin categoría de ingreso" clasificable por reglas — una categoría de sistema nueva es un cambio en `classification/categories` (FR-CLASSIFICATION-003) sin necesidad para el owner hoy. |
 | D345 | Q35 Ventana máxima de la primera sincronización | Se acepta la recomendación: 365 días (`CONNECTION_SYNC_MAX_DAYS`), configurable. |
 | D346 | Q36 Auto-aprobación | Se acepta la recomendación: no en Phase 6; siempre vista previa. |
+
+## Decisiones posteriores
+
+| ID | Pregunta | Decisión |
+|---|---|---|
+| D360 | Varianza del drenado de eventos (TC-PLATFORM-EVENTS-014, de 5 s a más de 150 s en CI): el worker necesita refrescar las estadísticas de `pgboss.job_common`, lo que exige `GRANT MAINTAIN ON pgboss.job_common TO pf_app` | **Aprobado** (2026-11-04): el privilegio queda acotado a esa tabla interna de colas, sin datos financieros. Implementado en #205. |
