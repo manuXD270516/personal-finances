@@ -42,11 +42,18 @@ export const PGBOSS_SCHEMA = 'pgboss';
 
 const tracer = trace.getTracer('@pf/platform/queue');
 
+/** Cada cuánto el consumidor revisa si las estadísticas del planificador quedaron atrás de la tabla de trabajos. */
+const STATISTICS_CHECK_INTERVAL_MS = 15_000;
+/** Escrituras (altas, estados) desde el último `ANALYZE` a partir de las cuales se refrescan las estadísticas. */
+const STATISTICS_STALE_AFTER_MODIFICATIONS = 1_000;
+
 export class PgBossJobQueue implements JobQueue {
   private readonly boss: PgBoss;
   private readonly queues = new Set<string>();
   private readonly working = new Set<string>();
   private started = false;
+  private statisticsTimer: NodeJS.Timeout | undefined;
+  private statisticsRefresh: Promise<void> | undefined;
 
   constructor(private readonly options: PgBossJobQueueOptions) {
     const consumer = options.role === 'consumer';
@@ -165,6 +172,7 @@ export class PgBossJobQueue implements JobQueue {
       return results;
     });
     this.working.add(queue);
+    this.keepStatisticsFresh();
   }
 
   async workBatch<P extends object>(
@@ -238,6 +246,62 @@ export class PgBossJobQueue implements JobQueue {
       return results;
     });
     this.working.add(queue);
+    this.keepStatisticsFresh();
+  }
+
+  /**
+   * Mantiene frescas las estadísticas del planificador sobre las tablas de trabajos de pg-boss (fix-event-drain-variance).
+   *
+   * La consulta de entrega de una cola `key_strict_fifo` (`strict_fifo_heads` + anti-join por clave) cuesta del orden
+   * de trabajos de la cola × cabezas de clave cuando el planificador estima 1 fila (estadísticas anteriores al
+   * backlog): medido con 5 000 eventos en 500 agregados, un fetch pasa de ~5 ms a más de 500 ms y el drenado de 5 s a
+   * más de 100 s. El autoanalyze llega con retraso (naptime de 60 s y umbral del 10 %), así que un backlog que se
+   * encola y se drena en segundos casi siempre lo pierde. Se hace un `ANALYZE` al registrar el primer trabajador y
+   * después, cada 15 s, solo si hay escrituras suficientes desde el último. Reutiliza el pool de pg-boss (sin
+   * conexiones nuevas) y `ANALYZE` solo toma un lock que no bloquea lecturas ni escrituras.
+   */
+  private keepStatisticsFresh(): void {
+    if (this.statisticsTimer) return;
+    void this.refreshStatistics(true);
+    this.statisticsTimer = setInterval(
+      () => void this.refreshStatistics(false),
+      STATISTICS_CHECK_INTERVAL_MS,
+    );
+    this.statisticsTimer.unref();
+  }
+
+  private refreshStatistics(force: boolean): Promise<void> {
+    if (this.statisticsRefresh) return this.statisticsRefresh;
+    const schema = this.options.schema ?? PGBOSS_SCHEMA;
+    const run = async (): Promise<void> => {
+      const db = this.boss.getDb();
+      if (!force) {
+        const { rows } = await db.executeSql(
+          `SELECT coalesce(sum(n_mod_since_analyze), 0)::bigint AS n
+             FROM pg_stat_user_tables WHERE schemaname = $1 AND relname = 'job_common'`,
+          [schema],
+        );
+        if (Number((rows[0] as { n: string } | undefined)?.n ?? 0) < STATISTICS_STALE_AFTER_MODIFICATIONS)
+          return;
+      }
+      // Los trabajos de las colas sin partición propia (todas las nuestras) viven en `job_common`; un ANALYZE de la
+      // tabla padre `job` solo toma estadísticas del conjunto y no actualiza las de la partición.
+
+      await db.executeSql(`ANALYZE "${schema.replaceAll('"', '""')}".job_common`);
+    };
+    this.statisticsRefresh = run()
+      .catch((err: unknown) => {
+        this.options.logger.warn({ err: sanitizeError(err) }, 'job queue statistics refresh failed');
+      })
+      .finally(() => {
+        this.statisticsRefresh = undefined;
+      });
+    return this.statisticsRefresh;
+  }
+
+  private stopStatisticsRefresh(): void {
+    if (this.statisticsTimer) clearInterval(this.statisticsTimer);
+    this.statisticsTimer = undefined;
   }
 
   private async runJob<P extends object>(
@@ -302,12 +366,15 @@ export class PgBossJobQueue implements JobQueue {
   }
 
   async drain(): Promise<void> {
+    this.stopStatisticsRefresh();
     await Promise.all([...this.working].map((q) => this.boss.offWork(q, { wait: true })));
     this.working.clear();
   }
 
   async stop(): Promise<void> {
     if (!this.started) return;
+    this.stopStatisticsRefresh();
+    await this.statisticsRefresh;
     await this.boss.stop({ graceful: true, close: true, timeout: 10_000 });
     this.started = false;
   }

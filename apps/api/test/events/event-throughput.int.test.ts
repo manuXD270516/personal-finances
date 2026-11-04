@@ -184,6 +184,36 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
     }
   }, 240_000);
 
+  it('[TC-PLATFORM-EVENTS-014] al registrar consumidores se refrescan las estadísticas del planificador de pg-boss (la entrega key_strict_fifo no depende del autoanalyze)', async () => {
+    const consumer = `it.stats${randomUUID().slice(0, 8)}`;
+    const def: EventConsumerDefinition = {
+      consumer,
+      events: [{ type: TYPE, version: 1 }],
+      handler: async () => undefined,
+    };
+    const lastAnalyze = async (): Promise<number> =>
+      (
+        await migratorPool.query<{ t: Date | null }>(
+          `SELECT max(last_analyze) AS t FROM pg_stat_user_tables WHERE schemaname = 'pgboss' AND relname = 'job_common'`,
+        )
+      ).rows[0]!.t?.getTime() ?? 0;
+    const queue = await startQueue();
+    try {
+      const before = Date.now();
+      const runtime = new EventConsumerRuntime({
+        pool: workerPool,
+        queue,
+        subscriptions: new EventSubscriptions([def]),
+        logger: quiet,
+      });
+      await runtime.start();
+      // Las estadísticas acumuladas llegan con un pequeño retraso a pg_stat; el ANALYZE no depende del autovacuum.
+      await until(async () => ((await lastAnalyze()) >= before - 1_000 ? true : undefined), 20_000, 200);
+    } finally {
+      await stopAll(queue);
+    }
+  }, 60_000);
+
   it('[TC-PLATFORM-EVENTS-015] concurrencia 4 y lotes de 10 conservan el orden por agregado con un evento en reintento', async () => {
     const ws = randomUUID();
     const consumer = `it.order${randomUUID().slice(0, 8)}`;
