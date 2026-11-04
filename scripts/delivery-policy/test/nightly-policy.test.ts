@@ -9,6 +9,16 @@ const TITLE = 'nightly perf: umbral superado';
 const workflow = loadWorkflow('.github/workflows/nightly.yml');
 const perf = workflow.jobs['perf']!;
 
+describe('workflows de GitHub Actions', () => {
+  // Un byte NUL invalida el YAML: GitHub no registra los jobs ni el cron y el workflow deja de correr sin avisar.
+  it('[TC-PLATFORM-PIPELINE-009] ningún workflow contiene bytes NUL', () => {
+    const dir = join(ROOT, '.github/workflows');
+    for (const name of readdirSync(dir)) {
+      expect(readText(`.github/workflows/${name}`).includes(String.fromCharCode(0)), name).toBe(false);
+    }
+  });
+});
+
 describe('nightly.yml: permisos y aviso por issue del job perf (TC-PLATFORM-PIPELINE-009)', () => {
   it('[TC-PLATFORM-PIPELINE-009] issues: write nunca se declara a nivel de workflow', () => {
     expect(workflow.permissions).toEqual({ contents: 'read' });
