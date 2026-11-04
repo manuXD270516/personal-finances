@@ -1,0 +1,37 @@
+{
+  "schema": "imports.pdf-layout.v1",
+  "id": "bo.bcp.cuenta",
+  "version": 1,
+  "currencyLabels": [{ "label": "Bolivianos", "currency": "BOB" }],
+  "detect": { "literals": ["Extracto de Cuenta por Mes", "Medio de Atención", "Fecha Consulta"] },
+  "header": {
+    "account": { "label": "Nro. Cuenta:" },
+    "period": { "kind": "MONTH_YEAR", "label": "Periodo:" },
+    "openingBalance": { "kind": "LABEL", "label": "Saldo Inicial:" },
+    "closingBalance": { "kind": "LABEL", "label": "Saldo Final:" },
+    "totalPages": { "kind": "PAGE_N_OF_M" }
+  },
+  "table": {
+    "columns": [
+      { "labels": ["Fecha"], "role": "DATE", "align": "LEFT" },
+      { "labels": ["Hora"], "role": "TIME", "align": "LEFT" },
+      { "labels": ["Descripción"], "role": "DESCRIPTION", "align": "LEFT" },
+      { "labels": ["Medio de Atención"], "role": "IGNORE", "align": "LEFT" },
+      { "labels": ["Lugar"], "role": "IGNORE", "align": "LEFT" },
+      { "labels": ["Monto"], "role": "AMOUNT", "align": "RIGHT" },
+      { "labels": ["Saldo"], "role": "BALANCE", "align": "RIGHT" }
+    ],
+    "rowAnchor": "DATE"
+  },
+  "page": {
+    "repeatedLiterals": [],
+    "footerLiterals": ["Página"],
+    "blankPageLiterals": [],
+    "discardLiterals": ["Esta información está sujeta a verificación"]
+  },
+  "number": { "decimal": ".", "thousands": null },
+  "date": "YYYYMMDD",
+  "time": "HH:mm:ss",
+  "reference": { "unique": false },
+  "volatileFragments": []
+}

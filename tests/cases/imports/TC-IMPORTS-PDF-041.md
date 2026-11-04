@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "ni el nombre del titular, ni el operador, ni el número de cuenta completo aparecen en la importación, sus filas, la auditoría, los eventos ni los logs"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-041 — El titular, el operador y el número de cuenta completo del encabezado no se guardan ni se registran

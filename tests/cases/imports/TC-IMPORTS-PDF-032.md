@@ -12,9 +12,10 @@ invariants: ["INV-001"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +33,7 @@ expected_result:
   - "la importación registra el saldo del extracto de 155.00 a 1019.32 BOB del 2026-03-01 al 2026-03-31"
   - "queda \"en revisión\" con 4 filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-032 — Un extracto coherente registra su saldo inicial, final y periodo y pasa a revisión

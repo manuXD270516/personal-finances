@@ -8,6 +8,16 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { connect, inTx } from '../support/db.js';
 import { sha256Hex } from '../support/malicious-files.js';
 import {
+  renderPdf,
+  solidPng,
+  type RenderOptions,
+} from '../../../../packages/contexts/imports/test/support/render-pdf.js';
+import {
+  paintStatement,
+  type EntityId,
+  type PaintOptions,
+} from '../../../../tests/fixtures/imports/statements-bo/pdf/paint-statement.js';
+import {
   asAdmin,
   contract,
   money,
@@ -692,4 +702,131 @@ describe('Extractos solapados (criterio de salida sintético)', () => {
     }
     expect(await importedCount(account)).toBe(115);
   }, 600_000);
+});
+
+// Extractos PDF con texto (openspec add-pdf-statement-parser; imports/import-pipeline): los PDF se GENERAN por código con
+// pdfkit desde los movimientos sintéticos (SINTETICO), nunca se versionan; DOCUMENTS los inspecciona y el worker real los
+// lee en el hilo aislado con PDF.js.
+describe('Extractos PDF: lectura en el worker, coherencia, cuenta y relectura', () => {
+  const createAccountWithDigits = async (name: string, opening: string, last4: string | null) => {
+    const r = await post(owner, '/accounts', {
+      name,
+      type: 'BANK',
+      currency: 'BOB',
+      openingBalance: { amount: money(opening), date: '2026-01-01' },
+      ...(last4 ? { accountNumberLast4: last4 } : {}),
+    });
+    return ok(r, 201)['id'] as string;
+  };
+  const pdf = async (entity: EntityId, paint: PaintOptions = {}, render: RenderOptions = {}) =>
+    Buffer.from(await renderPdf(paintStatement(entity, paint), render));
+
+  it('[TC-IMPORTS-PDF-001][TC-IMPORTS-PDF-003][TC-IMPORTS-PDF-042] un PDF de Banco Ganadero llega a revisión, se aprueba y volver a descargar el mes crea 0 transacciones', async () => {
+    const account = await createAccountWithDigits('Cuenta Ganadero', '2640.00', '0001');
+    const documentId = await uploadStatement(await pdf('GANADERO'), 'extracto-marzo.pdf', 'application/pdf');
+    const reply = await createImport(documentId, account);
+    const created = ok(reply, 202);
+    expect(contract.validateResponse('createImport', 202, created), JSON.stringify(created)).toEqual([]);
+    expect(created).toMatchObject({ status: 'UPLOADED', format: 'PDF', source: 'FILE_PDF' });
+
+    const review = await waitFor(created['id'] as string, ['AWAITING_REVIEW', 'PARSE_FAILED']);
+    expect(review.status).toBe('AWAITING_REVIEW');
+    expect(review.statement).toMatchObject({
+      openingBalance: { amount: '2640.00', currency: 'BOB' },
+      closingBalance: { amount: '12050.66', currency: 'BOB' },
+      periodFrom: '2026-03-01',
+      periodTo: '2026-03-31',
+    });
+    expect(review.pdf).toMatchObject({
+      layout: { id: 'bo.ganadero.cuenta', version: 1 },
+      pagesRead: 2,
+      pagesDeclared: 2,
+      pagesWithoutText: [],
+      coherence: { totals: 'OK', balanceChain: 'OK', unrecognizedLines: [] },
+      openingDifference: { amount: '0.00', currency: 'BOB' },
+      extractionFailure: null,
+      warnings: [],
+    });
+    const rows = await preview(review.id);
+    expect(rows.rows).toHaveLength(11);
+    expect(rows.rows.every((r: any) => r.classification === 'NEW')).toBe(true);
+    // Ni el titular ni el operador ni el número completo llegan a la respuesta.
+    expect(JSON.stringify([review, rows])).not.toMatch(/TITULAR FICTICIO|Procesado por|NRO\. DE CUENTA/u);
+
+    ok(
+      await post(owner, `/imports/${review.id}/approve`, undefined, { 'if-match': `"${review.version}"` }),
+      202,
+    );
+    const done = await waitFor(review.id, ['COMPLETED', 'COMPLETED_WITH_DIFFERENCE']);
+    expect(done.status).toBe('COMPLETED');
+    expect(await importedCount(account)).toBe(11);
+
+    // El mismo mes descargado otro día: otra fecha de consulta, otros bytes; las huellas no cambian.
+    const again = await uploadStatement(
+      await pdf('GANADERO', { downloadDate: '07/04/2026' }),
+      'extracto-marzo-2.pdf',
+      'application/pdf',
+    );
+    expect(again).not.toBe(documentId);
+    const second = ok(await createImport(again, account), 202);
+    const secondReview = await waitFor(second['id'] as string, ['AWAITING_REVIEW']);
+    expect(secondReview.counters).toMatchObject({ rows: 11, alreadyImported: 11, newRows: 0 });
+    ok(
+      await post(owner, `/imports/${secondReview.id}/approve`, undefined, {
+        'if-match': `"${secondReview.version}"`,
+      }),
+      202,
+    );
+    const secondDone = await waitFor(secondReview.id, ['COMPLETED', 'COMPLETED_WITH_DIFFERENCE']);
+    expect(secondDone.counters.created).toBe(0);
+    expect(await importedCount(account)).toBe(11);
+  }, 300_000);
+
+  it('[TC-IMPORTS-PDF-008] un extracto con contraseña solo de propietario se acepta y se lee', async () => {
+    const account = await createAccountWithDigits('Cuenta BCP', '155.00', '1000');
+    const documentId = await uploadStatement(
+      await pdf('BCP', {}, { ownerPassword: 'propietario-sintetico' }),
+      'bcp-marzo.pdf',
+      'application/pdf',
+    );
+    const created = ok(await createImport(documentId, account), 202);
+    const review = await waitFor(created['id'] as string, ['AWAITING_REVIEW', 'PARSE_FAILED']);
+    expect(review.status).toBe('AWAITING_REVIEW');
+    expect(review.counters.rows).toBe(4);
+    expect(review.pdf.layout).toEqual({ id: 'bo.bcp.cuenta', version: 1 });
+  }, 180_000);
+
+  it('[TC-IMPORTS-PDF-038] un extracto de otra cuenta falla con IMPORT_PDF_ACCOUNT_MISMATCH sin filas', async () => {
+    const account = await createAccountWithDigits('Otra cuenta', '0.00', '0002');
+    const documentId = await uploadStatement(
+      await pdf('GANADERO', { downloadDate: '08/04/2026' }),
+      'ajeno.pdf',
+      'application/pdf',
+    );
+    const created = ok(await createImport(documentId, account), 202);
+    const failed = await waitFor(created['id'] as string, ['PARSE_FAILED', 'AWAITING_REVIEW']);
+    expect(failed.status).toBe('PARSE_FAILED');
+    expect(failed.failure).toMatchObject({ code: 'IMPORT_PDF_ACCOUNT_MISMATCH' });
+    expect(failed.pdf).toMatchObject({ layout: { id: 'bo.ganadero.cuenta' } });
+    expect((await preview(failed.id)).rows).toHaveLength(0);
+  }, 180_000);
+
+  it('[TC-IMPORTS-PDF-010] un PDF de solo imágenes falla con IMPORT_PDF_NO_TEXT y sin filas', async () => {
+    const account = await createAccountWithDigits('Cuenta escaneo', '0.00', null);
+    const documentId = await uploadStatement(
+      await pdf('GANADERO', { downloadDate: '09/04/2026' }, { imagePages: [1, 2] }),
+      'escaneado.pdf',
+      'application/pdf',
+    );
+    const created = ok(await createImport(documentId, account), 202);
+    const failed = await waitFor(created['id'] as string, ['PARSE_FAILED', 'AWAITING_REVIEW']);
+    expect(failed.failure).toMatchObject({ code: 'IMPORT_PDF_NO_TEXT' });
+    expect(failed.pdf.pagesWithoutText).toEqual([1, 2]);
+  }, 180_000);
+
+  it('[TC-IMPORTS-PDF-002] un documento PNG se rechaza con IMPORT_UNSUPPORTED_FORMAT al crear la importación', async () => {
+    const png = solidPng(16, 16, [10, 20, 30]);
+    const documentId = await uploadStatement(png, 'foto.png', 'image/png');
+    problem(await createImport(documentId), 422, 'IMPORT_UNSUPPORTED_FORMAT');
+  }, 120_000);
 });

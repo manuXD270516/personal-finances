@@ -52,12 +52,12 @@ contracts/events/
 │  └─ OccurrenceMatchSuggested.v1.schema.json         # add-commitment-matching: sugerencia de coincidencia creada o re-propuesta (nunca vincula sola)
 ├─ imports/                             # add-basic-csv-import (importación CSV; nunca eventos por fila, docs/33 D112)
 │  ├─ ImportApproved.v1.schema.json      # aprobación o reintento: lo consume el worker (imports.persist)
-│  ├─ ImportFileUploaded.v1.schema.json  # add-import-pipeline: importación creada desde un documento; la consume el worker (imports.persist)
+│  ├─ ImportFileUploaded.v1.schema.json  # add-import-pipeline: importación creada desde un documento; la consume el worker (imports.persist); `format` agrega `PDF` (add-pdf-statement-parser)
 │  ├─ ImportPreviewReady.v1.schema.json  # add-import-pipeline: vista previa lista (solo conteos; sin consumidores por ahora)
-│  ├─ ImportFailed.v1.schema.json        # add-import-pipeline: PARSE_FAILED con código y etapa, sin texto del archivo (sin consumidores por ahora)
+│  ├─ ImportFailed.v1.schema.json        # add-import-pipeline: PARSE_FAILED con código y etapa, sin texto del archivo (sin consumidores por ahora); `code` agrega los IMPORT_PDF_* (add-pdf-statement-parser)
 │  ├─ ImportRevertRequested.v1.schema.json  # add-import-pipeline: deshacer solicitado; lo consume el worker (imports.persist)
 │  ├─ ImportReverted.v1.schema.json      # add-import-pipeline: deshacer terminado (ROLLED_BACK o PARTIALLY_ROLLED_BACK; solo conteos)
-│  └─ ImportCompleted.v1.schema.json     # fin con COMPLETED, COMPLETED_WITH_DIFFERENCE, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS; `status` y `sourceType` son enums abiertos (aditivo, add-import-pipeline)
+│  └─ ImportCompleted.v1.schema.json     # fin con COMPLETED, COMPLETED_WITH_DIFFERENCE, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS; `status` y `sourceType` son enums abiertos (aditivo, add-import-pipeline; `FILE_PDF` desde add-pdf-statement-parser)
 ├─ debt/                                # add-loans (préstamos) y add-credit-cards (tarjetas; los de tarjeta los consume NOTIFY)
 │  ├─ LoanDisbursed.v1.schema.json      # desembolso: principal, comisión retenida y transacción
 │  ├─ LoanScheduleGenerated.v1.schema.json  # cronograma fijado (v1 INITIAL) con todas sus cuotas

@@ -12,9 +12,11 @@ invariants: ["INV-014"]
 priority: critical
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: true
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +34,7 @@ expected_result:
   - "la vista previa informa 11 filas ya importadas y 0 nuevas"
   - "al aprobar se crean 0 transacciones"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-042 — Volver a descargar el mismo mes crea 0 transacciones aunque cambien los bytes del PDF

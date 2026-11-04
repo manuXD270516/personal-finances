@@ -9,13 +9,13 @@ Flujo: **subir** (multipart, ≤ 2 MiB, el archivo NO se guarda: solo sus celdas
 separador decimal explícitos; clasificación síncrona) → **revisar** (nuevas, ya importadas, posibles duplicados, inválidas)
 → **aprobar** → el worker crea **una transacción `POSTED` sin categoría por fila**, por lotes de 200.
 
-| Capa | Contenido |
-|---|---|
-| `domain` | AR `ImportJob` (estados del subconjunto, contadores, versión); servicios puros `CsvSniffer` (codificación UTF-8/windows-1252, binario, delimitador, RFC 4180), `CsvMapping`, `RowNormalizer` (fecha estricta, monto exacto con `Decimal`, descripción saneada), `RowValidator` (cero, fecha futura, periodo cerrado), `RowFingerprint` (SHA-256 puro + `occurrenceIndex`), `DuplicateClassifier` (exacto por vínculo, probable por candidato, asignación 1:1 determinista) e `ImportBatchPlanner`. Sin Nest, Kysely ni módulos de Node. |
-| `application` | `ImportsService` (subir, mapear, decidir fila, aprobar, cancelar, reintentar, aceptar errores), `ImportsQueries` (lista, detalle, vista previa), `PersistImportService` (consumidor del worker; un lote = una transacción de base de datos) e `ImportsMaintenanceService` (expirar revisiones y purgar celdas). Dobles en `application/testing`. |
-| `infrastructure` | Repositorios Kysely/SQL (`imports.*`, inserciones y actualizaciones por `jsonb_array_elements` en chunks de 1 000), `PgImportsUnitOfWork` (con `runDetached` para el lote dentro del consumidor). |
-| `interface` | `ImportsModule` + `ImportsController` (`/imports*`, guard `CsvUploadGuard`: lee el multipart con tope antes de la idempotencia), consumidor `imports.persist` y jobs `imports.expire-reviews` / `imports.purge-staging`. |
-| `contracts` | Eventos `imports.ImportApproved.v1` / `imports.ImportCompleted.v1` (nunca por fila), `IMPORTS_AUDIT_POLICY` y las secciones de portabilidad (órdenes 770–771). |
+| Capa             | Contenido                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain`         | AR `ImportJob` (estados del subconjunto, contadores, versión); servicios puros `CsvSniffer` (codificación UTF-8/windows-1252, binario, delimitador, RFC 4180), `CsvMapping`, `RowNormalizer` (fecha estricta, monto exacto con `Decimal`, descripción saneada), `RowValidator` (cero, fecha futura, periodo cerrado), `RowFingerprint` (SHA-256 puro + `occurrenceIndex`), `DuplicateClassifier` (exacto por vínculo, probable por candidato, asignación 1:1 determinista) e `ImportBatchPlanner`. Sin Nest, Kysely ni módulos de Node. |
+| `application`    | `ImportsService` (subir, mapear, decidir fila, aprobar, cancelar, reintentar, aceptar errores), `ImportsQueries` (lista, detalle, vista previa), `PersistImportService` (consumidor del worker; un lote = una transacción de base de datos) e `ImportsMaintenanceService` (expirar revisiones y purgar celdas). Dobles en `application/testing`.                                                                                                                                                                                        |
+| `infrastructure` | Repositorios Kysely/SQL (`imports.*`, inserciones y actualizaciones por `jsonb_array_elements` en chunks de 1 000), `PgImportsUnitOfWork` (con `runDetached` para el lote dentro del consumidor).                                                                                                                                                                                                                                                                                                                                       |
+| `interface`      | `ImportsModule` + `ImportsController` (`/imports*`, guard `CsvUploadGuard`: lee el multipart con tope antes de la idempotencia), consumidor `imports.persist` y jobs `imports.expire-reviews` / `imports.purge-staging`.                                                                                                                                                                                                                                                                                                                |
+| `contracts`      | Eventos `imports.ImportApproved.v1` / `imports.ImportCompleted.v1` (nunca por fila), `IMPORTS_AUDIT_POLICY` y las secciones de portabilidad (órdenes 770–771).                                                                                                                                                                                                                                                                                                                                                                          |
 
 Dependencias: solo `contracts` de Transactions (`ImportedTransactionsCommand.recordBatch`, `DuplicateCandidatesQuery.findForImport`,
 `TransactionStatusQuery.statusOf`), Accounts, Ledger, Planning, Identity y Audit, y `@pf/shared-kernel`/`@pf/platform`.
@@ -28,7 +28,24 @@ Esquema de BD: `apps/api/db/migrations/20261010400000_txn_import_job_id.sql`, `2
 `20261010400200_imports_schema.sql`. Decisiones en `openspec/changes/add-basic-csv-import/design.md`; operación en
 [`docs/runbooks/importar-extracto-csv.md`](../../../docs/runbooks/importar-extracto-csv.md).
 
-| Script | Efecto |
-|---|---|
-| `pnpm test` | Unitarios, propiedades y aplicación con dobles en memoria (`src/**/*.test.ts`) |
+| Script                  | Efecto                                                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test`             | Unitarios, propiedades y aplicación con dobles en memoria (`src/**/*.test.ts`)                                                                                                 |
 | `pnpm test:integration` | Repositorios, RLS, permisos e índices contra PostgreSQL 18 (Testcontainers; requiere Docker). Las pruebas de API y del worker viven en `apps/api/test/api/imports.api.test.ts` |
+
+## Extractos PDF con texto (Phase 6, `add-pdf-statement-parser`, ADR-0032)
+
+El PDF con texto entra por la etapa `PARSE` del consumidor `imports.persist` (sin consumidores ni conexiones nuevos):
+`PdfjsTextExtractor` lee el texto con posiciones en un `worker_thread` por documento (`resourceLimits`, `env: {}`,
+temporizador, tope de páginas y texto, respuesta validada con `zod`) y el dominio (`src/domain/pdf`) lo reconstruye con un
+**diseño declarativo y versionado** por institución (`src/infrastructure/pdf/layouts/*.json`, inmutables por
+`pdf-layouts.lock.json`; esquema `contracts/imports/pdf-layout.v1.schema.json`). **Falla cerrada:** si los saldos y totales
+del extracto no cuadran con los movimientos leídos, la importación falla (`IMPORT_PDF_TOTALS_MISMATCH`) en lugar de mostrar
+una vista previa incompleta. Del encabezado solo se conservan moneda, saldos, periodo, páginas y los últimos 4 dígitos de
+la cuenta. Ningún PDF entra al repositorio: los de prueba se generan por código (`test/support/render-pdf.ts` y
+`tests/fixtures/imports/statements-bo/pdf/paint-statement.ts`).
+
+| Script                                                                                   | Efecto                                                                                                           |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `pnpm imports:pdf:probe <ruta-absoluta-al-pdf>`                                          | Diagnóstico local de un extracto real (fuera del repositorio): imprime solo la estructura, sin montos ni nombres |
+| `pnpm --filter @pf/imports exec tsx --conditions=@pf/source scripts/pdf-layouts-lock.ts` | Publica en el lock una versión nueva de un diseño (nunca modifica una ya publicada)                              |

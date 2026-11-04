@@ -46,7 +46,8 @@
     "reverted_at",
     "reverted_by",
     "rules_summary",
-    "failure"
+    "failure",
+    "pdf"
   ],
   "properties": {
     "id": {
@@ -220,7 +221,8 @@
       "format": "uuid"
     },
     "rules_summary": {},
-    "failure": {}
+    "failure": {},
+    "pdf": {}
   },
   "x-pfos-table": "imports.import_job",
   "x-pfos-context": "imports"

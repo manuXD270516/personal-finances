@@ -380,6 +380,8 @@ export const ROW_ISSUE_CODES: readonly string[] = [
   'IMPORT_RUNNING_BALANCE_GAP',
   'IMPORT_RULES_UNAVAILABLE',
   'IMPORT_OCCURRENCE_LINK_SKIPPED',
+  'IMPORT_PDF_AMBIGUOUS_CELL',
+  'IMPORT_PDF_BOTH_DEBIT_AND_CREDIT',
 ];
 export const issueKey = (code: string): string =>
   `issues.${ROW_ISSUE_CODES.includes(code) ? code : 'UNKNOWN'}`;

@@ -7909,7 +7909,7 @@ paths:
         **From a document (`application/json`)**: `{ accountId, documentId, mappingProfileId? }` with a document of purpose
         `IMPORT_SOURCE` and status `AVAILABLE` (uploaded with the documents API). The format (CSV, OFX 1.x/2.x, QIF, JSON
         `pfos.import-file` v1 or XLSX) is detected from the CONTENT. Not available → 409 `DOCUMENT_NOT_AVAILABLE`; another
-        purpose → 422 `VALIDATION_FAILED`; a format that cannot be imported (a PDF) → 422 `IMPORT_UNSUPPORTED_FORMAT`.
+        purpose → 422 `VALIDATION_FAILED`; a format that cannot be imported (an image, a binary) → 422 `IMPORT_UNSUPPORTED_FORMAT`. A PDF with text is accepted (`format = PDF`): the worker reads it in an isolated thread and may fail it with `IMPORT_PDF_NO_TEXT`, `IMPORT_PDF_LAYOUT_UNKNOWN`, `IMPORT_PDF_EXTRACTION_FAILED`, `IMPORT_PDF_TOTALS_MISMATCH`, `IMPORT_PDF_PAGE_COUNT_MISMATCH` or `IMPORT_PDF_ACCOUNT_MISMATCH` (see `ImportJob.pdf`).
         Replies 202 with the import in `UPLOADED`; the worker reads it by stages (`PROCESSING` with `stage`) and leaves it
         in `AWAITING_REVIEW` (or `AWAITING_MAPPING` with `profileCandidates` and `missingColumns`, or `PARSE_FAILED`).
         The document is linked to the import in the same transaction, `imports.ImportFileUploaded.v1` is published and the
@@ -12997,6 +12997,12 @@ components:
         - IMPORT_REVIEW_INCOMPLETE               # 409 (add-basic-csv-import: possible duplicates without a decision; details.pendingDecisions)
         - IMPORT_PARSE_FAILED                    # 422 (add-import-pipeline: the statement could not be read; also the code of a PARSE_FAILED job)
         - IMPORT_REVERT_BLOCKED                  # 409 (add-import-pipeline: transactions reconciled or in a closed period block the undo; details.blocked[])
+        - IMPORT_PDF_NO_TEXT                     # 422 (add-pdf-statement-parser: a page of the PDF has no text; scanned or photographed, no OCR; code of a PARSE_FAILED job)
+        - IMPORT_PDF_LAYOUT_UNKNOWN              # 422 (add-pdf-statement-parser: the PDF has text but matches no published statement layout)
+        - IMPORT_PDF_EXTRACTION_FAILED           # 422 (add-pdf-statement-parser: the isolated reader hit its time, memory, page or text limit or the PDF is malformed; ImportJob.pdf.extractionFailure)
+        - IMPORT_PDF_TOTALS_MISMATCH             # 422 (add-pdf-statement-parser: the balances or section totals printed in the statement do not match the rows read; fail closed)
+        - IMPORT_PDF_PAGE_COUNT_MISMATCH         # 422 (add-pdf-statement-parser: fewer pages were read than the statement declares)
+        - IMPORT_PDF_ACCOUNT_MISMATCH            # 422 (add-pdf-statement-parser: the last 4 digits of the statement account differ from the target account)
         - LOAN_METHOD_NOT_AVAILABLE              # 422 (add-loans: only the French method is available)
         - LOAN_ACCOUNT_INVALID                   # 422 (add-loans: the loan account is not an active loan account)
         - LOAN_ACCOUNT_IN_USE                    # 409 (add-loans: the account already backs another non-cancelled loan)
@@ -20234,6 +20240,8 @@ components:
         - IMPORT_RUNNING_BALANCE_GAP
         - IMPORT_RULES_UNAVAILABLE
         - IMPORT_OCCURRENCE_LINK_SKIPPED
+        - IMPORT_PDF_AMBIGUOUS_CELL
+        - IMPORT_PDF_BOTH_DEBIT_AND_CREDIT
     ImportRowIssue:
       type: object
       additionalProperties: false
@@ -20479,7 +20487,7 @@ components:
               additionalProperties: false
               required: [code, pointer]
               properties:
-                code: { type: string, description: '`IMPORT_PARSE_FAILED`, `IMPORT_TOO_MANY_ROWS` or `IMPORT_UNSUPPORTED_FORMAT`.' }
+                code: { type: string, description: '`IMPORT_PARSE_FAILED`, `IMPORT_TOO_MANY_ROWS`, `IMPORT_UNSUPPORTED_FORMAT` or an `IMPORT_PDF_*` code of the PDF reader.' }
                 pointer:
                   type: [string, 'null']
                   description: JSON pointer or technical locator of the first error; never text of the file.
@@ -20524,6 +20532,11 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ImportRuleCoverage'
             - type: 'null'
+        pdf:
+          oneOf:
+            - $ref: '#/components/schemas/ImportPdfInfo'
+            - type: 'null'
+          description: What the reader reports about a PDF statement (`format = PDF`); `null` for the other formats. Structure and counts only, never text of the statement.
     ImportCreated:
       description: The import just created, with the first rows of the file to build the mapping.
       allOf:
@@ -20809,11 +20822,90 @@ components:
     # ── Imports: pipeline completo (openspec add-import-pipeline) ──
     ImportFormat:
       type: string
-      x-extensible-enum: [CSV, OFX, QIF, JSON, XLSX]
+      x-extensible-enum: [CSV, OFX, QIF, JSON, XLSX, PDF]
       description: Format of the statement, detected from the CONTENT of the file (never from its name).
     ImportSource:
       type: string
-      x-extensible-enum: [FILE_CSV, FILE_OFX, FILE_QIF, FILE_JSON, FILE_XLSX]
+      x-extensible-enum: [FILE_CSV, FILE_OFX, FILE_QIF, FILE_JSON, FILE_XLSX, FILE_PDF]
+    ImportPdfInfo:
+      type: object
+      additionalProperties: false
+      required: [layout, pagesRead, pagesDeclared, pagesWithoutText, coherence, openingDifference, extractionFailure, warnings]
+      description: >-
+        Reading of a PDF statement (openspec add-pdf-statement-parser). Only structure and counts: the holder, the full
+        account number, the PDF metadata and the texts of the statement are never stored or returned.
+      properties:
+        layout:
+          oneOf:
+            - $ref: '#/components/schemas/ImportPdfLayoutRef'
+            - type: 'null'
+          description: The published statement layout (and its immutable version) the PDF was read with.
+        pagesRead: { type: integer, minimum: 0 }
+        pagesDeclared:
+          type: [integer, 'null']
+          minimum: 1
+          description: Total pages the statement declares (`Total Páginas`, `Página N de M`), if any.
+        pagesWithoutText:
+          type: array
+          items: { type: integer, minimum: 1 }
+          description: Pages with no text (scanned); with any, the import fails with `IMPORT_PDF_NO_TEXT`.
+        coherence:
+          oneOf:
+            - $ref: '#/components/schemas/ImportPdfCoherence'
+            - type: 'null'
+        openingDifference:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: Opening balance of the statement minus the balance of the account at the close of the day before the period (shown only; it does not block the approval).
+        extractionFailure:
+          oneOf:
+            - $ref: '#/components/schemas/ImportPdfExtractionFailure'
+            - type: 'null'
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/ImportPdfWarning' }
+    ImportPdfLayoutRef:
+      type: object
+      additionalProperties: false
+      required: [id, version]
+      properties:
+        id: { type: string }
+        version: { type: integer, minimum: 1 }
+    ImportPdfCoherence:
+      type: object
+      additionalProperties: false
+      required: [totals, difference, balanceChain, unrecognizedLines]
+      properties:
+        totals:
+          type: string
+          x-extensible-enum: [OK, MISMATCH, NOT_AVAILABLE]
+          description: Opening balance + sum of the rows = closing balance, section totals = sum of their rows, and no line left unrecognized. A MISMATCH fails the import (`IMPORT_PDF_TOTALS_MISMATCH`).
+        difference:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: Absolute value of the first difference found.
+        balanceChain:
+          type: string
+          x-extensible-enum: [OK, GAPS, NOT_AVAILABLE]
+        unrecognizedLines:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [page, line]
+            properties:
+              page: { type: integer, minimum: 1 }
+              line: { type: integer, minimum: 1 }
+          description: Page and line number of each line the reader could not place (never its text).
+    ImportPdfExtractionFailure:
+      type: string
+      x-extensible-enum: [TIMEOUT, MEMORY, PAGE_LIMIT, TEXT_LIMIT, MALFORMED, ENCRYPTED]
+    ImportPdfWarning:
+      type: string
+      x-extensible-enum: [IMPORT_PDF_ACCOUNT_UNVERIFIED]
+      description: The target account has no registered last digits, so the account of the statement could not be verified.
     ImportStage:
       type: string
       x-extensible-enum: [PARSE, NORMALIZE, VALIDATE, CLASSIFY, DEDUPE, MATCH]
@@ -20917,8 +21009,9 @@ components:
       description: >-
         `imports.profile.v1` (contracts/imports/imports.profile.v1.schema.json): a superset of `ImportMapping` with the
         bank-statement options (`skipFooterRows`, indicator amount mode, multi-column description, currency aliases,
-        unique reference, running balance, time, value date and literal-prefix description cleanup). The server validates it
-        against that JSON Schema (422 `IMPORT_MAPPING_INVALID`).
+        unique reference, running balance, time, value date and literal-prefix description cleanup). A PDF profile has no
+        columns: it fixes the published statement layout with `pdfLayout` `{ id, version }` and may add `descriptionCleanup`.
+        The server validates it against that JSON Schema (422 `IMPORT_MAPPING_INVALID`).
     ImportMappingRequest:
       description: A column mapping (`imports.mapping.v1`), a reference to a saved profile or a profile mapping (`imports.profile.v1`).
       anyOf:
@@ -21193,11 +21286,13 @@ components:
           items: { $ref: '#/components/schemas/ImportProfile' }
         page: { $ref: '#/components/schemas/PageInfo' }
     ImportProfileCreateRequest:
-      description: Either the profile data or the id of an import whose mapping is saved.
+      description: >-
+        Either the profile data or the id of an import whose mapping is saved. A profile targets an institution or one
+        account (at least one of `institutionId` and `accountId`); a PDF profile targets the account and fixes the statement layout.
       oneOf:
         - type: object
           additionalProperties: false
-          required: [name, format, institutionId, options]
+          required: [name, format, options]
           properties:
             name: { type: string, minLength: 1, maxLength: 120 }
             format: { $ref: '#/components/schemas/ImportFormat' }

@@ -147,6 +147,8 @@ export interface OccurrenceLinkingPort {
 /** Institución de la cuenta (ACCOUNTS `GetAccount`). */
 export interface InstitutionOfAccountPort {
   institutionOf(workspaceId: string, accountId: string): Promise<string | null>;
+  /** Últimos 4 caracteres del número de cuenta registrados (ACCOUNTS); verifica el extracto PDF (D353). */
+  accountNumberLast4Of?(workspaceId: string, accountId: string): Promise<string | null>;
 }
 
 // ───────────────────────────────────────────────────────────── repositorios nuevos

@@ -12,9 +12,11 @@ invariants: ["INV-003"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/pdf/grammars.test.ts
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la fila es inválida con `IMPORT_INVALID_AMOUNT` y no se redondea"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-028 — Un monto con más decimales que la escala invalida la fila sin redondear

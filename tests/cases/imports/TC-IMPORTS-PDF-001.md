@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - apps/web/src/ui/imports/pdf.test.tsx
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +35,7 @@ expected_result:
   - "la importación se crea en \"subida\" con el formato PDF"
   - "se procesa con el lector de extractos PDF"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-001 — Un extracto PDF disponible se acepta al crear la importación y se procesa con el lector de PDF

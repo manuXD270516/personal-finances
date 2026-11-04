@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: security
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-layouts.test.ts
+  - packages/contexts/imports/src/infrastructure/pdf/pdfjs-text-extractor.test.ts
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +35,7 @@ expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PDF_EXTRACTION_FAILED` y el motivo de memoria, sin filas"
   - "el proceso del worker sigue activo"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-005 — Superar el límite de memoria del hilo aislado falla la importación sin tumbar el worker

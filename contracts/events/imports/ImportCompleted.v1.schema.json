@@ -53,9 +53,10 @@
             "FILE_OFX",
             "FILE_QIF",
             "FILE_JSON",
-            "FILE_XLSX"
+            "FILE_XLSX",
+            "FILE_PDF"
           ],
-          "description": "Origen del import. Enum abierto (add-import-pipeline agrega los formatos de archivo; add-banking-providers, las sincronizaciones)."
+          "description": "Origen del import. Enum abierto (add-import-pipeline agrega los formatos de archivo y add-pdf-statement-parser FILE_PDF; add-banking-providers, las sincronizaciones)."
         },
         "status": {
           "type": "string",

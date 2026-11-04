@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/pdf/grammars.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "el periodo del extracto es del 2026-03-01 al 2026-03-31 y la fila tiene la fecha de negocio 2026-03-05 y la hora 09:40:10 en America/La_Paz"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-030 — La fecha compacta y el mes en español se leen igual con otro idioma y zona del sistema

@@ -15,7 +15,7 @@
 | Deploy | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) → [`deploy/host/pfos-deploy.sh`](../../deploy/host/pfos-deploy.sh) | `workflow_dispatch` + environment `production` (aprobación) → SSH por Tailscale → pull por digest, backup pre-migración, `up --wait`, smoke, rollback automático si falla |
 | Backups | [`deploy/host/pfos-backup.sh`](../../deploy/host/pfos-backup.sh) + timers [`deploy/host/systemd/`](../../deploy/host/systemd) | pgBackRest ([`deploy/pgbackrest/pgbackrest.conf`](../../deploy/pgbackrest/pgbackrest.conf)) → B2: full semanal + diff diario + WAL continuo (PITR 14 d), full mensual (12), réplica nocturna de documentos, check horario |
 
-Presupuesto de memoria (2 GB + 2 GiB swap; techos en `compose.prod.yaml`): Keycloak ≈ 550 MiB (techo 704m), PostgreSQL 150–250 (384m), api 160–340 (320m), worker ≈ 200 (288m), web 150–250 (288m), SeaweedFS 60–110 (192m), Caddy ≈ 30 (64m) → **≈ 1.4–1.7 GiB estables** (SPIKE-09 §3 y §17). Sin Grafana Alloy: la app exporta OTLP directo a Grafana Cloud.
+Presupuesto de memoria (2 GB + 2 GiB swap; techos en `compose.prod.yaml`): Keycloak ≈ 550 MiB (techo 704m), PostgreSQL 150–250 (384m), api 160–340 (320m), worker ≈ 200 (448m: heap 192 + hilo aislado de lectura de PDF 192 mientras lee un extracto, ADR-0032), web 150–250 (288m), SeaweedFS 60–110 (192m), Caddy ≈ 30 (64m) → **≈ 1.4–1.7 GiB estables** (SPIKE-09 §3 y §17). Sin Grafana Alloy: la app exporta OTLP directo a Grafana Cloud.
 
 ## 1. Señales para salir del plan de 2 GB
 

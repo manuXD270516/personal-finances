@@ -34,6 +34,7 @@ export class AccountCatalogQueries implements AccountCatalogQuery {
           includeInNetWorth: s.includeInNetWorth,
           displayOrder: s.displayOrder,
           institutionId: s.institutionId,
+          accountNumberLast4: s.accountNumberLast4,
         })),
     );
   }

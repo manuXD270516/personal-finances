@@ -12,9 +12,10 @@ invariants: ["INV-001", "INV-003"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/pdf/grammars.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "la fila es un ingreso de 10500.75 BOB"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-026 — Un crédito con miles con coma se lee como decimal exacto

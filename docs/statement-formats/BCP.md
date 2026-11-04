@@ -48,6 +48,15 @@ Mapeo a docs/13: Fecha+Hora → fecha de negocio (la hora no tiene zona; se asum
 - Saldo corrido: `saldo(n) = saldo(n-1) + monto(n)` en el orden impreso.
 - La moneda del encabezado coincide con la de la cuenta destino.
 
+
+## Diseño publicado (change 57, `add-pdf-statement-parser`)
+
+- **Diseño:** `bo.bcp.cuenta` **versión 1** (`packages/contexts/imports/src/infrastructure/pdf/layouts/bo.bcp.cuenta.v1.json`, inmutable; un formato nuevo del banco es la versión 2). Los literales de detección son rótulos fijos de la primera página, sin el nombre del banco ni datos del titular.
+- **Extracción:** por **coordenadas** con PDF.js (decisión del change, ya no hipótesis): el motor ordena los fragmentos por posición, arma las bandas de columna con los rótulos de cada página y reconstruye cada fila; el orden del flujo de contenido no cuenta.
+- **Lectura:** ancla por fecha (`AAAAMMDD`); montos con signo y sin miles; saldo inicial y final del encabezado (`Saldo Inicial:` / `Saldo Final:`); el mes del periodo por tabla de meses en español; `Página N de M` como total de páginas; los últimos 4 dígitos de `Nro. Cuenta:` casan con la cuenta destino.
+- **Falla cerrada:** `saldo inicial + Σ montos = saldo final`; cualquier línea con monto o fecha que no encaja detiene la importación (`IMPORT_PDF_TOTALS_MISMATCH`).
+- **Verificación con extractos reales:** pendiente del owner con `pnpm imports:pdf:probe <ruta-absoluta-al-pdf>` (solo imprime estructura, nunca montos ni nombres; tarea 9.1). `statementImport` sigue en `PENDING_SAMPLE` hasta entonces.
+
 ## Valor recomendado de `statementImport`
 
 **`PENDING_SAMPLE`.** El PDF es texto (no `IMAGE_ONLY_STATEMENT`), pero no hay evidencia de un CSV o XLS exportable, así que no se declara `GENERIC_ONLY`. Pasaría a `GENERIC_ONLY` si el owner confirma una exportación CSV/XLS compatible, y a `SUPPORTED` con el perfil de PDF de Phase 6/11. Es el formato más simple de los cuatro: buen candidato para el primer perfil.

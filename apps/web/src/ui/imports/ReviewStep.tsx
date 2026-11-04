@@ -29,12 +29,14 @@ import {
   hasOccurrenceCandidates,
   highConfidenceUniqueCount,
   isDocumentJob,
+  profilesPath,
   reevaluatePath,
   ruleOptionsOf,
   statementPath,
   type ReviewFilter,
 } from './pipeline-logic';
 import { RowDetail, hasPipelineData, type RowPatch } from './RowDetail';
+import { PdfReadingPanel } from './PdfReadingPanel';
 import { AdvancedFilters, BulkTools, StatementPanel } from './ReviewTools';
 import {
   ApproveBar,
@@ -293,6 +295,22 @@ export function ReviewStep({
       if (r.data) onJobChange(r.data);
     });
 
+  /** Perfil PDF de la cuenta: fija el diseño y su versión (add-pdf-statement-parser, tarea 6.2). */
+  const pinPdfLayout = () =>
+    bulkAction(
+      async () => {
+        const layout = job.pdf?.layout;
+        if (!layout) return;
+        await api.command('POST', profilesPath(base), {
+          name: `${layout.id} v${layout.version}`,
+          format: 'PDF',
+          accountId: job.accountId,
+          options: { version: 'imports.profile.v1', pdfLayout: { id: layout.id, version: layout.version } },
+        });
+      },
+      () => f.t('pdf.pinned'),
+    );
+
   async function approve() {
     setApproving(true);
     setProblem(undefined);
@@ -354,6 +372,14 @@ export function ReviewStep({
           onBulkCategory={(id) => void bulkCategory(id)}
           onReevaluate={() => void reevaluate()}
           onConfirmMatches={() => void confirmMatches()}
+        />
+      ) : null}
+      {pipeline ? (
+        <PdfReadingPanel
+          job={job}
+          f={f}
+          busy={busyAll}
+          {...(ctx.canEdit ? { onPinLayout: () => void pinPdfLayout() } : {})}
         />
       ) : null}
       {pipeline ? (

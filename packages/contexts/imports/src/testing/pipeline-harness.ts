@@ -7,7 +7,10 @@ import { ProcessImportService } from '../application/process-import.service.js';
 import { ProfilesService } from '../application/profiles.service.js';
 import { RevertImportService } from '../application/revert-import.service.js';
 import { MemoryWorld, createMemoryDeps } from '../application/testing/in-memory.js';
+import { PdfStatementReader } from '../application/pdf/pdf-statement-reader.js';
+import type { PdfLayoutRegistry, PdfTextExtractor } from '../application/pdf/ports.js';
 import type { ImportsSettings } from '../application/ports/index.js';
+import { FilePdfLayoutRegistry } from '../infrastructure/pdf/file-pdf-layout-registry.js';
 
 /** Arnés de los tests del pipeline de documentos (dobles en memoria; sin base de datos). */
 
@@ -16,8 +19,24 @@ export const ACCOUNT = 'acc-bob';
 export const USER = 'user-ana';
 export const INSTITUTION = 'inst-cumbre';
 
-export function setupPipeline(settings: Partial<ImportsSettings> = {}) {
+export function setupPipeline(
+  settings: Partial<ImportsSettings> = {},
+  extras: {
+    /** Extractor de texto de PDF (add-pdf-statement-parser); sin él un PDF no es importable. */
+    readonly pdfExtractor?: PdfTextExtractor;
+    readonly pdfLayouts?: PdfLayoutRegistry;
+  } = {},
+) {
   const world = new MemoryWorld();
+  if (extras.pdfExtractor) {
+    world.pdf = new PdfStatementReader(
+      extras.pdfExtractor,
+      extras.pdfLayouts ?? new FilePdfLayoutRegistry(),
+      {
+        minPageTextChars: 20,
+      },
+    );
+  }
   world.addAccount({ accountId: ACCOUNT });
   world.institutions.set(ACCOUNT, INSTITUTION);
   world.readers = new DefaultStatementReader();

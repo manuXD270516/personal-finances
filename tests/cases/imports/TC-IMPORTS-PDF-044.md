@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-layouts.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "la verificación de la entrega falla y nombra el archivo"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-044 — La verificación de la entrega falla si el repositorio contiene un archivo PDF

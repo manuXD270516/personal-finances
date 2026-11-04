@@ -118,7 +118,7 @@ describe('pipeline: archivo', () => {
   it('[TC-IMPORTS-PIPELINE-012] valida tamaño y tipo antes de subir (la API decide el formato por contenido)', () => {
     expect(checkStatementFile({ name: 'extracto.ofx', size: 900 })).toBe('ok');
     expect(checkStatementFile({ name: 'extracto.qif', size: 900 })).toBe('ok');
-    expect(checkStatementFile({ name: 'extracto.pdf', size: 900 })).toBe('ok'); // PDF es un tipo de documento; la API rechaza al crear la importación
+    expect(checkStatementFile({ name: 'extracto.pdf', size: 900 })).toBe('ok'); // PDF con texto: desde add-pdf-statement-parser se lee en el worker
     expect(checkStatementFile({ name: 'x.exe', size: 10 })).toBe('type');
     expect(checkStatementFile({ name: 'x.csv', size: 0 })).toBe('empty');
     expect(checkStatementFile({ name: 'x.csv', size: 21 * 1024 * 1024 })).toBe('tooLarge');

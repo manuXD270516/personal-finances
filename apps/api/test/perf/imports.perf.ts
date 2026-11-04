@@ -13,6 +13,8 @@ import {
   type User,
 } from '../support/portability.js';
 import { perfOutDir, recordSuiteLoad } from './background-load.js';
+import { renderPdf } from '../../../../packages/contexts/imports/test/support/render-pdf.js';
+import { paintLargeStatement } from '../../../../tests/fixtures/imports/statements-bo/pdf/paint-statement.js';
 import {
   ACQUIRE_TIMEOUT_MESSAGE,
   AcquisitionRecorder,
@@ -551,6 +553,63 @@ describe('import por documento OFX de 5 000 movimientos', () => {
     const reviewMs = performance.now() - started;
     console.log(`[imports-pipeline] ${ROWS} movimientos OFX hasta la revisión: ${Math.round(reviewMs)} ms`);
     expect((review['counters'] as Record<string, number>)['rows']).toBe(ROWS);
+    expect(reviewMs).toBeLessThanOrEqual(PREVIEW_BUDGET_MS);
+  }, 600_000);
+});
+
+// Fila informativa del extracto PDF (openspec add-pdf-statement-parser, decisión 16, TC-IMPORTS-PDF-046, Should): un PDF
+// de 100 páginas y 5 000 movimientos, generado aquí con pdfkit (no se versiona), llega a revisión en ≤ 30 s con el
+// pipeline completo; el presupuesto interno es hilo ≤ 0,5 s, extracción ≤ 6 s y reconstrucción ≤ 2 s.
+describe('import por documento PDF de 100 páginas y 5 000 movimientos', () => {
+  it('[TC-IMPORTS-PDF-046] llega a revisión en ≤ 30 s (extracción en el hilo aislado, reconstrucción, coherencia y el resto del pipeline)', async () => {
+    await prepare(HOST_CONFIG);
+    const content = Buffer.from(await renderPdf(paintLargeStatement(ROWS, 50)));
+    const requested = await h.call('POST', `${W()}/documents/uploads`, {
+      token: owner.token,
+      body: {
+        fileName: 'extracto-5000.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: content.length,
+        sha256: createHash('sha256').update(content).digest('hex'),
+        purpose: 'IMPORT_SOURCE',
+      },
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    expect(requested.status, JSON.stringify(requested.body)).toBe(201);
+    const target = requested.body['upload'] as {
+      url: string;
+      method: string;
+      headers: Record<string, string>;
+    };
+    const put = await fetch(target.url, { method: target.method, headers: target.headers, body: content });
+    expect(put.status).toBe(200);
+    const documentId = (requested.body['document'] as { id: string }).id;
+    const done = await h.call('POST', `${W()}/documents/${documentId}/complete`, {
+      token: owner.token,
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+
+    const started = performance.now();
+    const created = await h.call('POST', `${W()}/imports`, {
+      token: owner.token,
+      body: { accountId, documentId },
+      headers: { 'idempotency-key': randomUUID() },
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(202);
+    const importId = created.body['id'] as string;
+    const review = await until(async () => {
+      const r = await h.call('GET', `${W()}/imports/${importId}`, { token: owner.token });
+      const status = r.body['status'] as string;
+      if (status === 'PARSE_FAILED') throw new Error(JSON.stringify([r.body['failure'], r.body['pdf']]));
+      return status === 'AWAITING_REVIEW' ? r.body : undefined;
+    }, 120_000);
+    const reviewMs = performance.now() - started;
+    console.log(
+      `[imports-pdf] ${ROWS} movimientos en ${(review['pdf'] as { pagesRead: number }).pagesRead} páginas PDF hasta la revisión: ${Math.round(reviewMs)} ms`,
+    );
+    expect((review['counters'] as Record<string, number>)['rows']).toBe(ROWS);
+    expect((review['pdf'] as { pagesRead: number }).pagesRead).toBe(100);
     expect(reviewMs).toBeLessThanOrEqual(PREVIEW_BUDGET_MS);
   }, 600_000);
 });

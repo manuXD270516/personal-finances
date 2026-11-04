@@ -43,6 +43,9 @@ export const ROW_ISSUE_CODES = [
   'IMPORT_RUNNING_BALANCE_GAP',
   'IMPORT_RULES_UNAVAILABLE',
   'IMPORT_OCCURRENCE_LINK_SKIPPED',
+  // add-pdf-statement-parser.
+  'IMPORT_PDF_AMBIGUOUS_CELL',
+  'IMPORT_PDF_BOTH_DEBIT_AND_CREDIT',
 ] as const;
 export type RowIssueCode = (typeof ROW_ISSUE_CODES)[number];
 

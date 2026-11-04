@@ -7,6 +7,7 @@ import type {
   ImportFailure,
   ImportJobState,
   ImportMappingRef,
+  ImportPdfInfo,
   ImportProgress,
   ImportSource,
   ImportStatus,
@@ -63,6 +64,8 @@ export interface ImportJobView {
   readonly reconciliationOffer: ReconciliationOfferView | null;
   readonly revertSummary: RevertSummaryView | null;
   readonly ruleCoverage: RuleCoverageView | null;
+  /** Lectura de un extracto PDF (solo `format = PDF`; sin textos del extracto). */
+  readonly pdf: ImportPdfInfo | null;
 }
 
 export interface StatementView {
@@ -127,6 +130,7 @@ export function toJobView(s: ImportJobState, currency = ''): ImportJobView {
     format: s.format,
     stage: s.progress.stage ?? null,
     failure: s.failure,
+    pdf: s.pdf,
     mappingProfile: s.mappingProfile,
     profileCandidates: s.mappingHelp?.profileCandidates ?? [],
     missingColumns: s.mappingHelp?.missingColumns ?? [],

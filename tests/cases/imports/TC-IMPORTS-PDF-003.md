@@ -12,9 +12,12 @@ invariants: ["INV-001"]
 priority: high
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/infrastructure/pdf/pdfjs-text-extractor.test.ts
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +35,7 @@ steps:
 expected_result:
   - "la importación queda \"en revisión\" con 4 filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-003 — El extracto PDF sintético de una página se lee en el hilo aislado y queda en revisión con 4 filas

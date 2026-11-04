@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/profile-options.pdf.test.ts
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +34,7 @@ steps:
 expected_result:
   - "la importación se lee con la versión 1 y la registra"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-013 — El perfil PDF de la cuenta fija la versión del diseño aunque exista una más reciente

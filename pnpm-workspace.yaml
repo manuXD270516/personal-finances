@@ -47,6 +47,8 @@ catalog:
   # PDF del recorrido (docs/31 D52; add-lifecycle-timeline § Ampliación D52): MIT, sin navegador headless.
   pdfkit: 0.20.2
   '@types/pdfkit': 0.17.6
+  # Lectura de extractos PDF con texto (add-pdf-statement-parser, ADR-0032): Apache-2.0, JS puro; sin su canvas nativo.
+  pdfjs-dist: 6.3.289
   # Canal email de las notificaciones (add-alerts): MIT, trae sus tipos; Mailpit en local/CI, relay SMTP después.
   nodemailer: 10.0.10
 
@@ -73,5 +75,9 @@ allowBuilds:
 # @swc/core 1.16.x no carga en Windows con ACL heredadas de AppContainer en %LOCALAPPDATA%\swc
 # (ERR_SWC_NATIVE_CACHE; SPIKE-04 R2, ADR-0018). next-intl lo requiere al cargar su plugin (solo lo usa el
 # extractor de mensajes, que no usamos): se fija la última 1.15.x. Revisar en cada upgrade de next-intl.
+# Sin binarios nativos en el lector de PDF (ADR-0032): pdfjs-dist declara @napi-rs/canvas como opcional.
+ignoredOptionalDependencies:
+  - '@napi-rs/canvas'
+
 overrides:
   '@swc/core': 1.15.47

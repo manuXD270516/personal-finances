@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-statement-reader.pdf.test.ts
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la vista previa tiene los mismos 4 movimientos que el extracto dibujado por celdas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-018 — Texto dibujado carácter por carácter y espacios como separación producen los mismos movimientos

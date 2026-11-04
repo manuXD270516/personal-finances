@@ -3809,7 +3809,9 @@
       "IMPORT_AMBIGUOUS_NUMBER": "The number is ambiguous: choose the decimal separator.",
       "IMPORT_RUNNING_BALANCE_GAP": "The running balance of the file does not add up at this row.",
       "IMPORT_RULES_UNAVAILABLE": "Rules were not available: the row has no proposal.",
-      "IMPORT_OCCURRENCE_LINK_SKIPPED": "The commitment was already resolved: the transaction was created without a link."
+      "IMPORT_OCCURRENCE_LINK_SKIPPED": "The commitment was already resolved: the transaction was created without a link.",
+      "IMPORT_PDF_AMBIGUOUS_CELL": "An amount or date in the PDF crosses two columns and could not be read with certainty.",
+      "IMPORT_PDF_BOTH_DEBIT_AND_CREDIT": "The PDF row has a debit and a credit at once; the amount cannot be decided."
     },
     "warnings": {
       "IMPORT_FILE_ALREADY_IMPORTED": "This same file was already imported into this account on {date}. You can continue: rows already imported are not duplicated.",
@@ -3874,7 +3876,7 @@
     "docUpload": {
       "intro": "Choose the statement account and its file (up to {max}). The file is stored encrypted as a workspace document and processed in the background; the format is detected from its content.",
       "file": "Statement",
-      "fileHint": "CSV, OFX, QIF, JSON of the own schema or XLSX.",
+      "fileHint": "CSV, OFX, QIF, JSON of the own schema, XLSX or a PDF with text from a supported bank.",
       "profile": "Mapping profile",
       "profileHint": "Optional: by default the account profile or its institution profile applies by itself.",
       "profileAuto": "Automatic",
@@ -4082,6 +4084,39 @@
       "archiveTitle": "Archive the profile “{name}”",
       "archiveBody": "It stops being suggested and applied to new imports; finished ones do not change.",
       "keep": "Keep"
+    },
+    "pdf": {
+      "title": "PDF statement reading",
+      "layout": "Detected layout: {id}, version {version}.",
+      "pages": "Pages read: {read} of {declared}.",
+      "pagesOnly": "Pages read: {read}.",
+      "coherenceOk": "The balances and totals printed in the statement match the rows read.",
+      "chainGaps": "The running balance of the statement does not add up on some row (warning; check them in the table).",
+      "openingDifference": "Difference between the opening balance of the statement and your account balance the day before: {amount}.",
+      "openingMatches": "The opening balance of the statement matches your account balance the day before.",
+      "openingHint": "A difference means months not imported or manual entries; you can still approve.",
+      "warning": {
+        "IMPORT_PDF_ACCOUNT_UNVERIFIED": "We could not verify that the statement belongs to this account. Register the last 4 digits of its number in the account so it is verified."
+      },
+      "failure": {
+        "title": "PDF reading details",
+        "layout": "Layout: {id}, version {version}.",
+        "noText": "Pages without text: {pages}.",
+        "unrecognized": "Lines that could not be read (page:line): {lines}.",
+        "difference": "Difference between the statement balances and the rows read: {amount}.",
+        "pages": "{read} pages were read and the statement declares {declared}.",
+        "reason": {
+          "TIMEOUT": "Reading took longer than allowed.",
+          "MEMORY": "The PDF needed more memory than allowed.",
+          "PAGE_LIMIT": "The PDF has more pages than allowed.",
+          "TEXT_LIMIT": "The PDF has more text than allowed.",
+          "MALFORMED": "The PDF is damaged or incomplete.",
+          "ENCRYPTED": "The PDF is password protected."
+        }
+      },
+      "pin": "Pin layout {id} v{version} to this account",
+      "pinHint": "Future imports of this account will use that version even if a newer one is published.",
+      "pinned": "Layout pinned in a PDF profile of the account."
     }
   },
   "Debt": {

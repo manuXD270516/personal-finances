@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +33,7 @@ expected_result:
   - "esa fila es inválida con `IMPORT_PDF_AMBIGUOUS_CELL` y su número de línea"
   - "las demás filas son válidas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-019 — Un fragmento que cruza dos columnas invalida solo su fila con IMPORT_PDF_AMBIGUOUS_CELL

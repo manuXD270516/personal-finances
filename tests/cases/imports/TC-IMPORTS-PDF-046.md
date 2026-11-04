@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/imports.perf.ts
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-large.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación queda \"en revisión\" en 30 segundos o menos desde su creación"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-046 — Un extracto PDF de 100 páginas y 5 000 movimientos llega a revisión en 30 segundos o menos

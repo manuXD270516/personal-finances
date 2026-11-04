@@ -1,4 +1,5 @@
 import type { AuditEntry, LifecycleStepInput } from '@pf/audit/contracts';
+import type { PdfStatementReader } from '../pdf/pdf-statement-reader.js';
 import { DomainError, FixedClock, Instant, LocalDate, dec } from '@pf/shared-kernel';
 import type {
   DuplicateCandidatesQuery,
@@ -106,6 +107,10 @@ export class MemoryWorld {
   profileVersions: StoredProfileVersion[] = [];
   /** Institución de cada cuenta (perfiles por institución). */
   institutions = new Map<string, string | null>();
+  /** Últimos 4 dígitos registrados de cada cuenta (verificación de extractos PDF). */
+  accountLast4 = new Map<string, string | null>();
+  /** Lector de extractos PDF (add-pdf-statement-parser); ausente ⇒ un PDF no es importable. */
+  pdf: PdfStatementReader | undefined;
   /** Alias de contraparte: descripción exacta ⇒ contraparte. */
   aliases = new Map<string, string>();
   /** Categoría por defecto de cada contraparte. */
@@ -1095,6 +1100,12 @@ export const TEST_SETTINGS: ImportsSettings = {
   duplicateHighScore: '0.9000',
   duplicateLowScore: '0.6000',
   documentMaxBytes: 20 * 1024 * 1024,
+  pdfExtractionTimeoutMs: 30_000,
+  pdfMaxPages: 200,
+  pdfMaxTextItems: 300_000,
+  pdfMaxTextChars: 4_194_304,
+  pdfWorkerMaxOldMb: 192,
+  pdfMinPageTextChars: 20,
 };
 
 export function createMemoryDeps(world: MemoryWorld, settings: Partial<ImportsSettings> = {}): ImportsDeps {
@@ -1236,13 +1247,17 @@ export function createMemoryDeps(world: MemoryWorld, settings: Partial<ImportsSe
         });
       },
     },
-    institutions: { institutionOf: async (_ws, accountId) => world.institutions.get(accountId) ?? null },
+    institutions: {
+      institutionOf: async (_ws, accountId) => world.institutions.get(accountId) ?? null,
+      accountNumberLast4Of: async (_ws, accountId) => world.accountLast4.get(accountId) ?? null,
+    },
     conversions: {
       async recordBatch() {
         return { created: [], alreadyExisting: [] };
       },
     },
     readers: world.readers,
+    ...(world.pdf ? { pdf: world.pdf } : {}),
     refs: {
       async assertCategory(_ws, id, kind, pointer) {
         const k = world.categories.get(id);

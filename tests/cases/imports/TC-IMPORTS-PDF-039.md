@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pdf.test.tsx
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación queda \"en revisión\" con la advertencia `IMPORT_PDF_ACCOUNT_UNVERIFIED`"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-039 — Una cuenta sin dígitos registrados se importa con la advertencia de cuenta no verificada

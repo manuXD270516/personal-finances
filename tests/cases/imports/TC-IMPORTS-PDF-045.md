@@ -12,9 +12,11 @@ invariants: ["INV-001", "INV-003"]
 priority: critical
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-statement-reader.pdf.test.ts
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: true
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la lectura de cada uno produce exactamente esos movimientos, con sus fechas, horas, descripciones, montos, saldos y el saldo del extracto"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-045 — Los PDF generados de los tres diseños se leen exactamente igual a sus movimientos sintéticos

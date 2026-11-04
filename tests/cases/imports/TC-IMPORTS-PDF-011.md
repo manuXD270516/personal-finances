@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-statement-reader.pdf.test.ts
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PDF_NO_TEXT` indicando la página 2, sin filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-011 — Una página de solo imagen entre páginas con texto rechaza el PDF indicando la página

@@ -24,7 +24,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "imports:pdf:probe": "tsx --conditions=@pf/source scripts/pdf-probe.ts"
   },
   "dependencies": {
     "@nestjs/common": "catalog:",
@@ -39,16 +40,21 @@
     "ajv": "8.20.0",
     "busboy": "1.6.0",
     "kysely": "catalog:",
-    "pg": "catalog:"
+    "pdfjs-dist": "catalog:",
+    "pg": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "catalog:",
+    "@types/pdfkit": "catalog:",
     "@types/pg": "catalog:",
     "ajv-formats": "3.0.1",
     "fast-check": "4.10.2",
+    "pdfkit": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -3809,7 +3809,9 @@
       "IMPORT_AMBIGUOUS_NUMBER": "O número é ambíguo: indique o separador decimal.",
       "IMPORT_RUNNING_BALANCE_GAP": "O saldo corrente do arquivo não fecha nesta linha.",
       "IMPORT_RULES_UNAVAILABLE": "As regras não estavam disponíveis: a linha fica sem proposta.",
-      "IMPORT_OCCURRENCE_LINK_SKIPPED": "O compromisso já havia sido resolvido: a transação foi criada sem vínculo."
+      "IMPORT_OCCURRENCE_LINK_SKIPPED": "O compromisso já havia sido resolvido: a transação foi criada sem vínculo.",
+      "IMPORT_PDF_AMBIGUOUS_CELL": "Um valor ou data do PDF cruza duas colunas e não pôde ser lido com certeza.",
+      "IMPORT_PDF_BOTH_DEBIT_AND_CREDIT": "A linha do PDF traz débito e crédito ao mesmo tempo; não é possível decidir o valor."
     },
     "warnings": {
       "IMPORT_FILE_ALREADY_IMPORTED": "Este mesmo arquivo já foi importado nesta conta em {date}. Você pode continuar: as linhas já importadas não são duplicadas.",
@@ -3874,7 +3876,7 @@
     "docUpload": {
       "intro": "Escolha a conta do extrato e o arquivo (até {max}). O arquivo é guardado cifrado como documento do espaço de trabalho e processado em segundo plano; o formato é detectado pelo conteúdo.",
       "file": "Extrato",
-      "fileHint": "CSV, OFX, QIF, JSON do esquema próprio ou XLSX.",
+      "fileHint": "CSV, OFX, QIF, JSON do esquema próprio, XLSX ou um PDF com texto de um banco suportado.",
       "profile": "Perfil de mapeamento",
       "profileHint": "Opcional: por padrão se aplica sozinho o da conta ou o da instituição.",
       "profileAuto": "Automático",
@@ -4082,6 +4084,39 @@
       "archiveTitle": "Arquivar o perfil «{name}»",
       "archiveBody": "Deixa de ser sugerido e aplicado a importações novas; as já feitas não mudam.",
       "keep": "Manter"
+    },
+    "pdf": {
+      "title": "Leitura do extrato PDF",
+      "layout": "Layout detectado: {id}, versão {version}.",
+      "pages": "Páginas lidas: {read} de {declared}.",
+      "pagesOnly": "Páginas lidas: {read}.",
+      "coherenceOk": "Os saldos e totais impressos no extrato batem com as linhas lidas.",
+      "chainGaps": "O saldo corrido do extrato não bate em alguma linha (aviso; revise-as na tabela).",
+      "openingDifference": "Diferença entre o saldo inicial do extrato e o saldo da sua conta no dia anterior: {amount}.",
+      "openingMatches": "O saldo inicial do extrato coincide com o saldo da sua conta no dia anterior.",
+      "openingHint": "Uma diferença indica meses sem importar ou lançamentos manuais; você pode aprovar mesmo assim.",
+      "warning": {
+        "IMPORT_PDF_ACCOUNT_UNVERIFIED": "Não conseguimos verificar se o extrato é desta conta. Registre os últimos 4 dígitos do número na conta para que seja verificado."
+      },
+      "failure": {
+        "title": "Detalhes da leitura do PDF",
+        "layout": "Layout: {id}, versão {version}.",
+        "noText": "Páginas sem texto: {pages}.",
+        "unrecognized": "Linhas que não puderam ser lidas (página:linha): {lines}.",
+        "difference": "Diferença entre os saldos do extrato e as linhas lidas: {amount}.",
+        "pages": "Foram lidas {read} páginas e o extrato declara {declared}.",
+        "reason": {
+          "TIMEOUT": "A leitura demorou mais do que o permitido.",
+          "MEMORY": "O PDF precisou de mais memória do que o permitido.",
+          "PAGE_LIMIT": "O PDF tem mais páginas do que o permitido.",
+          "TEXT_LIMIT": "O PDF tem mais texto do que o permitido.",
+          "MALFORMED": "O PDF está danificado ou incompleto.",
+          "ENCRYPTED": "O PDF está protegido por senha."
+        }
+      },
+      "pin": "Fixar o layout {id} v{version} nesta conta",
+      "pinHint": "As próximas importações desta conta usarão essa versão mesmo que uma nova seja publicada.",
+      "pinned": "Layout fixado em um perfil PDF da conta."
     }
   },
   "Debt": {

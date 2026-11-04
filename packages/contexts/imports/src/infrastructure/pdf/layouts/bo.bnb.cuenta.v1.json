@@ -1,0 +1,45 @@
+{
+  "schema": "imports.pdf-layout.v1",
+  "id": "bo.bnb.cuenta",
+  "version": 1,
+  "currencyLabels": [{ "label": "BOLIVIANOS", "currency": "BOB" }],
+  "detect": { "literals": ["Tu Banca Personal", "Resumen de cuenta"] },
+  "header": {
+    "account": { "label": "Número de cuenta:" },
+    "period": { "kind": "LONG_DATE_RANGE" },
+    "openingBalance": { "kind": "LABEL", "label": "Saldo al", "occurrence": "FIRST" },
+    "closingBalance": { "kind": "LABEL", "label": "Saldo al", "occurrence": "LAST" },
+    "totalDebits": { "label": "Total de débitos" },
+    "totalCredits": { "label": "Total de créditos" },
+    "totalPages": { "kind": "PAGE_N_OF_M" }
+  },
+  "table": {
+    "columns": [
+      { "labels": ["Fecha"], "role": "DATE", "align": "LEFT" },
+      { "labels": ["Hora"], "role": "TIME", "align": "LEFT" },
+      { "labels": ["Descripción"], "role": "DESCRIPTION", "align": "LEFT" },
+      { "labels": ["Referencia"], "role": "REFERENCE", "align": "LEFT" },
+      { "labels": ["Comprobante"], "role": "IGNORE", "align": "LEFT" },
+      { "labels": ["ITF"], "role": "IGNORE", "align": "RIGHT" },
+      { "labels": ["Créditos", "Débitos"], "role": "AMOUNT", "align": "RIGHT" }
+    ],
+    "rowAnchor": "AMOUNT",
+    "sections": [
+      { "id": "DEPOSITS", "startLabel": "Depósitos", "totalLabel": "Total depósitos", "sign": "CREDIT" },
+      { "id": "WITHDRAWALS", "startLabel": "Retiros", "totalLabel": "Total retiros", "sign": "DEBIT" }
+    ],
+    "counterpartyStarts": ["Cuenta Destino:"],
+    "dropLinePrefixes": ["CUENTA:"]
+  },
+  "page": {
+    "repeatedLiterals": [],
+    "footerLiterals": ["Página"],
+    "blankPageLiterals": ["Esta página se dejó en blanco intencionalmente"],
+    "discardLiterals": ["| Número de cuenta"]
+  },
+  "number": { "decimal": ".", "thousands": "," },
+  "date": "DD/MM/YYYY",
+  "time": "HH:mm",
+  "reference": { "unique": false },
+  "volatileFragments": []
+}

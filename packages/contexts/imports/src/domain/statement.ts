@@ -7,7 +7,7 @@ import type { RowIssue } from './types.js';
  * salida es negativa.
  */
 
-export const STATEMENT_FORMATS = ['CSV', 'OFX', 'QIF', 'JSON', 'XLSX'] as const;
+export const STATEMENT_FORMATS = ['CSV', 'OFX', 'QIF', 'JSON', 'XLSX', 'PDF'] as const;
 export type StatementFormat = (typeof STATEMENT_FORMATS)[number];
 
 /** Formatos tabulares: el mapeo de columnas (perfil o manual) define fecha, descripción y monto. */

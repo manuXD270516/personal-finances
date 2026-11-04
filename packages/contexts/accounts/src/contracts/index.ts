@@ -85,6 +85,8 @@ export interface AccountSummaryDto {
   readonly displayOrder: number;
   /** Institución de la cuenta (perfiles de mapeo de IMPORTS; aditivo). */
   readonly institutionId?: string | null;
+  /** Últimos 4 caracteres del número de cuenta, si se registraron (IMPORTS verifica el extracto PDF; aditivo). */
+  readonly accountNumberLast4?: string | null;
 }
 
 /**

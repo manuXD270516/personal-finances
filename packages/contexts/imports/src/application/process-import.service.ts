@@ -1,5 +1,5 @@
 import type { AuditChangeInput } from '@pf/audit/contracts';
-import { DomainError, dec } from '@pf/shared-kernel';
+import { DomainError, LocalDate, dec } from '@pf/shared-kernel';
 import { IMPORTS_EVENTS } from '../contracts/index.js';
 import {
   matchProfile,
@@ -13,10 +13,13 @@ import {
   type ImportStatementInfo,
   type MappingHelp,
   type ProfileMapping,
+  type ImportPdfInfo,
   type StatementBalance,
   type StatementFormat,
+  type StatementRecord,
 } from '../domain/index.js';
 import { publishJobEvent, recordJob, SYSTEM_ACTOR } from './job-recorder.js';
+import type { PdfStatementReader } from './pdf/pdf-statement-reader.js';
 import type { ImportsDeps, StagedInsert, StoredProfileVersion } from './ports/index.js';
 import { countersOf } from './row-pipeline.js';
 import { runStatementPipeline, type StageName } from './statement-pipeline.js';
@@ -33,6 +36,15 @@ class Stopped extends Error {
     super('import is no longer PROCESSING');
   }
 }
+
+/** Los primeros bytes son la firma de un PDF (la detección real y la inspección son de DOCUMENTS). */
+const isPdf = (bytes: Uint8Array): boolean =>
+  bytes.length >= 5 &&
+  bytes[0] === 0x25 &&
+  bytes[1] === 0x50 &&
+  bytes[2] === 0x44 &&
+  bytes[3] === 0x46 &&
+  bytes[4] === 0x2d;
 
 const toStatementInfo = (s: StatementBalance | null): ImportStatementInfo | null =>
   s === null
@@ -122,6 +134,11 @@ export class ProcessImportService {
       return this.fail(state, { code: 'IMPORT_PARSE_FAILED', pointer: 'document' }, 'PARSE');
     }
 
+    if (isPdf(bytes)) {
+      // Extracto PDF (add-pdf-statement-parser): sin el lector configurado sigue siendo un formato no importable.
+      if (!deps.pdf) return this.fail(state, { code: 'IMPORT_UNSUPPORTED_FORMAT', pointer: null }, 'PARSE');
+      return this.readPdf(state, bytes, { account, scale, deadline });
+    }
     const sniffed = deps.readers.sniff(bytes.subarray(0, 4096));
     if (sniffed === null) {
       return this.fail(state, { code: 'IMPORT_UNSUPPORTED_FORMAT', pointer: null }, 'PARSE');
@@ -173,24 +190,7 @@ export class ProcessImportService {
           statement: toStatementInfo(parsed.statement),
         });
       }
-      const inserts: StagedInsert[] = parsed.records.map((r) => ({
-        id: deps.ids.next(),
-        rowNumber: r.line,
-        raw: [],
-        record: {
-          bookingDate: r.bookingDate,
-          bookingTime: r.time,
-          valueDate: r.valueDate,
-          signedAmount: r.amount,
-          currency: r.currency,
-          description: r.description,
-          externalId: r.externalId,
-          reference: r.reference,
-          counterpartyText: r.counterparty,
-          runningBalance: r.runningBalance,
-          issues: r.issues,
-        },
-      }));
+      const inserts = this.toInserts(parsed.records);
       const stopped = await this.insertBlocks(state, inserts, deadline, toStatementInfo(parsed.statement));
       if (stopped !== 'CONTINUE') return stopped;
       if (selfMatch?.kind === 'APPLIED') {
@@ -242,6 +242,107 @@ export class ProcessImportService {
       delimiter: read.delimiter,
       statement: null,
     });
+  }
+
+  private toInserts(records: readonly StatementRecord[]): StagedInsert[] {
+    return records.map((r) => ({
+      id: this.deps.ids.next(),
+      rowNumber: r.line,
+      raw: [],
+      record: {
+        bookingDate: r.bookingDate,
+        bookingTime: r.time,
+        valueDate: r.valueDate,
+        signedAmount: r.amount,
+        currency: r.currency,
+        description: r.description,
+        externalId: r.externalId,
+        reference: r.reference,
+        counterpartyText: r.counterparty,
+        runningBalance: r.runningBalance,
+        issues: r.issues,
+      },
+    }));
+  }
+
+  /**
+   * Lectura de un extracto PDF (add-pdf-statement-parser, decisión 4): la etapa es atómica (extracción en el hilo
+   * aislado, reconstrucción y coherencia completas) y el staging se escribe DESPUÉS, por bloques con
+   * `ON CONFLICT DO NOTHING`; una reentrega vuelve a extraer sin dejar filas a medias.
+   */
+  private async readPdf(
+    state: ImportJobState,
+    bytes: Uint8Array,
+    ctx: {
+      readonly account: { readonly currency: string };
+      readonly scale: number;
+      readonly deadline: number;
+    },
+  ): Promise<'CONTINUE' | 'PARSE_FAILED' | 'CANCELLED'> {
+    const { deps } = this;
+    const pdfReader = deps.pdf as PdfStatementReader;
+    const { workspaceId } = state;
+    const institutionId = await deps.uow.run(workspaceId, () =>
+      deps.institutions.institutionOf(workspaceId, state.accountId),
+    );
+    const last4Of = deps.institutions.accountNumberLast4Of?.bind(deps.institutions);
+    const accountLast4 = last4Of
+      ? await deps.uow.run(workspaceId, () => last4Of(workspaceId, state.accountId))
+      : null;
+    // Diseño: el perfil elegido al crear la importación, o el de la cuenta, o el de su institución.
+    let chosen: StoredProfileVersion | null;
+    if (state.mappingProfile) {
+      const ref = state.mappingProfile;
+      const versions = await deps.uow.run(workspaceId, () => deps.profiles.versionsOf(workspaceId, ref.id));
+      chosen = versions.find((v) => v.version === ref.version) ?? null;
+    } else {
+      const profiles = await deps.uow.run(workspaceId, () =>
+        deps.profiles.latestForMatching(workspaceId, {
+          accountId: state.accountId,
+          institutionId,
+          format: 'PDF',
+        }),
+      );
+      const match = matchProfile({
+        header: [],
+        format: 'PDF',
+        accountId: state.accountId,
+        institutionId,
+        profiles,
+      });
+      chosen =
+        match.kind === 'APPLIED'
+          ? (profiles.find((p) => p.id === match.profileId && p.version === match.version) ?? null)
+          : null;
+    }
+
+    const outcome = await pdfReader.read({
+      bytes,
+      accountCurrency: ctx.account.currency,
+      scale: ctx.scale,
+      maxRows: deps.settings.maxRows,
+      accountLast4,
+      pinned: chosen?.options.pdfLayout ?? null,
+    });
+    if (outcome.kind === 'FAILED') return this.fail(state, outcome.failure, 'PARSE', outcome.pdf);
+
+    await deps.uow.runDetached(workspaceId, async () => {
+      const job = await this.lockProcessing(state);
+      job.setPdf(outcome.pdf, deps.clock.now().toString());
+      await this.save(job);
+    });
+    const stopped = await this.insertBlocks(
+      state,
+      this.toInserts(outcome.parsed.records),
+      ctx.deadline,
+      toStatementInfo(outcome.parsed.statement),
+    );
+    if (stopped !== 'CONTINUE') return stopped;
+    if (chosen && !state.mappingProfile) {
+      await this.pinProfile(state, { id: chosen.id, version: chosen.version }, null);
+    }
+    await this.moveToStage(state, 'NORMALIZE');
+    return 'CONTINUE';
   }
 
   /** El perfil elegido por el usuario al crear la importación: se resuelve contra el encabezado real. */
@@ -382,6 +483,10 @@ export class ProcessImportService {
     }
 
     const cleanup = await this.profileCleanup(fresh);
+    // PDF: fragmentos variables del diseño (solo para la huella) y diferencia del saldo inicial con la cuenta.
+    const layoutRef = fresh.pdf?.layout ?? null;
+    const volatileFragments = layoutRef ? (deps.pdf?.layoutOf(layoutRef)?.volatileFragments ?? []) : [];
+    const openingDifference = await this.openingDifference(fresh, account, scale);
     const output = await runStatementPipeline(
       deps,
       {
@@ -393,6 +498,7 @@ export class ProcessImportService {
         format,
         mapping: tabular ? fresh.profileMapping : null,
         descriptionCleanup: cleanup,
+        volatileFragments,
         closedPeriods,
         openingBalance: fresh.statement?.openingBalance ?? null,
       },
@@ -438,6 +544,9 @@ export class ProcessImportService {
       await deps.staging.applyPipeline(workspaceId, state.id, output.items, output.resetIds);
       const summary = await deps.staging.summary(workspaceId, state.id);
       const now = deps.clock.now();
+      if (job.state.pdf !== null) {
+        job.setPdf({ ...job.state.pdf, openingDifference }, now.toString());
+      }
       job.readyForReview({
         counters: countersOf(summary),
         rowCount: summary.rows,
@@ -466,6 +575,27 @@ export class ProcessImportService {
       });
     });
     return 'AWAITING_REVIEW';
+  }
+
+  /**
+   * Diferencia entre el saldo inicial del extracto PDF y el saldo de la cuenta al cierre del día anterior al periodo
+   * (decisión 10, Should): meses faltantes o movimientos manuales sin importar. Solo se muestra; no bloquea.
+   */
+  private async openingDifference(
+    state: ImportJobState,
+    account: { readonly currency: string; readonly nature: string },
+    scale: number,
+  ): Promise<{ readonly amount: string; readonly currency: string } | null> {
+    const opening = state.statement?.openingBalance ?? null;
+    const from = state.statement?.periodFrom ?? null;
+    if (state.format !== 'PDF' || opening === null || from === null || account.nature !== 'ASSET')
+      return null;
+    const dayBefore = LocalDate.parse(from).plusDays(-1).toString();
+    const balance = await this.deps.uow.run(state.workspaceId, () =>
+      this.deps.balances.presentedBalance(state.workspaceId, state.accountId, dayBefore),
+    );
+    if (balance === null) return null;
+    return { amount: dec(opening).minus(dec(balance)).toFixed(scale), currency: account.currency };
   }
 
   private coverageOf(
@@ -538,13 +668,14 @@ export class ProcessImportService {
     state: ImportJobState,
     failure: ImportFailure,
     stage: string,
+    pdf?: ImportPdfInfo | null,
   ): Promise<'PARSE_FAILED' | 'CANCELLED'> {
     const { deps } = this;
     try {
       await deps.uow.runDetached(state.workspaceId, async () => {
         const job = await this.lockProcessing(state);
         await deps.staging.deleteAll(state.workspaceId, state.id);
-        job.failParse({ failure, now: deps.clock.now().toString() });
+        job.failParse({ failure, ...(pdf === undefined ? {} : { pdf }), now: deps.clock.now().toString() });
         await this.save(job);
         const event = await publishJobEvent(deps, job, IMPORTS_EVENTS.failed, { code: failure.code, stage });
         const changes: AuditChangeInput[] = [

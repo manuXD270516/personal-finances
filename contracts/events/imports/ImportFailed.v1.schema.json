@@ -49,9 +49,15 @@
           "examples": [
             "IMPORT_PARSE_FAILED",
             "IMPORT_TOO_MANY_ROWS",
-            "IMPORT_UNSUPPORTED_FORMAT"
+            "IMPORT_UNSUPPORTED_FORMAT",
+            "IMPORT_PDF_NO_TEXT",
+            "IMPORT_PDF_LAYOUT_UNKNOWN",
+            "IMPORT_PDF_EXTRACTION_FAILED",
+            "IMPORT_PDF_TOTALS_MISMATCH",
+            "IMPORT_PDF_PAGE_COUNT_MISMATCH",
+            "IMPORT_PDF_ACCOUNT_MISMATCH"
           ],
-          "description": "Código de error del job. Enum abierto."
+          "description": "Código de error del job. Enum abierto. Los IMPORT_PDF_* son los de la lectura de extractos PDF (add-pdf-statement-parser); ninguno lleva texto del extracto."
         },
         "stage": {
           "oneOf": [

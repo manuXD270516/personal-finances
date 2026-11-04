@@ -197,9 +197,11 @@ services:
       migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy, restart: true }
       object-storage: { condition: service_healthy }
+    # 448m = heap principal (192) + hilo aislado de lectura de PDF (IMPORT_PDF_WORKER_MAX_OLD_MB = 192, una extracción a la
+    # vez, ADR-0032) + margen nativo; en reposo el worker sigue en ≈ 200 MiB (el hilo solo existe mientras lee un PDF).
     deploy:
       resources:
-        limits: { cpus: '1', memory: 288m }
+        limits: { cpus: '1', memory: 448m }
 
   finance-web:
     image: ${FINANCE_WEB_IMAGE:?digest de finance-web (main.yml)}
