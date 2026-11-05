@@ -188,6 +188,19 @@ Dependencias que fijan el orden: `add-financial-periods` es la base del plan men
 | 56 | `add-banking-providers` | `imports/banking-providers` (nueva: puerto `BankingProvider`, proveedor simulado, credenciales con sobre X25519, sincronización por cursor; el grupo 9 con exchanges reales depende del owner) + `identity/workspace-portability` | 6 |
 | 57 | `add-pdf-statement-parser` | `imports/import-pipeline` (1 MODIFIED: el PDF con texto pasa a ser formato importable; 13 ADDED: extracción con posiciones en un `worker_thread` aislado, rechazo de escaneados, diseños por institución versionados, reconstrucción por columnas, páginas, montos exactos, coherencia de saldos con falla cerrada, cuenta y moneda, huella con fragmentos variables, fixtures generados por código; D324) | 6 |
 
+**Phase 7 (consolidado el 2026-11-04).** Cinco changes redactados en paralelo en tres hilos; preguntas al owner en [61-phase-7-consolidation-questions.md](61-phase-7-consolidation-questions.md).
+
+| Orden | Change | Capabilities | Fase |
+|---|---|---|---|
+| 58 | `add-financial-reports` | `reporting/financial-reports` (nueva: catálogo de 16 reportes, reportes Must 1, 2, 3, 7, 8 y 15, comparativas MoM/YoY/rango/móvil, drill-down, conversión declarada, export CSV, reconciliación reporte↔ledger en tres niveles, NFR-PERF-006) + `reporting/net-worth`, `reporting/dashboard` | 7 |
+| 59 | `add-financial-reports-extended` | `reporting/financial-reports` (reportes Should 4–6 y 9–14, vistas guardadas, PDF Could) | 7 |
+| 60 | `add-cash-flow-forecast` | `reporting/cash-flow-calendar` (saldo proyectado 7/30/60/90, mínimo esperado y riesgo de déficit, NFR-PERF-010) + `reporting/dashboard` (Q5 hasta el próximo ingreso, esenciales, Q7, SM-05) + `notifications/alerts` (alerta de déficit y digest) | 7 |
+| 61 | `add-historical-budgets` | `planning/budgets` (sugerencia por promedio o año anterior con exclusión de atípicos, confirmación explícita) | 7 |
+| 62 | `add-rule-suggestions` | `rules/rule-engine` (reglas sugeridas desde clasificaciones manuales, vista previa con el motor del dry-run, aceptación explícita) | 7 |
+
+Dependencias que fijan el orden: el núcleo de reportes fija contratos y esquemas que usa el ampliado; el forecast y los reportes coordinan `PERF_THRESHOLDS` y el delta de `reporting/dashboard`; las sugerencias de reglas se archivan después de `add-rule-engine`.
+
+
 Dependencias que fijan el orden: el throughput va primero porque cambia el perfil de eventos de los imports; la escritura por lote antes del pipeline (NFR-PERF-007); los documentos antes de la etapa de subida del pipeline (sus parsers pueden avanzar con fixtures); el motor de reglas (55, `add-rule-engine`: contexto `@pf/rules` sin consumidores de eventos nuevos) expone `RuleEvaluationQuery` a la etapa de clasificación y puede implementarse antes o en paralelo del pipeline, pero la medición del 70 % de Phase 6 requiere ambos (D334); los proveedores bancarios entran por la normalización del pipeline. El parser de PDF (57, D324) entra por la etapa de lectura del pipeline: requiere aplicados `add-document-attachments` y `add-import-pipeline` y se archiva después de este (su delta modifica un requirement que agrega el 54).
 
 Orden de implementación de Phase 6: `optimize-consumer-throughput` → `add-bulk-imported-transactions` → `add-document-attachments` y `add-rule-engine` → `add-import-pipeline` → `add-banking-providers` → parser de PDF. `add-import-pipeline` se archiva después de `add-bulk-imported-transactions` (ambos tocan `imports/import-pipeline`, con requirements distintos).
