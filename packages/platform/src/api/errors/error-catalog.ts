@@ -168,6 +168,17 @@ export const ERROR_CATALOG = {
   IMPORT_PDF_TOTALS_MISMATCH: { status: 422, title: 'The statement totals do not match the rows read' },
   IMPORT_PDF_PAGE_COUNT_MISMATCH: { status: 422, title: 'Fewer pages were read than the statement declares' },
   IMPORT_PDF_ACCOUNT_MISMATCH: { status: 422, title: 'The statement belongs to a different account' },
+  // imports / connections with providers (Phase 6, add-banking-providers)
+  BANKING_PROVIDER_NOT_AVAILABLE: {
+    status: 422,
+    title: 'The provider is not available (terms or format not verified)',
+  },
+  CONNECTION_CREDENTIAL_NOT_READ_ONLY: { status: 422, title: 'The API key is not read-only' },
+  CONNECTION_SYNC_IN_PROGRESS: {
+    status: 409,
+    title: 'The connection already has a synchronization in progress',
+  },
+  IMPORT_CONNECTION_EXPIRED: { status: 409, title: 'The provider rejected the credential of the connection' },
   // transactions / bulk edit (Phase 2)
   BULK_EDIT_NOT_APPLICABLE: { status: 422, title: 'The change does not apply to the transaction' },
   // commitments / recurrence engine (Phase 3)

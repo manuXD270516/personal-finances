@@ -3,6 +3,7 @@
 - Estado: Aceptado (2026-10-16; el owner adoptó la recomendación de las preguntas 1–4 de [docs/42](../42-phase-5-owner-answers-and-decisions.md), ver [docs/43](../43-phase-5-owner-answers-2026-10-16.md) D256–D260). Aceptado **con las condiciones C1–C4**: ninguna fuente se habilita (descriptor `VERIFIED`) hasta completar la lectura directa de la tarea 1.5
 - Fecha: 2026-10-13 (propuesto); 2026-10-16 (aceptado)
 - Decisores: Owner (Product/Tech Lead)
+- Nota (2026-11-04): la condición C4 aplica a los **precios públicos**. La lectura de movimientos privados del owner con claves de solo lectura se decide aparte en [ADR-0031](0031-lectura-de-movimientos-de-exchanges-con-claves-de-solo-lectura.md) (propuesto).
 - Relacionado: Extiende [ADR-0025](0025-fuentes-de-tipo-de-cambio-bolivia.md); docs/41-phase-5-consolidation-decisions.md (D225–D229); docs/42-phase-5-owner-answers-and-decisions.md (D251); docs/43-phase-5-owner-answers-2026-10-16.md (D256–D260); docs/26-risk-register.md (RISK-023); [ADR-0027](0027-destino-de-despliegue-inicial-vps-compose.md) (VPS N1 en `sa-east-1`); OpenSpec change `add-crypto-rate-providers` (capabilities `fx/market-rate-providers`, `fx/market-rates`), tareas 1.1, 1.2 y 1.5
 
 ## Contexto y problema

@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Conexión con un proveedor y mapeo de activos a cuentas"
 scenario: "Activo sin cuenta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-014"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -36,7 +38,7 @@ expected_result:
   - "Fila con issue CONNECTION_ASSET_UNMAPPED"
   - "Ninguna transacción creada para ella"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-005 — Un activo sin mapear llega como fila no importable

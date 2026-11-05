@@ -5,16 +5,17 @@ spec: identity/workspace-portability
 related_specs: ["imports/banking-providers"]
 requirement: "Conexiones con proveedores en el export sin credenciales"
 scenario: "Ida y vuelta de una conexión de exchange"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-010", "FR-IDENTITY-017"]
 nfr: ["NFR-COMP-008"]
 invariants: []
 priority: critical
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -37,7 +38,7 @@ expected_result:
   - "Conexión con dos mapeos en NEEDS_CREDENTIAL y 37 transacciones"
   - "sync ⇒ 409 INVALID_STATUS_TRANSITION"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-036 — El export lleva la conexión sin credenciales y la importación pide una nueva

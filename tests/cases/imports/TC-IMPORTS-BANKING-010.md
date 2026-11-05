@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Nunca usuario y contraseña de banca"
 scenario: "Descriptor que pide contraseña"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-COMP-008"]
 invariants: []
 priority: critical
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -33,7 +34,7 @@ expected_result:
   - "El registro falla"
   - "El proveedor no aparece en el catálogo"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-010 — Un descriptor con usuario y contraseña no se registra

@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Importación por archivo del historial de un exchange"
 scenario: "Columnas desconocidas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-014"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.file.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -32,7 +33,7 @@ steps:
 expected_result:
   - "422 IMPORT_UNSUPPORTED_FORMAT"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-028 — Un archivo sin formato verificado se rechaza

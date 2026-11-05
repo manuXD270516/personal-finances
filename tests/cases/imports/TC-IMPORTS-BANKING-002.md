@@ -5,16 +5,20 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Proveedores habilitados solo con términos y formato verificados"
 scenario: "Exchange con términos pendientes"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+  - apps/web/src/ui/imports/connections.test.tsx
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -34,7 +38,7 @@ expected_result:
   - "availability PENDING_VERIFICATION"
   - "422 BANKING_PROVIDER_NOT_AVAILABLE"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-002 — Un proveedor con términos pendientes no admite conexiones

@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Permisos y auditoría de las conexiones"
 scenario: "EDITOR intenta revocar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +36,7 @@ expected_result:
   - "EDITOR: 403 en revocar, credencial y crear; 202 en sync"
   - "VIEWER: 200 en GET; 403 en sync"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-033 — Solo el OWNER gestiona credenciales y revoca

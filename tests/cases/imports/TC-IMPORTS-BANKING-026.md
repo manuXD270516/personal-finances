@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: ["rules/rule-engine"]
 requirement: "Depósitos, retiros, comisiones y recompensas"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-014", "FR-IMPORTS-008"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +36,7 @@ expected_result:
   - "Recompensa: ingreso en Rendimientos con origen en la regla Staking"
   - "Depósito: ingreso sin categoría con señal POSSIBLE_TRANSFER"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-026 — Depósitos y recompensas pasan por las reglas del workspace

@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Rotación de la clave maestra"
 scenario: "Rotar de k1 a k2"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-SEC-007"]
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/banking/credential-vault.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -37,7 +39,7 @@ expected_result:
   - "El secreto no se descifra durante la rotación (espía sobre el descifrado de datos)"
   - "Las sincronizaciones funcionan sin k1"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-015 — La rotación vuelve a envolver las claves de datos sin descifrar secretos

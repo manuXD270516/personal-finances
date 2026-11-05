@@ -306,6 +306,8 @@ const blankStaged = (id: string, jobId: string, rowNumber: number, raw: readonly
   jobId,
   rowNumber,
   raw,
+  accountId: null,
+  external: null,
   bookingDate: null,
   amount: null,
   currency: null,
@@ -364,7 +366,10 @@ class MemoryStaging implements StagingRepository {
           bookingDate: r.record.bookingDate,
           bookingTime: r.record.bookingTime,
           valueDate: r.record.valueDate,
-          amount: signed === null ? null : dec(signed).abs().toFixed(2),
+          accountId: r.accountId ?? null,
+          external: r.external ?? null,
+          amount:
+            signed === null ? null : r.external ? dec(signed).abs().toFixed() : dec(signed).abs().toFixed(2),
           direction:
             signed === null ? null : dec(signed).isNegative() ? 'OUT' : dec(signed).isZero() ? null : 'IN',
           description: r.record.description,
@@ -1143,7 +1148,7 @@ export function createMemoryDeps(world: MemoryWorld, settings: Partial<ImportsSe
     },
     currencies: {
       async scaleOf(code) {
-        return ({ BOB: 2, USD: 2, JPY: 0 } as Record<string, number>)[code] ?? null;
+        return ({ BOB: 2, USD: 2, JPY: 0, USDT: 6, BTC: 8, BNB: 8 } as Record<string, number>)[code] ?? null;
       },
     },
     calendar: { timeZoneOf: async () => world.timeZone },
