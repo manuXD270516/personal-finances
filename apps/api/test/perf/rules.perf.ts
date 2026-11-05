@@ -293,7 +293,9 @@ describe('add-rule-suggestions 7.3: sugerencias', () => {
         limit: 5000,
       }),
     );
-    console.info(`rule suggestions: lectura de la evidencia ${Math.round(performance.now() - readStarted)} ms`);
+    console.info(
+      `rule suggestions: lectura de la evidencia ${Math.round(performance.now() - readStarted)} ms`,
+    );
     const times: number[] = [];
     for (let i = 0; i < 5; i += 1) times.push(await list());
     const median = [...times].sort((a, b) => a - b)[2]!;
