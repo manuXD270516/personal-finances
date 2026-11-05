@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Patrones por descripción normalizada y por contraparte"
 scenario: "Contraparte con glosas distintas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-011"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/rule-proposal.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

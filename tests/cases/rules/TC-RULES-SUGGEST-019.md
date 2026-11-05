@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Descartar una sugerencia"
 scenario: "Descartar PedidosYa"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-011"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/rule-proposals.service.test.ts
+  - apps/api/test/api/rule-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

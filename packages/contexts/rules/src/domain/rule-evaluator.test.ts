@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { evaluateRules, previewRule, type EvaluableRule } from './rule-evaluator.js';
+import { CompiledRuleSet, evaluateRules, previewRule, type EvaluableRule } from './rule-evaluator.js';
 import { catalog, rule, subject } from './testing.js';
 import type { EvaluationMode, RuleTrigger } from './types.js';
 
@@ -302,5 +302,31 @@ describe('vista previa', () => {
     expect(p.conditions.map((c) => c.met)).toEqual([true, false]);
     expect(p.conditions[1]?.actual).toBe('180.00 BOB');
     expect(p.outcome.category).toBeNull();
+  });
+});
+
+describe('filtro de disparadores', () => {
+  it('[TC-RULES-SUGGEST-013] con triggerFilter ANY una regla solo de importación también participa', () => {
+    const soloImport = rule('solo-import', { triggers: ['IMPORT'] });
+    const set = (filter?: 'ANY' | 'TRIGGER') =>
+      CompiledRuleSet.compile(
+        [soloImport],
+        'RETROACTIVE',
+        undefined,
+        filter ? { triggerFilter: filter } : {},
+      );
+    expect(set().size).toBe(0);
+    expect(set('TRIGGER').size).toBe(0);
+    expect(set('ANY').size).toBe(1);
+    const out = set('ANY').evaluate(subject(), 'FILL_EMPTY', catalog());
+    expect(out.category?.categoryId).toBe('cat-super');
+  });
+
+  it('[TC-RULES-SUGGEST-013] ANY sigue ignorando las reglas inactivas y archivadas', () => {
+    const rules = [
+      rule('inactiva', { enabled: false, triggers: ['IMPORT'] }),
+      rule('archivada', { archived: true, triggers: ['IMPORT'] }),
+    ];
+    expect(CompiledRuleSet.compile(rules, 'RETROACTIVE', undefined, { triggerFilter: 'ANY' }).size).toBe(0);
   });
 });

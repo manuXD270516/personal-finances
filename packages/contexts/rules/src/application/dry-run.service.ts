@@ -72,7 +72,7 @@ export function dryRunToken(rules: readonly EvaluableRule[], mode: EvaluationMod
     .digest('hex');
 }
 
-const toSubject = (s: ClassificationSubjectDto): RuleSubject => ({
+export const toSubject = (s: ClassificationSubjectDto): RuleSubject => ({
   ref: s.transactionId,
   kind: s.kind,
   accountId: s.accountId,

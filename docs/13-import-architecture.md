@@ -568,6 +568,7 @@ Ejemplos de TC: `TC-IMPORTS-CSV-001` (coma decimal y dd/mm/yyyy), `TC-IMPORTS-ID
 | 3 (Could) | **Implementado** (`add-basic-csv-import`): CSV de una cuenta con mapeo manual (sin perfiles reutilizables), preview, duplicados exactos por huella y probables por candidato (sin score), persistencia asíncrona por lotes, fallo parcial con reintento. Sin reglas (Rules llega en 6), sin reconciliación automática, sin deshacer. |
 | 6 | Pipeline completo: CSV/XLSX/OFX/QIF/JSON, perfiles versionados, duplicados probables con score, rules dry-run, reconciliación, revert, workers con progreso, ExchangeProvider (Could). |
 | 6 (`add-pdf-statement-parser`) | Extractos PDF con texto de BCP y Banco Ganadero (BNB tras validar un extracto real): diseños versionados, hilo aislado, falla cerrada por coherencia, diagnóstico local `pnpm imports:pdf:probe`. |
+| 7 (`add-rule-suggestions`) | Las correcciones manuales de categoría en la vista previa del import (origen `MANUAL`) y las categorías de lo importado anteriores al motor de reglas (`source = IMPORT`, origen desconocido) alimentan las sugerencias de reglas (`rules/rule-engine`): tres clasificaciones manuales de la misma glosa o contraparte en la misma categoría sugieren la regla, que solo se crea si el usuario la acepta. |
 | Futuro | Aggregators (Plaid/regionales), Bank APIs, OCR de PDF escaneados, auto-approve por conexión. |
 
 ## Preguntas abiertas

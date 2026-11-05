@@ -242,3 +242,64 @@ describe('add-rule-engine 7.3: registro manual', () => {
     expect(delta).toBeLessThanOrEqual(CREATE_BUDGET_MS);
   }, 600_000);
 });
+
+describe('add-rule-suggestions 7.3: sugerencias', () => {
+  it('[TC-RULES-SUGGEST-024] 5 000 transacciones de evidencia y 200 reglas activas de 5 condiciones: ≤ 3 s', async () => {
+    const W = `/api/v1/workspaces/${workspaceId}`;
+    const cats = (await api('GET', `${W}/categories?kind=EXPENSE&limit=10`)).body['data'] as { id: string }[];
+    await admin.query('DELETE FROM rules.rule WHERE workspace_id = $1', [workspaceId]);
+    await seedRules(200, 5, ['IMPORT', 'RETROACTIVE']);
+    // 5 000 gastos de evidencia manual sembrados por SQL (sin asiento: PENDING): 676 glosas, cada una en una categoría.
+    const seed = await admin.connect();
+    // Una sola transacción: el trigger diferido exige que los splits sumen el monto al confirmar.
+    await seed.query('BEGIN');
+    await seed.query(
+      `INSERT INTO txn.transaction (id, workspace_id, kind, status, transaction_date, account_id, amount, currency,
+                                    description, source)
+       SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid, $1, 'EXPENSE', 'PENDING',
+              DATE '2026-10-05' - (n % 150), $2, 10, 'BOB',
+              'COMERCIO ' || chr(97 + n % 26) || chr(97 + (n / 26) % 26), 'MANUAL'
+         FROM generate_series(1, 5000) n`,
+      [workspaceId, accountId],
+    );
+    await seed.query(
+      `INSERT INTO txn.transaction_split (id, workspace_id, transaction_id, position, amount, currency, category_id,
+                                          revision, category_origin)
+       SELECT gen_random_uuid(), t.workspace_id, t.id, 0, 10, 'BOB', ($2::uuid[])[1 + ((t.description_n) % 5)], 1, 'MANUAL'
+         FROM (SELECT id, workspace_id, ascii(substr(description, 10, 1)) - 97 AS description_n
+                 FROM txn.transaction WHERE workspace_id = $1 AND id::text LIKE '00000000-0000-4000-8000-%') t`,
+      [workspaceId, cats.slice(0, 5).map((c) => c.id)],
+    );
+    await seed.query('COMMIT');
+    // Estadísticas al día, como las deja el autovacuum en una base en uso (sin ellas el plan de la evidencia no es el real).
+    await seed.query('ANALYZE txn.transaction');
+    await seed.query('ANALYZE txn.transaction_split');
+    seed.release();
+    const list = async () => {
+      const started = performance.now();
+      const out = await queries.inWs(userId, workspaceId, () => queries.r.rules.proposals.list(workspaceId));
+      expect(out.scanned).toBe(5000);
+      expect(out.items.length).toBeGreaterThan(0);
+      return performance.now() - started;
+    };
+    await list(); // calienta el caché de árboles compilados
+    // Informativo: lectura de la evidencia (TRANSACTIONS) por separado, para explicar el reparto del tiempo.
+    const readStarted = performance.now();
+    await queries.inWs(userId, workspaceId, () =>
+      queries.r.transactions.classificationSubjects.listEvidence({
+        workspaceId,
+        from: '2026-04-20',
+        to: '2026-10-20',
+        limit: 5000,
+      }),
+    );
+    console.info(`rule suggestions: lectura de la evidencia ${Math.round(performance.now() - readStarted)} ms`);
+    const times: number[] = [];
+    for (let i = 0; i < 5; i += 1) times.push(await list());
+    const median = [...times].sort((a, b) => a - b)[2]!;
+    console.info(
+      `rule suggestions 5000 × 200: mediana ${Math.round(median)} ms (${times.map(Math.round).join(', ')})`,
+    );
+    expect(median).toBeLessThanOrEqual(EVAL_BUDGET_MS);
+  }, 600_000);
+});

@@ -891,6 +891,12 @@ export interface ClassificationSubjectDto {
   readonly needsReview: boolean;
 }
 
+/** Evidencia de clasificación manual (add-rule-suggestions): un sujeto con el `source` de su transacción. */
+export interface ClassificationEvidenceDto extends ClassificationSubjectDto {
+  /** `source` de la transacción (`MANUAL`, `IMPORT`, …). */
+  readonly source: string;
+}
+
 /**
  * Sujetos de clasificación para RULES (dry-run, aplicación y vista previa). Sin efectos; en la unidad de trabajo del
  * llamador si existe. `list` recorre por keyset `(fecha, id)`, hasta 5 000, solo `INCOME`/`EXPENSE`/`REFUND` no anuladas.
@@ -910,6 +916,18 @@ export interface ClassificationSubjectsQuery {
     readonly workspaceId: string;
     readonly transactionIds: readonly string[];
   }): Promise<readonly ClassificationSubjectDto[]>;
+  /**
+   * Evidencia de clasificación manual (add-rule-suggestions): transacciones no anuladas `INCOME`/`EXPENSE`/`REFUND` de
+   * un solo split, sin `managedBy`, con categoría distinta de «sin categoría» y origen `MANUAL`, o desconocido (anterior
+   * al motor de reglas) con `source` `MANUAL` o `IMPORT`. Orden (fecha DESC, id DESC), hasta `limit` (≤ 5 000);
+   * `truncated` indica que había más. Sin efectos; en la unidad de trabajo del llamador.
+   */
+  listEvidence(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly limit: number;
+  }): Promise<{ readonly items: readonly ClassificationEvidenceDto[]; readonly truncated: boolean }>;
 }
 
 export const CLASSIFICATION_SUBJECTS_QUERY = Symbol.for('pf.transactions.ClassificationSubjectsQuery');

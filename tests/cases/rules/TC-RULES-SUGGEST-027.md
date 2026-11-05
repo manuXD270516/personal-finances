@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Sugerencia de reglas por clasificaciones manuales repetidas"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-011"]
 nfr: []
 invariants: []
 priority: medium
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/rule-proposal.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

@@ -3,12 +3,14 @@ import { DomainError, normalizeText } from '@pf/shared-kernel';
 import {
   Rule,
   parseDefinition,
+  suggestionAggregateId,
   parseTriggers,
   ruleStatus,
   type RuleDefinition,
   type RuleState,
 } from '../domain/index.js';
-import type { RulesDeps } from './ports/index.js';
+import type { RuleProposalDecisionRecord, RulesDeps } from './ports/index.js';
+import { decisionChanges, parseProposalPattern, snapshotOf } from './rule-proposals.service.js';
 
 export interface CreateRuleCommand {
   readonly id?: string;
@@ -20,6 +22,8 @@ export interface CreateRuleCommand {
   readonly actions?: unknown;
   readonly triggers?: unknown;
   readonly stopProcessing?: unknown;
+  /** Sugerencia de origen (add-rule-suggestions): su aceptación se registra en la misma unidad de trabajo. */
+  readonly fromSuggestion?: unknown;
 }
 
 /** Merge-patch de una regla: lo ausente no cambia; la definición se reemplaza por campo. */
@@ -136,6 +140,7 @@ export class RulesService {
   async createRule(userId: string, workspaceId: string, cmd: CreateRuleCommand): Promise<RuleState> {
     return this.deps.uow.run(workspaceId, async () => {
       const definition = parseDefinition(cmd);
+      const origin = this.parseOrigin(cmd.fromSuggestion);
       const rule = Rule.create({
         id: cmd.id ?? this.deps.ids.next(),
         workspaceId,
@@ -146,6 +151,9 @@ export class RulesService {
         createdBy: userId,
         now: this.now(),
       });
+      // Reclama la sugerencia ANTES de las demás verificaciones: una segunda aceptación (o una concurrente) responde
+      // `RULE_SUGGESTION_DECIDED` y no crea otra regla; si algo falla después, la transacción entera se revierte.
+      const decision = origin ? await this.claimSuggestion(userId, workspaceId, origin, rule.id) : null;
       if ((await this.deps.rules.countNonArchived(workspaceId)) >= this.deps.settings.maxRules) {
         throw new DomainError(
           'RULE_LIMIT_EXCEEDED',
@@ -164,8 +172,64 @@ export class RulesService {
         aggregateVersion: rule.snapshot.version,
         changes: diff(null, ruleAuditView(rule.snapshot)),
       });
+      if (decision) {
+        await this.audit(userId, {
+          workspaceId,
+          action: 'rules.suggestion.accepted',
+          aggregateType: 'RuleSuggestion',
+          aggregateId: suggestionAggregateId(decision.suggestionId),
+          changes: decisionChanges(decision),
+        });
+      }
       return rule.snapshot;
     });
+  }
+
+  private parseOrigin(
+    raw: unknown,
+  ): { suggestionId: string; pattern: ReturnType<typeof parseProposalPattern> } | null {
+    if (raw === undefined || raw === null) return null;
+    if (typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new DomainError('VALIDATION_FAILED', 'fromSuggestion must be an object').at('/fromSuggestion');
+    }
+    const o = raw as Record<string, unknown>;
+    const extra = Object.keys(o).filter((k) => k !== 'suggestionId' && k !== 'pattern');
+    if (extra.length > 0) {
+      throw new DomainError('VALIDATION_FAILED', `unknown property ${extra[0]}`).at(
+        `/fromSuggestion/${extra[0]}`,
+      );
+    }
+    const pattern = parseProposalPattern(o['suggestionId'], o['pattern'], '/fromSuggestion/pattern');
+    return { suggestionId: o['suggestionId'] as string, pattern };
+  }
+
+  private async claimSuggestion(
+    userId: string,
+    workspaceId: string,
+    origin: { suggestionId: string; pattern: ReturnType<typeof parseProposalPattern> },
+    ruleId: string,
+  ): Promise<RuleProposalDecisionRecord> {
+    const decided = () =>
+      new DomainError('RULE_SUGGESTION_DECIDED', 'the suggestion was already accepted or dismissed');
+    // Atajo barato; la garantía es el INSERT atómico de más abajo (clave primaria).
+    if (await this.deps.decisions.find(workspaceId, origin.suggestionId)) throw decided();
+    const snapshot = await snapshotOf(this.deps, workspaceId, origin.suggestionId);
+    const record: RuleProposalDecisionRecord = {
+      suggestionId: origin.suggestionId,
+      patternType: origin.pattern.type,
+      patternValue: origin.pattern.value,
+      kind: origin.pattern.kind,
+      categoryId: origin.pattern.categoryId,
+      decision: 'ACCEPTED',
+      ruleId,
+      support: snapshot?.support ?? null,
+      evidenceCount: snapshot?.evidenceCount ?? null,
+      confidence: snapshot?.confidence ?? null,
+      decidedAt: this.now(),
+      decidedBy: userId,
+    };
+    if (!(await this.deps.decisions.insert(workspaceId, record))) throw decided();
+    return record;
   }
 
   async updateRule(

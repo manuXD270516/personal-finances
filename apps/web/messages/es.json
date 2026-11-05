@@ -5816,7 +5816,8 @@
       "label": "Secciones de reglas",
       "rules": "Reglas",
       "run": "Ejecutar sobre el historial",
-      "coverage": "Cobertura"
+      "coverage": "Cobertura",
+      "suggestions": "Sugerencias"
     },
     "list": {
       "new": "Nueva regla",
@@ -5950,7 +5951,8 @@
       "save": "Guardar regla",
       "saving": "Guardando…",
       "saved": "Regla guardada.",
-      "errorsTitle": "Revisa estos datos antes de guardar:"
+      "errorsTitle": "Revisa estos datos antes de guardar:",
+      "fromSuggestion": "Regla prellenada desde una sugerencia: revísala, edítala si quieres y guárdala. Crearla no reclasifica nada; después podrás aplicarla a las transacciones existentes."
     },
     "errors": {
       "nameRequired": "El nombre es obligatorio (hasta 80 caracteres).",
@@ -6059,7 +6061,9 @@
       "pages": "Se aplican por páginas de {size}.",
       "progress": "Progreso de la aplicación",
       "summary": "Se aplicaron {applied} transacciones; {notApplicable} no se pudieron aplicar (periodo cerrado, conciliadas o administradas por otro módulo).",
-      "stale": "Una regla o una transacción cambió después de la ejecución y no se aplicó nada de esa página. Vuelve a ejecutar para ver el resultado actual."
+      "stale": "Una regla o una transacción cambió después de la ejecución y no se aplicó nada de esa página. Vuelve a ejecutar para ver el resultado actual.",
+      "onlyRule": "Ejecutando solo la regla «{name}» sobre los últimos {days} días: revisa el resultado y aplícalo.",
+      "onlyRuleUnknown": "Ejecutando solo la regla recién creada sobre los últimos {days} días: revisa el resultado y aplícalo."
     },
     "coverage": {
       "intro": "Mide cuántas transacciones importadas tienen hoy su categoría fijada por una regla. Una categoría que corregiste a mano después no cuenta. Meta de la fase: 70 %.",
@@ -6111,6 +6115,80 @@
       "resolved": "Se quitó la marca de revisión.",
       "marked": "La transacción quedó pendiente de revisión.",
       "createRule": "Crear regla desde esta transacción"
+    },
+    "suggestions": {
+      "intro": "Patrones que repetiste a mano: si clasificaste 3 o más transacciones parecidas en la misma categoría, te sugerimos la regla. Nada se crea ni se aplica solo.",
+      "window": "Ventana de evidencia",
+      "windowOption": "{days, plural, one {# día} other {# días}}",
+      "range": "Del {from} al {to}; {scanned, plural, one {# transacción leída} other {# transacciones leídas}}.",
+      "includeDismissed": "Ver también las descartadas",
+      "truncated": "Hay más evidencia que el tope de lectura: se usaron las {scanned} transacciones más recientes.",
+      "empty": "No hay sugerencias. Aparecen cuando clasificas a mano al menos 3 transacciones parecidas en la misma categoría.",
+      "emptyDismissed": "No hay sugerencias descartadas en esta ventana.",
+      "list": "Sugerencias de reglas",
+      "pattern": {
+        "DESCRIPTION": "La descripción contiene «{value}»",
+        "COUNTERPARTY": "La contraparte es {value}"
+      },
+      "kinds": {
+        "INCOME": "ingreso",
+        "EXPENSE": "gasto",
+        "REFUND": "reembolso"
+      },
+      "summary": "{kind} → categoría «{category}»",
+      "support": "{support} de {total} transacciones en esa categoría",
+      "confidence": "Confianza {confidence}",
+      "level": {
+        "HIGH": "Alta",
+        "MEDIUM": "Media"
+      },
+      "proposedName": "Nombre propuesto: {name}",
+      "status": {
+        "DISMISSED": "Descartada"
+      },
+      "evidence": "Evidencia ({count})",
+      "counterExamples": "En otras categorías ({count})",
+      "evidenceItem": "{date} · {description} · {amount} · {account}",
+      "counterItem": "{date} · {description} · {amount} · en «{category}»",
+      "noDescription": "(sin descripción)",
+      "conflicts": "Choca con reglas existentes",
+      "conflictItem": "«{name}» (versión {version}, prioridad {priority}) pondría {count, plural, one {# transacción} other {# transacciones}} en «{category}».",
+      "proposedPriority": "Se propone la prioridad {priority} para que se evalúe antes.",
+      "cannotOutrank": "No puede quedar antes: una regla en conflicto ya tiene prioridad 0 y el desempate es por antigüedad.",
+      "test": "Probar",
+      "accept": "Aceptar…",
+      "dismiss": "Descartar",
+      "restore": "Restaurar",
+      "testing": "Probando…",
+      "dismissed": "Sugerencia «{name}» descartada.",
+      "restored": "Sugerencia «{name}» restaurada.",
+      "viewerNotice": "Tu rol es de lectura: puedes ver y probar las sugerencias, pero no aceptarlas ni descartarlas.",
+      "preview": {
+        "title": "Vista previa (no cambia nada)",
+        "counts": "{matched, plural, one {# coincidencia} other {# coincidencias}}: completaría {wouldFill}, {alreadyInCategory} ya están en la categoría, {otherCategory} tienen otra y {notApplicable} no se pueden aplicar.",
+        "truncated": "La ventana tiene más de 5 000 transacciones: solo se evaluaron las primeras.",
+        "none": "Ninguna transacción de la ventana coincide con esta sugerencia.",
+        "region": "Resultado de la vista previa",
+        "caption": "Transacciones que coinciden con la sugerencia",
+        "date": "Fecha",
+        "transaction": "Transacción",
+        "current": "Categoría actual",
+        "outcome": "Resultado",
+        "uncategorized": "(sin categoría)",
+        "outcomes": {
+          "WOULD_FILL": "La completaría",
+          "ALREADY_IN_CATEGORY": "Ya está en la categoría",
+          "OTHER_CATEGORY": "Tiene otra categoría",
+          "NOT_APPLICABLE": "No se puede aplicar"
+        },
+        "shown": "Se muestran las primeras {shown} de {total}."
+      },
+      "apply": {
+        "title": "Regla «{name}» creada",
+        "body": "Crearla no reclasificó nada. ¿La aplicas ahora a las transacciones existentes? Verás primero qué cambiaría.",
+        "go": "Aplicar a transacciones existentes",
+        "later": "Ahora no"
+      }
     }
   },
   "Reports": {

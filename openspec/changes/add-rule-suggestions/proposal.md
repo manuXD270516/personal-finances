@@ -33,7 +33,7 @@ El motor de reglas de Phase 6 (`add-rule-engine`, implementado; criterio de sali
 - Ninguna.
 
 ### Modified Capabilities
-- `rules/rule-engine`: 12 requirements ADDED (2 Must, 1 Should, 9 Could): sugerencia por repetición, evidencia, patrones, confianza, cobertura y conflictos, explicación, vista previa, aceptación, descarte, sin automatismo, permisos y auditoría, límites y rendimiento. La capability la crea `add-rule-engine` (implementado y sin archivar): este change se archiva después.
+- `rules/rule-engine`: 12 requirements ADDED (2 Must, 10 Should; D399 sube FR-RULES-011 de Could a Should): sugerencia por repetición, evidencia, patrones, confianza, cobertura y conflictos, explicación, vista previa, aceptación, descarte, sin automatismo, permisos y auditoría, límites y rendimiento. La capability la crea `add-rule-engine` (implementado y sin archivar): este change se archiva después.
 - `identity/workspace-portability`: 1 requirement ADDED (Must): decisiones de sugerencias en el export.
 
 ## Impact

@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Aceptación explícita de una sugerencia"
 scenario: "Aceptar la sugerencia de Tigo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-011","FR-RULES-008"]
 nfr: []
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/rule-suggestions.spec.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

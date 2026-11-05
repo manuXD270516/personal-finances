@@ -5816,7 +5816,8 @@
       "label": "Rules sections",
       "rules": "Rules",
       "run": "Run on history",
-      "coverage": "Coverage"
+      "coverage": "Coverage",
+      "suggestions": "Suggestions"
     },
     "list": {
       "new": "New rule",
@@ -5950,7 +5951,8 @@
       "save": "Save rule",
       "saving": "Saving…",
       "saved": "Rule saved.",
-      "errorsTitle": "Review this before saving:"
+      "errorsTitle": "Review this before saving:",
+      "fromSuggestion": "Rule prefilled from a suggestion: review it, edit it if you want and save it. Creating it does not reclassify anything; afterwards you can apply it to the existing transactions."
     },
     "errors": {
       "nameRequired": "The name is required (up to 80 characters).",
@@ -6059,7 +6061,9 @@
       "pages": "Applied in pages of {size}.",
       "progress": "Application progress",
       "summary": "{applied} transactions were applied; {notApplicable} could not be applied (closed period, reconciled or managed by another module).",
-      "stale": "A rule or a transaction changed after the run and nothing of that page was applied. Run it again to see the current result."
+      "stale": "A rule or a transaction changed after the run and nothing of that page was applied. Run it again to see the current result.",
+      "onlyRule": "Running only the rule \"{name}\" over the last {days} days: review the result and apply it.",
+      "onlyRuleUnknown": "Running only the rule you just created over the last {days} days: review the result and apply it."
     },
     "coverage": {
       "intro": "Measures how many imported transactions hold today a category set by a rule. A category you corrected by hand afterwards does not count. Phase target: 70%.",
@@ -6111,6 +6115,80 @@
       "resolved": "The review mark was cleared.",
       "marked": "The transaction is pending review.",
       "createRule": "Create a rule from this transaction"
+    },
+    "suggestions": {
+      "intro": "Patterns you repeated by hand: if you classified 3 or more similar transactions in the same category, we suggest the rule. Nothing is created or applied on its own.",
+      "window": "Evidence window",
+      "windowOption": "{days, plural, one {# day} other {# days}}",
+      "range": "From {from} to {to}; {scanned, plural, one {# transaction read} other {# transactions read}}.",
+      "includeDismissed": "Also show dismissed ones",
+      "truncated": "There is more evidence than the read limit: the {scanned} most recent transactions were used.",
+      "empty": "No suggestions. They appear when you classify at least 3 similar transactions by hand in the same category.",
+      "emptyDismissed": "No dismissed suggestions in this window.",
+      "list": "Rule suggestions",
+      "pattern": {
+        "DESCRIPTION": "The description contains \"{value}\"",
+        "COUNTERPARTY": "The counterparty is {value}"
+      },
+      "kinds": {
+        "INCOME": "income",
+        "EXPENSE": "expense",
+        "REFUND": "refund"
+      },
+      "summary": "{kind} → category \"{category}\"",
+      "support": "{support} of {total} transactions in that category",
+      "confidence": "Confidence {confidence}",
+      "level": {
+        "HIGH": "High",
+        "MEDIUM": "Medium"
+      },
+      "proposedName": "Proposed name: {name}",
+      "status": {
+        "DISMISSED": "Dismissed"
+      },
+      "evidence": "Evidence ({count})",
+      "counterExamples": "In other categories ({count})",
+      "evidenceItem": "{date} · {description} · {amount} · {account}",
+      "counterItem": "{date} · {description} · {amount} · in \"{category}\"",
+      "noDescription": "(no description)",
+      "conflicts": "Conflicts with existing rules",
+      "conflictItem": "\"{name}\" (version {version}, priority {priority}) would put {count, plural, one {# transaction} other {# transactions}} in \"{category}\".",
+      "proposedPriority": "Priority {priority} is proposed so it is evaluated first.",
+      "cannotOutrank": "It cannot come first: a conflicting rule already has priority 0 and ties are broken by age.",
+      "test": "Test",
+      "accept": "Accept…",
+      "dismiss": "Dismiss",
+      "restore": "Restore",
+      "testing": "Testing…",
+      "dismissed": "Suggestion \"{name}\" dismissed.",
+      "restored": "Suggestion \"{name}\" restored.",
+      "viewerNotice": "Your role is read-only: you can view and test the suggestions, but not accept or dismiss them.",
+      "preview": {
+        "title": "Preview (changes nothing)",
+        "counts": "{matched, plural, one {# match} other {# matches}}: it would fill {wouldFill}, {alreadyInCategory} are already in the category, {otherCategory} have another one and {notApplicable} cannot be applied.",
+        "truncated": "The window has more than 5,000 transactions: only the first ones were evaluated.",
+        "none": "No transaction in the window matches this suggestion.",
+        "region": "Preview result",
+        "caption": "Transactions that match the suggestion",
+        "date": "Date",
+        "transaction": "Transaction",
+        "current": "Current category",
+        "outcome": "Result",
+        "uncategorized": "(uncategorized)",
+        "outcomes": {
+          "WOULD_FILL": "It would fill it",
+          "ALREADY_IN_CATEGORY": "Already in the category",
+          "OTHER_CATEGORY": "Has another category",
+          "NOT_APPLICABLE": "Cannot be applied"
+        },
+        "shown": "Showing the first {shown} of {total}."
+      },
+      "apply": {
+        "title": "Rule \"{name}\" created",
+        "body": "Creating it did not reclassify anything. Apply it now to the existing transactions? You will see first what would change.",
+        "go": "Apply to existing transactions",
+        "later": "Not now"
+      }
     }
   },
   "Reports": {
