@@ -14,7 +14,15 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
   it('[TC-PLATFORM-PIPELINE-025] nightly va primero, las suites de latencia después, y commitments, throughput e imports al final', () => {
     const idx = (n: string) => PERF_SUITE_ORDER.indexOf(`${n}.perf.ts`);
     expect(idx('nightly')).toBe(0);
-    const latency = ['spendable', 'goals', 'rules', 'loan-simulator', 'upcoming-payments', 'subscriptions'];
+    const latency = [
+      'spendable',
+      'goals',
+      'budget-suggestions',
+      'rules',
+      'loan-simulator',
+      'upcoming-payments',
+      'subscriptions',
+    ];
     for (const s of latency) expect(idx(s)).toBeLessThan(idx('commitments'));
     expect(idx('commitments')).toBeLessThan(idx('throughput'));
     expect(idx('throughput')).toBeLessThan(idx('imports'));
@@ -34,6 +42,7 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
       paths[3]!,
       paths[8]!,
       paths[4]!,
+      paths[10]!,
     ];
     expect(orderPerfSuites(shuffled, (p) => p)).toEqual(paths);
     expect(orderPerfSuites([...paths].reverse(), (p) => p)).toEqual(paths);

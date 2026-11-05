@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: []
 requirement: "Exclusión de valores atípicos"
 scenario: "Mes del viaje excluido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +34,7 @@ expected_result:
   - "2026-08 (3950.00 BOB) con estado OUTLIER"
   - "Sugerencia 1480.00 BOB (7400.00 ÷ 5)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-008 — Vallas de Tukey excluyen el mes atípico del promedio

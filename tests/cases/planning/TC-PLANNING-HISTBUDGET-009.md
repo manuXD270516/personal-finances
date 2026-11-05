@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: []
 requirement: "Exclusión de valores atípicos"
 scenario: "Muestra chica sin exclusión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +34,7 @@ expected_result:
   - "Sugerencia 2268.17 BOB (6804.50 ÷ 3 = 2268.1666…)"
   - "Explicación con outlierRule NONE_SMALL_SAMPLE"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-009 — Con menos de cuatro valores no se excluyen atípicos

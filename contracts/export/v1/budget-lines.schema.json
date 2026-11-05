@@ -28,7 +28,8 @@
     "overridden",
     "version",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "history_basis"
   ],
   "properties": {
     "id": {
@@ -140,7 +141,8 @@
     "updated_at": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
-    }
+    },
+    "history_basis": {}
   },
   "x-pfos-table": "planning.budget_line",
   "x-pfos-context": "planning"

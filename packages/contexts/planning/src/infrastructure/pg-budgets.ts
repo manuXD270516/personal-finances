@@ -12,6 +12,7 @@ import type {
 import {
   Budget,
   BudgetLine,
+  HistoryBasis,
   type BudgetLineKind,
   type BudgetLineState,
   type BudgetNature,
@@ -72,6 +73,7 @@ interface LineRow {
   source: 'MANUAL' | 'TEMPLATE' | 'CLONE';
   template_line_id: string | null;
   overridden: boolean;
+  history_basis: unknown;
   version: number;
 }
 
@@ -121,6 +123,10 @@ function toBudget(row: BudgetRow, lines: readonly LineRow[]): Budget {
         source: l.source,
         templateLineId: l.template_line_id,
         overridden: l.overridden,
+        historyBasis:
+          l.history_basis === null || l.history_basis === undefined
+            ? null
+            : HistoryBasis.parse(l.history_basis),
         version: Number(l.version),
       };
       return BudgetLine.restore(line);
@@ -135,7 +141,7 @@ async function loadLines(budgetIds: readonly string[]): Promise<Map<string, Line
     SELECT id, workspace_id, budget_id, target_kind, target_id, nature, kind,
            planned_amount::text, min_amount::text, max_amount::text, percent::text, income_basis,
            rollover_policy, rollover_cap::text, rollover_in_amount::text, rollover_status,
-           thresholds::text[] AS thresholds, source, template_line_id, overridden, version
+           thresholds::text[] AS thresholds, source, template_line_id, overridden, history_basis, version
       FROM planning.budget_line
      WHERE budget_id = ANY(${[...budgetIds]}::uuid[])
      ORDER BY created_at, id`.execute(db());
@@ -235,12 +241,14 @@ export class PgBudgetRepository implements BudgetRepository {
       INSERT INTO planning.budget_line
         (id, workspace_id, budget_id, target_kind, target_id, nature, kind, planned_amount, min_amount, max_amount,
          percent, income_basis, rollover_policy, rollover_cap, rollover_in_amount, rollover_status, thresholds, source,
-         template_line_id, overridden, version)
+         template_line_id, overridden, history_basis, version)
       VALUES (${s.id}::uuid, ${s.workspaceId}::uuid, ${s.budgetId}::uuid, ${s.target.kind}, ${s.target.id}::uuid,
               ${s.nature}, ${s.kind}, ${s.planned}::numeric, ${s.min}::numeric, ${s.max}::numeric,
               ${s.percent}::numeric, ${s.incomeBasis}, ${s.rolloverPolicy}, ${s.rolloverCap}::numeric,
               ${s.rolloverInAmount}::numeric, ${s.rolloverStatus}, ${[...s.thresholds]}::numeric[], ${s.source},
-              ${s.templateLineId}::uuid, ${s.overridden}, ${s.version})`.execute(db());
+              ${s.templateLineId}::uuid, ${s.overridden}, ${s.historyBasis === null ? null : JSON.stringify(s.historyBasis)}::jsonb, ${s.version})`.execute(
+      db(),
+    );
   }
 
   async updateLine(line: BudgetLine): Promise<boolean> {
@@ -251,7 +259,8 @@ export class PgBudgetRepository implements BudgetRepository {
              max_amount = ${s.max}::numeric, percent = ${s.percent}::numeric, income_basis = ${s.incomeBasis},
              rollover_policy = ${s.rolloverPolicy}, rollover_cap = ${s.rolloverCap}::numeric,
              rollover_in_amount = ${s.rolloverInAmount}::numeric, rollover_status = ${s.rolloverStatus},
-             thresholds = ${[...s.thresholds]}::numeric[], overridden = ${s.overridden}, version = ${s.version},
+             thresholds = ${[...s.thresholds]}::numeric[], overridden = ${s.overridden},
+             history_basis = ${s.historyBasis === null ? null : JSON.stringify(s.historyBasis)}::jsonb, version = ${s.version},
              updated_at = now()
        WHERE workspace_id = ${s.workspaceId}::uuid AND id = ${s.id}::uuid AND version = ${line.persistedVersion}`.execute(
       db(),

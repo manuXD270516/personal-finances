@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sugerencia por promedio de los periodos anteriores"
 scenario: "Periodo sin gasto cuenta como cero"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -32,7 +33,7 @@ expected_result:
   - "Sugerencia 150.00 BOB (450.00 ÷ 3)"
   - "2026-08 figura como USED con 0.00 BOB"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-002 — Un periodo sin gasto cuenta como cero en el promedio

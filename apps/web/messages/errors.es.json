@@ -84,6 +84,7 @@
   "BUDGET_THRESHOLD_INVALID": "Los umbrales no son válidos: usa hasta 10 valores distintos mayores que 0 y de hasta 1000 %, con a lo sumo dos decimales.",
   "BUDGET_TEMPLATE_ARCHIVED": "Ese template está archivado: desarchívalo para usarlo, versionarlo o marcarlo como predeterminado.",
   "BUDGET_PROPAGATION_STALE": "Algo cambió desde la vista previa (un plan o el template). Revisa la vista previa de nuevo antes de confirmar.",
+  "BUDGET_SUGGESTION_STALE": "La historia o el plan cambiaron desde la vista previa. Vuelve a calcular las sugerencias antes de confirmar.",
   "BUDGET_NO_TEMPLATE_ORIGIN": "Ese plan no viene de un template: crea un template con sus líneas para poder propagar los cambios.",
   "CUSTOM_FIELD_KEY_TAKEN": "Ya existe un campo personalizado activo con esa clave. Elige otra o archiva el existente.",
   "CUSTOM_FIELD_ARCHIVED": "Ese campo personalizado está archivado y no acepta valores nuevos.",

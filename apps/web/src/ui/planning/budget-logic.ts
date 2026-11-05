@@ -33,6 +33,15 @@ export const THRESHOLD_KINDS: readonly BudgetLineKind[] = ['FIXED', 'MAXIMUM', '
 /** Tipos que proyectan al fin del periodo (docs/33 D83). */
 export const PROJECTING_KINDS: readonly BudgetLineKind[] = ['MAXIMUM', 'RANGE', 'PERCENT_OF_INCOME'];
 
+/** Resumen de la base histórica de una línea (`BudgetHistoryBasis` del contrato). */
+export interface HistoryBasisInfo {
+  readonly method: 'AVERAGE' | 'SAME_PERIOD_LAST_YEAR';
+  readonly usedCount: number;
+  readonly suggested: Money | null;
+  readonly applied?: Money | null;
+  readonly modifiedAfterSuggestion?: boolean;
+}
+
 export interface BudgetLineProgress {
   readonly reference: Money;
   readonly effectivePlanned: Money;
@@ -65,6 +74,8 @@ export interface BudgetLine {
   readonly thresholds: readonly string[];
   readonly source: 'MANUAL' | 'TEMPLATE' | 'CLONE';
   readonly overridden: boolean;
+  /** Base de la sugerencia aplicada desde el historial (add-historical-budgets); ausente o `null` si no viene de él. */
+  readonly historyBasis?: HistoryBasisInfo | null;
   readonly version: number;
   readonly progress: BudgetLineProgress;
 }

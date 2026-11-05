@@ -5,16 +5,18 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sugerencia por promedio de los periodos anteriores"
 scenario: "Planificar un periodo futuro excluye el periodo en curso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+  - packages/contexts/planning/src/domain/suggestion-window.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +35,7 @@ expected_result:
   - "Ventana: 2026-08, 2026-09 y 2026-10"
   - "2026-11 informado como IN_PROGRESS y fuera del promedio"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-003 — La ventana de un periodo futuro excluye el periodo en curso

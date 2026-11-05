@@ -786,6 +786,36 @@ export const VARIABLES = {
       default: '3',
     },
   ),
+  PLANNING_HISTORY_DEFAULT_PERIODS: variable(z.coerce.number().int().min(1).max(12), {
+    group: 'Planning',
+    description:
+      'Periodos terminados (N) que usa por omisión la sugerencia de presupuesto desde el historial (add-historical-budgets, decisión 2; 1 a 12). El EDITOR puede pedir otro N en cada vista previa.',
+    default: '6',
+  }),
+  PLANNING_HISTORY_MAX_PERIODS: variable(z.coerce.number().int().min(1).max(24), {
+    group: 'Planning',
+    description:
+      'Máximo de periodos terminados (N) que admite la sugerencia de presupuesto desde el historial; una solicitud mayor se rechaza con `VALIDATION_FAILED`.',
+    default: '12',
+  }),
+  PLANNING_HISTORY_MIN_VALID_RATIO: variable(z.coerce.number().gt(0).max(1), {
+    group: 'Planning',
+    description:
+      'Fracción de N (redondeada hacia arriba, al menos 1) de valores válidos que necesita una línea para recibir sugerencia; con menos queda en `INSUFFICIENT_HISTORY`.',
+    default: '0.5',
+  }),
+  PLANNING_HISTORY_OUTLIER_MIN_SAMPLE: variable(z.coerce.number().int().min(4).max(24), {
+    group: 'Planning',
+    description:
+      'Cantidad mínima de valores válidos para excluir atípicos con las vallas de Tukey; con menos no se excluye ninguno.',
+    default: '4',
+  }),
+  PLANNING_HISTORY_OUTLIER_IQR_FACTOR: variable(z.coerce.number().gt(0).max(10), {
+    group: 'Planning',
+    description:
+      'Factor del rango intercuartil de las vallas de Tukey [Q1 - f x RIC, Q3 + f x RIC] de la sugerencia de presupuesto (1.5 por omisión).',
+    default: '1.5',
+  }),
   PLANNING_PERIODS_CRON: variable(
     z
       .string()
@@ -1456,6 +1486,11 @@ export const APP_VARIABLES = {
     ...FX_PROVIDERS,
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',
+    'PLANNING_HISTORY_DEFAULT_PERIODS',
+    'PLANNING_HISTORY_MAX_PERIODS',
+    'PLANNING_HISTORY_MIN_VALID_RATIO',
+    'PLANNING_HISTORY_OUTLIER_MIN_SAMPLE',
+    'PLANNING_HISTORY_OUTLIER_IQR_FACTOR',
     'COMMITMENTS_HORIZON_DAYS',
     // add-basic-csv-import: la API lee, valida y deja en staging el CSV, y reparte los lotes al aprobar.
     'IMPORT_CSV_MAX_BYTES',

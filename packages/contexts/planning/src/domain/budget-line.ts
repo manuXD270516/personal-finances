@@ -14,6 +14,7 @@ import {
   type RolloverPolicy,
   type RolloverStatus,
 } from './budget-types.js';
+import type { HistoryBasisState } from './history-basis.js';
 import { normalizeThresholds } from './thresholds.js';
 
 /** Monto tal como llega por la API: string decimal + moneda (ADR-0006). */
@@ -63,6 +64,8 @@ export interface BudgetLineState extends BudgetLineSpec {
   readonly source: BudgetLineSource;
   readonly templateLineId: string | null;
   readonly overridden: boolean;
+  /** Base de la sugerencia histórica aplicada (add-historical-budgets); `null` si la línea no viene del historial. */
+  readonly historyBasis: HistoryBasisState | null;
   readonly version: number;
 }
 
@@ -254,6 +257,8 @@ export class BudgetLine {
     readonly templateLineId?: string | null;
     /** Clonado del periodo anterior: conserva la marca de línea modificada a mano. */
     readonly overridden?: boolean;
+    /** Solo la confirmación de una sugerencia histórica la fija; el clonado y la propagación NO la copian. */
+    readonly historyBasis?: HistoryBasisState | null;
   }): BudgetLine {
     return new BudgetLine(
       {
@@ -268,6 +273,7 @@ export class BudgetLine {
         source: input.source ?? 'MANUAL',
         templateLineId: input.templateLineId ?? null,
         overridden: input.overridden ?? false,
+        historyBasis: input.historyBasis ?? null,
         version: 1,
       },
       0,
@@ -292,6 +298,9 @@ export class BudgetLine {
   }
   get version(): number {
     return this.state.version;
+  }
+  get historyBasis(): HistoryBasisState | null {
+    return this.state.historyBasis;
   }
   get snapshot(): BudgetLineState {
     return { ...this.state };
@@ -332,6 +341,14 @@ export class BudgetLine {
       },
       this.persistedVersion,
     );
+  }
+
+  /**
+   * Fija la base de una sugerencia histórica sobre la línea ya modificada con `withSpec` (misma versión: el cambio es
+   * UNA edición). Una edición manual posterior no la borra (`withSpec` conserva el estado).
+   */
+  withHistoryBasis(basis: HistoryBasisState): BudgetLine {
+    return new BudgetLine({ ...this.state, historyBasis: basis }, this.persistedVersion);
   }
 
   /** Congela (`FINAL`) o vuelve a provisional el remanente recibido (consumidor `planning.rollover-finalizer`). */

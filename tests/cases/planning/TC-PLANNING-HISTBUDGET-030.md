@@ -5,16 +5,17 @@ spec: identity/workspace-portability
 related_specs: ["planning/budgets"]
 requirement: "Base histórica de las líneas del plan en el export"
 scenario: "Ida y vuelta de una línea aplicada desde el historial"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-010","FR-IDENTITY-017","FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions-portability.api.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -34,7 +35,7 @@ expected_result:
   - "La línea tiene 1480.00 BOB"
   - "La misma base: 6 periodos, 2026-08 OUTLIER, sugerido 1480.00 BOB, con ids de periodo del workspace nuevo"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-030 — La base histórica de las líneas sobrevive la ida y vuelta del export

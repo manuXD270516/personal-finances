@@ -369,6 +369,7 @@ export class InMemoryBudgets {
       templates: this.templates,
       crossings: this.crossings,
       calendar: this.mem.calendar,
+      activity: this.mem.activity,
       settings: { settingsOf: async () => ({ baseCurrency: this.baseCurrency, timeZone: 'America/La_Paz' }) },
       flows: {
         summarizeNominalFlows: async ({ dateFrom, dateTo, categoryIds, withTags }) => {

@@ -5,16 +5,18 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sugerencia por el mismo periodo del año anterior"
 scenario: "Noviembre del año pasado más 10 %"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "Sugerencia 1100.16 BOB (1100.165 HALF_EVEN; HALF_UP daría 1100.17)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-012 — Mismo periodo del año anterior con ajuste y empate HALF_EVEN

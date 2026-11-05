@@ -10,6 +10,7 @@ import type {
   BudgetVsActual,
 } from '../contracts/index.js';
 import { rateKey, type BudgetView, type LineView } from './budget-calculator.js';
+import { historyBasisDto, type BudgetHistoryBasisDto } from './suggestion-view.js';
 import type { OmittedLineDto } from './template-view.js';
 
 const money = (m: Money): BudgetMoneyDto => m.toJSON();
@@ -47,6 +48,8 @@ export interface BudgetLineDto {
   readonly thresholds: readonly string[];
   readonly source: 'MANUAL' | 'TEMPLATE' | 'CLONE';
   readonly overridden: boolean;
+  /** Base de la sugerencia histórica aplicada (add-historical-budgets); `null` si la línea no viene del historial. */
+  readonly historyBasis: BudgetHistoryBasisDto | null;
   readonly version: number;
   readonly progress: BudgetLineProgressDto;
 }
@@ -183,6 +186,7 @@ export function toLineDto(view: LineView, currency: string): BudgetLineDto {
     thresholds: s.thresholds,
     source: s.source,
     overridden: s.overridden,
+    historyBasis: s.historyBasis ? historyBasisDto(s.historyBasis, s) : null,
     version: s.version,
     progress: {
       reference: money(p.reference),

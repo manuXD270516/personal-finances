@@ -5,16 +5,19 @@ spec: planning/budgets
 related_specs: []
 requirement: "Explicación de cada sugerencia"
 scenario: "Explicación del supermercado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: ["NFR-USAB-104"]
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+  - apps/web/src/ui/planning/suggestions.test.tsx
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -35,7 +38,7 @@ expected_result:
   - "currentAmount 1500.00 BOB y difference −20.00 BOB"
   - "Sin textos libres: solo códigos y montos"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-016 — Explicación por línea con periodos, estados, promedio, mediana y diferencia
