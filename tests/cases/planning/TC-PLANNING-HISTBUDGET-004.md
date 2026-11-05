@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sugerencia por promedio de los periodos anteriores"
 scenario: "Empate en el redondeo del promedio"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: property
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "Sugerencia 100.00 BOB (100.005 redondeado HALF_EVEN; HALF_UP daría 100.01)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-004 — Empate del promedio redondeado HALF_EVEN a la escala de la moneda

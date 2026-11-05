@@ -5,16 +5,19 @@ spec: planning/budgets
 related_specs: ["planning/financial-periods"]
 requirement: "Exclusión de periodos incompletos"
 scenario: "Primera actividad a mitad de un periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+  - packages/contexts/planning/src/domain/suggestion-window.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +36,7 @@ expected_result:
   - "2026-08 con estado INCOMPLETE"
   - "Sugerencia 630.00 BOB (1260.00 ÷ 2)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-005 — Periodo que contiene la primera actividad excluido como incompleto

@@ -2017,7 +2017,9 @@
       "remove": "Remover",
       "removeLabel": "Remover a linha {name}",
       "confirmRemoveTitle": "Remover a linha {name}?",
-      "confirmRemoveBody": "O gasto não se perde: apenas deixa de ser medido neste plano. Os limites já avisados não são avisados de novo se você adicionar a linha outra vez."
+      "confirmRemoveBody": "O gasto não se perde: apenas deixa de ser medido neste plano. Os limites já avisados não são avisados de novo se você adicionar a linha outra vez.",
+      "fromHistory": "Sugerido a partir do histórico",
+      "fromHistoryModified": "alterado depois"
     },
     "status": {
       "UNDER": "Abaixo da meta",
@@ -2145,7 +2147,11 @@
       "exceededBy": "Excedido em {amount}",
       "pendingTotal": "Total pendente:",
       "incomplete": "incompleto: falta uma taxa de câmbio"
-    }
+    },
+    "suggest": {
+      "open": "Sugerir a partir do histórico"
+    },
+    "historyRegion": "Histórico de alterações do plano"
   },
   "Templates": {
     "title": "Templates de orçamento",
@@ -6411,6 +6417,132 @@
         "keyId": "Informe o identificador da chave.",
         "secret": "Informe o segredo da chave."
       }
+    }
+  },
+  "Suggestions": {
+    "title": "Sugerir a partir do histórico",
+    "intro": "Calcula um valor para cada linha com o que você realmente gastou em períodos anteriores. Nada é aplicado até você confirmar.",
+    "viewerNote": "Só os editores podem escolher e aplicar sugestões; você pode revisá-las.",
+    "loading": "Calculando sugestões…",
+    "params": {
+      "title": "Parâmetros da sugestão",
+      "method": "Método",
+      "methodAVERAGE": "Média dos últimos períodos",
+      "methodSAME_PERIOD_LAST_YEAR": "Mesmo período do ano anterior",
+      "periods": "Períodos (1 a 12)",
+      "periodsInvalid": "Digite um número inteiro entre 1 e 12.",
+      "adjustment": "Ajuste (%)",
+      "adjustmentHint": "De -100 a 1.000; por exemplo 10 soma 10 %.",
+      "adjustmentInvalid": "Digite uma porcentagem entre -100 e 1.000 com até 2 casas decimais.",
+      "rounding": "Arredondamento",
+      "roundingNone": "Sem arredondamento",
+      "roundingValue": "Para múltiplos de {value}",
+      "calculate": "Calcular sugestões",
+      "recalculate": "Calcular novamente"
+    },
+    "window": {
+      "title": "Períodos considerados: {periods}.",
+      "notFrozen": "Inclui períodos não fechados: seus dados ainda podem mudar.",
+      "noPlan": "Este período não tem plano: propõem-se linhas novas para as categorias com gasto.",
+      "noPlanCreate": "O período não tem plano: será criado vazio e as linhas escolhidas serão adicionadas."
+    },
+    "table": {
+      "caption": "Sugestões por linha com o valor vigente, o sugerido e a diferença",
+      "empty": "Não há linhas com histórico para sugerir.",
+      "columns": {
+        "choose": "Escolher",
+        "target": "Orçamento",
+        "current": "Vigente",
+        "suggested": "Sugerido",
+        "difference": "Diferença",
+        "status": "Estado"
+      },
+      "chooseLabel": "Aplicar a sugestão de {name}",
+      "newLine": "linha nova",
+      "explain": "Como foi calculado",
+      "amountLabel": "Valor a aplicar para {name}",
+      "amountInvalid": "Digite um valor válido, sem negativos e com as casas decimais da moeda.",
+      "pickAll": "Escolher todas as que têm sugestão",
+      "pickNone": "Limpar seleção",
+      "insufficient": "Valores válidos: {used} de {min} necessários."
+    },
+    "status": {
+      "OK": "Com sugestão",
+      "INSUFFICIENT_HISTORY": "Histórico insuficiente",
+      "NOT_APPLICABLE": "Não se aplica (porcentagem da receita)"
+    },
+    "diff": {
+      "UP": "acima do vigente",
+      "DOWN": "abaixo do vigente",
+      "SAME": "igual ao vigente",
+      "NONE": "sem diferença calculável"
+    },
+    "kind": {
+      "FIXED": "Fixo",
+      "MAXIMUM": "Máximo",
+      "MINIMUM": "Mínimo",
+      "RANGE": "Faixa",
+      "PERCENT_OF_INCOME": "Porcentagem da receita"
+    },
+    "explanation": {
+      "method": {
+        "AVERAGE": "Média dos últimos {n} períodos terminados.",
+        "SAME_PERIOD_LAST_YEAR": "Mesmo período do ano anterior."
+      },
+      "todayCategories": "Segundo as suas categorias de hoje.",
+      "periodsCaption": "Períodos considerados para {name}",
+      "columns": {
+        "period": "Período",
+        "range": "Datas",
+        "actual": "Real",
+        "status": "Estado",
+        "action": "Ação"
+      },
+      "closed": "fechado",
+      "notClosed": "não fechado (dados não congelados)",
+      "range": "{start} a {end}",
+      "status": {
+        "USED": "Usado",
+        "OUTLIER": "Atípico (excluído)",
+        "INCOMPLETE": "Incompleto (primeira atividade)",
+        "BEFORE_FIRST_ACTIVITY": "Anterior à primeira atividade",
+        "NO_RATE": "Sem taxa de câmbio",
+        "IN_PROGRESS": "Em andamento",
+        "USER_EXCLUDED": "Excluído por você"
+      },
+      "used": "Valores usados: {used} (são necessários pelo menos {min}).",
+      "rule": {
+        "TUKEY_1_5_IQR": "Atípicos fora de [Q1 - 1,5 x AIQ, Q3 + 1,5 x AIQ] com Q1 {q1} e Q3 {q3}.",
+        "NONE_SMALL_SAMPLE": "Com menos de 4 valores não se excluem atípicos."
+      },
+      "mean": "Média: {value}",
+      "median": "Mediana: {value}",
+      "adjustment": "Ajuste: {percent} %",
+      "noRounding": "sem arredondamento",
+      "rounding": "arredondado para múltiplos de {value}",
+      "suggested": "Sugerido: {value}",
+      "current": "Vigente: {value}",
+      "difference": "Diferença: {value}",
+      "action": {
+        "exclude": "Excluir",
+        "include": "Incluir de novo",
+        "clear": "Voltar a usar",
+        "excludeLabel": "Excluir {period} de {name}",
+        "includeLabel": "Incluir {period} de novo em {name}",
+        "clearLabel": "Voltar a usar {period} em {name}"
+      }
+    },
+    "confirm": {
+      "summaryTitle": "{count} linhas serão aplicadas",
+      "addLine": "{name}: linha nova de {to}",
+      "changeLine": "{name}: de {from} para {to}",
+      "review": "Revisar {count} linhas escolhidas",
+      "apply": "Aplicar ao plano",
+      "back": "Voltar",
+      "recalculate": "Calcular novamente",
+      "done": "Sugestões aplicadas ao plano.",
+      "close": "Fechar",
+      "cancel": "Cancelar"
     }
   }
 }

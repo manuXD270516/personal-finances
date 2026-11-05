@@ -5,16 +5,19 @@ spec: planning/budgets
 related_specs: []
 requirement: "Exclusión e inclusión manual de periodos"
 scenario: "Volver a incluir el mes del viaje"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/planning/suggestions.test.tsx
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -32,7 +35,7 @@ expected_result:
   - "Sugerencia 1891.67 BOB (11350.00 ÷ 6)"
   - "Un periodo INCOMPLETE o NO_RATE en includePeriodIds se rechaza con VALIDATION_FAILED"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-011 — Reincluir un periodo atípico cambia la sugerencia

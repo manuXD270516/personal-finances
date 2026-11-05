@@ -5,16 +5,18 @@ spec: planning/budgets
 related_specs: []
 requirement: "Permisos, periodos cerrados y auditoría de las sugerencias"
 scenario: "Periodo cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-005","FR-PLANNING-021"]
 nfr: []
 invariants: ["INV-015"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -32,7 +34,7 @@ expected_result:
   - "409 PERIOD_CLOSED"
   - "El plan conserva sus montos"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-027 — Confirmar sugerencias en un periodo cerrado se rechaza

@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: ["planning/budget-templates","planning/financial-periods"]
 requirement: "Sin aplicación automática de sugerencias históricas"
 scenario: "Periodo nuevo desde el template predeterminado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021","FR-PLANNING-014"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -32,7 +33,7 @@ steps:
 expected_result:
   - "\"Supermercado\" con 1600.00 BOB y sin historyBasis"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-023 — El plan creado desde el template predeterminado no usa el historial

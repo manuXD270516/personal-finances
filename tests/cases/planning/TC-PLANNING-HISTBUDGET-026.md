@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: ["security/access-control"]
 requirement: "Permisos, periodos cerrados y auditoría de las sugerencias"
 scenario: "VIEWER ve pero no confirma"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-006","FR-PLANNING-021"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -36,7 +37,7 @@ expected_result:
   - "Confirmación 403 INSUFFICIENT_ROLE"
   - "Los flujos de \"W2\" no entran en ningún real de \"W1\""
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-026 — VIEWER ve la vista previa, no confirma y no ve otro workspace

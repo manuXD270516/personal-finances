@@ -5,16 +5,19 @@ spec: planning/budgets
 related_specs: ["fx/market-rates"]
 requirement: "Exclusión de periodos incompletos"
 scenario: "Gasto en dólares sin tasa en un periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021","FR-PLANNING-023"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -34,7 +37,7 @@ expected_result:
   - "Sugerencia 400.00 BOB"
   - "Las demás líneas de 2026-09 no cambian de estado"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-006 — Periodo con gasto sin tasa excluido solo para esa línea

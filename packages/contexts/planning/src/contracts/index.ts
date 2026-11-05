@@ -359,6 +359,9 @@ export const PLANNING_AUDIT_POLICY = {
     omittedLines: 'plain',
     propagatedChanges: 'plain',
     propagationConflicts: 'plain',
+    // add-historical-budgets: la base de la sugerencia aplicada (texto JSON) y el identificador común de la operación.
+    historyBasis: 'plain',
+    operationId: 'plain',
     threshold: 'plain',
     alsoCrossed: 'plain',
     reference: 'money',

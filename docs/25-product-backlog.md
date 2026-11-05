@@ -963,7 +963,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 | FEAT-21.1 Catálogo de reportes | Must | reporting/financial-reports | **US-221** Ver los 16 reportes con filtros comunes. **US-222** Comparar MoM/YoY/rango custom/rolling. **US-223** Drill-down a transacciones. **US-224** Elegir moneda de reporte con política de conversión visible. **US-225** Exportar CSV. **US-226** (Could) Exportar PDF. **US-227** (Should) Guardar vistas. |
 | FEAT-21.2 Cash-flow calendar | Must | reporting/cash-flow-calendar | **US-228** Ver saldo esperado día a día a 7/30/60/90 días. **US-229** Ver saldo más bajo esperado y riesgo de déficit con alerta. |
 | FEAT-21.3 Dashboard completo | Must | reporting/dashboard | **US-230** Las 9 preguntas del Home respondidas (SM-05). |
-| FEAT-21.4 Presupuestos estadísticos | Could | planning/budgets | **US-231** (Could) Presupuestos average-based e historical-based. |
+| FEAT-21.4 Presupuestos estadísticos | Should (Phase 7, D394) | planning/budgets | **US-231** (Should, `add-historical-budgets`) Presupuestos average-based e historical-based como sugerencia revisable. Criterios de aceptación: cada sugerencia se explica (periodos, estados, promedio, mediana, ajuste y redondeo, vigente y diferencia); se excluyen periodos incompletos, sin tasa y atípicos (el EDITOR puede excluir o reincluir a mano); nada se aplica sin la confirmación explícita del EDITOR, con el monto sugerido o uno escrito a mano; una línea aplicada guarda su base y no se recalcula sola. |
 | FEAT-21.5 Sugerencia de reglas | Could | rules/rule-engine | **US-232** (Could) Sugerir reglas a partir de recategorizaciones repetidas. |
 
 ## EPIC-22 — Forecasting (Phase 8)

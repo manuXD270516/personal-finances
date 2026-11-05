@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: []
 requirement: "Rendimiento de la vista previa histórica"
 scenario: "Doce periodos en el seed large"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: ["NFR-PERF-006"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/budget-suggestions.perf.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +34,7 @@ expected_result:
   - "p95 del servidor ≤ 800 ms"
   - "Una consulta de agregados y un lote de tasas por pedido"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-029 — Vista previa de doce periodos y sesenta líneas en p95 de 800 ms

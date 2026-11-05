@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: []
 requirement: "Redondeo opcional a un múltiplo"
 scenario: "Supermercado a múltiplos de 50"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "Sugerencia mostrada 1500.00 BOB (29.6 múltiplos → 30)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-014 — Redondeo de la sugerencia al múltiplo de 50

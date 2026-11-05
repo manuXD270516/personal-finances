@@ -2017,7 +2017,9 @@
       "remove": "Remove",
       "removeLabel": "Remove the {name} line",
       "confirmRemoveTitle": "Remove the {name} line?",
-      "confirmRemoveBody": "The spending is not lost: it just stops being measured in this plan. Thresholds already notified are not notified again if you add the line back."
+      "confirmRemoveBody": "The spending is not lost: it just stops being measured in this plan. Thresholds already notified are not notified again if you add the line back.",
+      "fromHistory": "Suggested from history",
+      "fromHistoryModified": "changed afterwards"
     },
     "status": {
       "UNDER": "Below target",
@@ -2145,7 +2147,11 @@
       "exceededBy": "Exceeded by {amount}",
       "pendingTotal": "Total pending:",
       "incomplete": "incomplete: an exchange rate is missing"
-    }
+    },
+    "suggest": {
+      "open": "Suggest from history"
+    },
+    "historyRegion": "Plan change history"
   },
   "Templates": {
     "title": "Budget templates",
@@ -6411,6 +6417,132 @@
         "keyId": "Enter the key identifier.",
         "secret": "Enter the key secret."
       }
+    }
+  },
+  "Suggestions": {
+    "title": "Suggest from history",
+    "intro": "Calculates an amount for each line from what you actually spent in earlier periods. Nothing is applied until you confirm.",
+    "viewerNote": "Only editors can choose and apply suggestions; you can review them.",
+    "loading": "Calculating suggestions…",
+    "params": {
+      "title": "Suggestion parameters",
+      "method": "Method",
+      "methodAVERAGE": "Average of the last periods",
+      "methodSAME_PERIOD_LAST_YEAR": "Same period of the previous year",
+      "periods": "Periods (1 to 12)",
+      "periodsInvalid": "Enter a whole number between 1 and 12.",
+      "adjustment": "Adjustment (%)",
+      "adjustmentHint": "From -100 to 1,000; for example 10 adds 10 %.",
+      "adjustmentInvalid": "Enter a percentage between -100 and 1,000 with at most 2 decimals.",
+      "rounding": "Rounding",
+      "roundingNone": "No rounding",
+      "roundingValue": "To multiples of {value}",
+      "calculate": "Calculate suggestions",
+      "recalculate": "Recalculate"
+    },
+    "window": {
+      "title": "Periods considered: {periods}.",
+      "notFrozen": "Includes periods that are not closed: their data can still change.",
+      "noPlan": "This period has no plan: new lines are proposed for the categories with spending.",
+      "noPlanCreate": "The period has no plan: an empty one will be created and the chosen lines added."
+    },
+    "table": {
+      "caption": "Suggestions per line with the current amount, the suggested one and the difference",
+      "empty": "There are no lines with history to suggest.",
+      "columns": {
+        "choose": "Choose",
+        "target": "Budget",
+        "current": "Current",
+        "suggested": "Suggested",
+        "difference": "Difference",
+        "status": "Status"
+      },
+      "chooseLabel": "Apply the suggestion for {name}",
+      "newLine": "new line",
+      "explain": "How it was calculated",
+      "amountLabel": "Amount to apply for {name}",
+      "amountInvalid": "Enter a valid amount, not negative and with the currency decimals.",
+      "pickAll": "Choose all lines with a suggestion",
+      "pickNone": "Clear selection",
+      "insufficient": "Valid values: {used} of {min} needed."
+    },
+    "status": {
+      "OK": "With suggestion",
+      "INSUFFICIENT_HISTORY": "Insufficient history",
+      "NOT_APPLICABLE": "Not applicable (percent of income)"
+    },
+    "diff": {
+      "UP": "above the current amount",
+      "DOWN": "below the current amount",
+      "SAME": "same as the current amount",
+      "NONE": "no difference available"
+    },
+    "kind": {
+      "FIXED": "Fixed",
+      "MAXIMUM": "Maximum",
+      "MINIMUM": "Minimum",
+      "RANGE": "Range",
+      "PERCENT_OF_INCOME": "Percent of income"
+    },
+    "explanation": {
+      "method": {
+        "AVERAGE": "Average of the last {n} finished periods.",
+        "SAME_PERIOD_LAST_YEAR": "Same period of the previous year."
+      },
+      "todayCategories": "Based on your categories today.",
+      "periodsCaption": "Periods considered for {name}",
+      "columns": {
+        "period": "Period",
+        "range": "Dates",
+        "actual": "Actual",
+        "status": "Status",
+        "action": "Action"
+      },
+      "closed": "closed",
+      "notClosed": "not closed (data not frozen)",
+      "range": "{start} to {end}",
+      "status": {
+        "USED": "Used",
+        "OUTLIER": "Outlier (excluded)",
+        "INCOMPLETE": "Incomplete (first activity)",
+        "BEFORE_FIRST_ACTIVITY": "Before the first activity",
+        "NO_RATE": "No exchange rate",
+        "IN_PROGRESS": "In progress",
+        "USER_EXCLUDED": "Excluded by you"
+      },
+      "used": "Values used: {used} (at least {min} needed).",
+      "rule": {
+        "TUKEY_1_5_IQR": "Outliers outside [Q1 - 1.5 x IQR, Q3 + 1.5 x IQR] with Q1 {q1} and Q3 {q3}.",
+        "NONE_SMALL_SAMPLE": "With fewer than 4 values no outliers are excluded."
+      },
+      "mean": "Average: {value}",
+      "median": "Median: {value}",
+      "adjustment": "Adjustment: {percent} %",
+      "noRounding": "no rounding",
+      "rounding": "rounded to multiples of {value}",
+      "suggested": "Suggested: {value}",
+      "current": "Current: {value}",
+      "difference": "Difference: {value}",
+      "action": {
+        "exclude": "Exclude",
+        "include": "Include again",
+        "clear": "Use again",
+        "excludeLabel": "Exclude {period} from {name}",
+        "includeLabel": "Include {period} again in {name}",
+        "clearLabel": "Use {period} again in {name}"
+      }
+    },
+    "confirm": {
+      "summaryTitle": "{count} lines will be applied",
+      "addLine": "{name}: new line of {to}",
+      "changeLine": "{name}: from {from} to {to}",
+      "review": "Review {count} chosen lines",
+      "apply": "Apply to the plan",
+      "back": "Back",
+      "recalculate": "Recalculate",
+      "done": "Suggestions applied to the plan.",
+      "close": "Close",
+      "cancel": "Cancel"
     }
   }
 }

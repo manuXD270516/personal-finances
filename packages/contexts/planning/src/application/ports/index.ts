@@ -265,7 +265,28 @@ export interface BudgetsDeps {
   readonly rateValidityWindowDays: number;
   /** Aportes planificados a metas del periodo (add-savings-goals); sin él, la sección "Aportes a metas" va vacía. */
   readonly goalPlans?: GoalPlanPort;
+  /** Rango de actividad del ledger (primera actividad); solo lo exige la sugerencia histórica (add-historical-budgets). */
+  readonly activity?: LedgerActivityRangeQuery;
+  /** Parámetros de la sugerencia histórica (`PLANNING_HISTORY_*`); por omisión, los valores de la spec. */
+  readonly suggestions?: HistorySuggestionConfig;
 }
+
+/** `PLANNING_HISTORY_*` (openspec add-historical-budgets, decisiones 2 y 4). */
+export interface HistorySuggestionConfig {
+  readonly defaultPeriods: number;
+  readonly maxPeriods: number;
+  readonly minValidRatio: number;
+  readonly outlierMinSample: number;
+  readonly outlierIqrFactor: number;
+}
+
+export const DEFAULT_HISTORY_SUGGESTION_CONFIG: HistorySuggestionConfig = {
+  defaultPeriods: 6,
+  maxPeriods: 12,
+  minValidRatio: 0.5,
+  outlierMinSample: 4,
+  outlierIqrFactor: 1.5,
+};
 
 // ───────────────────────────────────────────── add-month-closing
 

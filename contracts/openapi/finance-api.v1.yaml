@@ -6635,6 +6635,90 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/budget-suggestions/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Planning]
+      operationId: previewBudgetSuggestions
+      summary: Preview budget amounts suggested from the history (no effects, no audit)
+      description: |
+        Stateless: nothing is stored or audited. Suggests, for each line of the plan of the period (or, if the period has
+        no plan, for the non-archived root categories with a suggestion above 0.00), an amount from the real of the last N
+        finished periods (method `AVERAGE`) or from the same period of the previous year (`SAME_PERIOD_LAST_YEAR`), with
+        the same flow valuation as the budget progress (D109). Periods before or containing the first activity and
+        periods with amounts without a rate are excluded for that line (never counted as 0.00); with 4 or more valid
+        values, outliers outside the Tukey fences (1.5 x IQR) are excluded. Each line carries a structured explanation
+        (codes and amounts only; the client builds the text). The `token` hashes everything the preview saw.
+      x-openspec-capability: [planning/budgets]
+      x-required-role: VIEWER
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetSuggestionRequest' }
+      responses:
+        '200':
+          description: Preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetSuggestionPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CATEGORY_ARCHIVED or TAG_ARCHIVED (extra target).'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND (period or extra target), VALIDATION_FAILED or BUDGET_TARGET_OVERLAP.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/budget-suggestions/confirm:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Planning]
+      operationId: confirmBudgetSuggestions
+      summary: Apply the chosen suggestions to the plan of the period (one atomic operation)
+      description: |
+        Recomputes the preview in one transaction. If the `token` differs (the history, the plan version or the
+        parameters changed) or a chosen suggestion differs from the one shown, it answers `BUDGET_SUGGESTION_STALE` and
+        changes nothing. Otherwise it creates the plan (origin `EMPTY`) if the period has none, and creates or updates
+        only the chosen lines with the amount suggested or the one the editor wrote (validated like any line amount).
+        Each applied line keeps its `historyBasis`; a line that came from a template is marked as modified without
+        changing the template. Every line is audited with a common `operationId`. Never automatic.
+      x-openspec-capability: [planning/budgets]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetSuggestionConfirm' }
+      responses:
+        '200':
+          description: The plan with the applied lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'BUDGET_SUGGESTION_STALE, PERIOD_CLOSED, CATEGORY_ARCHIVED or TAG_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BUDGET_INVALID_AMOUNTS, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, BUDGET_TARGET_OVERLAP, BUDGET_INVALID_LINE_KIND, VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Reconciliation (Phase 2, add-reconciliation) ─────────────────────────────
   /workspaces/{workspaceId}/reconciliations:
     parameters:
@@ -14238,6 +14322,7 @@ components:
         - BUDGET_TEMPLATE_ARCHIVED          # 409 (add-budget-templates: applying, versioning or defaulting an archived template)
         - BUDGET_PROPAGATION_STALE          # 409 (add-budget-templates: the plans or the template changed since the preview)
         - BUDGET_NO_TEMPLATE_ORIGIN         # 422 (add-budget-templates: propagating from a plan that did not come from a template)
+        - BUDGET_SUGGESTION_STALE           # 409 (add-historical-budgets: the history or the plan changed since the suggestion preview)
         - RECONCILIATION_IN_PROGRESS        # 409 (add-reconciliation: the account already has a session in progress)
         - RECONCILIATION_STATEMENT_DATE_INVALID  # 422 (add-reconciliation: future date or not after the last completed session)
         - RECONCILIATION_DIFFERENCE_NOT_ZERO     # 422 (add-reconciliation: completing with a non-zero difference and no adjustment)
@@ -17563,6 +17648,11 @@ components:
           type: string
           enum: [MANUAL, TEMPLATE, CLONE]
         overridden: { type: boolean }
+        historyBasis:
+          description: Base of the suggestion applied from the history (add-historical-budgets); null if the line did not come from it.
+          oneOf:
+            - $ref: '#/components/schemas/BudgetHistoryBasis'
+            - type: 'null'
         version: { type: integer, minimum: 1 }
         progress: { $ref: '#/components/schemas/BudgetLineProgress' }
     BudgetTotals:
@@ -18096,6 +18186,224 @@ components:
               periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
               changes: { type: integer, minimum: 0 }
               conflicts: { type: integer, minimum: 0 }
+
+    # ── Planning: sugerencias de presupuesto desde el historial (add-historical-budgets, Phase 7) ──
+    BudgetSuggestionMethod:
+      type: string
+      description: >-
+        AVERAGE (average of the last N finished periods) or SAME_PERIOD_LAST_YEAR (the period 12 periods before, with
+        an optional adjustment). Open set — clients must handle unknown values.
+      x-extensible-enum: [AVERAGE, SAME_PERIOD_LAST_YEAR]
+    BudgetSuggestionRequest:
+      type: object
+      additionalProperties: false
+      required: [periodId]
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        method: { $ref: '#/components/schemas/BudgetSuggestionMethod' }
+        periods:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: N, only for AVERAGE (6 when omitted).
+        adjustmentPercent:
+          $ref: '#/components/schemas/DecimalString'
+        roundingIncrement:
+          type: [integer, 'null']
+          enum: [1, 5, 10, 50, 100, null]
+        extraTargets:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/BudgetLineTarget' }
+        overrides:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [target]
+            properties:
+              target: { $ref: '#/components/schemas/BudgetLineTarget' }
+              excludePeriodIds:
+                type: array
+                maxItems: 12
+                items: { $ref: '#/components/schemas/Uuid' }
+              includePeriodIds:
+                type: array
+                maxItems: 12
+                items: { $ref: '#/components/schemas/Uuid' }
+                description: Only periods flagged OUTLIER (an incomplete or rate-less period is rejected).
+    BudgetSuggestionPeriodStatus:
+      type: string
+      description: Open set — clients must handle unknown values.
+      x-extensible-enum: [USED, OUTLIER, INCOMPLETE, BEFORE_FIRST_ACTIVITY, NO_RATE, IN_PROGRESS, USER_EXCLUDED]
+    BudgetHistoryBasis:
+      type: object
+      description: >-
+        Explanation of a suggestion (in the preview) and base saved in a line that was applied from it (`historyBasis`
+        of `BudgetLine`, with `applied` and `modifiedAfterSuggestion`). Codes, amounts and dates only.
+      additionalProperties: false
+      required:
+        - method
+        - periodsRequested
+        - adjustmentPercent
+        - roundingIncrement
+        - usedCount
+        - minValid
+        - outlierRule
+        - suggested
+        - computedAt
+        - periods
+      properties:
+        method: { $ref: '#/components/schemas/BudgetSuggestionMethod' }
+        periodsRequested: { type: integer }
+        adjustmentPercent: { $ref: '#/components/schemas/DecimalString' }
+        roundingIncrement: { type: [integer, 'null'] }
+        usedCount: { type: integer }
+        minValid: { type: integer }
+        outlierRule:
+          type: string
+          x-extensible-enum: [TUKEY_1_5_IQR, NONE_SMALL_SAMPLE]
+        q1: { type: [string, 'null'] }
+        q3: { type: [string, 'null'] }
+        mean: { type: [string, 'null'] }
+        median: { type: [string, 'null'] }
+        suggested:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        applied:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        modifiedAfterSuggestion: { type: boolean }
+        computedAt: { $ref: '#/components/schemas/Instant' }
+        periods:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [periodId, label, start, end, closed, actual, status]
+            properties:
+              periodId:
+                type: [string, 'null']
+                format: uuid
+              label: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+              start: { $ref: '#/components/schemas/LocalDate' }
+              end: { $ref: '#/components/schemas/LocalDate' }
+              closed: { type: boolean }
+              actual:
+                oneOf:
+                  - $ref: '#/components/schemas/Money'
+                  - type: 'null'
+              status: { $ref: '#/components/schemas/BudgetSuggestionPeriodStatus' }
+    BudgetSuggestionWindowPeriod:
+      type: object
+      additionalProperties: false
+      required: [periodId, label, start, end, closed]
+      properties:
+        periodId:
+          type: [string, 'null']
+          format: uuid
+        label: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        start: { $ref: '#/components/schemas/LocalDate' }
+        end: { $ref: '#/components/schemas/LocalDate' }
+        closed: { type: boolean }
+    BudgetSuggestionLine:
+      type: object
+      additionalProperties: false
+      required:
+        - target
+        - targetName
+        - nature
+        - kind
+        - existingLineId
+        - currentAmount
+        - suggestedAmount
+        - difference
+        - status
+        - explanation
+      properties:
+        target: { $ref: '#/components/schemas/BudgetLineTarget' }
+        targetName: { type: string }
+        nature: { $ref: '#/components/schemas/BudgetNature' }
+        kind: { $ref: '#/components/schemas/BudgetLineKind' }
+        existingLineId:
+          type: [string, 'null']
+          format: uuid
+        currentAmount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        suggestedAmount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        difference:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        status:
+          type: string
+          description: Open set — clients must handle unknown values.
+          x-extensible-enum: [OK, INSUFFICIENT_HISTORY, NOT_APPLICABLE]
+        explanation:
+          oneOf:
+            - $ref: '#/components/schemas/BudgetHistoryBasis'
+            - type: 'null'
+    BudgetSuggestionPreview:
+      type: object
+      additionalProperties: false
+      required:
+        - periodId
+        - budgetId
+        - budgetVersion
+        - currency
+        - method
+        - periods
+        - adjustmentPercent
+        - roundingIncrement
+        - token
+        - window
+        - lines
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        budgetId:
+          type: [string, 'null']
+          format: uuid
+        budgetVersion: { type: [integer, 'null'] }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        method: { $ref: '#/components/schemas/BudgetSuggestionMethod' }
+        periods: { type: integer }
+        adjustmentPercent: { $ref: '#/components/schemas/DecimalString' }
+        roundingIncrement: { type: [integer, 'null'] }
+        token: { type: string, pattern: '^[0-9a-f]{64}$' }
+        window:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetSuggestionWindowPeriod' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetSuggestionLine' }
+    BudgetSuggestionConfirm:
+      type: object
+      additionalProperties: false
+      required: [token, request, lines]
+      properties:
+        token: { type: string, pattern: '^[0-9a-f]{64}$' }
+        request: { $ref: '#/components/schemas/BudgetSuggestionRequest' }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [target, amount, suggestedAmount]
+            properties:
+              target: { $ref: '#/components/schemas/BudgetLineTarget' }
+              kind: { $ref: '#/components/schemas/BudgetLineKind' }
+              amount: { $ref: '#/components/schemas/Money' }
+              suggestedAmount: { $ref: '#/components/schemas/Money' }
 
     # ── Recorrido del ciclo de vida (add-lifecycle-timeline, docs/31 D37) ──
     LifecycleAggregateType:

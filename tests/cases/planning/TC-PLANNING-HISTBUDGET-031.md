@@ -5,16 +5,17 @@ spec: planning/budgets
 related_specs: []
 requirement: "Exclusión de valores atípicos"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +34,7 @@ expected_result:
   - "Sin ajuste, la sugerencia queda entre el mínimo y el máximo de los usados"
   - "Nunca queda un solo valor usado si ese valor es atípico"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-031 — Propiedades del estimador histórico ante permutaciones y valores aleatorios

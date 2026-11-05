@@ -92,10 +92,10 @@ export interface UpdateBudgetLineInput {
 }
 
 /** Monto del plan para la auditoría (`money` exacto de la allow-list). */
-const auditMoney = (amount: string | null, currency: string) =>
+export const auditMoney = (amount: string | null, currency: string) =>
   amount === null ? null : { amount, currency };
 
-function lineSnapshotChanges(state: BudgetLineState, currency: string): AuditChangeInput[] {
+export function lineSnapshotChanges(state: BudgetLineState, currency: string): AuditChangeInput[] {
   return [
     { field: 'line', before: null, after: state.id },
     { field: 'target', before: null, after: `${state.target.kind}:${state.target.id}` },
@@ -114,7 +114,11 @@ function lineSnapshotChanges(state: BudgetLineState, currency: string): AuditCha
 }
 
 /** Cambios campo a campo entre dos versiones de una línea (solo lo que cambió, más la línea afectada). */
-function lineDiff(before: BudgetLineState, after: BudgetLineState, currency: string): AuditChangeInput[] {
+export function lineDiff(
+  before: BudgetLineState,
+  after: BudgetLineState,
+  currency: string,
+): AuditChangeInput[] {
   const out: AuditChangeInput[] = [
     { field: 'line', before: before.id, after: after.id },
     {
@@ -138,7 +142,7 @@ function lineDiff(before: BudgetLineState, after: BudgetLineState, currency: str
   return out;
 }
 
-function parseTarget(raw: unknown): BudgetTarget {
+export function parseTarget(raw: unknown): BudgetTarget {
   const target = raw as { kind?: unknown; id?: unknown } | null | undefined;
   if (!target || !isTargetKind(target.kind) || typeof target.id !== 'string' || target.id === '') {
     throw new DomainError('VALIDATION_FAILED', 'target must be {kind: CATEGORY|GROUP|TAG, id}').at('/target');
@@ -494,6 +498,23 @@ export class BudgetsService {
         await this.calculator.view({ workspaceId, budget, period, now: deps.clock.now() }),
         await originOf(deps, budget),
       );
+    });
+  }
+
+  /**
+   * Crea el plan `EMPTY` del periodo dentro de la unidad de trabajo en curso (la confirmación de sugerencias históricas
+   * sobre un periodo sin plan; add-historical-budgets 3.4). Mismas reglas, auditoría y evento que `createBudget`.
+   */
+  async createEmptyInUnit(input: { readonly workspaceId: string; readonly periodId: string }): Promise<void> {
+    const { deps } = this;
+    if (!deps.settings) throw new Error('BudgetsDeps.settings is required to create budgets');
+    const settings = await deps.settings.settingsOf(input.workspaceId);
+    await this.createIn({
+      workspaceId: input.workspaceId,
+      periodId: input.periodId,
+      source: { kind: 'EMPTY' },
+      zeroBased: false,
+      baseCurrency: settings.baseCurrency,
     });
   }
 

@@ -1,3 +1,4 @@
+import type { CategoryTreeDto } from '@pf/classification/contracts';
 import type { ResolvedRateDto, ValuationRateDto } from '@pf/fx/contracts';
 import {
   DomainError,
@@ -20,6 +21,7 @@ import {
   type AggregateLine,
   type Budget,
   type BudgetLine,
+  type BudgetTarget,
   type FinancialPeriod,
   type LineProgress,
   type PlanTotals,
@@ -31,7 +33,7 @@ import type { BudgetsDeps } from './ports/index.js';
 /** Profundidad máxima del encadenado de rollover (12 meses; más allá se asume sin remanente). */
 export const MAX_ROLLOVER_DEPTH = 12;
 
-interface NominalFlow {
+export interface NominalFlow {
   readonly date: string;
   readonly nature: 'INCOME' | 'EXPENSE';
   readonly categoryId: string;
@@ -66,6 +68,29 @@ export interface BudgetView {
   readonly ratesUsed: readonly ResolvedRateDto[];
 }
 
+/**
+ * Real de UNA línea (objetivo -> flujos -> consolidado con `FlowValuation`, D109): el mismo cálculo del progreso del
+ * presupuesto y de la sugerencia histórica (add-historical-budgets 3.1), sin una segunda definición de "gasto". Un tag
+ * mide gasto de cualquier categoría con la etiqueta; una categoría o grupo, los flujos de su naturaleza en su árbol.
+ */
+export function lineActual<R>(input: {
+  readonly tree: TargetTree;
+  readonly target: BudgetTarget;
+  readonly nature: 'INCOME' | 'EXPENSE';
+  readonly flows: readonly NominalFlow[];
+  readonly consolidate: (subset: readonly NominalFlow[]) => R;
+}): R {
+  const t = input.target;
+  const subset =
+    t.kind === 'TAG'
+      ? input.flows.filter((f) => f.nature === 'EXPENSE' && f.tagIds.includes(t.id))
+      : (() => {
+          const wanted = categoriesOfTarget(input.tree, t);
+          return input.flows.filter((f) => f.nature === input.nature && wanted.has(f.categoryId));
+        })();
+  return input.consolidate(subset);
+}
+
 /** Clave de identidad de una tasa usada (misma versión almacenada y orientación => una sola entrada). */
 export const rateKey = (r: ResolvedRateDto): string =>
   `${r.fxRateId ?? JSON.stringify(r.components.map((c) => (c as { id?: unknown }).id))}|${r.rate.base}|${r.rate.quote}`;
@@ -74,7 +99,11 @@ const decimalsOf = (amount: string): number => amount.split('.')[1]?.length ?? 0
 
 /** Árbol de CLASSIFICATION en la forma que usa el dominio. */
 export async function loadTargetTree(deps: BudgetsDeps, workspaceId: string): Promise<TargetTree> {
-  const tree = await deps.catalog.categoryTree({ userId: deps.actor.userId(), workspaceId });
+  return targetTreeOf(await deps.catalog.categoryTree({ userId: deps.actor.userId(), workspaceId }));
+}
+
+/** Conversión del árbol de CLASSIFICATION a la forma del dominio. */
+export function targetTreeOf(tree: CategoryTreeDto): TargetTree {
   return {
     groups: new Map(tree.groups.map((g) => [g.groupId, { kind: g.kind, archived: g.archived }])),
     categories: new Map(
@@ -207,15 +236,10 @@ export class BudgetCalculator {
 
     const actuals = new Map<string, ReturnType<typeof consolidate>>();
     for (const line of lines) {
-      const t = line.target;
-      const subset =
-        t.kind === 'TAG'
-          ? flows.filter((f) => f.nature === 'EXPENSE' && f.tagIds.includes(t.id))
-          : (() => {
-              const wanted = categoriesOfTarget(tree, t);
-              return flows.filter((f) => f.nature === line.nature && wanted.has(f.categoryId));
-            })();
-      actuals.set(line.id, consolidate(subset));
+      actuals.set(
+        line.id,
+        lineActual({ tree, target: line.target, nature: line.nature, flows, consolidate }),
+      );
     }
 
     // Base del porcentaje de ingresos: esperados (Σ líneas de ingreso) o reales (todo el ingreso del periodo).
