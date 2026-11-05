@@ -4972,8 +4972,10 @@ paths:
       x-openspec-capability: [reporting/financial-reports]
       x-required-role: VIEWER
       parameters:
-        - $ref: '#/components/parameters/ReportFrom'
-        - $ref: '#/components/parameters/ReportTo'
+        # `from` y `to` son obligatorios, pero se validan después de resolver la cuenta: una cuenta inexistente o de otro
+        # workspace responde 404 aunque falten (TC-SECURITY-ISOLATION-001).
+        - { name: from, in: query, required: false, description: 'First business date of the report (inclusive). Required; validated after the account is resolved.', schema: { $ref: '#/components/schemas/LocalDate' } }
+        - { name: to, in: query, required: false, description: 'Last business date of the report (inclusive). Required; validated after the account is resolved.', schema: { $ref: '#/components/schemas/LocalDate' } }
         - $ref: '#/components/parameters/ReportingCurrency'
         - $ref: '#/components/parameters/IfNoneMatch'
       responses:
@@ -5014,8 +5016,10 @@ paths:
       x-required-role: VIEWER
       x-rate-limit: costly
       parameters:
-        - $ref: '#/components/parameters/ReportFrom'
-        - $ref: '#/components/parameters/ReportTo'
+        # `from` y `to` son obligatorios, pero se validan después de resolver la cuenta: una cuenta inexistente o de otro
+        # workspace responde 404 aunque falten (TC-SECURITY-ISOLATION-001).
+        - { name: from, in: query, required: false, description: 'First business date of the report (inclusive). Required; validated after the account is resolved.', schema: { $ref: '#/components/schemas/LocalDate' } }
+        - { name: to, in: query, required: false, description: 'Last business date of the report (inclusive). Required; validated after the account is resolved.', schema: { $ref: '#/components/schemas/LocalDate' } }
         - $ref: '#/components/parameters/ReportingCurrency'
       responses:
         '200':

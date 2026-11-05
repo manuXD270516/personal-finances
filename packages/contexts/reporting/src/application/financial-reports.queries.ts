@@ -663,9 +663,21 @@ export class FinancialReportsQueries {
 
   // ───────────────────────────────────────────── reporte 15: historial de saldo de una cuenta
 
-  getAccountBalanceHistory(
+  async getAccountBalanceHistory(
     params: ReportParams & { readonly accountId: string },
   ): Promise<ReportResult<AccountBalanceHistoryReportDto>> {
+    // La cuenta se resuelve antes que el rango: una cuenta inexistente o de otro workspace es 404 aunque falten `from` o
+    // `to` (TC-SECURITY-ISOLATION-001).
+    const visible = await this.deps.uow.run(
+      { userId: params.userId, workspaceId: params.workspaceId },
+      async () =>
+        (
+          await this.deps.accounts.listAccounts({ workspaceId: params.workspaceId, includeArchived: true })
+        ).some((a) => a.accountId === params.accountId),
+    );
+    if (!visible) throw new DomainError('RESOURCE_NOT_FOUND', 'account not found');
+    if (!params.from) throw invalid('from is required', '/from');
+    if (!params.to) throw invalid('to is required', '/to');
     return this.run('ACCOUNT_BALANCE_HISTORY', params, async (ctx) => {
       if (params.compare && params.compare !== 'NONE')
         throw invalid('comparisons are not supported', '/compare');
