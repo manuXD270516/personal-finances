@@ -74,6 +74,7 @@ function KpiCard({
   amount,
   perCurrency,
   meter,
+  reportsHref,
   children,
 }: {
   summary: ReportSummary;
@@ -84,6 +85,8 @@ function KpiCard({
   perCurrency: readonly Money[];
   /** Barra decorativa de magnitud relativa (ingresos vs gastos del mes); el monto ya está en texto. */
   meter?: number | undefined;
+  /** Enlace de Q7 al reporte de ingresos y gastos con la misma comparación (add-financial-reports). */
+  reportsHref?: string | undefined;
   children?: ReactNode;
 }) {
   const { t, locale } = ctx;
@@ -128,6 +131,13 @@ function KpiCard({
           {variation && q7.status === 'AVAILABLE' ? (
             <VariationLine metric={metric} variation={variation} ctx={ctx} />
           ) : null}
+          {variation && q7.status === 'AVAILABLE' && reportsHref ? (
+            <p className="pf-home-muted">
+              <a href={reportsHref} data-testid={`${metric}-report-link`}>
+                {t('reportsLink')}
+              </a>
+            </p>
+          ) : null}
         </>
       )}
     </section>
@@ -154,7 +164,15 @@ export function IncomeCard({ summary, ctx }: { summary: ReportSummary; ctx: Form
 }
 
 /** Q3 "¿Cuánto gasté?" (neto de reembolsos). */
-export function ExpenseCard({ summary, ctx }: { summary: ReportSummary; ctx: FormatContext }) {
+export function ExpenseCard({
+  summary,
+  ctx,
+  reportsHref,
+}: {
+  summary: ReportSummary;
+  ctx: FormatContext;
+  reportsHref?: string | undefined;
+}) {
   return (
     <KpiCard
       summary={summary}
@@ -164,6 +182,7 @@ export function ExpenseCard({ summary, ctx }: { summary: ReportSummary; ctx: For
       amount={summary.consolidated.expense}
       perCurrency={summary.byCurrency.map((c) => c.expense)}
       meter={barRatio(summary.consolidated.expense.amount, flowScale(summary))}
+      reportsHref={reportsHref}
     />
   );
 }

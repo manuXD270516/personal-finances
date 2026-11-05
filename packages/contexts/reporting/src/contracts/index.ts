@@ -192,7 +192,12 @@ export interface SpendableBudgetViewDto {
 /** Bloque `spendable` de `ReportSummary` y base de `Spendable` (sin el detalle de ítems). */
 export interface SpendableSummaryDto {
   /** `id` es `null` si ningún periodo financiero cubre hoy (se usa el mes calendario; ver design.md, pendientes). */
-  readonly period: { readonly id: string | null; readonly label: string; readonly start: string; readonly end: string };
+  readonly period: {
+    readonly id: string | null;
+    readonly label: string;
+    readonly start: string;
+    readonly end: string;
+  };
   readonly reportingCurrency: string;
   readonly byCurrency: readonly SpendableCurrencyTermsDto[];
   readonly consolidated: {
@@ -549,3 +554,5 @@ export interface ConversionCostAnalysisDto {
     readonly attributions: readonly RateAttributionDto[];
   };
 }
+
+export * from './financial-reports.js';

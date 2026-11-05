@@ -7,6 +7,7 @@ import { performance } from 'node:perf_hooks';
 import { createLedgerMaintenance, createLedgerRuntime } from '@pf/ledger/interface/ledger.module';
 import { runWithRequestContext } from '@pf/platform/api';
 import { loadConfig } from '@pf/platform/config';
+import { describeMismatch, ReportsReconciliation } from '@pf/reporting/interface/reporting.module';
 import { systemClock } from '@pf/shared-kernel';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Client, Pool } from 'pg';
@@ -17,6 +18,7 @@ import { daysInMonth, monthAt, ymd } from '../../src/demo/dataset/calendar.js';
 import { buildLargePlan, LARGE_MAIN_WORKSPACE_ID, LARGE_MANIFEST } from '../../src/seed/large/large-plan.js';
 import { MINIMAL_USERS, runSeed } from '../../src/seed/run-seed.js';
 import { apiConfig, baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
+import { httpReports, sqlLedger } from '../support/reports-reconciliation.js';
 import {
   aggregateBackgroundLoad,
   buildReport,
@@ -647,6 +649,203 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
       }),
     );
   });
+
+  // ───────────────────────────────────────────── reportes financieros (add-financial-reports 5.2 y 5.3, NFR-PERF-006)
+  // Rango fijo de los 12 meses completos que terminan en la ancla del seed (no depende del reloj); sin `If-None-Match`.
+  const REPORT_FROM = '2025-10-01';
+  const REPORT_TO = '2026-09-30';
+  const REPORT_RANGE = `from=${REPORT_FROM}&to=${REPORT_TO}`;
+  const reportSamples = () => Math.max(20, Math.round(ITERATIONS / 4));
+  let drillCell = '';
+
+  const reportRow = async (
+    id: string,
+    title: string,
+    path: string,
+    opts: { limitMs?: number; gate?: boolean } = {},
+  ) => {
+    const first = await call('GET', `${W}/reports/${path}`);
+    if (first.status !== 200) throw new Error(`${id}: ${first.status} ${JSON.stringify(first.body)}`);
+    const samples = await timed(reportSamples(), async () => {
+      const r = await call('GET', `${W}/reports/${path}`);
+      if (r.status !== 200) throw new Error(`${id}: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    results.push(
+      latencyResult({
+        id,
+        nfr: 'NFR-PERF-006',
+        title,
+        samples,
+        limitMs: opts.limitMs ?? PERF_THRESHOLDS['NFR-PERF-006'].limitMs,
+        ...(opts.gate === false ? { gate: false } : {}),
+      }),
+    );
+  };
+
+  it('[TC-REPORTING-REPORTS-030] NFR-PERF-006 (add-financial-reports 5.2): reportes de ingresos y gastos, gastos por categoría y flujo de caja de 12 meses', async () => {
+    await reportRow(
+      'report-income-expenses-12m',
+      'GET /reports/income-expenses (12 periodos, compare=PREVIOUS_PERIOD)',
+      `income-expenses?${REPORT_RANGE}&compare=PREVIOUS_PERIOD`,
+    );
+    // Lee 36 meses (periodo + año anterior + 12 previos del promedio móvil): bloqueante desde el inicio (D369).
+    await reportRow(
+      'report-income-expenses-12m-yoy-rolling12',
+      'GET /reports/income-expenses (12 periodos, compare=PREVIOUS_YEAR, rolling=12)',
+      `income-expenses?${REPORT_RANGE}&compare=PREVIOUS_YEAR&rolling=12`,
+    );
+    await reportRow(
+      'report-expenses-by-category-12m',
+      'GET /reports/expenses/by-category (12 periodos)',
+      `expenses/by-category?${REPORT_RANGE}`,
+    );
+    await reportRow(
+      'report-cash-flow-12m',
+      'GET /reports/cash-flow (12 periodos, cuentas líquidas)',
+      `cash-flow?${REPORT_RANGE}`,
+    );
+  });
+
+  it('[TC-REPORTING-REPORTS-030] NFR-PERF-006 (add-financial-reports 5.2): presupuesto vs real con 12 presupuestos de 30 líneas creados por la prueba', async () => {
+    await ok('POST', `${W}/periods`, { through: new Date().toISOString().slice(0, 10) });
+    const periods = dataOf(await ok('GET', `${W}/periods?limit=100`)).filter(
+      (p) => String(p['periodStart']) >= REPORT_FROM && String(p['periodEnd']) <= REPORT_TO,
+    );
+    const expense = dataOf(await ok('GET', `${W}/categories?kind=EXPENSE&limit=200`)).filter(
+      (c) => c['systemCode'] === null && !c['parentId'],
+    );
+    let created = 0;
+    for (const period of periods) {
+      const r = await call('POST', `${W}/budgets`, { periodId: period['id'] });
+      if (r.status !== 201) continue; // el periodo ya tiene plan (p. ej. el de la prueba de presupuestos)
+      const budget = r.body as Record<string, unknown>;
+      for (const c of expense.slice(0, 30)) {
+        await ok('POST', `${W}/budgets/${String(budget['id'])}/lines`, {
+          target: { kind: 'CATEGORY', id: c['id'] },
+          kind: 'MAXIMUM',
+          planned: { amount: '1000.00', currency: 'BOB' },
+        });
+      }
+      created += 1;
+    }
+    dataset['presupuestos del benchmark de reportes'] = created;
+    await reportRow(
+      'report-budget-vs-actual-12m',
+      `GET /reports/budget-vs-actual (12 periodos, ${periods.length} periodos con plan)`,
+      `budget-vs-actual?${REPORT_RANGE}`,
+    );
+  });
+
+  it('[TC-REPORTING-REPORTS-030] NFR-PERF-006 (add-financial-reports 5.2): historial de saldo, patrimonio y serie diaria de 366 días', async () => {
+    const { rows } = await superuser.query<{ id: string }>(
+      `SELECT la.source_account_id::text AS id
+         FROM ledger.ledger_account la
+        WHERE la.workspace_id = $1 AND la.source_account_id IS NOT NULL
+        ORDER BY (SELECT count(*) FROM ledger.posting p WHERE p.ledger_account_id = la.id) DESC LIMIT 1`,
+      [WS],
+    );
+    await reportRow(
+      'report-account-balance-history-12m',
+      'GET /reports/accounts/{id}/balance-history (365 días, la cuenta con más movimientos)',
+      `accounts/${rows[0]!.id}/balance-history?${REPORT_RANGE}`,
+    );
+    await reportRow(
+      'report-net-worth-12m',
+      'GET /reports/net-worth (12 periodos con descomposición)',
+      `net-worth?${REPORT_RANGE}`,
+    );
+    await reportRow(
+      'report-net-worth-daily-366',
+      'GET /reports/net-worth (serie diaria de 365 días)',
+      `net-worth?${REPORT_RANGE}&granularity=DAY`,
+      { gate: false },
+    );
+  });
+
+  it('[TC-REPORTING-REPORTS-031] NFR-PERF-006 (add-financial-reports 5.2): drill-down de la categoría con más porciones (primera página y página 20) y exportación CSV', async () => {
+    const { rows } = await superuser.query<{ id: string; n: string }>(
+      `SELECT s.category_id::text AS id, count(*)::text AS n
+         FROM txn.transaction t
+         JOIN txn.transaction_split s ON s.workspace_id = t.workspace_id AND s.transaction_id = t.id AND s.superseded_in_revision IS NULL
+        WHERE t.workspace_id = $1 AND t.status IN ('POSTED', 'CLEARED', 'RECONCILED')
+          AND t.kind IN ('EXPENSE', 'REFUND') AND t.transaction_date BETWEEN $2::date AND $3::date
+        GROUP BY 1 ORDER BY count(*) DESC LIMIT 1`,
+      [WS, REPORT_FROM, REPORT_TO],
+    );
+    drillCell = `drill-down?report=EXPENSES_BY_CATEGORY&${REPORT_RANGE}&categoryId=${rows[0]!.id}`;
+    dataset['porciones de la celda del drill-down'] = Number(rows[0]!.n);
+    const limitMs = PERF_THRESHOLDS['NFR-PERF-006'].drillDownLimitMs;
+    await reportRow(
+      'report-drill-down-first-page',
+      `GET /reports/drill-down (primera página de 50, ${rows[0]!.n} porciones)`,
+      `${drillCell}&limit=50`,
+      { limitMs },
+    );
+    // Página 20 por cursor: se recorren las 19 anteriores fuera de la medición.
+    let cursor: string | null = null;
+    let deep = '';
+    for (let page = 1; page <= 20; page += 1) {
+      deep = `${drillCell}&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+      const r = await ok('GET', `${W}/reports/${deep}`);
+      cursor = (r['nextCursor'] as string | null) ?? null;
+      if (!cursor) break;
+    }
+    await reportRow(
+      'report-drill-down-deep-page',
+      'GET /reports/drill-down (página 20 por cursor de la misma celda)',
+      deep,
+      { limitMs },
+    );
+    // Exportación CSV de la celda completa (informativa).
+    const exportPath = `${W}/reports/drill-down/export?${drillCell.slice('drill-down?'.length)}`;
+    const t = performance.now();
+    const res = await fetch(`${baseUrl}${exportPath}`, { headers: { authorization: `Bearer ${token}` } });
+    const body = await res.arrayBuffer();
+    results.push(
+      latencyResult({
+        id: 'report-export-csv',
+        nfr: 'NFR-PERF-006',
+        title: `GET /reports/drill-down/export (CSV de la celda completa, ${String(body.byteLength)} bytes, HTTP ${String(res.status)})`,
+        samples: [performance.now() - t],
+        limitMs: PERF_THRESHOLDS['NFR-PERF-006'].limitMs,
+        gate: false,
+      }),
+    );
+  });
+
+  it('[TC-REPORTING-REPORTS-029] NFR-PERF-006 (add-financial-reports 5.3): reconciliación reporte↔ledger sobre los 60 meses del Large Seed', async () => {
+    const reconciliation = new ReportsReconciliation(
+      httpReports(
+        async (method, path) => {
+          const r = await call(method, path);
+          return { status: r.status, body: (r.body ?? {}) as Record<string, unknown> };
+        },
+        token,
+        WS,
+      ),
+      sqlLedger(superuser),
+    );
+    const top = await superuser.query<{ id: string }>(
+      `SELECT la.source_account_id::text AS id
+         FROM ledger.ledger_account la
+        WHERE la.workspace_id = $1 AND la.source_account_id IS NOT NULL
+        ORDER BY (SELECT count(*) FROM ledger.posting p WHERE p.ledger_account_id = la.id) DESC LIMIT 1`,
+      [WS],
+    );
+    // Cinco bloques de 12 meses (60 meses) con 10 celdas de drill-down cada uno = 50 celdas muestreadas.
+    const mismatches = await reconciliation.verify({
+      userId: ownerId,
+      workspaceId: WS,
+      from: '2021-10-01',
+      to: REPORT_TO,
+      historyAccountIds: [top.rows[0]!.id],
+      sampleDays: 30,
+      drillSamples: 10,
+    });
+    dataset['diferencias de la reconciliación de reportes'] = mismatches.length;
+    // Un fallo nombra el reporte, el periodo y la moneda de cada diferencia (TC-REPORTING-REPORTS-029).
+    expect(mismatches.map(describeMismatch)).toEqual([]);
+  }, 900_000);
 
   it('RLS: overhead < 10 % en la consulta real de saldos (PgBalanceQuery) y las de índice; agregado sintético informativo (docs/31 D43)', async () => {
     const card = ids.accounts.get('Tarjeta Andina Demo')!;

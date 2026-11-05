@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: ["ledger/balances"]
 requirement: "Drill-down del flujo de caja y del historial de saldo"
 scenario: "Componente deuda de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-010"]
 nfr: []
 invariants: ["INV-004"]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-account-set-flow.int.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["drill-down", "cash-flow"]
 error_code: null
@@ -32,7 +34,7 @@ expected_result:
   - "Se lista el movimiento −3500.00 BOB del día"
   - "Σ movimientos = cifra de origen"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-020 — El drill-down de un componente del flujo de caja y de un día del historial suma su cifra

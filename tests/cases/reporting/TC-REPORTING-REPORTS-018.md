@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Drill-down de una celda a sus porciones"
 scenario: "Supermercado de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-010"]
 nfr: []
 invariants: ["INV-021"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+  - packages/contexts/transactions/test/integration/pg-nominal-portions.int.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["drill-down"]
 error_code: null
@@ -32,7 +35,7 @@ expected_result:
   - "2026-10: 2 porciones 3500.00 y −200.00 BOB; Σ = 3300.00 BOB (nativo y consolidado)"
   - "2026-11: 1 porción de 400.00 BOB con enlace a la transacción de 600.00 BOB"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-018 — El drill-down de una categoría lista sus porciones y su suma es igual a la cifra

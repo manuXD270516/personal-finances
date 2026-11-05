@@ -14,6 +14,7 @@ export type NavKey =
   | 'recurring'
   | 'goals'
   | 'debt'
+  | 'reports'
   | 'documents'
   | 'settings';
 
@@ -43,6 +44,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'goals', path: '/goals' },
   // Phase 4 (add-loans): Deudas → préstamos (lista, alta, detalle y comparación con la tabla del banco).
   { key: 'debt', path: '/debts' },
+  // Phase 7 (add-financial-reports): catálogo de reportes y los seis reportes disponibles con filtros, drill-down y CSV.
+  { key: 'reports', path: '/reportes' },
   // Phase 6 (add-document-attachments): Documentos (todos los adjuntos del espacio de trabajo y la cuota).
   { key: 'documents', path: '/documentos' },
   { key: 'settings', path: '/configuracion' },

@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Moneda de reporte seleccionable"
 scenario: "Reporte en dólares"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-011"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["reporting-currency"]
 error_code: "CURRENCY_NOT_ENABLED"
@@ -32,7 +34,7 @@ expected_result:
   - "Ingreso consolidado 1200.00 USD; nativo 12000.00 BOB"
   - "EUR ⇒ 422 CURRENCY_NOT_ENABLED"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-015 — El reporte en una moneda habilitada distinta no cambia las cifras nativas y una no habilitada se rechaza

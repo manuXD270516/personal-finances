@@ -29,6 +29,9 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/fx?vista=proveedores', name: 'FX: proveedores' },
   // add-conversion-cost-analysis 7.1: costo de conversiones por canal, par y periodo (sin conversiones: estado vacío).
   { path: '/fx/costos', name: 'Costo de conversiones' },
+  // add-financial-reports 7.1: catálogo de reportes y un reporte con gráfico, tabla equivalente y bloque de conversión.
+  { path: '/reportes', name: 'Reportes: catálogo' },
+  { path: '/reportes/ingresos-gastos', name: 'Reportes: ingresos y gastos' },
   // add-workspace-identity 8.4: preferencias personales y alta de workspace.
   { path: '/preferencias', name: 'Mis preferencias' },
   { path: '/workspaces/nuevo', name: 'Nuevo espacio de trabajo' },

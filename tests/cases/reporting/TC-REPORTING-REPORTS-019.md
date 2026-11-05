@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Drill-down con los mismos filtros y paginado"
 scenario: "Ciento veinte porciones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-010"]
 nfr: ["NFR-PERF-006"]
 invariants: []
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+  - packages/contexts/transactions/test/integration/pg-nominal-portions.int.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["drill-down", "pagination"]
 error_code: null
@@ -33,7 +35,7 @@ expected_result:
   - "Las tres páginas informan los mismos totales"
   - "Con el filtro, todas las filas son de \"Tarjeta Andina\" y suman 500.00 BOB"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-019 — El drill-down respeta los filtros del reporte y pagina por cursor sin repetidos con los mismos totales

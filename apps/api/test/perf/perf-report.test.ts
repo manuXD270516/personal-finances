@@ -57,6 +57,30 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
     expect(rowOf(id)).toContain(t.docText);
   });
 
+  it('[TC-REPORTING-REPORTS-030] cada reporte de 12 meses del Large Seed es bloqueante con p95 de 800 ms y un p95 de 801 ms es brecha', () => {
+    expect(PERF_THRESHOLDS['NFR-PERF-006']).toMatchObject({ metric: 'p95', limitMs: 800 });
+    const row = latencyResult({
+      id: 'report-income-expenses-12m-yoy-rolling12',
+      nfr: 'NFR-PERF-006',
+      title: 'reporte',
+      samples: Array.from({ length: 20 }, () => 801),
+      limitMs: PERF_THRESHOLDS['NFR-PERF-006'].limitMs,
+    });
+    expect([row.gate, row.passed]).toEqual([true, false]);
+  });
+
+  it('[TC-REPORTING-REPORTS-031] la primera página y la página 20 del drill-down tienen umbral p95 de 300 ms', () => {
+    expect(PERF_THRESHOLDS['NFR-PERF-006'].drillDownLimitMs).toBe(300);
+    const ok = latencyResult({
+      id: 'report-drill-down-first-page',
+      nfr: 'NFR-PERF-006',
+      title: 'drill-down',
+      samples: Array.from({ length: 20 }, () => 300),
+      limitMs: PERF_THRESHOLDS['NFR-PERF-006'].drillDownLimitMs,
+    });
+    expect(ok.passed).toBe(true);
+  });
+
   it('[TC-PLATFORM-PIPELINE-008] NFR-PERF-002 (búsqueda de texto) tiene umbral p95 de 400 ms bloqueante y un p95 de 450 ms es brecha', () => {
     expect(PERF_THRESHOLDS['NFR-PERF-002']).toMatchObject({ metric: 'p95', limitMs: 400 });
     const search = latencyResult({

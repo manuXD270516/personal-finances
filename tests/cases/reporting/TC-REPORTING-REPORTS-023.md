@@ -5,16 +5,17 @@ spec: reporting/financial-reports
 related_specs: ["audit/audit-trail"]
 requirement: "Exportaciones de reportes auditadas"
 scenario: "Exportación registrada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-012", "FR-AUDIT-013"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["csv", "audit"]
@@ -31,7 +32,7 @@ expected_result:
   - "Sin montos ni descripciones en la entrada"
   - "Registrada en la misma unidad de trabajo"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-023 — Cada exportación de un reporte queda auditada con actor, filtros y filas, sin contenido

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { fileURLToPath } from 'node:url';
+import { describeMismatch, ReportsReconciliation } from '@pf/reporting/interface/reporting.module';
 import { dec } from '@pf/shared-kernel';
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -9,6 +10,7 @@ import { connect } from '../support/db.js';
 import { rowsByTable, unbalancedEntries } from '../support/demo-db.js';
 import { demoQueryRuntimes } from '../support/demo-runtimes.js';
 import { DemoWorld, eventually, type DemoLoad } from '../support/demo-world.js';
+import { httpReports, sqlLedger } from '../support/reports-reconciliation.js';
 
 // Dataset Demo v2 de extremo a extremo (openspec add-phase-4-demo-data, TC-IDENTITY-DEMO-007 y 015..020): la carga
 // en proceso con la ancla fija 2026-09-30, el worker real (consumidores asíncronos del outbox) y las consultas
@@ -547,4 +549,37 @@ describe('otra fecha ancla e independencia del catálogo (TC-IDENTITY-DEMO-020)'
       await q2.close();
     }
   }, 600_000);
+});
+
+describe('dataset Demo v2: reconciliación de los reportes con el ledger', () => {
+  it('[TC-REPORTING-REPORTS-028] ingresos, gastos, categorías, flujo de caja, historial, patrimonio y drill-down cuadran con el ledger', async () => {
+    // El ledger se lee por SQL directo (superusuario, sin RLS) y los reportes por HTTP: caminos independientes.
+    const admin = await connect(deps.superuserUrl);
+    try {
+      const { rows } = await admin.query<{ first: string; accountId: string }>(
+        `SELECT to_char(date_trunc('month', min(entry_date)), 'YYYY-MM-DD') AS first,
+                (SELECT la.source_account_id::text FROM ledger.ledger_account la
+                  WHERE la.workspace_id = $1 AND la.source_account_id IS NOT NULL
+                  ORDER BY (SELECT count(*) FROM ledger.posting p WHERE p.ledger_account_id = la.id) DESC LIMIT 1) AS "accountId"
+           FROM ledger.journal_entry WHERE workspace_id = $1 AND entry_date <= $2::date`,
+        [ws, FIXED],
+      );
+      const reconciliation = new ReportsReconciliation(
+        httpReports((method, path, token) => world.call(method, path, token), main.user.token, ws),
+        sqlLedger(admin),
+      );
+      const mismatches = await reconciliation.verify({
+        userId,
+        workspaceId: ws,
+        from: rows[0]!.first,
+        to: FIXED,
+        historyAccountIds: [rows[0]!.accountId],
+        sampleDays: 30,
+        drillSamples: 5,
+      });
+      expect(mismatches.map(describeMismatch)).toEqual([]);
+    } finally {
+      await admin.end();
+    }
+  }, 300_000);
 });

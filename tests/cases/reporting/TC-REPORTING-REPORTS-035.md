@@ -5,17 +5,18 @@ spec: reporting/net-worth
 related_specs: []
 requirement: "Movimientos con cuentas fuera del patrimonio"
 scenario: "Transferencia a una cuenta excluida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-005", "FR-REPORTING-008"]
 nfr: []
 invariants: ["INV-009"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["net-worth", "decomposition"]
 error_code: null
@@ -30,7 +31,7 @@ expected_result:
   - "Cambio del patrimonio −1000.00 BOB"
   - "Otros movimientos −1000.00 BOB; ahorro y revalorización 0.00"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-035 — Una transferencia a una cuenta excluida del patrimonio se informa como otros movimientos

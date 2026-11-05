@@ -472,3 +472,26 @@ describe('formato del Home', () => {
     expect(formatSignedDecimal('12345678901234567890.12', 'es-BO')).toBe('+12.345.678.901.234.567.890,12');
   });
 });
+
+describe('enlace de Q7 al reporte de ingresos y gastos (add-financial-reports, TC-REPORTING-REPORTS-038)', () => {
+  it('[TC-REPORTING-REPORTS-038] la variación del gasto enlaza al reporte con la misma comparación a la fecha, el mismo rango y la misma moneda', () => {
+    const html = renderToStaticMarkup(
+      <DashboardView summary={SUMMARY} {...ctx} reportsPath="/es/reportes/ingresos-gastos" />,
+    );
+    const link = /data-testid="expense-report-link"/.test(html);
+    expect(SUMMARY.comparison).toBeTruthy();
+    expect(link).toBe(true);
+    const href = /<a href="([^"]+)" data-testid="expense-report-link"/.exec(html)?.[1] ?? '';
+    expect(href).toContain('/es/reportes/ingresos-gastos?');
+    expect(href).toContain('compare=PREVIOUS_PERIOD_TO_DATE');
+    expect(href).toContain('grouping=CALENDAR_MONTH');
+    expect(href).toContain(`from=${SUMMARY.period.from}`);
+    expect(href).toContain(`to=${SUMMARY.period.to}`);
+    expect(href).toContain(`reportingCurrency=${SUMMARY.meta.reportingCurrency}`);
+    expect(text(html)).toContain('Ver el reporte de ingresos y gastos');
+  });
+
+  it('sin la ruta del reporte (o sin comparación) no hay enlace', () => {
+    expect(render(SUMMARY)).not.toContain('expense-report-link');
+  });
+});

@@ -5,17 +5,20 @@ spec: reporting/net-worth
 related_specs: []
 requirement: "Descomposición del cambio del patrimonio"
 scenario: "Octubre con ahorro y revalorización"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-005"]
 nfr: []
 invariants: ["INV-031", "INV-012"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["net-worth", "decomposition", "pbt"]
 error_code: null
@@ -33,7 +36,7 @@ expected_result:
   - "Venta: resultado de conversiones −10.00 BOB y revalorización 0.00"
   - "PBT: ΔNW = Σ componentes a precisión 40"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-033 — El cambio del patrimonio se descompone exactamente en ahorro, revalorización cambiaria y de activos

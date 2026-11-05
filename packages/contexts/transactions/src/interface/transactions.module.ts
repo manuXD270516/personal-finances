@@ -34,7 +34,12 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-transactions.js';
 import { PgConversionDetailQuery } from '../infrastructure/pg-conversion-cost.js';
-import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
+import { PgReconciliationMarksQuery } from '../infrastructure/pg-reconciliation-marks.js';
+import {
+  PgCounterpartyCategoryUsage,
+  PgNominalFlowQuery,
+  PgNominalPortionQuery,
+} from '../infrastructure/pg-nominal-flows.js';
 import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
 import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
 import { PgAccountMovementsQuery, systemCategoryCodesFrom } from '../infrastructure/pg-account-movements.js';
@@ -68,6 +73,8 @@ import type {
   TransactionStatusQuery,
   ConversionDetailQuery,
   NominalFlowQuery,
+  NominalPortionQuery,
+  ReconciliationMarksQuery,
   ReconciliationStatusQuery,
   TransactionsClosingQuery,
 } from '../contracts/index.js';
@@ -109,8 +116,12 @@ export interface TransactionsRuntime {
   readonly reconciliations: ReconciliationsService;
   /** Query pública `ReconciliationStatusQuery.getCoverage` para PLANNING (cierre de mes, decisión 9). */
   readonly reconciliationStatus: ReconciliationStatusQuery;
+  /** Fechas de conciliaciones cerradas por cuenta y rango (REPORTING, add-financial-reports). */
+  readonly reconciliationMarks: ReconciliationMarksQuery;
   /** Query pública `SummarizeNominalFlows` para Reporting (add-basic-dashboard). */
   readonly flows: NominalFlowQuery;
+  /** Query pública `NominalPortionQuery.listPortions` para el drill-down de REPORTING (add-financial-reports). */
+  readonly portions: NominalPortionQuery;
   /** Query pública `ConversionDetailQuery` para REPORTING (análisis de costo) y FX (carga inicial de observaciones). */
   readonly conversionDetails: ConversionDetailQuery;
   /** Última categoría usada con una counterparty, para la sugerencia de CLASSIFICATION (add-classification). */
@@ -204,6 +215,8 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     reconciliations,
     reconciliationStatus: reconciliations,
     flows: new PgNominalFlowQuery(deps.uow, deps.currencies),
+    portions: new PgNominalPortionQuery(deps.uow, deps.currencies),
+    reconciliationMarks: new PgReconciliationMarksQuery(deps.uow),
     conversionDetails: new PgConversionDetailQuery(deps.uow),
     categoryUsage: new PgCounterpartyCategoryUsage(deps.uow),
     closing: new PgTransactionsClosingQuery(deps.uow, deps.currencies, deps.categories),

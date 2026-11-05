@@ -45,7 +45,8 @@
     "debt": "Debts",
     "goals": "Goals",
     "documents": "Documents",
-    "rules": "Rules"
+    "rules": "Rules",
+    "reports": "Reports"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -505,7 +506,8 @@
         "loading": "Loading the spendable amount…",
         "noAccounts": "You do not have liquid accounts yet: there is no spendable amount to calculate."
       }
-    }
+    },
+    "reportsLink": "See the income and expenses report"
   },
   "Common": {
     "noWorkspace": "Select or create a workspace.",
@@ -6103,6 +6105,245 @@
       "resolved": "The review mark was cleared.",
       "marked": "The transaction is pending review.",
       "createRule": "Create a rule from this transaction"
+    }
+  },
+  "Reports": {
+    "title": "Reports",
+    "subtitle": "Exact figures from your movements, with the conversion policy in plain sight.",
+    "loading": "Loading…",
+    "empty": "There is no data for the requested range.",
+    "export": "Export CSV",
+    "partial": "partial",
+    "total": "Total",
+    "backToCatalog": "Back to the report catalog",
+    "catalog": {
+      "status": {
+        "AVAILABLE": "Available",
+        "PARTIAL": "Partial",
+        "PLANNED": "Planned"
+      },
+      "open": "Open report",
+      "partial": "Open the existing view",
+      "planned": "Arrives in phase {phase}; no figures yet."
+    },
+    "filters": {
+      "title": "Report filters",
+      "from": "From (business date)",
+      "to": "To (business date)",
+      "grouping": "Group by",
+      "FINANCIAL_PERIOD": "Financial period",
+      "CALENDAR_MONTH": "Calendar month",
+      "granularity": "Granularity",
+      "PERIOD": "By period",
+      "WEEK": "By ISO week",
+      "DAY": "By day",
+      "account": "Account",
+      "accountPick": "Pick an account",
+      "topN": "Show only the top N categories",
+      "reportingCurrency": "Reporting currency",
+      "baseCurrency": "Workspace base currency",
+      "conversion": "Flow valuation",
+      "HISTORICAL": "Rate of each movement date",
+      "CUTOFF": "Cutoff date rate",
+      "compare": "Compare with",
+      "NONE": "No comparison",
+      "PREVIOUS_PERIOD": "Previous period",
+      "PREVIOUS_YEAR": "Same period last year",
+      "PREVIOUS_PERIOD_TO_DATE": "Previous period to date",
+      "CUSTOM": "Custom range",
+      "compareFrom": "Compare from",
+      "compareTo": "Compare to",
+      "normalize": "Normalize per day",
+      "rolling": "Moving average (periods)",
+      "accounts": "Accounts (comma-separated ids)",
+      "currencies": "Currencies (comma-separated codes)",
+      "categories": "Categories (ids; include subcategories)",
+      "tags": "Tags (ids; any)",
+      "counterparties": "Counterparties (ids)",
+      "idsHint": "optional",
+      "apply": "Apply filters",
+      "errors": {
+        "range": "The start date cannot be after the end date.",
+        "custom": "The comparison range is incomplete or inverted."
+      }
+    },
+    "variation": {
+      "new": "new",
+      "up": "Went up",
+      "down": "Went down",
+      "same": "No change"
+    },
+    "incomplete": {
+      "short": "No rate for: {amounts}",
+      "report": "Incomplete report: no conversion rate for {amounts}. Those amounts are neither estimated nor converted 1:1.",
+      "line": "(incomplete)"
+    },
+    "conversion": {
+      "title": "How it was converted",
+      "policy": {
+        "TRANSACTION_DATE": "Flows are valued at the rate in force at the close of each movement day and balances at the rate of their date.",
+        "VALUATION_DATE": "Balances are valued at the rate of each date.",
+        "CUTOFF_DATE": "All flows are valued at the rate in force at the close of the cutoff date {date}."
+      },
+      "reporting": "Reporting currency {currency}; rate validity window of {days} days.",
+      "none": "This report used no conversion rates.",
+      "rate": "1 {base} = {value} {quote} · type {type} · source {source} · as of {date}"
+    },
+    "drill": {
+      "title": "Figure detail",
+      "close": "Close detail",
+      "open": "See the detail of {cell}",
+      "totals": "{count, plural, one {# row} other {# rows}} · cell total:",
+      "caption": "Rows that make up the figure",
+      "date": "Date",
+      "description": "Description",
+      "amount": "Native amount",
+      "valued": "Valued",
+      "more": "Load more rows",
+      "component": {
+        "operating": "Operating",
+        "debt": "Debt",
+        "savingsInvestments": "Savings and investments",
+        "currencyExchange": "Currency exchange",
+        "adjustments": "Adjustments",
+        "INCOME": "Income",
+        "EXPENSE": "Expense",
+        "FX_TRADING": "Currency exchange",
+        "OPENING_BALANCE": "Opening balance",
+        "ADJUSTMENTS": "Adjustment",
+        "OUTSIDE_ASSET": "Transfer to another account",
+        "OUTSIDE_LIABILITY": "Debt payment"
+      }
+    },
+    "income": {
+      "period": "Period",
+      "income": "Income",
+      "expenses": "Expenses",
+      "savings": "Savings",
+      "savingsRate": "Savings rate",
+      "rateUndefined": "undefined",
+      "vsExpenses": "Expense change",
+      "baseline": "Expense moving average",
+      "chartTitle": "Income and expenses by period",
+      "chartDesc": "Grouped bars of {n} periods in {currency}; the table below has the same data.",
+      "daysDiffer": "The ranges have a different number of days: {current} and {compared}.",
+      "caption": "Income, expenses, savings and savings rate by period"
+    },
+    "baseline": {
+      "insufficient": "Not enough history for {n} periods",
+      "value": "Average of {n}: {average}{delta}"
+    },
+    "category": {
+      "name": "Category",
+      "amount": "Spending",
+      "vs": "Change",
+      "caption": "Spending by group, category and subcategory",
+      "others": "Other categories",
+      "archived": "archived",
+      "negativeNet": "negative net"
+    },
+    "budget": {
+      "noBudget": "No budget",
+      "caption": "Budget lines of {period} in {currency}",
+      "line": "Line",
+      "reference": "Reference",
+      "actual": "Actual",
+      "status": "Status",
+      "statuses": {
+        "UNDER": "Under plan",
+        "ON_TARGET": "On target",
+        "OVER": "Over",
+        "WITHIN": "Within range",
+        "BELOW": "Below",
+        "ABOVE": "Above",
+        "PENDING": "Pending",
+        "MET": "Met",
+        "NO_BUDGET": "No budget"
+      }
+    },
+    "cash": {
+      "chartTitle": "Closing balance of liquid accounts by period",
+      "chartDesc": "Line of {n} periods in {currency}; the table of each period has the same data.",
+      "note": "A conversion from a liquid account to a non-liquid one in another currency counts as currency exchange. Transfers between liquid accounts are not flow.",
+      "caption": "Cash flow of {period} by currency",
+      "currency": "Currency",
+      "opening": "Opening balance",
+      "operating": "Operating",
+      "debt": "Debt",
+      "savingsInvestments": "Savings and investments",
+      "currencyExchange": "Currency exchange",
+      "adjustments": "Adjustments",
+      "closing": "Closing balance",
+      "consolidated": "Consolidated in {currency}",
+      "revaluation": "Revaluation (valuation difference between balances and flows): {amount}"
+    },
+    "history": {
+      "chartTitle": "Daily account balance",
+      "chartDesc": "Step line of {n} days in {currency}; hollow points are reconciliation days.",
+      "summary": "Opening balance {opening}; closing balance {closing}.",
+      "caption": "Days with movements or reconciliation",
+      "date": "Date",
+      "balance": "Balance",
+      "valued": "Valued",
+      "marks": "Mark",
+      "reconciled": "Reconciled"
+    },
+    "worth": {
+      "chartTitle": "Net worth",
+      "chartDesc": "Line of {n} points in {currency}; hollow points are incomplete.",
+      "change": "Net worth went from {opening} to {closing}.",
+      "caption": "Decomposition of the change of {period}",
+      "component": "Component",
+      "amount": "Amount",
+      "savings": "Savings",
+      "conversionResult": "Conversion result",
+      "adjustments": "Adjustments and opening balances",
+      "otherMovements": "Other movements",
+      "fxRevaluation": "Currency revaluation",
+      "assetRevaluation": "Asset revaluation",
+      "byCurrency": "{currency} ({kind}): {amount}",
+      "kind": {
+        "FX": "currency",
+        "ASSET": "asset"
+      },
+      "incomplete": "Incomplete decomposition: no rate for {amounts}. Its revaluation was not computed or attributed to another component.",
+      "excludedNote": "Savings are those of the accounts included in net worth: an expense paid from an excluded account does not show here."
+    },
+    "names": {
+      "INCOME_EXPENSES": "Income and expenses",
+      "BUDGET_VS_ACTUAL": "Budget vs actual",
+      "EXPENSES_BY_CATEGORY": "Expenses by category",
+      "EXPENSES_BY_TAG": "Expenses by tag",
+      "EXPENSES_BY_ACCOUNT": "Expenses by account",
+      "MONTHLY_TRENDS": "Monthly trends",
+      "CASH_FLOW": "Cash flow",
+      "NET_WORTH": "Net worth",
+      "SAVINGS_GOALS": "Savings goals",
+      "DEBT_EVOLUTION": "Debt evolution",
+      "RECURRING_COSTS": "Recurring costs and subscriptions",
+      "SUBSCRIPTION_EVOLUTION": "Subscription evolution",
+      "FX_CONVERSIONS": "Currency and crypto conversions",
+      "FEES": "Fees and charges",
+      "ACCOUNT_BALANCE_HISTORY": "Account balance history",
+      "FORECAST_VS_ACTUAL": "Forecast vs actual"
+    },
+    "purposes": {
+      "INCOME_EXPENSES": "How much came in, went out and was saved in each period.",
+      "BUDGET_VS_ACTUAL": "Each budget line against what was spent, period by period.",
+      "EXPENSES_BY_CATEGORY": "Where spending went: group, category and subcategory.",
+      "EXPENSES_BY_TAG": "Spending grouped by tag.",
+      "EXPENSES_BY_ACCOUNT": "Spending grouped by account.",
+      "MONTHLY_TRENDS": "How your income and spending evolve month by month.",
+      "CASH_FLOW": "Where the money of your liquid accounts comes from and goes.",
+      "NET_WORTH": "What you own is worth and why it changed: savings, conversions and revaluation.",
+      "SAVINGS_GOALS": "Progress of your savings goals.",
+      "DEBT_EVOLUTION": "How what you owe goes down.",
+      "RECURRING_COSTS": "What you pay on a recurring basis.",
+      "SUBSCRIPTION_EVOLUTION": "How the cost of your subscriptions changes.",
+      "FX_CONVERSIONS": "What converting currencies and crypto costs you.",
+      "FEES": "Fees, interest and charges paid.",
+      "ACCOUNT_BALANCE_HISTORY": "The balance of one account, day by day, with its reconciliations.",
+      "FORECAST_VS_ACTUAL": "What was forecast against what happened."
     }
   }
 }

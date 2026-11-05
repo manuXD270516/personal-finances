@@ -5,17 +5,21 @@ spec: reporting/financial-reports
 related_specs: ["security/access-control"]
 requirement: "Reportes de solo lectura para todos los miembros y aislados por workspace"
 scenario: "Otro workspace"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/ledger/test/integration/pg-account-set-flow.int.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/transactions/test/integration/pg-nominal-portions.int.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["rls", "isolation"]
 error_code: null
@@ -31,7 +35,7 @@ expected_result:
   - "X recibe 403 sin datos de W1"
   - "Ninguna consulta modifica datos financieros"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-025 — Los reportes son de solo lectura para todos los miembros y no mezclan workspaces

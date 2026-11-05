@@ -106,3 +106,72 @@ export {
   type ExclusionReason,
 } from './conversion-cost.js';
 export { CostPeriodCalendar, MAX_COST_PERIODS, type KnownPeriod } from './cost-periods.js';
+export {
+  daysBetween,
+  isoWeekOf,
+  MAX_REPORT_PERIODS,
+  MAX_REPORT_WEEKS,
+  ReportPeriodCalendar,
+  type ReportGrouping,
+  type ReportPeriod,
+} from './report-periods.js';
+export {
+  ReportConversionPolicy,
+  type RateLookup,
+  type ReportAmount,
+  type ReportConversionPolicyKind,
+} from './report-conversion.js';
+export {
+  ReportComparator,
+  ROLLING_WINDOWS,
+  type ComparisonPair,
+  type ReportBaseline,
+  type ReportCompareMode,
+  type ReportVariation,
+  type RollingWindow,
+} from './report-comparator.js';
+export { IncomeExpenseReport, type FlowFact, type IncomeExpenseFigures } from './income-expense-report.js';
+export {
+  CategoryTreeReport,
+  isNegativeNet,
+  type CategoryGroup,
+  type CategoryGroupInfo,
+  type CategoryLeaf,
+  type CategoryNode,
+  type CategoryNodeInfo,
+  type CategoryTree,
+} from './category-tree-report.js';
+export {
+  COMPONENT_CLASSES,
+  componentOf,
+  LIQUIDITY_COMPONENTS,
+  LiquidityFlowReport,
+  type FlowCounterpart,
+  type LiquidityComponent,
+  type LiquidityConsolidated,
+  type LiquidityCurrencyBlock,
+  type LiquidityFlowFigures,
+  type SetFlow,
+} from './liquidity-flow-report.js';
+export { BalanceStepSeries, MAX_BALANCE_HISTORY_DAYS, type BalanceDay } from './balance-step-series.js';
+export {
+  NetWorthDecomposer,
+  type DecomposerFlow,
+  type NetWorthDecomposition,
+  type Revaluation,
+} from './net-worth-decomposer.js';
+export { describeMismatch, ReportReconciler, type ReconciliationMismatch } from './report-reconciler.js';
+export {
+  REPORT_CATALOG,
+  REPORT_IDS,
+  type CatalogEntry,
+  type ReportAvailability,
+  type ReportId,
+} from './report-catalog.js';
+export {
+  evaluateReportsReadModelAlert,
+  REPORT_DURATION_METRIC,
+  REPORTS_READ_MODEL_ALERT,
+  type ReportDurationSample,
+  type ReportsReadModelAlertState,
+} from './reports-read-model-alert.js';

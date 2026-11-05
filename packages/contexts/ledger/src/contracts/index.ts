@@ -233,6 +233,70 @@ export interface LedgerActivityRangeQuery {
   ): Promise<{ readonly minEntryDate: string; readonly maxEntryDate: string } | null>;
 }
 
+/** Clase de la contrapartida de un movimiento de un conjunto de cuentas (add-financial-reports, INV-004). */
+export type FlowCounterpartClassDto =
+  | 'INCOME'
+  | 'EXPENSE'
+  | 'FX_TRADING'
+  | 'OPENING_BALANCE'
+  | 'ADJUSTMENTS'
+  | 'OUTSIDE_ASSET'
+  | 'OUTSIDE_LIABILITY';
+
+export interface AccountSetFlowRowDto {
+  readonly businessDate: string;
+  readonly currency: string;
+  readonly counterpart: FlowCounterpartClassDto;
+  /** Con el signo del conjunto: lo que entra al conjunto es positivo (−Σ de las patas de afuera). */
+  readonly amount: string;
+}
+
+export interface AccountSetMovementDto {
+  readonly journalEntryId: string;
+  /** Id de la transacción de origen del asiento (`source_id` si el origen es una transacción). */
+  readonly transactionId: string | null;
+  readonly businessDate: string;
+  /** Cuentas del usuario DEL CONJUNTO tocadas por el asiento en esa moneda. */
+  readonly accountIds: readonly string[];
+  readonly currency: string;
+  readonly counterpart: FlowCounterpartClassDto;
+  readonly amount: string;
+}
+
+/**
+ * Flujo de un CONJUNTO de cuentas del usuario por clase de contrapartida (add-financial-reports, design decisión 3).
+ * Como cada asiento cuadra por moneda, el flujo del conjunto en una moneda es −Σ de las patas de FUERA del conjunto en
+ * los asientos que lo tocan en esa moneda; clasificar esas patas reparte el flujo sin residuo. Una transferencia entre
+ * cuentas del conjunto no tiene patas de afuera y no aparece. `listMovements` entrega el detalle por (asiento, moneda,
+ * clase) paginado por cursor, con los totales por moneda de TODA la celda. Sin efectos; en la unidad de trabajo del
+ * llamador (RLS del workspace).
+ */
+export interface AccountSetFlowQuery {
+  summarize(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    readonly dateFrom: string;
+    readonly dateTo: string;
+  }): Promise<readonly AccountSetFlowRowDto[]>;
+  listMovements(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    readonly dateFrom: string;
+    readonly dateTo: string;
+    readonly counterparts?: readonly FlowCounterpartClassDto[];
+    /** Solo asientos de esta moneda (opcional). */
+    readonly currency?: string;
+    /** 1..200. */
+    readonly limit: number;
+    readonly cursor?: string;
+  }): Promise<{
+    readonly rows: readonly AccountSetMovementDto[];
+    readonly nextCursor: string | null;
+    readonly count: number;
+    readonly totals: readonly MoneyDto[];
+  }>;
+}
+
 /**
  * Primera fecha con saldo por moneda del workspace (openspec add-crypto-rate-providers, decisión 6; D229): la fecha de
  * negocio más antigua de un posting sobre una cuenta del usuario (activo o pasivo) en cada moneda. FX la usa para cargar
@@ -285,6 +349,7 @@ export interface OpeningEntryDto {
   readonly amount: MoneyDto;
 }
 
+export const ACCOUNT_SET_FLOW_QUERY = Symbol.for('pf.ledger.AccountSetFlowQuery');
 export const FIRST_BALANCE_DATE_QUERY = Symbol.for('pf.ledger.FirstBalanceDateQuery');
 export const LEDGER_POSTING_PORT = Symbol.for('pf.ledger.LedgerPostingPort');
 export const LEDGER_PERIOD_LOCK_PORT = Symbol.for('pf.ledger.LedgerPeriodLockPort');

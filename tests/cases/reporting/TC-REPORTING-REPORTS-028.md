@@ -5,17 +5,18 @@ spec: reporting/financial-reports
 related_specs: ["ledger/balances"]
 requirement: "Reconciliación de los reportes con el ledger"
 scenario: "Octubre cuadra con el ledger"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: ["NFR-DATA-008"]
 invariants: ["INV-021", "INV-024"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/demo/demo-v2.int.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["reconciliation", "exit-criteria"]
 error_code: null
@@ -29,7 +30,7 @@ expected_result:
   - "Σ categorías = gasto; flujo de caja e historial de saldo cuadran con los saldos contables"
   - "Diferencia tolerada: 0"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-028 — Los reportes del dataset Demo v2 cuadran con el balance de comprobación del ledger

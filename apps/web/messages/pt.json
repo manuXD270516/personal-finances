@@ -45,7 +45,8 @@
     "debt": "Dívidas",
     "goals": "Metas",
     "documents": "Documentos",
-    "rules": "Regras"
+    "rules": "Regras",
+    "reports": "Relatórios"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -505,7 +506,8 @@
         "loading": "Carregando o disponível…",
         "noAccounts": "Você ainda não tem contas líquidas: não há disponível a calcular."
       }
-    }
+    },
+    "reportsLink": "Ver o relatório de receitas e despesas"
   },
   "Common": {
     "noWorkspace": "Selecione ou crie um espaço de trabalho.",
@@ -6103,6 +6105,245 @@
       "resolved": "A marca de revisão foi removida.",
       "marked": "A transação ficou pendente de revisão.",
       "createRule": "Criar regra a partir desta transação"
+    }
+  },
+  "Reports": {
+    "title": "Relatórios",
+    "subtitle": "Números exatos dos seus movimentos, com a política de conversão à vista.",
+    "loading": "Carregando…",
+    "empty": "Não há dados para o intervalo pedido.",
+    "export": "Exportar CSV",
+    "partial": "parcial",
+    "total": "Total",
+    "backToCatalog": "Voltar ao catálogo de relatórios",
+    "catalog": {
+      "status": {
+        "AVAILABLE": "Disponível",
+        "PARTIAL": "Parcial",
+        "PLANNED": "Planejado"
+      },
+      "open": "Abrir relatório",
+      "partial": "Ver a vista existente",
+      "planned": "Chega na fase {phase}; sem números por enquanto."
+    },
+    "filters": {
+      "title": "Filtros do relatório",
+      "from": "De (data de negócio)",
+      "to": "Até (data de negócio)",
+      "grouping": "Agrupar por",
+      "FINANCIAL_PERIOD": "Período financeiro",
+      "CALENDAR_MONTH": "Mês calendário",
+      "granularity": "Granularidade",
+      "PERIOD": "Por período",
+      "WEEK": "Por semana ISO",
+      "DAY": "Por dia",
+      "account": "Conta",
+      "accountPick": "Escolha uma conta",
+      "topN": "Mostrar só as N primeiras categorias",
+      "reportingCurrency": "Moeda do relatório",
+      "baseCurrency": "Moeda base do espaço",
+      "conversion": "Avaliação dos fluxos",
+      "HISTORICAL": "Taxa da data de cada movimento",
+      "CUTOFF": "Taxa da data de corte",
+      "compare": "Comparar com",
+      "NONE": "Sem comparação",
+      "PREVIOUS_PERIOD": "Período anterior",
+      "PREVIOUS_YEAR": "Mesmo período do ano anterior",
+      "PREVIOUS_PERIOD_TO_DATE": "Período anterior até a data",
+      "CUSTOM": "Intervalo personalizado",
+      "compareFrom": "Comparar desde",
+      "compareTo": "Comparar até",
+      "normalize": "Normalizar por dia",
+      "rolling": "Média móvel (períodos)",
+      "accounts": "Contas (ids separados por vírgula)",
+      "currencies": "Moedas (códigos separados por vírgula)",
+      "categories": "Categorias (ids; incluem subcategorias)",
+      "tags": "Etiquetas (ids; qualquer)",
+      "counterparties": "Contrapartes (ids)",
+      "idsHint": "opcional",
+      "apply": "Aplicar filtros",
+      "errors": {
+        "range": "A data inicial não pode ser posterior à final.",
+        "custom": "O intervalo de comparação está incompleto ou invertido."
+      }
+    },
+    "variation": {
+      "new": "novo",
+      "up": "Subiu",
+      "down": "Desceu",
+      "same": "Sem mudança"
+    },
+    "incomplete": {
+      "short": "Sem taxa para: {amounts}",
+      "report": "Relatório incompleto: sem taxa de conversão para {amounts}. Esses valores não são estimados nem convertidos 1:1.",
+      "line": "(incompleto)"
+    },
+    "conversion": {
+      "title": "Como foi convertido",
+      "policy": {
+        "TRANSACTION_DATE": "Os fluxos são avaliados com a taxa vigente no fechamento do dia de cada movimento e os saldos com a taxa da sua data.",
+        "VALUATION_DATE": "Os saldos são avaliados com a taxa de cada data.",
+        "CUTOFF_DATE": "Todos os fluxos são avaliados com a taxa vigente no fechamento da data de corte {date}."
+      },
+      "reporting": "Moeda do relatório {currency}; janela de vigência das taxas de {days} dias.",
+      "none": "Este relatório não usou taxas de conversão.",
+      "rate": "1 {base} = {value} {quote} · tipo {type} · fonte {source} · em {date}"
+    },
+    "drill": {
+      "title": "Detalhe do valor",
+      "close": "Fechar detalhe",
+      "open": "Ver o detalhe de {cell}",
+      "totals": "{count, plural, one {# linha} other {# linhas}} · total da célula:",
+      "caption": "Linhas que compõem o valor",
+      "date": "Data",
+      "description": "Descrição",
+      "amount": "Valor nativo",
+      "valued": "Avaliado",
+      "more": "Carregar mais linhas",
+      "component": {
+        "operating": "Operacional",
+        "debt": "Dívida",
+        "savingsInvestments": "Poupança e investimento",
+        "currencyExchange": "Câmbio de moeda",
+        "adjustments": "Ajustes",
+        "INCOME": "Receita",
+        "EXPENSE": "Despesa",
+        "FX_TRADING": "Câmbio de moeda",
+        "OPENING_BALANCE": "Saldo inicial",
+        "ADJUSTMENTS": "Ajuste",
+        "OUTSIDE_ASSET": "Transferência para outra conta",
+        "OUTSIDE_LIABILITY": "Pagamento de dívida"
+      }
+    },
+    "income": {
+      "period": "Período",
+      "income": "Receitas",
+      "expenses": "Despesas",
+      "savings": "Poupança",
+      "savingsRate": "Taxa de poupança",
+      "rateUndefined": "indefinida",
+      "vsExpenses": "Variação da despesa",
+      "baseline": "Média móvel da despesa",
+      "chartTitle": "Receitas e despesas por período",
+      "chartDesc": "Barras agrupadas de {n} períodos em {currency}; a tabela seguinte tem os mesmos dados.",
+      "daysDiffer": "Os intervalos têm quantidades diferentes de dias: {current} e {compared}.",
+      "caption": "Receitas, despesas, poupança e taxa de poupança por período"
+    },
+    "baseline": {
+      "insufficient": "Histórico insuficiente para {n} períodos",
+      "value": "Média de {n}: {average}{delta}"
+    },
+    "category": {
+      "name": "Categoria",
+      "amount": "Gasto",
+      "vs": "Variação",
+      "caption": "Gasto por grupo, categoria e subcategoria",
+      "others": "Outras categorias",
+      "archived": "arquivada",
+      "negativeNet": "líquido negativo"
+    },
+    "budget": {
+      "noBudget": "Sem orçamento",
+      "caption": "Linhas do orçamento de {period} em {currency}",
+      "line": "Linha",
+      "reference": "Referência",
+      "actual": "Real",
+      "status": "Situação",
+      "statuses": {
+        "UNDER": "Dentro do plano",
+        "ON_TARGET": "Na meta",
+        "OVER": "Excedido",
+        "WITHIN": "Dentro da faixa",
+        "BELOW": "Abaixo",
+        "ABOVE": "Acima",
+        "PENDING": "Pendente",
+        "MET": "Cumprido",
+        "NO_BUDGET": "Sem orçamento"
+      }
+    },
+    "cash": {
+      "chartTitle": "Saldo final das contas líquidas por período",
+      "chartDesc": "Linha de {n} períodos em {currency}; a tabela de cada período tem os mesmos dados.",
+      "note": "Uma conversão de uma conta líquida para uma não líquida em outra moeda conta como câmbio de moeda. Transferências entre contas líquidas não são fluxo.",
+      "caption": "Fluxo de caixa de {period} por moeda",
+      "currency": "Moeda",
+      "opening": "Saldo inicial",
+      "operating": "Operacional",
+      "debt": "Dívida",
+      "savingsInvestments": "Poupança e investimento",
+      "currencyExchange": "Câmbio de moeda",
+      "adjustments": "Ajustes",
+      "closing": "Saldo final",
+      "consolidated": "Consolidado em {currency}",
+      "revaluation": "Reavaliação (diferença de avaliação entre saldos e fluxos): {amount}"
+    },
+    "history": {
+      "chartTitle": "Saldo diário da conta",
+      "chartDesc": "Degraus de {n} dias em {currency}; os pontos vazados são dias com conciliação.",
+      "summary": "Saldo inicial {opening}; saldo final {closing}.",
+      "caption": "Dias com movimentos ou conciliação",
+      "date": "Data",
+      "balance": "Saldo",
+      "valued": "Avaliado",
+      "marks": "Marca",
+      "reconciled": "Conciliado"
+    },
+    "worth": {
+      "chartTitle": "Patrimônio líquido",
+      "chartDesc": "Linha de {n} pontos em {currency}; os pontos vazados são incompletos.",
+      "change": "O patrimônio passou de {opening} para {closing}.",
+      "caption": "Decomposição da mudança de {period}",
+      "component": "Componente",
+      "amount": "Valor",
+      "savings": "Poupança",
+      "conversionResult": "Resultado de conversões",
+      "adjustments": "Ajustes e saldos iniciais",
+      "otherMovements": "Outros movimentos",
+      "fxRevaluation": "Reavaliação cambial",
+      "assetRevaluation": "Reavaliação de ativos",
+      "byCurrency": "{currency} ({kind}): {amount}",
+      "kind": {
+        "FX": "cambial",
+        "ASSET": "de ativos"
+      },
+      "incomplete": "Decomposição incompleta: sem taxa para {amounts}. Sua reavaliação não foi calculada nem atribuída a outro componente.",
+      "excludedNote": "A poupança é a das contas incluídas no patrimônio: uma despesa paga de uma conta excluída não aparece aqui."
+    },
+    "names": {
+      "INCOME_EXPENSES": "Receitas e despesas",
+      "BUDGET_VS_ACTUAL": "Orçamento vs real",
+      "EXPENSES_BY_CATEGORY": "Despesas por categoria",
+      "EXPENSES_BY_TAG": "Despesas por etiqueta",
+      "EXPENSES_BY_ACCOUNT": "Despesas por conta",
+      "MONTHLY_TRENDS": "Tendências mensais",
+      "CASH_FLOW": "Fluxo de caixa",
+      "NET_WORTH": "Patrimônio líquido",
+      "SAVINGS_GOALS": "Metas de poupança",
+      "DEBT_EVOLUTION": "Evolução das dívidas",
+      "RECURRING_COSTS": "Custos recorrentes e assinaturas",
+      "SUBSCRIPTION_EVOLUTION": "Evolução das assinaturas",
+      "FX_CONVERSIONS": "Conversões de moeda e cripto",
+      "FEES": "Tarifas e encargos",
+      "ACCOUNT_BALANCE_HISTORY": "Histórico de saldo de uma conta",
+      "FORECAST_VS_ACTUAL": "Previsão vs real"
+    },
+    "purposes": {
+      "INCOME_EXPENSES": "Quanto entrou, saiu e foi poupado em cada período.",
+      "BUDGET_VS_ACTUAL": "Cada linha do orçamento contra o gasto, período a período.",
+      "EXPENSES_BY_CATEGORY": "Onde foi o gasto: grupo, categoria e subcategoria.",
+      "EXPENSES_BY_TAG": "O gasto agrupado por etiqueta.",
+      "EXPENSES_BY_ACCOUNT": "O gasto agrupado por conta.",
+      "MONTHLY_TRENDS": "Como evoluem suas receitas e despesas mês a mês.",
+      "CASH_FLOW": "De onde vem e para onde vai o dinheiro das suas contas líquidas.",
+      "NET_WORTH": "Quanto vale o que você tem e por que mudou: poupança, conversões e reavaliação.",
+      "SAVINGS_GOALS": "O avanço das suas metas de poupança.",
+      "DEBT_EVOLUTION": "Como diminui o que você deve.",
+      "RECURRING_COSTS": "O que você paga de forma recorrente.",
+      "SUBSCRIPTION_EVOLUTION": "Como muda o custo das suas assinaturas.",
+      "FX_CONVERSIONS": "Quanto custa converter moedas e cripto.",
+      "FEES": "Tarifas, juros e encargos pagos.",
+      "ACCOUNT_BALANCE_HISTORY": "O saldo de uma conta, dia a dia, com suas conciliações.",
+      "FORECAST_VS_ACTUAL": "O previsto contra o que aconteceu."
     }
   }
 }

@@ -5,16 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Catálogo de reportes con su disponibilidad"
 scenario: "Catálogo al terminar este change"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-001"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["catalog"]
@@ -30,7 +33,7 @@ expected_result:
   - "El reporte 16 con estado PLANNED y fase 8, sin cifras"
   - "El reporte 13 con estado PARTIAL y el enlace a la vista de costo de conversiones"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-001 — El catálogo lista los 16 reportes con su estado y el pronóstico vs real queda planificado sin cifras

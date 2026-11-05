@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Rendimiento de los reportes con el dataset grande"
 scenario: "Doce meses del dataset grande"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: ["NFR-PERF-006"]
 invariants: []
 priority: high
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/nightly.perf.ts
+  - apps/api/test/perf/perf-report.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["perf", "nightly", "large-seed"]
 error_code: null
@@ -31,7 +33,7 @@ expected_result:
   - "p95 ≤ 800 ms en ingresos y gastos (MoM y YoY + móvil 12), gastos por categoría, presupuesto vs real, flujo de caja, historial de saldo y patrimonio"
   - "El worker arranca con los mismos consumidores (sin consumidores nuevos)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-030 — Cada reporte de 12 meses del Large Seed responde con p95 de 800 ms o menos

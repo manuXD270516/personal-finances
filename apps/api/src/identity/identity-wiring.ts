@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { ModuleMetadata } from '@nestjs/common';
 import {
   AuditModule,
@@ -118,6 +119,7 @@ import {
   DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
   ReportingModule,
 } from '@pf/reporting/interface/reporting.module';
+import { REPORTING_AUDIT_POLICY } from '@pf/reporting/contracts';
 import {
   createTransactionsRuntime,
   RECONCILIATION_LIFECYCLE_MACHINE,
@@ -277,6 +279,8 @@ export const AUDIT_POLICIES = [
   DOCUMENTS_AUDIT_POLICY,
   // add-rule-engine (Phase 6): reglas de clasificación (condiciones y acciones como texto JSON).
   RULES_AUDIT_POLICY,
+  // add-financial-reports (Phase 7): exportación de reportes (reporte, filtros y filas; nunca el contenido).
+  REPORTING_AUDIT_POLICY,
 ];
 
 /**
@@ -588,8 +592,36 @@ export function financeRuntimes(input: {
         getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
       },
     },
-    metrics: { observe: (name, value) => reportingHistograms.record(name, value, {}) },
+    metrics: {
+      observe: (name, value, attributes) => reportingHistograms.record(name, value, attributes ?? {}),
+    },
     rateValidityWindowDays,
+    // add-financial-reports: reportes por contratos públicos (sin read models ni consumidores nuevos, D361).
+    portions: transactions.portions,
+    accountFlows: ledger.accountSetFlow,
+    activity: ledger.activityRange,
+    budgets: {
+      getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
+    },
+    reconciliationMarks: transactions.reconciliationMarks,
+    // La exportación de un reporte se audita sin su contenido: reporte, filtros (texto JSON) y cantidad de filas.
+    reportAudit: {
+      exported: async (entry) => {
+        await input.audit.append({
+          workspaceId: entry.workspaceId,
+          action: 'reporting.report.exported',
+          aggregateType: 'ReportExport',
+          aggregateId: randomUUID(),
+          aggregateVersion: null,
+          ...(entry.userId ? { actor: { type: 'USER' as const, userId: entry.userId } } : {}),
+          changes: [
+            { field: 'reportId', before: null, after: entry.reportId },
+            { field: 'filters', before: null, after: entry.filters },
+            { field: 'rowCount', before: null, after: entry.rowCount },
+          ],
+        });
+      },
+    },
   });
   // PLANNING (add-financial-periods): periodos financieros; calendario del workspace (IDENTITY, membresía del usuario)
   // y rango de actividad del ledger en la unidad de trabajo del comando.

@@ -4512,6 +4512,815 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/reports/catalog:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getReportCatalog
+      summary: Catalog of the 16 reports with their availability
+      description: |
+        Static catalog: `AVAILABLE` reports have an `endpoint`; `PARTIAL` reports link an existing application view
+        (`viewPath`); `PLANNED` reports name the change or phase where they arrive and never carry figures.
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Report catalog
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportCatalog' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/income-expenses:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getIncomeExpensesReport
+      summary: Income and expenses by period or ISO week
+      description: |
+        Income, expenses, savings (income minus expenses) and savings rate (1 decimal HALF_EVEN, `null` when income is not
+        positive) per period or ISO week, per native currency and consolidated in `reportingCurrency`, with optional comparison
+        (`compare`), moving-average baseline (`rolling`) and totals. Every figure is a `ReportAmount`; amounts without a rate are
+        excluded from the consolidated figure (`complete=false`, `unconverted[]`), never converted 1:1. Read from the source of
+        truth in one read transaction.
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportNormalize'
+        - $ref: '#/components/parameters/ReportRolling'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportConversion'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+        - $ref: '#/components/parameters/ReportCategoryId'
+        - $ref: '#/components/parameters/ReportTagId'
+        - $ref: '#/components/parameters/ReportCounterpartyId'
+        - name: granularity
+          in: query
+          schema: { type: string, enum: [PERIOD, WEEK], default: PERIOD }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Report
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncomeExpensesReport' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/income-expenses/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: exportIncomeExpensesReport
+      summary: Export the income and expenses report to CSV
+      description: |
+        Synchronous CSV of the same query as its JSON report (same filters and conversion policy), one row per period
+        (and dimension) and native currency plus consolidated rows in the reporting currency, with the columns
+        `conversion_policy`, `reporting_currency` and `complete`. More than 50000 rows are rejected with
+        `REPORT_EXPORT_TOO_LARGE` (422) and no file is produced. Read-only for every member. Costly operation
+        (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`).
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportNormalize'
+        - $ref: '#/components/parameters/ReportRolling'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportConversion'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+        - $ref: '#/components/parameters/ReportCategoryId'
+        - $ref: '#/components/parameters/ReportTagId'
+        - $ref: '#/components/parameters/ReportCounterpartyId'
+        - name: granularity
+          in: query
+          schema: { type: string, enum: [PERIOD, WEEK], default: PERIOD }
+      responses:
+        '200':
+          description: >-
+            CSV report as an attachment (`Content-Disposition: attachment`). RFC 4180, UTF-8 with BOM, comma separator,
+            decimal point, amounts as exact decimal strings, text cells starting with `=`, `+`, `-`, `@`, tab or CR
+            neutralized. The export is audited (`reporting.report.exported`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency) or REPORT_EXPORT_TOO_LARGE (more than 50000 rows).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/expenses/by-category:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getExpensesByCategoryReport
+      summary: Expenses by category group, category and subcategory
+      description: |
+        Expense of the range by group, category (it adds its subcategories) and subcategory, per native currency and
+        consolidated, sorted from highest to lowest, with `topN` and an "other categories" bucket. A negative net (refunds above
+        spending) keeps its sign and is flagged `negativeNet`. Archived categories keep their history.
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportNormalize'
+        - $ref: '#/components/parameters/ReportRolling'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportConversion'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+        - $ref: '#/components/parameters/ReportCategoryId'
+        - $ref: '#/components/parameters/ReportTagId'
+        - $ref: '#/components/parameters/ReportCounterpartyId'
+        - name: topN
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50 }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Report
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExpensesByCategoryReport' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/expenses/by-category/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: exportExpensesByCategoryReport
+      summary: Export the expenses by category report to CSV
+      description: |
+        Synchronous CSV of the same query as its JSON report (same filters and conversion policy), one row per period
+        (and dimension) and native currency plus consolidated rows in the reporting currency, with the columns
+        `conversion_policy`, `reporting_currency` and `complete`. More than 50000 rows are rejected with
+        `REPORT_EXPORT_TOO_LARGE` (422) and no file is produced. Read-only for every member. Costly operation
+        (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`).
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportNormalize'
+        - $ref: '#/components/parameters/ReportRolling'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportConversion'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+        - $ref: '#/components/parameters/ReportCategoryId'
+        - $ref: '#/components/parameters/ReportTagId'
+        - $ref: '#/components/parameters/ReportCounterpartyId'
+        - name: topN
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        '200':
+          description: >-
+            CSV report as an attachment (`Content-Disposition: attachment`). RFC 4180, UTF-8 with BOM, comma separator,
+            decimal point, amounts as exact decimal strings, text cells starting with `=`, `+`, `-`, `@`, tab or CR
+            neutralized. The export is audited (`reporting.report.exported`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency) or REPORT_EXPORT_TOO_LARGE (more than 50000 rows).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/budget-vs-actual:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getBudgetVsActualReport
+      summary: Budget vs actual by financial period
+      description: |
+        For each financial period of the range, the budget lines with their reference, actual and status exactly as the planning
+        context computes them (nothing is recalculated here); a period without a budget is `NO_BUDGET`. Always groups by
+        financial period: `grouping=CALENDAR_MONTH` is rejected with `VALIDATION_FAILED`.
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Report
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetVsActualReport' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/budget-vs-actual/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: exportBudgetVsActualReport
+      summary: Export the budget vs actual report to CSV
+      description: |
+        Synchronous CSV of the same query as its JSON report (same filters and conversion policy), one row per period
+        (and dimension) and native currency plus consolidated rows in the reporting currency, with the columns
+        `conversion_policy`, `reporting_currency` and `complete`. More than 50000 rows are rejected with
+        `REPORT_EXPORT_TOO_LARGE` (422) and no file is produced. Read-only for every member. Costly operation
+        (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`).
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportingCurrency'
+      responses:
+        '200':
+          description: >-
+            CSV report as an attachment (`Content-Disposition: attachment`). RFC 4180, UTF-8 with BOM, comma separator,
+            decimal point, amounts as exact decimal strings, text cells starting with `=`, `+`, `-`, `@`, tab or CR
+            neutralized. The export is audited (`reporting.report.exported`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency) or REPORT_EXPORT_TOO_LARGE (more than 50000 rows).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/cash-flow:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getCashFlowReport
+      summary: Historical cash flow of the liquid accounts
+      description: |
+        Per period and currency: opening and closing balance of the selected liquid accounts (all non-archived liquid accounts by
+        default) and the period flow classified by the counterpart of each movement: operating, debt, savings and investments,
+        currency exchange and adjustments. Per currency, opening + components = closing. Transfers between liquid accounts are not
+        flow. Consolidated, the valuation difference between balances and flows is the `revaluation` line.
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Report
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashFlowReport' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/cash-flow/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: exportCashFlowReport
+      summary: Export the cash flow report to CSV
+      description: |
+        Synchronous CSV of the same query as its JSON report (same filters and conversion policy), one row per period
+        (and dimension) and native currency plus consolidated rows in the reporting currency, with the columns
+        `conversion_policy`, `reporting_currency` and `complete`. More than 50000 rows are rejected with
+        `REPORT_EXPORT_TOO_LARGE` (422) and no file is produced. Read-only for every member. Costly operation
+        (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`).
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+      responses:
+        '200':
+          description: >-
+            CSV report as an attachment (`Content-Disposition: attachment`). RFC 4180, UTF-8 with BOM, comma separator,
+            decimal point, amounts as exact decimal strings, text cells starting with `=`, `+`, `-`, `@`, tab or CR
+            neutralized. The export is audited (`reporting.report.exported`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency) or REPORT_EXPORT_TOO_LARGE (more than 50000 rows).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/accounts/{accountId}/balance-history:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - name: accountId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/Uuid' }
+    get:
+      tags: [Reporting]
+      operationId: getAccountBalanceHistoryReport
+      summary: Daily balance of an account
+      description: |
+        Daily accounting balance of one account in its currency for up to 731 days (the balance of the previous day on days
+        without movements), optionally valued at the rate of each date (`reportingCurrency` present), with the days a
+        reconciliation closes marked. Each day equals the accounting balance at that date. A missing account or one of
+        another workspace is 404.
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Report
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountBalanceHistoryReport' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/accounts/{accountId}/balance-history/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - name: accountId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/Uuid' }
+    get:
+      tags: [Reporting]
+      operationId: exportAccountBalanceHistoryReport
+      summary: Export the account balance history to CSV
+      description: |
+        Synchronous CSV of the same query as `getAccountBalanceHistoryReport`, one row per day. More than 50000 rows are
+        rejected with `REPORT_EXPORT_TOO_LARGE` (422). Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportingCurrency'
+      responses:
+        '200':
+          description: >-
+            CSV report as an attachment (`Content-Disposition: attachment`). RFC 4180, UTF-8 with BOM, comma separator,
+            decimal point, amounts as exact decimal strings, text cells starting with `=`, `+`, `-`, `@`, tab or CR
+            neutralized. The export is audited (`reporting.report.exported`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency) or REPORT_EXPORT_TOO_LARGE (more than 50000 rows).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/net-worth:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getNetWorthReport
+      summary: Net worth with the decomposition of its change
+      description: |
+        Net worth at the end of each period (or each day, up to 366 days) and, per period, the exact decomposition of its
+        change into savings of the net-worth accounts, conversion result, adjustments, other movements (with accounts excluded from
+        net worth) and revaluation per currency (fiat is `fxRevaluation`; the other currencies, including USDT, are
+        `assetRevaluation`). The sum of the components equals the change exactly (precision 40). A currency without a rate leaves the
+        decomposition incomplete and is listed in `unvalued[]` (nothing is attributed to another component).
+      x-openspec-capability: [reporting/net-worth]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - name: granularity
+          in: query
+          description: One point per period (default) or per day (up to 366 days).
+          schema: { type: string, enum: [PERIOD, DAY], default: PERIOD }
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Report
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetWorthReport' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/net-worth/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: exportNetWorthReport
+      summary: Export the net worth decomposition to CSV
+      description: |
+        Synchronous CSV of the same query as its JSON report (same filters and conversion policy), one row per period
+        (and dimension) and native currency plus consolidated rows in the reporting currency, with the columns
+        `conversion_policy`, `reporting_currency` and `complete`. More than 50000 rows are rejected with
+        `REPORT_EXPORT_TOO_LARGE` (422) and no file is produced. Read-only for every member. Costly operation
+        (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`).
+      x-openspec-capability: [reporting/net-worth]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - name: granularity
+          in: query
+          description: One point per period (default) or per day (up to 366 days).
+          schema: { type: string, enum: [PERIOD, DAY], default: PERIOD }
+        - $ref: '#/components/parameters/ReportingCurrency'
+      responses:
+        '200':
+          description: >-
+            CSV report as an attachment (`Content-Disposition: attachment`). RFC 4180, UTF-8 with BOM, comma separator,
+            decimal point, amounts as exact decimal strings, text cells starting with `=`, `+`, `-`, `@`, tab or CR
+            neutralized. The export is audited (`reporting.report.exported`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency) or REPORT_EXPORT_TOO_LARGE (more than 50000 rows).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/drill-down:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getReportDrillDown
+      summary: Rows behind a report figure
+      description: |
+        Lists the rows that compose a report cell with the same filters and conversion policy: transaction portions
+        (`PORTION`), cash-flow movements (`LIQUIDITY_MOVEMENT`) or the movements of a balance history day (`ACCOUNT_MOVEMENT`).
+        Ordered by business date descending then id, cursor paginated (`limit` 1..200), and every page carries the totals of the
+        whole cell so that the sum of the rows equals the figure.
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportNormalize'
+        - $ref: '#/components/parameters/ReportRolling'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportConversion'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+        - $ref: '#/components/parameters/ReportCategoryId'
+        - $ref: '#/components/parameters/ReportTagId'
+        - $ref: '#/components/parameters/ReportCounterpartyId'
+        - name: report
+          in: query
+          required: true
+          description: Report whose cell is opened.
+          schema:
+            type: string
+            enum: [INCOME_EXPENSES, EXPENSES_BY_CATEGORY, BUDGET_VS_ACTUAL, CASH_FLOW, ACCOUNT_BALANCE_HISTORY, NET_WORTH]
+        - name: nature
+          in: query
+          schema: { type: string, enum: [INCOME, EXPENSE] }
+        - name: categoryGroupId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: budgetPeriodId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: budgetLineId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: component
+          in: query
+          description: Cash-flow component of the cell, or net-worth decomposition component (`NET_WORTH`, lists the accounts behind it).
+          schema:
+            type: string
+            enum:
+              [operating, debt, savingsInvestments, currencyExchange, adjustments, savings, conversionResult, otherMovements, fxRevaluation, assetRevaluation]
+        - name: historyAccountId
+          in: query
+          description: Account of the balance history day (`ACCOUNT_BALANCE_HISTORY`).
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: date
+          in: query
+          description: Day of the balance history (`ACCOUNT_BALANCE_HISTORY`).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Report
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportDrillDownPage' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/drill-down/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: exportReportDrillDown
+      summary: Export every row of a drill-down to CSV
+      description: |
+        Synchronous CSV of the same query as its JSON report (same filters and conversion policy), one row per period
+        (and dimension) and native currency plus consolidated rows in the reporting currency, with the columns
+        `conversion_policy`, `reporting_currency` and `complete`. More than 50000 rows are rejected with
+        `REPORT_EXPORT_TOO_LARGE` (422) and no file is produced. Read-only for every member. Costly operation
+        (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`).
+      x-openspec-capability: [reporting/financial-reports]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/ReportFrom'
+        - $ref: '#/components/parameters/ReportTo'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCompare'
+        - $ref: '#/components/parameters/ReportCompareFrom'
+        - $ref: '#/components/parameters/ReportCompareTo'
+        - $ref: '#/components/parameters/ReportNormalize'
+        - $ref: '#/components/parameters/ReportRolling'
+        - $ref: '#/components/parameters/ReportingCurrency'
+        - $ref: '#/components/parameters/ReportConversion'
+        - $ref: '#/components/parameters/ReportAccountId'
+        - $ref: '#/components/parameters/ReportCurrency'
+        - $ref: '#/components/parameters/ReportCategoryId'
+        - $ref: '#/components/parameters/ReportTagId'
+        - $ref: '#/components/parameters/ReportCounterpartyId'
+        - name: report
+          in: query
+          required: true
+          description: Report whose cell is opened.
+          schema:
+            type: string
+            enum: [INCOME_EXPENSES, EXPENSES_BY_CATEGORY, BUDGET_VS_ACTUAL, CASH_FLOW, ACCOUNT_BALANCE_HISTORY, NET_WORTH]
+        - name: nature
+          in: query
+          schema: { type: string, enum: [INCOME, EXPENSE] }
+        - name: categoryGroupId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: budgetPeriodId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: budgetLineId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: component
+          in: query
+          description: Cash-flow component of the cell, or net-worth decomposition component (`NET_WORTH`, lists the accounts behind it).
+          schema:
+            type: string
+            enum:
+              [operating, debt, savingsInvestments, currencyExchange, adjustments, savings, conversionResult, otherMovements, fxRevaluation, assetRevaluation]
+        - name: historyAccountId
+          in: query
+          description: Account of the balance history day (`ACCOUNT_BALANCE_HISTORY`).
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: date
+          in: query
+          description: Day of the balance history (`ACCOUNT_BALANCE_HISTORY`).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+      responses:
+        '200':
+          description: >-
+            CSV report as an attachment (`Content-Disposition: attachment`). RFC 4180, UTF-8 with BOM, comma separator,
+            decimal point, amounts as exact decimal strings, text cells starting with `=`, `+`, `-`, `@`, tab or CR
+            neutralized. The export is audited (`reporting.report.exported`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency) or REPORT_EXPORT_TOO_LARGE (more than 50000 rows).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/reports/surprise-payments:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -12267,6 +13076,110 @@ components:
       in: query
       description: Groups by the workspace financial period (default) or by calendar month; each conversion is assigned by its business date.
       schema: { $ref: '#/components/schemas/ConversionCostGrouping' }
+    ReportFrom:
+      name: from
+      in: query
+      required: true
+      description: First business date of the report (inclusive).
+      schema: { $ref: '#/components/schemas/LocalDate' }
+    ReportTo:
+      name: to
+      in: query
+      required: true
+      description: Last business date of the report (inclusive). The range covers at most 24 periods.
+      schema: { $ref: '#/components/schemas/LocalDate' }
+    ReportGrouping:
+      name: grouping
+      in: query
+      description: Groups by the workspace financial period (default) or by calendar month; each movement is assigned by its business date.
+      schema: { type: string, enum: [FINANCIAL_PERIOD, CALENDAR_MONTH], default: FINANCIAL_PERIOD }
+    ReportCompare:
+      name: compare
+      in: query
+      description: >-
+        Comparison: previous period of the same type, the period containing the same start date one year earlier, a custom
+        range (`compareFrom`/`compareTo`) or, for the current period, the same elapsed days of the previous one.
+      schema:
+        type: string
+        enum: [NONE, PREVIOUS_PERIOD, PREVIOUS_YEAR, CUSTOM, PREVIOUS_PERIOD_TO_DATE]
+        default: NONE
+    ReportCompareFrom:
+      name: compareFrom
+      in: query
+      description: Start of the custom comparison range (only with `compare=CUSTOM`).
+      schema: { $ref: '#/components/schemas/LocalDate' }
+    ReportCompareTo:
+      name: compareTo
+      in: query
+      description: End of the custom comparison range (only with `compare=CUSTOM`).
+      schema: { $ref: '#/components/schemas/LocalDate' }
+    ReportNormalize:
+      name: normalize
+      in: query
+      description: '`PER_DAY` divides each figure by the days of its range (no intermediate rounding).'
+      schema: { type: string, enum: [NONE, PER_DAY], default: NONE }
+    ReportRolling:
+      name: rolling
+      in: query
+      description: Moving average of the 3, 6 or 12 complete periods before each period, as a baseline with its variation.
+      schema: { type: integer, enum: [3, 6, 12] }
+    ReportingCurrency:
+      name: reportingCurrency
+      in: query
+      description: Reporting currency; defaults to the workspace base currency. A currency that is not enabled is `CURRENCY_NOT_ENABLED`.
+      schema: { $ref: '#/components/schemas/CurrencyCode' }
+    ReportConversion:
+      name: conversion
+      in: query
+      description: >-
+        `HISTORICAL` (default) values every flow at the rate of its own business date; `CUTOFF` values them all at the
+        rate of the cutoff date (the last day of the range, or today if it has not ended).
+      schema: { type: string, enum: [HISTORICAL, CUTOFF], default: HISTORICAL }
+    ReportAccountId:
+      name: accountId
+      in: query
+      description: Only movements of these accounts (repeatable). An unknown id matches nothing.
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/Uuid' }
+      style: form
+      explode: true
+    ReportCurrency:
+      name: currency
+      in: query
+      description: Only movements in these currencies (repeatable).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/CurrencyCode' }
+      style: form
+      explode: true
+    ReportCategoryId:
+      name: categoryId
+      in: query
+      description: Only these categories, each including its subcategories (repeatable).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/Uuid' }
+      style: form
+      explode: true
+    ReportTagId:
+      name: tagId
+      in: query
+      description: Only portions with ANY of these tags (repeatable).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/Uuid' }
+      style: form
+      explode: true
+    ReportCounterpartyId:
+      name: counterpartyId
+      in: query
+      description: Only these counterparties (repeatable).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/Uuid' }
+      style: form
+      explode: true
     AuditAggregateType:
       name: aggregateType
       in: query
@@ -12948,6 +13861,7 @@ components:
         - FX_RATE_ANOMALY_ALREADY_REVIEWED  # 409
         - FX_RATE_NOT_ANOMALOUS             # 422
         - CURRENCY_NOT_ENABLED              # 422
+        - REPORT_EXPORT_TOO_LARGE           # 422
         # planning (Phase 2)
         - PERIOD_NOT_STARTED                # 409 (add-financial-periods: activating a period that has not started)
         - PERIOD_NOT_ENDED                  # 409 (add-month-closing: the period end is not before today in the workspace zone)
@@ -23432,3 +24346,512 @@ components:
       required: [explanation]
       properties:
         explanation: { type: string, minLength: 1, maxLength: 1000 }
+    ReportId:
+      type: string
+      description: Identifier of one of the 16 reports of the catalog. Open set.
+      x-extensible-enum:
+        - INCOME_EXPENSES
+        - BUDGET_VS_ACTUAL
+        - EXPENSES_BY_CATEGORY
+        - EXPENSES_BY_TAG
+        - EXPENSES_BY_ACCOUNT
+        - MONTHLY_TRENDS
+        - CASH_FLOW
+        - NET_WORTH
+        - SAVINGS_GOALS
+        - DEBT_EVOLUTION
+        - RECURRING_COSTS
+        - SUBSCRIPTION_EVOLUTION
+        - FX_CONVERSIONS
+        - FEES
+        - ACCOUNT_BALANCE_HISTORY
+        - FORECAST_VS_ACTUAL
+    ReportCatalog:
+      type: object
+      additionalProperties: false
+      required: [reports]
+      properties:
+        reports:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [reportId, number, status, phase, plannedIn, endpoint, viewPath]
+            properties:
+              reportId: { $ref: '#/components/schemas/ReportId' }
+              number: { type: integer, minimum: 1, maximum: 16 }
+              status:
+                type: string
+                x-extensible-enum: [AVAILABLE, PARTIAL, PLANNED]
+              phase: { type: integer }
+              plannedIn: { type: [string, 'null'] }
+              endpoint: { type: [string, 'null'] }
+              viewPath: { type: [string, 'null'] }
+    ReportPeriod:
+      type: object
+      additionalProperties: false
+      required: [label, from, to, partial, days]
+      properties:
+        label: { type: string }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        partial: { type: boolean, description: The period contains today. }
+        days: { type: integer }
+    ReportAmount:
+      type: object
+      description: >-
+        A report figure per native currency and consolidated in the reporting currency. Amounts without a rate are
+        excluded from `consolidated` (never converted 1:1) and listed in `unconverted`.
+      additionalProperties: false
+      required: [byCurrency, consolidated, complete, unconverted]
+      properties:
+        byCurrency:
+          type: array
+          items: { $ref: '#/components/schemas/Money' }
+        consolidated: { $ref: '#/components/schemas/Money' }
+        complete: { type: boolean }
+        unconverted:
+          type: array
+          items: { $ref: '#/components/schemas/Money' }
+    ReportVariation:
+      type: object
+      additionalProperties: false
+      required: [compared, deltaAbs, deltaPct, isNew]
+      properties:
+        compared: { $ref: '#/components/schemas/ReportAmount' }
+        deltaAbs: { $ref: '#/components/schemas/Money' }
+        deltaPct:
+          description: Percentage with 2 decimals HALF_EVEN over the absolute compared value; null when the compared value is 0 (see `isNew`).
+          oneOf: [{ $ref: '#/components/schemas/DecimalString' }, { type: 'null' }]
+        isNew: { type: boolean }
+    ReportBaseline:
+      type: object
+      additionalProperties: false
+      required: [periods, average, periodsUsed, insufficient, deltaAbs, deltaPct]
+      properties:
+        periods: { type: integer, enum: [3, 6, 12] }
+        average:
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        periodsUsed: { type: integer }
+        insufficient: { type: boolean }
+        deltaAbs:
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        deltaPct:
+          oneOf: [{ $ref: '#/components/schemas/DecimalString' }, { type: 'null' }]
+    ReportConversionMeta:
+      type: object
+      additionalProperties: false
+      required: [policy, cutoffDate, rateWindowDays, ratesUsed, attributions]
+      properties:
+        policy:
+          type: string
+          x-extensible-enum: [TRANSACTION_DATE, VALUATION_DATE, CUTOFF_DATE]
+        cutoffDate:
+          oneOf: [{ $ref: '#/components/schemas/LocalDate' }, { type: 'null' }]
+        rateWindowDays: { type: integer }
+        ratesUsed:
+          type: array
+          items: { $ref: '#/components/schemas/ResolvedRate' }
+        attributions:
+          type: array
+          items: { type: string }
+    ReportMeta:
+      type: object
+      additionalProperties: false
+      required:
+        - reportId
+        - reportingCurrency
+        - grouping
+        - from
+        - to
+        - periods
+        - comparison
+        - conversion
+        - complete
+        - unconverted
+        - dataVersion
+        - latestEntryAt
+        - generatedAt
+        - filters
+      properties:
+        reportId: { $ref: '#/components/schemas/ReportId' }
+        reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        grouping: { type: string, enum: [FINANCIAL_PERIOD, CALENDAR_MONTH] }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        periods:
+          type: array
+          items: { $ref: '#/components/schemas/ReportPeriod' }
+        comparison:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [mode, from, to, days, currentDays, normalized]
+              properties:
+                mode: { type: string }
+                from: { $ref: '#/components/schemas/LocalDate' }
+                to: { $ref: '#/components/schemas/LocalDate' }
+                days: { type: integer, description: Days of the compared range. }
+                currentDays: { type: integer, description: Days of the report range (differs from `days` when the ranges have different length). }
+                normalized: { type: boolean }
+        conversion: { $ref: '#/components/schemas/ReportConversionMeta' }
+        complete: { type: boolean }
+        unconverted:
+          type: array
+          items: { $ref: '#/components/schemas/Money' }
+        dataVersion: { type: string }
+        latestEntryAt:
+          oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }]
+        generatedAt: { $ref: '#/components/schemas/Instant' }
+        filters:
+          type: object
+          additionalProperties: false
+          required: [accountIds, currencies, categoryIds, tagIds, counterpartyIds]
+          properties:
+            accountIds: { type: array, items: { type: string } }
+            currencies: { type: array, items: { type: string } }
+            categoryIds: { type: array, items: { type: string } }
+            tagIds: { type: array, items: { type: string } }
+            counterpartyIds: { type: array, items: { type: string } }
+    IncomeExpensesReport:
+      type: object
+      additionalProperties: false
+      required: [meta, granularity, rows, totals]
+      properties:
+        meta: { $ref: '#/components/schemas/ReportMeta' }
+        granularity: { type: string, enum: [PERIOD, WEEK] }
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/IncomeExpensesRow' }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [income, expenses, savings, savingsRate, comparison]
+          properties:
+            income: { $ref: '#/components/schemas/ReportAmount' }
+            expenses: { $ref: '#/components/schemas/ReportAmount' }
+            savings: { $ref: '#/components/schemas/ReportAmount' }
+            savingsRate:
+              oneOf: [{ $ref: '#/components/schemas/DecimalString' }, { type: 'null' }]
+            comparison:
+              oneOf: [{ $ref: '#/components/schemas/IncomeExpensesComparison' }, { type: 'null' }]
+    IncomeExpensesComparison:
+      type: object
+      additionalProperties: false
+      required: [income, expenses, savings]
+      properties:
+        income: { $ref: '#/components/schemas/ReportVariation' }
+        expenses: { $ref: '#/components/schemas/ReportVariation' }
+        savings: { $ref: '#/components/schemas/ReportVariation' }
+    IncomeExpensesRow:
+      type: object
+      additionalProperties: false
+      required: [period, income, expenses, savings, savingsRate, comparison, baseline]
+      properties:
+        period: { $ref: '#/components/schemas/ReportPeriod' }
+        income: { $ref: '#/components/schemas/ReportAmount' }
+        expenses: { $ref: '#/components/schemas/ReportAmount' }
+        savings: { $ref: '#/components/schemas/ReportAmount' }
+        savingsRate:
+          description: Savings over income as a percentage with 1 decimal HALF_EVEN; null (undefined) when income is not positive.
+          oneOf: [{ $ref: '#/components/schemas/DecimalString' }, { type: 'null' }]
+        comparison:
+          oneOf: [{ $ref: '#/components/schemas/IncomeExpensesComparison' }, { type: 'null' }]
+        baseline:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [income, expenses, savings]
+              properties:
+                income: { $ref: '#/components/schemas/ReportBaseline' }
+                expenses: { $ref: '#/components/schemas/ReportBaseline' }
+                savings: { $ref: '#/components/schemas/ReportBaseline' }
+    ReportCategoryLeaf:
+      type: object
+      required: [categoryId, name, archived, amount, negativeNet, comparison]
+      properties:
+        categoryId: { type: string }
+        name: { type: string }
+        archived: { type: boolean }
+        amount: { $ref: '#/components/schemas/ReportAmount' }
+        negativeNet: { type: boolean }
+        comparison:
+          oneOf: [{ $ref: '#/components/schemas/ReportVariation' }, { type: 'null' }]
+    ExpensesByCategoryReport:
+      type: object
+      additionalProperties: false
+      required: [meta, groups, others, total]
+      properties:
+        meta: { $ref: '#/components/schemas/ReportMeta' }
+        groups:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [groupId, name, amount, negativeNet, comparison, categories]
+            properties:
+              groupId: { type: string }
+              name: { type: string }
+              amount: { $ref: '#/components/schemas/ReportAmount' }
+              negativeNet: { type: boolean }
+              comparison:
+                oneOf: [{ $ref: '#/components/schemas/ReportVariation' }, { type: 'null' }]
+              categories:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/ReportCategoryLeaf'
+                    - type: object
+                      required: [subcategories]
+                      properties:
+                        subcategories:
+                          type: array
+                          items: { $ref: '#/components/schemas/ReportCategoryLeaf' }
+        others:
+          oneOf: [{ $ref: '#/components/schemas/ReportAmount' }, { type: 'null' }]
+        total: { $ref: '#/components/schemas/ReportAmount' }
+    BudgetVsActualReport:
+      type: object
+      additionalProperties: false
+      required: [meta, periods]
+      properties:
+        meta: { $ref: '#/components/schemas/ReportMeta' }
+        periods:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [period, status, budgetId, periodId, currency, lines, totals, ratesUsed]
+            properties:
+              period: { $ref: '#/components/schemas/ReportPeriod' }
+              status: { type: string, enum: [BUDGETED, NO_BUDGET] }
+              budgetId: { type: [string, 'null'] }
+              periodId: { type: string }
+              currency: { type: [string, 'null'] }
+              lines:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [budgetLineId, target, nature, kind, reference, actual, actualComplete, status]
+                  properties:
+                    budgetLineId: { type: string }
+                    target:
+                      type: object
+                      additionalProperties: false
+                      required: [kind, id, name]
+                      properties:
+                        kind: { type: string }
+                        id: { type: string }
+                        name: { type: string }
+                    nature: { type: string }
+                    kind: { type: string }
+                    reference: { $ref: '#/components/schemas/Money' }
+                    actual: { $ref: '#/components/schemas/Money' }
+                    actualComplete: { type: boolean }
+                    status: { type: string }
+              totals:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    additionalProperties: false
+                    required: [planned, actual, remaining, availableToSpend, complete, unconverted]
+                    properties:
+                      planned: { $ref: '#/components/schemas/Money' }
+                      actual: { $ref: '#/components/schemas/Money' }
+                      remaining: { $ref: '#/components/schemas/Money' }
+                      availableToSpend: { $ref: '#/components/schemas/Money' }
+                      complete: { type: boolean }
+                      unconverted:
+                        type: array
+                        items: { $ref: '#/components/schemas/Money' }
+              ratesUsed:
+                type: array
+                items: { $ref: '#/components/schemas/ResolvedRate' }
+    CashFlowReport:
+      type: object
+      additionalProperties: false
+      required: [meta, periods]
+      properties:
+        meta: { $ref: '#/components/schemas/ReportMeta' }
+        periods:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [period, byCurrency, consolidated, comparison]
+            properties:
+              period: { $ref: '#/components/schemas/ReportPeriod' }
+              byCurrency:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [currency, opening, operating, debt, savingsInvestments, currencyExchange, adjustments, closing]
+                  properties:
+                    currency: { $ref: '#/components/schemas/CurrencyCode' }
+                    opening: { $ref: '#/components/schemas/Money' }
+                    operating: { $ref: '#/components/schemas/Money' }
+                    debt: { $ref: '#/components/schemas/Money' }
+                    savingsInvestments: { $ref: '#/components/schemas/Money' }
+                    currencyExchange: { $ref: '#/components/schemas/Money' }
+                    adjustments: { $ref: '#/components/schemas/Money' }
+                    closing: { $ref: '#/components/schemas/Money' }
+              consolidated:
+                type: object
+                additionalProperties: false
+                required:
+                  [opening, operating, debt, savingsInvestments, currencyExchange, adjustments, revaluation, closing, complete, unconverted]
+                properties:
+                  opening: { $ref: '#/components/schemas/Money' }
+                  operating: { $ref: '#/components/schemas/Money' }
+                  debt: { $ref: '#/components/schemas/Money' }
+                  savingsInvestments: { $ref: '#/components/schemas/Money' }
+                  currencyExchange: { $ref: '#/components/schemas/Money' }
+                  adjustments: { $ref: '#/components/schemas/Money' }
+                  revaluation: { $ref: '#/components/schemas/Money' }
+                  closing: { $ref: '#/components/schemas/Money' }
+                  complete: { type: boolean }
+                  unconverted:
+                    type: array
+                    items: { $ref: '#/components/schemas/Money' }
+              comparison:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    description: Variation per component (and `closing`) against the compared period.
+                    additionalProperties: { $ref: '#/components/schemas/ReportVariation' }
+    AccountBalanceHistoryReport:
+      type: object
+      additionalProperties: false
+      required: [meta, accountId, currency, opening, days, closing]
+      properties:
+        meta: { $ref: '#/components/schemas/ReportMeta' }
+        accountId: { type: string }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        opening: { $ref: '#/components/schemas/Money' }
+        days:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [date, balance, valued, hasMovements, reconciled]
+            properties:
+              date: { $ref: '#/components/schemas/LocalDate' }
+              balance: { $ref: '#/components/schemas/Money' }
+              valued:
+                oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+              hasMovements: { type: boolean }
+              reconciled: { type: boolean, description: A reconciliation of the account closes this day. }
+        closing: { $ref: '#/components/schemas/Money' }
+    NetWorthReport:
+      type: object
+      additionalProperties: false
+      required: [meta, granularity, points, decomposition]
+      properties:
+        meta: { $ref: '#/components/schemas/ReportMeta' }
+        granularity: { type: string, enum: [PERIOD, DAY] }
+        points:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [date, netWorth]
+            properties:
+              date: { $ref: '#/components/schemas/LocalDate' }
+              netWorth: { $ref: '#/components/schemas/ReportAmount' }
+        decomposition:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - period
+              - opening
+              - closing
+              - savings
+              - conversionResult
+              - adjustments
+              - otherMovements
+              - fxRevaluation
+              - assetRevaluation
+              - revaluationByCurrency
+              - complete
+              - unvalued
+            properties:
+              period: { $ref: '#/components/schemas/ReportPeriod' }
+              opening: { $ref: '#/components/schemas/Money' }
+              closing: { $ref: '#/components/schemas/Money' }
+              savings: { $ref: '#/components/schemas/Money' }
+              conversionResult: { $ref: '#/components/schemas/Money' }
+              adjustments: { $ref: '#/components/schemas/Money' }
+              otherMovements: { $ref: '#/components/schemas/Money' }
+              fxRevaluation: { $ref: '#/components/schemas/Money' }
+              assetRevaluation: { $ref: '#/components/schemas/Money' }
+              revaluationByCurrency:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [currency, kind, amount]
+                  properties:
+                    currency: { $ref: '#/components/schemas/CurrencyCode' }
+                    kind: { type: string, enum: [FX, ASSET] }
+                    amount: { $ref: '#/components/schemas/Money' }
+              complete: { type: boolean }
+              unvalued:
+                type: array
+                items: { $ref: '#/components/schemas/Money' }
+    ReportDrillDownPage:
+      type: object
+      additionalProperties: false
+      required: [meta, kind, totals, count, rows, nextCursor]
+      properties:
+        meta: { $ref: '#/components/schemas/ReportMeta' }
+        kind:
+          type: string
+          x-extensible-enum: [PORTION, LIQUIDITY_MOVEMENT, ACCOUNT_MOVEMENT, NET_WORTH_ACCOUNT]
+        totals: { $ref: '#/components/schemas/ReportAmount' }
+        count: { type: integer, description: Rows of the whole cell. }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - transactionId
+              - splitId
+              - journalEntryId
+              - date
+              - accountId
+              - accountIds
+              - categoryId
+              - counterpartyId
+              - description
+              - nature
+              - component
+              - amount
+              - valued
+              - rate
+            properties:
+              transactionId: { type: [string, 'null'] }
+              splitId: { type: [string, 'null'] }
+              journalEntryId: { type: [string, 'null'] }
+              date: { $ref: '#/components/schemas/LocalDate' }
+              accountId: { type: [string, 'null'] }
+              accountIds:
+                type: [array, 'null']
+                items: { type: string }
+              categoryId: { type: [string, 'null'] }
+              counterpartyId: { type: [string, 'null'] }
+              description: { type: [string, 'null'] }
+              nature: { type: [string, 'null'] }
+              component: { type: [string, 'null'] }
+              amount: { $ref: '#/components/schemas/Money' }
+              valued:
+                oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+              rate:
+                oneOf: [{ $ref: '#/components/schemas/ResolvedRate' }, { type: 'null' }]
+        nextCursor: { type: [string, 'null'] }

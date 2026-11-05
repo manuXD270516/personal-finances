@@ -5,16 +5,18 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Comparación a la fecha del periodo en curso"
 scenario: "Quince días de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-009", "FR-REPORTING-018"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["comparison", "to-date"]
@@ -31,7 +33,7 @@ expected_result:
   - "Variación 300.00 BOB y 20.00 %"
   - "Con hoy 2026-10-31 el tramo comparado es 2026-09-01 → 2026-09-30"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-013 — La comparación a la fecha usa los mismos días del periodo anterior acotados a su último día

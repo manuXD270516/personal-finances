@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Rendimiento de los reportes con el dataset grande"
 scenario: "Drill-down de la celda más grande"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-010"]
 nfr: ["NFR-PERF-006"]
 invariants: []
 priority: high
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/nightly.perf.ts
+  - apps/api/test/perf/perf-report.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["perf", "nightly", "drill-down"]
 error_code: null
@@ -30,7 +32,7 @@ expected_result:
   - "p95 ≤ 300 ms en ambas"
   - "report-export-csv se informa (no bloquea)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-031 — La primera página y una página profunda del drill-down más grande responden con p95 de 300 ms o menos

@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Periodos de los reportes"
 scenario: "Mes financiero que empieza el día 25"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-009", "FR-PLANNING-001"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/report-periods.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["periods"]
 error_code: "VALIDATION_FAILED"
@@ -34,7 +37,7 @@ expected_result:
   - "El rango de 25 periodos se rechaza con VALIDATION_FAILED"
   - "El periodo que contiene hoy se marca parcial"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-003 — Los periodos se asignan por fecha de negocio y un rango de más de 24 periodos se rechaza

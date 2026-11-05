@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Sección de reportes en la aplicación"
 scenario: "Del gráfico a la transacción"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-010", "FR-REPORTING-011"]
 nfr: ["NFR-USAB-101", "NFR-USAB-105"]
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/reports/reports.test.tsx
+  - tests/e2e/specs/financial-reports.spec.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["ui", "e2e", "a11y"]
 error_code: null
@@ -35,7 +37,7 @@ expected_result:
   - "Gráfico con tabla de datos equivalente y bloque de conversión visible"
   - "Sin violaciones de axe; textos en es/en/pt"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-026 — El owner navega del gráfico de gastos por categoría a la transacción y exporta el CSV

@@ -76,6 +76,7 @@ export function Dashboard() {
       t={(key, values) => t(key, values)}
       has={(key) => t.has(key)}
       createAccountHref={localized(uiLocale, '/cuentas/nueva')}
+      reportsPath={localized(uiLocale, '/reportes/ingresos-gastos')}
       registerRateHref={localized(uiLocale, '/fx')}
       registerExpenseHref={localized(uiLocale, '/transacciones/nueva')}
       spendableDetailHref={localized(uiLocale, SPENDABLE_PATH)}

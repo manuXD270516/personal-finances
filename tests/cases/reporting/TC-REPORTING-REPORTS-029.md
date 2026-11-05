@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Reconciliación de los reportes con el ledger"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: ["NFR-DATA-008", "NFR-PERF-006"]
 invariants: []
 priority: critical
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/nightly.perf.ts
+  - packages/contexts/reporting/src/application/reports-reconciliation.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["reconciliation", "nightly", "large-seed", "exit-criteria"]
 error_code: null
@@ -29,7 +31,7 @@ expected_result:
   - "0 diferencias"
   - "Un fallo bloquea el nightly e indica reporte, periodo y moneda"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-029 — El nightly verifica la reconciliación de los reportes sobre los 60 meses del Large Seed
