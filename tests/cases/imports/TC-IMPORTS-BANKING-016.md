@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Rotación de la clave maestra"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-SEC-007"]
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/banking/credential-vault.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -34,7 +36,7 @@ expected_result:
   - "La de k0 queda NEEDS_ATTENTION"
   - "La de k1 sincroniza normalmente"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-016 — Una credencial con clave maestra ausente no detiene las demás

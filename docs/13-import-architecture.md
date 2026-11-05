@@ -311,6 +311,14 @@ interface BankingProvider {
 | `ExchangeProvider` (p. ej. Binance, otros) | Exchange API | 6 (Could) | Historial de **trades, P2P orders, depósitos, retiros, fees**. API keys **read-only** (se valida que la key no tenga permisos de trading/retiro; si los tiene, se rechaza). |
 | Bank API directa | Bank API | Futuro | Solo si un banco local publica API; adapter específico. |
 
+### 6.2.1 As-built Phase 6 (`add-banking-providers`)
+
+- **Puerto real** (`imports/application/banking/ports.ts`): `BankingProvider { descriptor, verifyCredential, listAssets, fetchRecords(window, cursor) → páginas con cursor }` y `FileHistoryProvider { parse(bytes) }`; `ProviderDescriptor` (`kind`, `credentialMode` sin `USERNAME_PASSWORD`, `allowedHosts`, `termsStatus`, `formatStatus`); `ExternalRecord` con montos como texto decimal exacto. Suite de contrato común (`providerContractSuite`).
+- **Conexión** (`Connection`): `PENDING_VERIFICATION → ACTIVE ↔ NEEDS_ATTENTION`, `REJECTED`, `REVOKED`, `NEEDS_CREDENTIAL`; recorrido registrado (`ImportConnection`). Cursor **confirmado** (`sync_cursor`, fin de la ventana) que solo avanza cuando el import termina; el cursor de paginación del proveedor es provisional (`pending_sync`).
+- **Entrada al pipeline:** `ImportStagingPort.stageExternalRecords` escribe las filas en el staging desde la normalización; un import de una conexión mezcla cuentas, así que las etapas corren **una vez por cuenta** y la persistencia hace un lote por cuenta. Namespace de referencia `imports.provider:<exchange>:<tipo>` compartido por archivo y API.
+- **Mapeo:** `TRADE` ⇒ conversión (bruto entregado, NETO recibido, comisión del exchange, tasa cotizada, instante del exchange); `DEPOSIT`/`WITHDRAWAL` ⇒ ingreso/gasto con señal `POSSIBLE_TRANSFER` (D343) y comisión de red como gasto `FEES` aparte; `REWARD` ⇒ ingreso sin categoría clasificable por reglas (D344); `P2P` y otros ⇒ excluidos (`CONNECTION_RECORD_UNSUPPORTED`). La categoría `FEES` propuesta viaja con origen `COUNTERPARTY_DEFAULT` (en TRANSACTIONS `SYSTEM_DEFAULT` significa «sin categoría»).
+- **Jobs** (cola existente, concurrencia 1, sin consumidores ni conexiones nuevas, D249): `imports.connection-verify`, `imports.connection-sync` e `imports.credentials-rewrap`; se registran solo en un worker con claves privadas. Sin auto-aprobación (D346).
+
 ### 6.3 Realidad Bolivia
 
 - La mayoría de bancos bolivianos **no ofrece APIs abiertas** ni agregadores con cobertura confiable. Formatos reales: **CSV/XLS(X)** desde banca en línea y **PDF** de extractos mensuales.

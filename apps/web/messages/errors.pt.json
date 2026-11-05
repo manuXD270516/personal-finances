@@ -171,5 +171,9 @@
   "IMPORT_PDF_EXTRACTION_FAILED": "Não conseguimos ler o PDF dentro dos limites de segurança (tempo, memória, páginas ou arquivo danificado). Baixe-o novamente no internet banking.",
   "IMPORT_PDF_TOTALS_MISMATCH": "Os saldos e totais do extrato não batem com as linhas que lemos, por isso não importamos nada para não deixar um saldo errado. Os detalhes indicam as páginas e linhas a revisar.",
   "IMPORT_PDF_PAGE_COUNT_MISMATCH": "O extrato declara mais páginas do que o PDF tem. Baixe-o completo novamente.",
-  "IMPORT_PDF_ACCOUNT_MISMATCH": "O extrato é de outra conta que não a escolhida (os últimos 4 dígitos não coincidem). Escolha a conta certa e tente novamente."
+  "IMPORT_PDF_ACCOUNT_MISMATCH": "O extrato é de outra conta que não a escolhida (os últimos 4 dígitos não coincidem). Escolha a conta certa e tente novamente.",
+  "BANKING_PROVIDER_NOT_AVAILABLE": "Este provedor ainda não está disponível: seus termos de uso ou seu formato ainda não foram verificados. Escolha outro ou tente mais tarde.",
+  "CONNECTION_CREDENTIAL_NOT_READ_ONLY": "A chave de API permite operar, sacar ou transferir. Crie no exchange uma chave somente leitura e conecte novamente; a chave anterior foi destruída.",
+  "CONNECTION_SYNC_IN_PROGRESS": "Esta conexão já tem uma sincronização em andamento. Aguarde o fim ou cancele a pré-visualização.",
+  "IMPORT_CONNECTION_EXPIRED": "O provedor rejeitou a chave da conexão (foi apagada ou expirou). Substitua a credencial por uma chave somente leitura."
 }

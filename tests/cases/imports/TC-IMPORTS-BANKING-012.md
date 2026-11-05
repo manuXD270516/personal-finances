@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Solo credenciales de solo lectura"
 scenario: "Permisos ampliados después"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +36,7 @@ expected_result:
   - "Conexión NEEDS_ATTENTION"
   - "fetchRecords no se llama"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-012 — Permisos ampliados detienen la sincronización

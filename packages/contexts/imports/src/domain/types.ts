@@ -46,6 +46,10 @@ export const ROW_ISSUE_CODES = [
   // add-pdf-statement-parser.
   'IMPORT_PDF_AMBIGUOUS_CELL',
   'IMPORT_PDF_BOTH_DEBIT_AND_CREDIT',
+  // add-banking-providers: filas de una conexión con un proveedor (enum abierto `ImportRowIssueCode`).
+  'CONNECTION_ASSET_UNMAPPED',
+  'CONNECTION_RECORD_UNSUPPORTED',
+  'POSSIBLE_TRANSFER',
 ] as const;
 export type RowIssueCode = (typeof ROW_ISSUE_CODES)[number];
 

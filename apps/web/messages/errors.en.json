@@ -171,5 +171,9 @@
   "IMPORT_PDF_EXTRACTION_FAILED": "We could not read the PDF within the safety limits (time, memory, pages or a damaged file). Download it again from online banking.",
   "IMPORT_PDF_TOTALS_MISMATCH": "The balances and totals of the statement do not match the rows we read, so we imported nothing to avoid a wrong balance. The details list the pages and lines to check.",
   "IMPORT_PDF_PAGE_COUNT_MISMATCH": "The statement declares more pages than the PDF has. Download it again in full.",
-  "IMPORT_PDF_ACCOUNT_MISMATCH": "The statement belongs to a different account than the chosen one (the last 4 digits differ). Choose the right account and try again."
+  "IMPORT_PDF_ACCOUNT_MISMATCH": "The statement belongs to a different account than the chosen one (the last 4 digits differ). Choose the right account and try again.",
+  "BANKING_PROVIDER_NOT_AVAILABLE": "This provider is not available yet: its terms of use or its format have not been verified. Choose another one or try again later.",
+  "CONNECTION_CREDENTIAL_NOT_READ_ONLY": "The API key can trade, withdraw or transfer. Create a read-only key at the exchange and connect again; the previous key was destroyed.",
+  "CONNECTION_SYNC_IN_PROGRESS": "This connection already has a synchronization in progress. Wait for it to finish or cancel its preview.",
+  "IMPORT_CONNECTION_EXPIRED": "The provider rejected the key of the connection (it was deleted or expired). Replace the credential with a read-only key."
 }

@@ -203,6 +203,8 @@ Dependencias que fijan el orden: el núcleo de reportes fija contratos y esquema
 
 Dependencias que fijan el orden: el throughput va primero porque cambia el perfil de eventos de los imports; la escritura por lote antes del pipeline (NFR-PERF-007); los documentos antes de la etapa de subida del pipeline (sus parsers pueden avanzar con fixtures); el motor de reglas (55, `add-rule-engine`: contexto `@pf/rules` sin consumidores de eventos nuevos) expone `RuleEvaluationQuery` a la etapa de clasificación y puede implementarse antes o en paralelo del pipeline, pero la medición del 70 % de Phase 6 requiere ambos (D334); los proveedores bancarios entran por la normalización del pipeline. El parser de PDF (57, D324) entra por la etapa de lectura del pipeline: requiere aplicados `add-document-attachments` y `add-import-pipeline` y se archiva después de este (su delta modifica un requirement que agrega el 54).
 
+**`add-banking-providers` (56, implementado 2026-11-04).** El núcleo (puerto, conexiones, cifrado de sobre, solo lectura, revocación, sincronización) y su integración con el pipeline están probados con el proveedor simulado; los adapters reales de Binance y Bybit (archivo y API) esperan la puerta del owner (grupo 9, ADR-0031 propuesto).
+
 Orden de implementación de Phase 6: `optimize-consumer-throughput` → `add-bulk-imported-transactions` → `add-document-attachments` y `add-rule-engine` → `add-import-pipeline` → `add-banking-providers` → parser de PDF. `add-import-pipeline` se archiva después de `add-bulk-imported-transactions` (ambos tocan `imports/import-pipeline`, con requirements distintos).
 
 

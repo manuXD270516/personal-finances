@@ -369,9 +369,17 @@ export type ImportExternalNamespace = `imports.ext:${ImportExternalFormat}`;
 export const importExternalNamespace = (format: ImportExternalFormat): ImportExternalNamespace =>
   `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${format}`;
 
+/**
+ * Prefijo de las referencias de un proveedor de movimientos externos (`imports.provider:<exchange>:<tipo>`,
+ * add-banking-providers decisión 8): el archivo y la API del mismo exchange comparten el espacio de nombres.
+ */
+export const PROVIDER_RECORD_NAMESPACE_PREFIX = 'imports.provider:' as const;
+const PROVIDER_RECORD_NAMESPACE = /^imports\.provider:[A-Z0-9_]{1,40}:(TRADE|DEPOSIT|WITHDRAWAL|FEE|REWARD)$/;
+
 /** ¿Es un espacio de nombres de referencia importada que `recordBatch` acepta? */
 export function isImportRefNamespace(namespace: string): boolean {
   if (namespace === IMPORT_ROW_NAMESPACE) return true;
+  if (PROVIDER_RECORD_NAMESPACE.test(namespace)) return true;
   return (
     namespace.startsWith(IMPORT_EXTERNAL_NAMESPACE_PREFIX) &&
     (IMPORT_EXTERNAL_FORMATS as readonly string[]).includes(

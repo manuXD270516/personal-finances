@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Conexión con un proveedor y mapeo de activos a cuentas"
 scenario: "Cuenta de otra moneda"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-014"]
 nfr: []
 invariants: ["INV-002"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -32,7 +34,7 @@ steps:
 expected_result:
   - "422 CURRENCY_MISMATCH"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-006 — Mapear un activo a una cuenta de otra moneda se rechaza

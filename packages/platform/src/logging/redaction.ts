@@ -17,6 +17,11 @@ const SENSITIVE_KEYS = [
   'secret',
   'apiKey',
   'api_key',
+  // add-banking-providers: credenciales de proveedores y su sobre de cifrado (NFR-SEC-015).
+  'keyId',
+  'privateKey',
+  'wrappedDek',
+  'ciphertext',
   'presignedUrl',
   // Datos financieros y de documentos
   'amount',

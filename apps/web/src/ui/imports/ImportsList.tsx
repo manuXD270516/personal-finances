@@ -149,6 +149,11 @@ function ImportsList({ ctx, accountId }: { ctx: WorkspaceContext; accountId?: st
           {f.t('profiles.link')}
         </a>
       </p>
+      <p style={{ margin: 0 }}>
+        <a href={ctx.href('/imports/conexiones')} data-testid="import-connections-link">
+          {f.t('connectionsLink')}
+        </a>
+      </p>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {items === undefined ? (
         <p aria-busy="true">{f.t('loading')}</p>

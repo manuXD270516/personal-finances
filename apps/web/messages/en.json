@@ -3564,6 +3564,7 @@
     }
   },
   "Imports": {
+    "connectionsLink": "Exchange connections",
     "title": "Import statement",
     "listTitle": "Statement imports",
     "intro": "Upload your bank statement (CSV, OFX, QIF, JSON or XLSX), review what will be created and approve it. Nothing is created and no balance changes until you approve.",
@@ -6103,6 +6104,72 @@
       "resolved": "The review mark was cleared.",
       "marked": "The transaction is pending review.",
       "createRule": "Create a rule from this transaction"
+    }
+  },
+  "ImportConnections": {
+    "title": "Exchange connections",
+    "intro": "Connect an exchange with a READ-ONLY key to bring its trade, deposit and withdrawal history into PFOS. Nothing is created until you review and approve the preview. Never enter the exchange username and password: API keys only.",
+    "back": "Back to imports",
+    "loading": "Loading connections…",
+    "empty": "There are no connections yet.",
+    "ownerOnly": "Only the workspace owner can create connections, replace credentials or revoke them.",
+    "status": {
+      "PENDING_VERIFICATION": "Verifying",
+      "ACTIVE": "Active",
+      "NEEDS_ATTENTION": "Needs attention",
+      "REJECTED": "Rejected",
+      "REVOKED": "Revoked",
+      "NEEDS_CREDENTIAL": "Needs credential"
+    },
+    "hint": {
+      "active": "Ready to synchronize. Every synchronization goes through a preview before anything is created.",
+      "verifying": "We are checking with the exchange that the key is read-only.",
+      "expired": "The exchange rejected the key (it was deleted or expired). Replace the credential with a read-only key.",
+      "notReadOnly": "The key can trade, withdraw or transfer. Create a read-only key at the exchange and replace the credential.",
+      "attention": "The connection needs your attention. Check the last error and replace the credential.",
+      "rejected": "The key is not read-only and was destroyed. Create a read-only key at the exchange and replace the credential.",
+      "needsCredential": "The connection was imported without a credential. Load a read-only key to synchronize again.",
+      "revoked": "Revoked connection: it will not synchronize again. What was already imported stays."
+    },
+    "fingerprint": "Key {fingerprint}",
+    "lastError": "Last error: {code}",
+    "mapping": "{asset} → {account}",
+    "cursor": "Synchronized up to {date}",
+    "cursorNone": "Not synchronized yet",
+    "retryNotBefore": "the exchange asked to wait until {at}",
+    "syncFrom": "From",
+    "syncFromHint": "First synchronization: up to 365 days back.",
+    "sync": "Synchronize",
+    "uploadHistory": "Upload history",
+    "replace": "Replace credential",
+    "revoke": "Revoke",
+    "keep": "Keep",
+    "revokeTitle": "Revoke “{name}”?",
+    "revokeBody": "The credential is destroyed irrecoverably and the connection will not synchronize again; what was already imported stays. Remember to delete the key at the exchange too.",
+    "replaceTitle": "Replace the credential of “{name}”",
+    "create": {
+      "title": "New connection",
+      "provider": "Provider",
+      "choose": "Choose…",
+      "name": "Name",
+      "mappings": "Assets and accounts",
+      "mappingsHint": "Each exchange asset goes to a PFOS account of the same currency. An asset without an account is not imported.",
+      "asset": "Asset (e.g. USDT)",
+      "account": "Account",
+      "addMapping": "Add asset",
+      "credential": "API key",
+      "readOnlyNotice": "Create a READ-ONLY key at the exchange (no trading, withdrawing or transferring). A key with more permissions is rejected and destroyed.",
+      "keyId": "Key identifier",
+      "secret": "Secret",
+      "secretHint": "It is not shown again. We only keep the fingerprint of the key.",
+      "submit": "Connect",
+      "errors": {
+        "provider": "Choose a provider.",
+        "name": "Enter a name of 1 to 80 characters.",
+        "mappings": "Map at least one asset to an account, without repeating assets.",
+        "keyId": "Enter the key identifier.",
+        "secret": "Enter the key secret."
+      }
     }
   }
 }

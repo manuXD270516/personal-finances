@@ -13,6 +13,7 @@ import type {
   CsvMapping,
   Decision,
   Direction,
+  ExternalRowData,
   ImportJob,
   ImportStatus,
   OccurrenceCandidateEntry,
@@ -181,6 +182,11 @@ export interface StagedRow {
   readonly decidedAt: string | null;
   readonly decidedScore: string | null;
   readonly warnings: readonly RowIssue[];
+  // ── add-banking-providers: fila de una conexión (varias cuentas por import)
+  /** Cuenta de la fila cuando difiere de la del job (conexiones); `null` = la cuenta del job. */
+  readonly accountId: string | null;
+  /** Referencia externa, señal y conversión propuesta de un registro del proveedor. */
+  readonly external: ExternalRowData | null;
 }
 
 /** Resultado de normalizar y clasificar una fila de datos (se escribe en el staging al aplicar el mapeo). */
@@ -502,6 +508,23 @@ export interface ImportsDeps {
   readonly refs: ReferenceCatalogPort;
   /** Lector de extractos PDF (add-pdf-statement-parser); ausente ⇒ un PDF se rechaza como formato no importable. */
   readonly pdf?: PdfStatementReader;
+  /** Categorías de sistema (CLASSIFICATION): la de comisiones para las filas de un exchange (add-banking-providers). */
+  readonly systemCategories?: SystemCategoriesPort;
+  /** Gancho de las conexiones: el cursor confirmado se mueve solo al completar el import (add-banking-providers). */
+  readonly connectionHooks?: ConnectionHooksPort;
+}
+
+export interface SystemCategoriesPort {
+  /** Categoría de sistema «comisiones» (`FEES`), o `null` si no está provisionada. */
+  feesCategoryId(workspaceId: string): Promise<string | null>;
+}
+
+/** Lo que el ciclo del import le avisa a la conexión (misma unidad de trabajo que el cambio de estado del job). */
+export interface ConnectionHooksPort {
+  /** El import terminó (`COMPLETED*`): el cursor confirmado avanza al fin de su ventana. */
+  onImportCompleted(workspaceId: string, connectionId: string, importJobId: string): Promise<void>;
+  /** El import se canceló, venció o falló: el cursor confirmado queda como estaba. */
+  onImportAbandoned(workspaceId: string, connectionId: string, importJobId: string): Promise<void>;
 }
 
 /** `ImportedConversionsCommand.recordBatch` (lo implementa TRANSACTIONS; el mismo comando usa `add-banking-providers`). */
