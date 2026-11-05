@@ -45,6 +45,7 @@ import { ClosingVerifier } from '../application/closing-verifier.js';
 import { PeriodQueries } from '../application/period.queries.js';
 import { RolloverService } from '../application/rollover.service.js';
 import { PeriodsService } from '../application/periods.service.js';
+import { BudgetSuggestionService } from '../application/budget-suggestion.service.js';
 import { PropagationService } from '../application/propagation.service.js';
 import { TemplatePeriodHook } from '../application/period-created.hook.js';
 import { TemplateQueries } from '../application/template.queries.js';
@@ -54,6 +55,7 @@ import type {
   ClosingDeps,
   ClosingMetricsPort,
   GoalPlanPort,
+  HistorySuggestionConfig,
   OutboxPort,
   PlanningDeps,
   WorkspaceSettingsPort,
@@ -103,6 +105,7 @@ import {
   TEMPLATES_SERVICE,
   TemplatesController,
 } from './templates-http.js';
+import { BUDGET_SUGGESTION_SERVICE, BudgetSuggestionsController } from './budget-suggestions-http.js';
 
 /** Anticipación por defecto (`PLANNING_PERIOD_LOOKAHEAD`, docs/33 D63). */
 export const DEFAULT_PERIOD_LOOKAHEAD = 3;
@@ -132,6 +135,8 @@ export interface BudgetsRuntimeOptions {
    * conexión extra del directorio por cada evento evaluado (ver `cachedCalendar`). Sin él, sin caché (la API).
    */
   readonly calendarCacheMs?: number;
+  /** `PLANNING_HISTORY_*` (add-historical-budgets); sin él, los valores por omisión de la spec. */
+  readonly suggestions?: HistorySuggestionConfig;
 }
 
 /**
@@ -189,6 +194,8 @@ export interface BudgetsRuntime {
   readonly templates: TemplatesService;
   readonly templateQueries: TemplateQueries;
   readonly propagation: PropagationService;
+  /** Sugerencias de presupuesto desde el historial (add-historical-budgets). */
+  readonly suggestions: BudgetSuggestionService;
   readonly queries: BudgetQueries;
   readonly thresholds: BudgetThresholdService;
   readonly rollover: RolloverService;
@@ -259,6 +266,8 @@ export function createPlanningRuntime(options: PlanningRuntimeOptions): Planning
       clock: options.clock,
       rateValidityWindowDays: b.rateValidityWindowDays,
       ...(b.goalPlans ? { goalPlans: b.goalPlans } : {}),
+      activity: options.activity,
+      ...(b.suggestions ? { suggestions: b.suggestions } : {}),
     };
     const budgetQueries = new BudgetQueries(budgetsDeps);
     const budgetsService = new BudgetsService(budgetsDeps);
@@ -268,6 +277,7 @@ export function createPlanningRuntime(options: PlanningRuntimeOptions): Planning
       templates: new TemplatesService(budgetsDeps),
       templateQueries: new TemplateQueries(budgetsDeps),
       propagation: new PropagationService(budgetsDeps),
+      suggestions: new BudgetSuggestionService(budgetsDeps),
       queries: budgetQueries,
       thresholds: new BudgetThresholdService(budgetsDeps, new BudgetCalculator(budgetsDeps)),
       rollover: new RolloverService(budgetsDeps),
@@ -363,7 +373,9 @@ export class PlanningModule {
       module: PlanningModule,
       controllers: [
         PeriodsController,
-        ...(options.runtime.budgets ? [BudgetsController, TemplatesController] : []),
+        ...(options.runtime.budgets
+          ? [BudgetsController, TemplatesController, BudgetSuggestionsController]
+          : []),
         ...(options.runtime.closing ? [ClosingController] : []),
       ],
       providers: [
@@ -381,6 +393,7 @@ export class PlanningModule {
               { provide: TEMPLATES_SERVICE, useValue: options.runtime.budgets.templates },
               { provide: TEMPLATE_QUERIES, useValue: options.runtime.budgets.templateQueries },
               { provide: PROPAGATION_SERVICE, useValue: options.runtime.budgets.propagation },
+              { provide: BUDGET_SUGGESTION_SERVICE, useValue: options.runtime.budgets.suggestions },
               { provide: BUDGET_VS_ACTUAL_QUERY, useValue: options.runtime.budgets.vsActual },
             ]
           : []),

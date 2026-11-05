@@ -10,6 +10,7 @@ import {
   type Budget,
   type BudgetLine,
   type BudgetTargetKind,
+  type HistoryBasisInfo,
 } from './budget-logic';
 
 /** Nombres de los objetivos por tipo (catálogos de CLASSIFICATION, incluidos los archivados). */
@@ -21,6 +22,20 @@ export interface TargetNames {
 
 export const targetName = (names: TargetNames, kind: BudgetTargetKind, id: string): string =>
   names[kind].get(id) ?? id;
+
+/** Indicador "sugerido desde el historial" de una línea; "modificado después" si el monto vigente ya no es el aplicado. */
+export function HistoryBasisNote({ basis, f }: { basis: HistoryBasisInfo; f: FormatContext }) {
+  return (
+    <small
+      style={mutedStyle}
+      data-testid="line-history-basis"
+      data-modified={basis.modifiedAfterSuggestion ? 'true' : 'false'}
+    >
+      <span aria-hidden="true">◷</span> {f.t('lines.fromHistory')}
+      {basis.modifiedAfterSuggestion ? ` · ${f.t('lines.fromHistoryModified')}` : ''}
+    </small>
+  );
+}
 
 function Plan({ line, f }: { line: BudgetLine; f: FormatContext }) {
   const money = (m: Parameters<typeof formatMoney>[0]) => formatMoney(m, f.locale);
@@ -198,6 +213,12 @@ export function BudgetLinesTable({
                     {f.t(`targetKind.${line.target.kind}`)} · {f.t(`kind.${line.kind}`)}
                     {line.nature === 'INCOME' ? ` · ${f.t('lines.income')}` : ''}
                   </small>
+                  {line.historyBasis ? (
+                    <>
+                      <br />
+                      <HistoryBasisNote basis={line.historyBasis} f={f} />
+                    </>
+                  ) : null}
                 </th>
                 <td style={numCellStyle} data-testid="line-planned">
                   <Plan line={line} f={f} />

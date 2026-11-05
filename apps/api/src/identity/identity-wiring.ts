@@ -355,6 +355,11 @@ export function financeRuntimes(input: {
         ApiConfig,
         | 'REPORTING_RATE_VALIDITY_WINDOW'
         | 'PLANNING_PERIOD_LOOKAHEAD'
+        | 'PLANNING_HISTORY_DEFAULT_PERIODS'
+        | 'PLANNING_HISTORY_MAX_PERIODS'
+        | 'PLANNING_HISTORY_MIN_VALID_RATIO'
+        | 'PLANNING_HISTORY_OUTLIER_MIN_SAMPLE'
+        | 'PLANNING_HISTORY_OUTLIER_IQR_FACTOR'
         | 'COMMITMENTS_HORIZON_DAYS'
         | 'IMPORT_CSV_MAX_BYTES'
         | 'IMPORT_CSV_MAX_ROWS'
@@ -642,6 +647,14 @@ export function financeRuntimes(input: {
       rateValidityWindowDays,
       settings: identityWorkspaceSettings(input.pool),
       history: input.history,
+      // add-historical-budgets: parámetros de la sugerencia desde el historial (valores por omisión de la spec).
+      suggestions: {
+        defaultPeriods: input.config.PLANNING_HISTORY_DEFAULT_PERIODS ?? 6,
+        maxPeriods: input.config.PLANNING_HISTORY_MAX_PERIODS ?? 12,
+        minValidRatio: input.config.PLANNING_HISTORY_MIN_VALID_RATIO ?? 0.5,
+        outlierMinSample: input.config.PLANNING_HISTORY_OUTLIER_MIN_SAMPLE ?? 4,
+        outlierIqrFactor: input.config.PLANNING_HISTORY_OUTLIER_IQR_FACTOR ?? 1.5,
+      },
       // add-savings-goals: sección de solo lectura "Aportes a metas" (GOALS se compone después de PLANNING).
       goalPlans: {
         getForPeriod: (query) => deferred.goals?.queries.getForPeriod(query) ?? Promise.resolve([]),

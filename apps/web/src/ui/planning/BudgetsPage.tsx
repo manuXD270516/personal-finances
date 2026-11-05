@@ -31,6 +31,7 @@ import { loadPeriods } from './PeriodsPage';
 import { PeriodSelector } from './PeriodSelector';
 import { PlanOriginInfo, PlanOriginPanel, OmittedLinesNotice, type PlanSource } from './PlanOriginPanel';
 import { PlanTemplateActions } from './PlanTemplateActions';
+import { PlanSuggestions } from './SuggestionsPanel';
 import { PlanningNav } from './PlanningNav';
 import type { OmittedLine } from './template-logic';
 
@@ -304,6 +305,16 @@ function Budgets({
               {canWrite ? (
                 <PlanOriginPanel ctx={ctx} f={f} busy={busy} onCreate={(source) => void createPlan(source)} />
               ) : null}
+              {periodId && !closed ? (
+                <PlanSuggestions
+                  ctx={ctx}
+                  f={f}
+                  periodId={periodId}
+                  names={names}
+                  canConfirm={canWrite}
+                  onChanged={loadBudget}
+                />
+              ) : null}
             </div>
           ) : (
             <PlanView
@@ -461,6 +472,16 @@ function PlanView({
         {canWrite && !panel ? (
           <PlanTemplateActions ctx={ctx} f={f} budget={budget} names={names} onChanged={onChanged} />
         ) : null}
+        {!panel && budget.periodStatus !== 'CLOSED' ? (
+          <PlanSuggestions
+            ctx={ctx}
+            f={f}
+            periodId={budget.periodId}
+            names={names}
+            canConfirm={canWrite}
+            onChanged={onChanged}
+          />
+        ) : null}
         {canWrite && panel ? (
           <BudgetLineForm
             mode={panel.type}
@@ -477,7 +498,12 @@ function PlanView({
         ) : null}
       </section>
       {/* Las tablas de cambios son anchas: scroll propio en móvil, no de la página (NFR-USAB-006). */}
-      <div style={{ minWidth: 0, overflowX: 'auto', position: 'relative' }}>
+      <div
+        style={{ minWidth: 0, overflowX: 'auto', position: 'relative' }}
+        tabIndex={0}
+        role="region"
+        aria-label={f.t('historyRegion')}
+      >
         <AuditHistory
           workspaceId={ctx.ws.id}
           aggregateType="Budget"

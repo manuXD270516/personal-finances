@@ -5,16 +5,18 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sugerencia obsoleta al confirmar"
 scenario: "Gasto registrado entre la vista previa y la confirmación"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +35,7 @@ expected_result:
   - "409 BUDGET_SUGGESTION_STALE (la sugerencia recalculada es 1520.00 BOB)"
   - "El plan no cambia"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-022 — Gasto nuevo entre vista previa y confirmación da sugerencia obsoleta

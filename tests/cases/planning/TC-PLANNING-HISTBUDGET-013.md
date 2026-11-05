@@ -5,16 +5,19 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sugerencia por el mismo periodo del año anterior"
 scenario: "Sin el mismo periodo del año anterior"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+  - packages/contexts/planning/src/domain/suggestion-window.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -32,7 +35,7 @@ expected_result:
   - "Cada línea en INSUFFICIENT_HISTORY"
   - "2025-11 con estado BEFORE_FIRST_ACTIVITY"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-013 — Sin el periodo del año anterior la línea queda sin sugerencia

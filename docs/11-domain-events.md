@@ -4,6 +4,8 @@
 
 Catálogo de eventos publicados entre bounded contexts vía **transactional outbox**. Los eventos son hechos pasados, inmutables y versionados. Los JSON Schema de Phase 1 están en `contracts/events/`.
 
+> **Phase 7 (`add-historical-budgets`):** sin eventos nuevos ni cambios de esquema. Confirmar sugerencias de presupuesto sobre un periodo sin plan emite `planning.BudgetCreated.v1` (origen `EMPTY`) y los cruces de umbral que provoque el cambio de montos se emiten con el mecanismo vigente (idempotente por umbral y periodo).
+
 ## 1. Envelope
 
 Definido en ARCHITECTURE §7; schema: `contracts/events/envelope.v1.schema.json`.

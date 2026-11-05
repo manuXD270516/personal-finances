@@ -5,16 +5,19 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sugerencia por promedio de los periodos anteriores"
 scenario: "Promedio de cuatro periodos de supermercado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021","FR-PLANNING-023"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+  - packages/contexts/planning/src/domain/historical-budget-estimator.test.ts
+  - packages/contexts/planning/src/domain/suggestion-window.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -32,7 +35,7 @@ expected_result:
   - "Sugerencia 1495.00 BOB (5980.00 ÷ 4)"
   - "Método promedio, 4 periodos usados"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-001 — Promedio de cuatro periodos terminados para una línea de gasto

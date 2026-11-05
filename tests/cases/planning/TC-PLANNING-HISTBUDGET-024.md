@@ -5,16 +5,19 @@ spec: planning/budgets
 related_specs: []
 requirement: "Sin aplicación automática de sugerencias históricas"
 scenario: "Historia corregida después de aplicar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+  - apps/web/src/ui/planning/suggestions.test.tsx
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -33,7 +36,7 @@ expected_result:
   - "La línea sigue en 1480.00 BOB"
   - "historyBasis sin cambios"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-024 — Una línea aplicada no se recalcula cuando cambia la historia

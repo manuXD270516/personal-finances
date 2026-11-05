@@ -5,16 +5,18 @@ spec: planning/budgets
 related_specs: []
 requirement: "Líneas a las que se aplica la sugerencia"
 scenario: "Periodo sin plan"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-021","FR-PLANNING-015"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budget-suggestions.api.test.ts
+  - packages/contexts/planning/src/application/budget-suggestion.service.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["planning","budgets","historical-budgets"]
@@ -34,7 +36,7 @@ expected_result:
   - "Ninguna para \"Mascotas\""
   - "Ningún objetivo propuesto se solapa con otro"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-PLANNING-HISTBUDGET-018 — Periodo sin plan propone líneas para categorías raíz con gasto
