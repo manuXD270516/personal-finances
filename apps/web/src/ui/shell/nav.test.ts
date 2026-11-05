@@ -46,6 +46,9 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/en/goals/nuevo')).toBe('goals');
     expect(activeNav('/pt/goals/0198f0aa')).toBe('goals');
     expect(activeNav('/goals/reservas')).toBe('goals');
+    // Phase 7 (add-financial-reports): catálogo y reportes.
+    expect(activeNav('/reportes')).toBe('reports');
+    expect(activeNav('/en/reportes/ingresos-gastos')).toBe('reports');
     // La evolución del patrimonio cuelga del Home (add-net-worth-evolution).
     expect(activeNav('/patrimonio')).toBe('home');
     expect(activeNav('/en/patrimonio')).toBe('home');

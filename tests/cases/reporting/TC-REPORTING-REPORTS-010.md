@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Comparación con el periodo anterior y con el mismo periodo del año anterior"
 scenario: "Octubre contra septiembre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-009"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/report-periods.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["comparison"]
 error_code: null
@@ -33,7 +36,7 @@ expected_result:
   - "YoY: −200.00 BOB y −5.00 %"
   - "\"Mascotas\": +150.00 BOB marcado como nuevo, sin porcentaje"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-010 — La comparación con el periodo anterior y con el año anterior informa variación absoluta, porcentual y "nuevo"

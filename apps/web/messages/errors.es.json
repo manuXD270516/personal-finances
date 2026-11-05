@@ -171,5 +171,6 @@
   "IMPORT_PDF_EXTRACTION_FAILED": "No pudimos leer el PDF dentro de los límites de seguridad (tiempo, memoria, páginas o archivo dañado). Descárgalo de nuevo desde la banca por internet.",
   "IMPORT_PDF_TOTALS_MISMATCH": "Los saldos y totales del extracto no cuadran con los movimientos que leímos, así que no importamos nada para no dejar un saldo erróneo. El detalle indica las páginas y líneas a revisar.",
   "IMPORT_PDF_PAGE_COUNT_MISMATCH": "El extracto declara más páginas de las que tiene el PDF. Descárgalo completo de nuevo.",
-  "IMPORT_PDF_ACCOUNT_MISMATCH": "El extracto es de otra cuenta que la elegida (los últimos 4 dígitos no coinciden). Elige la cuenta correcta e inténtalo de nuevo."
+  "IMPORT_PDF_ACCOUNT_MISMATCH": "El extracto es de otra cuenta que la elegida (los últimos 4 dígitos no coinciden). Elige la cuenta correcta e inténtalo de nuevo.",
+  "REPORT_EXPORT_TOO_LARGE": "El reporte tiene más de 50 000 filas para exportar. Acota el rango de fechas o agrega filtros y vuelve a intentarlo."
 }

@@ -213,6 +213,7 @@ Consistente con ARCHITECTURE §10.
 | ML forecast falla | 3 runs seguidos fallidos | baja | 8 |
 | Scheduler perdido | `last_run` > 2× intervalo | media | 2 |
 | **`UpcomingPaymentsReadModelRecommended`** | p95 de `reporting_upcoming_payments_duration_seconds` **o de `reporting_spendable_duration_seconds`** (Q5, add-spendable-amount: mismo camino de lectura directa, sin alerta nueva) > 300 ms (presupuesto del Home, NFR-PERF-004) durante 15 min, **o** una consulta que lee > 5 000 ocurrencias (`reporting_upcoming_payments_rows`). Indica que conviene migrar a la proyección `reporting.upcoming_payment` alimentada por eventos; enlaza `openspec/changes/add-upcoming-payments/design.md` § "Evolución a read model" (regla evaluable en `evaluateReadModelAlert`, TC-REPORTING-UPCOMING-022) | media (notificación; sin paging) | 3 |
+| **`ReportsReadModelRecommended`** | p95 diario de `reporting_report_duration_seconds{report}` > 600 ms (75 % del presupuesto de 800 ms de NFR-PERF-006) durante 7 días para un mismo reporte. Recomienda introducir el read model de ese reporte (docs/14 §2.1); regla evaluable en `evaluateReportsReadModelAlert` (TC-REPORTING-REPORTS-032) | media (notificación; sin paging) | 7 |
 | Disco/BD | uso storage > 80 %, conexiones > 80 % del pool | media | 1 (cloud) |
 | Certificados / backups | backup diario no completado | alta | 1 (prod), ver 22/23 |
 

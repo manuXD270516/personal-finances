@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Reglas de flujos comunes a los reportes"
 scenario: "Movimientos que no son ingreso ni gasto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-TRANSACTIONS-016"]
 nfr: []
 invariants: ["INV-021", "INV-024"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+  - packages/contexts/transactions/test/integration/pg-nominal-portions.int.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["flow-rules"]
 error_code: null
@@ -31,7 +33,7 @@ expected_result:
   - "Gasto 2026-10 de esas operaciones = 2.00 BOB en la categoría de comisiones"
   - "\"Supermercado\" = 400.00 BOB en 2026-09 y −400.00 BOB en 2026-10"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-004 — Transferencias, conversiones, pagos de tarjeta y pendientes no son ingreso ni gasto; las comisiones sí

@@ -5,16 +5,17 @@ spec: reporting/net-worth
 related_specs: []
 requirement: "Serie diaria del patrimonio"
 scenario: "Sueldo del 5 de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-006"]
 nfr: []
 invariants: ["INV-012"]
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["net-worth", "daily"]
@@ -31,7 +32,7 @@ expected_result:
   - "Nunca se usa la tasa de hoy para un día pasado"
   - "Un día sin tasa queda incompleto"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-036 — La serie diaria del patrimonio valora cada día con la tasa de ese día

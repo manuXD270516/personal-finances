@@ -95,6 +95,8 @@ export const ERROR_CATALOG = {
   FX_RATE_ANOMALY_ALREADY_REVIEWED: { status: 409, title: 'Exchange rate anomaly already reviewed' },
   FX_RATE_NOT_ANOMALOUS: { status: 422, title: 'Exchange rate is not flagged as anomalous' },
   CURRENCY_NOT_ENABLED: { status: 422, title: 'Currency not enabled in this workspace' },
+  // reporting (Phase 7)
+  REPORT_EXPORT_TOO_LARGE: { status: 422, title: 'The report export exceeds the synchronous row limit' },
   // planning (Phase 2)
   PERIOD_NOT_STARTED: { status: 409, title: 'Financial period has not started yet' },
   PERIOD_NOT_ENDED: { status: 409, title: 'Financial period has not ended yet' },

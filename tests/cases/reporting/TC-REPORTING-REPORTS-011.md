@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Comparación con un rango personalizado"
 scenario: "Diez días contra un mes normalizados por día"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-009"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["comparison"]
 error_code: null
@@ -33,7 +35,7 @@ expected_result:
   - "Normalizado: 100.00 BOB por día en ambos y variación 0.00 BOB"
   - "Sin normalizar: variación −2000.00 BOB y aviso de 10 y 30 días"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-011 — La comparación con un rango personalizado indica la diferencia de días y normaliza por día a pedido

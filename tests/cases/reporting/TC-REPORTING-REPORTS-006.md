@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Reporte de gastos por categoría"
 scenario: "Grupo Alimentación en octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["by-category"]
 error_code: null
@@ -35,7 +38,7 @@ expected_result:
   - "\"Electrónica\" −200.00 BOB marcado como neto negativo"
   - "La categoría archivada aparece con sus movimientos"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-006 — Gastos por categoría con grupo, top N con "Otras categorías" y neto negativo visible

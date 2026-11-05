@@ -5,16 +5,18 @@ spec: reporting/dashboard
 related_specs: ["reporting/financial-reports"]
 requirement: "Detalle de la comparación del Home en los reportes"
 scenario: "Del Home al reporte"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-018", "FR-REPORTING-009"]
 nfr: []
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/dashboard/DashboardView.test.tsx
+  - tests/e2e/specs/financial-reports.spec.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["home", "q7"]
@@ -29,7 +31,7 @@ expected_result:
   - "Se abre el reporte de ingresos y gastos de 2026-10 por mes calendario comparado a la fecha"
   - "Gasto 1800.00 BOB y variación 20.00 %, igual que el Home"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-038 — La comparación del Home enlaza al reporte de ingresos y gastos con las mismas cifras

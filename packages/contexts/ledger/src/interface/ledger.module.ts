@@ -10,6 +10,7 @@ import type {
   AccountBalanceHistoryQuery,
   AccountBalancesQuery,
   BalanceQuery,
+  AccountSetFlowQuery,
   FirstBalanceDateQuery,
   LedgerActivityRangeQuery,
   LedgerOpeningBalanceQuery,
@@ -17,6 +18,7 @@ import type {
   LedgerPeriodLockPort,
   LedgerPostingPort,
 } from '../contracts/index.js';
+import { PgAccountSetFlowQuery } from '../infrastructure/pg-account-set-flow.queries.js';
 import { PgFirstBalanceDateQuery } from '../infrastructure/pg-first-balance.queries.js';
 import { PgLedgerActivityRangeQuery } from '../infrastructure/pg-activity-range.queries.js';
 import { PgLedgerOpeningBalanceQuery } from '../infrastructure/pg-opening-balance.queries.js';
@@ -60,6 +62,8 @@ export interface LedgerRuntime {
   readonly openingEntries: LedgerOpeningEntriesQuery;
   /** Primera fecha con saldo por moneda (FX, add-crypto-rate-providers: histórico de precios cripto). */
   readonly firstBalanceDates: FirstBalanceDateQuery;
+  /** Flujo de un conjunto de cuentas por clase de contrapartida (Reporting, add-financial-reports). */
+  readonly accountSetFlow: AccountSetFlowQuery;
 }
 
 /**
@@ -94,6 +98,7 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     openingBalance: ledgerOpeningBalance(),
     openingEntries: new PgLedgerOpeningEntriesQuery(),
     firstBalanceDates: ledgerFirstBalanceDates(),
+    accountSetFlow: new PgAccountSetFlowQuery(),
   };
 }
 
@@ -150,6 +155,7 @@ export {
   LEDGER_SNAPSHOTS_REBUILT_METRIC,
 } from '../application/ledger-maintenance.js';
 export type {
+  AccountSetFlowQuery,
   BalanceQuery,
   FirstBalanceDateQuery,
   LedgerActivityRangeQuery,

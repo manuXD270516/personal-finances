@@ -5,17 +5,18 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Exportación CSV de un drill-down"
 scenario: "Descripción con fórmula"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-012"]
 nfr: ["NFR-SEC-015"]
 invariants: []
 priority: high
 type: security
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["csv", "csv-injection"]
 error_code: null
@@ -30,7 +31,7 @@ expected_result:
   - "La descripción aparece como texto neutralizado"
   - "El monto aparece como \"-200.00\""
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-022 — El CSV del drill-down exporta todas las filas y neutraliza las fórmulas sin alterar los montos

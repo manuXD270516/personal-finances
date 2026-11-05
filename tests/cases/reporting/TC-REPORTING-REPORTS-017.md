@@ -5,16 +5,18 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Flujos valorados a la fecha de corte a pedido"
 scenario: "Gasto en dólares a la fecha de corte"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-011"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["conversion-policy", "cutoff"]
@@ -31,7 +33,7 @@ expected_result:
   - "meta.conversion.policy = CUTOFF_DATE con fecha 2026-10-31"
   - "El nativo sigue en 50.00 USD"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-017 — A pedido, los flujos se valoran con la tasa de la fecha de corte y el nativo no cambia

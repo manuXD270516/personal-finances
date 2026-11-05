@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: ["fx/market-rates"]
 requirement: "Política de conversión explícita en cada reporte"
 scenario: "Gasto en dólares a la tasa de su fecha"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-011"]
 nfr: []
 invariants: ["INV-012", "INV-020"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/reports/reports.test.tsx
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["conversion-policy"]
 error_code: null
@@ -30,7 +32,7 @@ expected_result:
   - "meta.conversion.policy = TRANSACTION_DATE con la tasa USD/BOB 10.00, su tipo, su fuente y su fecha"
   - "El redondeo HALF_EVEN se aplica solo al presentar"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-014 — Cada reporte declara su política de conversión y valora los flujos con la tasa de su fecha

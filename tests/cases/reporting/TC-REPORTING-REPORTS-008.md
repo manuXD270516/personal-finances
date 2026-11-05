@@ -5,17 +5,21 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Reporte de flujo de caja histórico"
 scenario: "Octubre con deuda, ahorro y transferencia interna"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: []
 invariants: ["INV-004", "INV-022"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/ledger/test/integration/pg-account-set-flow.int.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["cash-flow", "pbt"]
 error_code: null
@@ -35,7 +39,7 @@ expected_result:
   - "Conversión: cambio de moneda 1190.00 BOB y −100.000000 USDT; consolidado −10.00 BOB"
   - "PBT: inicial + Σ componentes = final por moneda en todo ledger generado"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-008 — El flujo de caja clasifica por contrapartida y cumple saldo inicial más componentes igual a saldo final

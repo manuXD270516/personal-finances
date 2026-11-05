@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Frescura y lectura condicional de los reportes"
 scenario: "Lectura repetida sin cambios"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-007"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["etag", "freshness"]
 error_code: null
@@ -31,7 +33,7 @@ expected_result:
   - "La nueva lectura sube \"Supermercado\" en 80.00 BOB aunque el consumidor de versión de datos vaya atrasado"
   - "meta trae dataVersion, latestEntryAt y generatedAt"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-024 — El reporte responde 304 con la misma versión y refleja de inmediato una transacción nueva

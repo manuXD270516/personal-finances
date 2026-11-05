@@ -258,6 +258,8 @@ Propiedades concretas (cada una es un TC con `type: property`):
 - **Ubicación:** `tests/smoke/`.
 - **CI:** job de deploy (ver [23-ci-cd.md](./23-ci-cd.md)); falla ⇒ rollback.
 
+**Reconciliación reporte↔ledger (add-financial-reports, D369).** La misma batería de identidades (`ReportsReconciliation` sobre `ReportReconciler`) corre en tres niveles: (1) PBT de dominio y de aplicación sobre ledgers aleatorios (ingresos, gastos, reembolsos, transferencias, plazo fijo, tarjeta, cuotas, conversiones con comisión y tasas aleatorias > 0; timeout explícito); (2) integración con el dataset Demo v2 contra PostgreSQL (reportes por HTTP, ledger por SQL directo); (3) nightly sobre los 60 meses del Large Seed con muestreo de 30 días de historial y 50 celdas de drill-down. El camino independiente del ledger es el balance de comprobación entre cierres de mes sobre `INCOME:<c>` y `EXPENSE:<c>`; tolerancia cero en cifras nativas y un fallo nombra reporte, periodo y moneda.
+
 ### 5.17 Architecture tests
 
 Ejecutables con **dependency-cruiser** y un **plugin ESLint propio** (`tools/eslint-plugin-pf`). Reglas explícitas:

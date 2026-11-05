@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Exportación CSV de un reporte"
 scenario: "Exportar ingresos y gastos de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-012"]
 nfr: ["NFR-SEC-015"]
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["csv"]
 error_code: "REPORT_EXPORT_TOO_LARGE"
@@ -33,7 +35,7 @@ expected_result:
   - "La de 50 001 filas ⇒ 422 REPORT_EXPORT_TOO_LARGE sin archivo"
   - "Cuota costly aplicada"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-021 — El CSV de ingresos y gastos trae filas nativas y consolidadas, y una exportación de más de 50 000 filas se rechaza

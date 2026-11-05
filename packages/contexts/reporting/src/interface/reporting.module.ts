@@ -2,16 +2,31 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
 import type { CategoryCatalogQuery, CounterpartyCatalogQuery } from '@pf/classification/contracts';
 import type { FxQuoteSideRatesPort, FxValuationPort } from '@pf/fx/contracts';
-import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
+import type {
+  AccountBalanceHistoryQuery,
+  AccountBalancesQuery,
+  AccountSetFlowQuery,
+} from '@pf/ledger/contracts';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
-import type { ConversionDetailQuery, NominalFlowQuery } from '@pf/transactions/contracts';
+import type {
+  ConversionDetailQuery,
+  NominalFlowQuery,
+  NominalPortionQuery,
+} from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { DataVersionProjector } from '../application/data-version-projector.js';
 import { NetWorthAtQueries, PeriodFlowsQueries } from '../application/closing-figures.queries.js';
 import { ConversionCostQueries } from '../application/conversion-cost.queries.js';
 import { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
+import { FinancialReportsService } from '../application/financial-reports.exports.js';
+import type {
+  BudgetVsActualPort,
+  LedgerActivityPort,
+  ReconciliationMarksPort,
+  ReportAuditPort,
+} from '../application/ports/financial-reports.js';
 import type {
   ClosingSnapshotsPort,
   FinancialPeriodsPort,
@@ -40,6 +55,7 @@ import {
   type PeriodFlowsQuery,
 } from '../contracts/index.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
+import { FINANCIAL_REPORTS, FinancialReportsController } from './financial-reports-http.js';
 import {
   CONVERSION_COST_QUERIES,
   NET_WORTH_HISTORY_QUERIES,
@@ -110,6 +126,18 @@ export interface ReportingRuntimeOptions {
    * D53). La composición entrega el MISMO valor a FX (`createFxRuntime({ windowDays })`).
    */
   readonly rateValidityWindowDays?: number;
+  /**
+   * Reportes financieros (add-financial-reports): porciones nominales para el drill-down (TRANSACTIONS), flujo por
+   * contrapartida de un conjunto de cuentas (LEDGER), primer asiento del workspace (LEDGER), presupuesto vs real y
+   * conciliaciones cerradas. PLANNING se compone después de REPORTING: `budgets` llega con resolución tardía.
+   */
+  readonly portions: NominalPortionQuery;
+  readonly accountFlows: AccountSetFlowQuery;
+  readonly activity: LedgerActivityPort;
+  readonly budgets: BudgetVsActualPort;
+  readonly reconciliationMarks: ReconciliationMarksPort;
+  /** Auditoría de las exportaciones (`reporting.report.exported`); opcional en pruebas. */
+  readonly reportAudit?: ReportAuditPort;
 }
 
 export interface ReportingRuntime {
@@ -126,6 +154,8 @@ export interface ReportingRuntime {
   readonly periodFlows: PeriodFlowsQuery;
   /** Patrimonio a una fecha de corte para el cierre de mes (contrato público `NetWorthQuery`; sin ruta HTTP). */
   readonly netWorth: NetWorthQuery;
+  /** Reportes financieros, drill-down y exportaciones CSV (add-financial-reports). */
+  readonly reports: FinancialReportsService;
   /** Ventana de vigencia efectiva (días). */
   readonly rateValidityWindowDays: number;
 }
@@ -160,6 +190,27 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
   };
   return {
     rateValidityWindowDays,
+    reports: new FinancialReportsService({
+      uow: deps.uow,
+      workspaces: options.workspaces,
+      accounts: options.accounts,
+      categories: options.categories,
+      rates: options.rates,
+      versions: deps.versions,
+      clock: options.clock,
+      flows: options.flows,
+      portions: options.portions,
+      accountFlows: options.accountFlows,
+      balanceHistory: options.balanceHistory,
+      periods: options.periods,
+      ...(options.financialCalendar ? { calendar: options.financialCalendar } : {}),
+      activity: options.activity,
+      budgets: options.budgets,
+      marks: options.reconciliationMarks,
+      ...(options.reportAudit ? { audit: options.reportAudit } : {}),
+      ...(options.metrics ? { metrics: options.metrics } : {}),
+      rateValidityWindowDays,
+    }),
     summary: new ReportSummaryQueries(deps),
     history: new NetWorthHistoryQueries(deps),
     upcoming: new UpcomingPaymentsQueries(deps),
@@ -209,7 +260,7 @@ export class ReportingModule {
   static register(options: ReportingModuleOptions): DynamicModule {
     return {
       module: ReportingModule,
-      controllers: [ReportingController],
+      controllers: [ReportingController, FinancialReportsController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: REPORT_SUMMARY_QUERIES, useValue: options.runtime.summary },
@@ -217,6 +268,7 @@ export class ReportingModule {
         { provide: UPCOMING_PAYMENTS_QUERIES, useValue: options.runtime.upcoming },
         { provide: SPENDABLE_QUERIES, useValue: options.runtime.spendable },
         { provide: CONVERSION_COST_QUERIES, useValue: options.runtime.conversionCosts },
+        { provide: FINANCIAL_REPORTS, useValue: options.runtime.reports },
       ],
     };
   }
@@ -224,3 +276,11 @@ export class ReportingModule {
 
 export { REPORTING_DATA_VERSION_CONSUMER } from '../contracts/index.js';
 export type { WorkspaceSettingsPort };
+
+export {
+  ReportsReconciliation,
+  type LedgerTrialPort,
+  type ReconciliationReports,
+} from '../application/reports-reconciliation.js';
+export { describeMismatch, type ReconciliationMismatch } from '../domain/index.js';
+export type { DrillDownParams } from '../application/financial-reports.exports.js';

@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Montos sin tasa fuera del consolidado"
 scenario: "Gasto en USDT sin tasa"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-011", "FR-FX-006"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/reports/reports.test.tsx
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["conversion-policy", "missing-rate"]
 error_code: null
@@ -31,7 +34,7 @@ expected_result:
   - "La vista nativa informa 20.000000 USDT"
   - "Nunca se convierte 1:1"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-016 — Un monto sin tasa queda fuera del consolidado, que se marca incompleto, y sigue visible en nativo

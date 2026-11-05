@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Filtros comunes de los reportes"
 scenario: "Filtro por cuenta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-010"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/transactions/test/integration/pg-nominal-portions.int.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["filters"]
 error_code: null
@@ -35,7 +37,7 @@ expected_result:
   - "Gasto de 2026-10 = 3300.00 BOB con el filtro por categoría (incluye la subcategoría)"
   - "El id de otro workspace no coincide con nada y no revela su existencia"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-002 — Los filtros por cuenta y por categoría con subcategorías se aplican a las cifras del reporte

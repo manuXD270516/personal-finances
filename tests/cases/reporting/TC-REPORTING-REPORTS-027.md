@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: ["ledger/balances"]
 requirement: "Reconciliación de los reportes con el ledger"
 scenario: "Diferencia detectada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-010"]
 nfr: ["NFR-DATA-008"]
 invariants: ["INV-004", "INV-021", "INV-022", "INV-031"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/reports-reconciliation.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["reconciliation", "pbt", "exit-criteria"]
 error_code: null
@@ -31,7 +33,7 @@ expected_result:
   - "Σ categorías = gasto; inicial + componentes = final; ΔNW = Σ componentes; Σ drill-down = celda"
   - "La diferencia inyectada falla indicando reporte, periodo y moneda"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-027 — PBT: los reportes cuadran con el ledger para ledgers aleatorios y una diferencia mínima falla nombrando reporte, periodo y moneda

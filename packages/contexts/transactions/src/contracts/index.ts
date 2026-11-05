@@ -71,6 +71,21 @@ export interface ReconciliationStatusQuery {
 
 export const RECONCILIATION_STATUS_QUERY = Symbol.for('pf.transactions.ReconciliationStatusQuery');
 
+/**
+ * Fechas de extracto de las conciliaciones COMPLETADAS de una cuenta en un rango (add-financial-reports: marca de
+ * conciliación del historial de saldo). Aditivo; sin efectos; en la unidad de trabajo del llamador.
+ */
+export interface ReconciliationMarksQuery {
+  closedStatementDates(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly string[]>;
+}
+
+export const RECONCILIATION_MARKS_QUERY = Symbol.for('pf.transactions.ReconciliationMarksQuery');
+
 export interface FlowMoneyDto {
   readonly amount: string;
   readonly currency: string;
@@ -94,7 +109,17 @@ export interface NominalFlowRowDto {
    * ausente (las filas no se parten por tags y las demás consultas conservan su agrupación).
    */
   readonly tagIds?: readonly string[];
+  /**
+   * Cuenta de la porción (add-financial-reports): la pata de usuario que paga o cobra (gasto, ingreso o reembolso) o,
+   * en las comisiones de transferencias y conversiones, la cuenta desde la que se cobra. Solo con `groupBy` `ACCOUNT`.
+   */
+  readonly accountId?: string;
+  /** Contraparte de la porción (o, si no tiene, la de la transacción). Solo con `groupBy` `COUNTERPARTY`. */
+  readonly counterpartyId?: string | null;
 }
+
+/** Dimensiones adicionales por las que `summarizeNominalFlows` puede agrupar (add-financial-reports). */
+export type NominalFlowGroupBy = 'ACCOUNT' | 'COUNTERPARTY';
 
 /** Query pública `SummarizeNominalFlows` (sin efectos; en la unidad de trabajo del llamador si existe). */
 export interface NominalFlowQuery {
@@ -107,10 +132,69 @@ export interface NominalFlowQuery {
     readonly categoryIds?: readonly string[];
     /** Agrega además por el conjunto de tags de la porción y lo informa en `tagIds` (add-budgets). */
     readonly withTags?: boolean;
+    /** Solo las porciones de estas cuentas (add-financial-reports; ver `NominalFlowRowDto.accountId`). Ausente: todas. */
+    readonly accountIds?: readonly string[];
+    /** Solo las porciones de estas contrapartes (la de la porción o, si no tiene, la de la transacción). */
+    readonly counterpartyIds?: readonly string[];
+    /** Solo las porciones con CUALQUIERA de estas etiquetas. */
+    readonly tagIds?: readonly string[];
+    /** Solo las porciones en estas monedas. */
+    readonly currencies?: readonly string[];
+    /** Agrega además por cuenta y/o contraparte; sin él la agrupación no cambia. */
+    readonly groupBy?: readonly NominalFlowGroupBy[];
   }): Promise<readonly NominalFlowRowDto[]>;
 }
 
 export const NOMINAL_FLOW_QUERY = Symbol.for('pf.transactions.NominalFlowQuery');
+
+/** Porción (split) vigente de una transacción con asiento activo: una fila del drill-down (add-financial-reports). */
+export interface NominalPortionDto {
+  readonly transactionId: string;
+  readonly splitId: string;
+  readonly businessDate: string;
+  readonly nature: 'INCOME' | 'EXPENSE';
+  readonly categoryId: string;
+  readonly accountId: string;
+  readonly counterpartyId: string | null;
+  readonly description: string | null;
+  /** Con el signo del flujo: un reembolso resta (monto negativo en `EXPENSE`). */
+  readonly amount: FlowMoneyDto;
+}
+
+export interface NominalPortionPageDto {
+  readonly rows: readonly NominalPortionDto[];
+  readonly nextCursor: string | null;
+  /** Porciones de TODA la celda (no solo de la página). */
+  readonly count: number;
+  /** Σ por moneda de TODA la celda, calculada con el mismo predicado que `summarizeNominalFlows`. */
+  readonly totals: readonly FlowMoneyDto[];
+}
+
+/**
+ * Query pública `NominalPortionQuery.listPortions` (add-financial-reports, drill-down): las porciones que componen una
+ * celda de `summarizeNominalFlows` con el MISMO predicado y los mismos filtros, ordenadas por fecha de negocio
+ * descendente y luego por id de porción descendente (keyset), con los totales de la celda en cada página. Sin efectos;
+ * en la unidad de trabajo del llamador si existe.
+ */
+export interface NominalPortionQuery {
+  listPortions(input: {
+    readonly workspaceId: string;
+    readonly dateFrom: string;
+    readonly dateTo: string;
+    readonly nature?: 'INCOME' | 'EXPENSE';
+    readonly categoryIds?: readonly string[];
+    readonly accountIds?: readonly string[];
+    readonly counterpartyIds?: readonly string[];
+    readonly tagIds?: readonly string[];
+    readonly currencies?: readonly string[];
+    /** 1..200. */
+    readonly limit: number;
+    /** Cursor opaco de la página anterior. */
+    readonly cursor?: string;
+  }): Promise<NominalPortionPageDto>;
+}
+
+export const NOMINAL_PORTION_QUERY = Symbol.for('pf.transactions.NominalPortionQuery');
 
 /**
  * Query pública para la sugerencia de categoría por counterparty de CLASSIFICATION (add-classification design §8,

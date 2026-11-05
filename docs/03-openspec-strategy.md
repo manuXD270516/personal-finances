@@ -192,7 +192,7 @@ Dependencias que fijan el orden: `add-financial-periods` es la base del plan men
 
 | Orden | Change | Capabilities | Fase |
 |---|---|---|---|
-| 58 | `add-financial-reports` | `reporting/financial-reports` (nueva: catálogo de 16 reportes, reportes Must 1, 2, 3, 7, 8 y 15, comparativas MoM/YoY/rango/móvil, drill-down, conversión declarada, export CSV, reconciliación reporte↔ledger en tres niveles, NFR-PERF-006) + `reporting/net-worth`, `reporting/dashboard` | 7 |
+| 58 | `add-financial-reports` **(implementado, 2026-11-05; va antes que el 59)** | `reporting/financial-reports` (nueva: catálogo de 16 reportes, reportes Must 1, 2, 3, 7, 8 y 15, comparativas MoM/YoY/rango/móvil, drill-down, conversión declarada, export CSV, reconciliación reporte↔ledger en tres niveles, NFR-PERF-006) + `reporting/net-worth`, `reporting/dashboard` | 7 |
 | 59 | `add-financial-reports-extended` | `reporting/financial-reports` (reportes Should 4–6 y 9–14, vistas guardadas, PDF Could) | 7 |
 | 60 | `add-cash-flow-forecast` | `reporting/cash-flow-calendar` (saldo proyectado 7/30/60/90, mínimo esperado y riesgo de déficit, NFR-PERF-010) + `reporting/dashboard` (Q5 hasta el próximo ingreso, esenciales, Q7, SM-05) + `notifications/alerts` (alerta de déficit y digest) | 7 |
 | 61 | `add-historical-budgets` | `planning/budgets` (sugerencia por promedio o año anterior con exclusión de atípicos, confirmación explícita) | 7 |

@@ -5,16 +5,18 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Métrica de duración y alerta de evolución a read models"
 scenario: "Reporte cerca del presupuesto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-007"]
 nfr: ["NFR-OBS-004"]
 invariants: []
 priority: medium
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports-read-model-alert.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["observability"]
@@ -29,7 +31,7 @@ expected_result:
   - "Una serie por reporte, sin etiquetas de alta cardinalidad"
   - "La alerta ReportsReadModelRecommended se dispara para ese reporte"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-032 — La duración de cada reporte se mide por reporte y la alerta recomienda un read model al acercarse al presupuesto

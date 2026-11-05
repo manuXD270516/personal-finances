@@ -307,7 +307,8 @@ export interface PendingTransactionsPort {
 
 /** Métricas de la consulta (D117): histogramas sin etiquetas de alta cardinalidad. */
 export interface ReportingMetricsPort {
-  observe(name: string, value: number): void;
+  /** `attributes`: etiquetas de BAJA cardinalidad (p. ej. `report` en `reporting_report_duration_seconds`). */
+  observe(name: string, value: number, attributes?: Readonly<Record<string, string>>): void;
 }
 
 /** Puertos de `GetUpcomingPayments` y `GetSurprisePayments`: los de `ReportingDeps` más periodos y métricas. */

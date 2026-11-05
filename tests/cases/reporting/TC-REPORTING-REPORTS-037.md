@@ -5,16 +5,17 @@ spec: reporting/net-worth
 related_specs: []
 requirement: "Drill-down del patrimonio a las cuentas"
 scenario: "Revalorización de activos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-010", "FR-REPORTING-005"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["net-worth", "drill-down"]
@@ -30,7 +31,7 @@ expected_result:
   - "Fila \"Wallet USDT\" con 1000.000000 USDT y 500.00 BOB de revalorización"
   - "Enlace a su historial de saldo de 2026-10"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-037 — El drill-down de la revalorización de activos lista las cuentas y enlaza su historial de saldo

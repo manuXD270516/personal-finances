@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Promedio móvil de periodos completos"
 scenario: "Promedio de tres meses"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-009"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["rolling"]
 error_code: null
@@ -31,7 +33,7 @@ expected_result:
   - "Línea base 3100.00 BOB; variación 700.00 BOB y 22.58 %"
   - "Con el primer movimiento el 2026-08-03: historial insuficiente, sin variación"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-012 — El promedio móvil de 3 periodos completos sirve de línea base y avisa el historial insuficiente

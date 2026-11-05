@@ -45,7 +45,8 @@
     "debt": "Deudas",
     "goals": "Metas",
     "documents": "Documentos",
-    "rules": "Reglas"
+    "rules": "Reglas",
+    "reports": "Reportes"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -505,7 +506,8 @@
         "loading": "Cargando el disponible…",
         "noAccounts": "Aún no tienes cuentas líquidas: no hay disponible que calcular."
       }
-    }
+    },
+    "reportsLink": "Ver el reporte de ingresos y gastos"
   },
   "Common": {
     "noWorkspace": "Selecciona o crea un espacio de trabajo.",
@@ -6103,6 +6105,245 @@
       "resolved": "Se quitó la marca de revisión.",
       "marked": "La transacción quedó pendiente de revisión.",
       "createRule": "Crear regla desde esta transacción"
+    }
+  },
+  "Reports": {
+    "title": "Reportes",
+    "subtitle": "Cifras exactas desde tus movimientos, con la política de conversión a la vista.",
+    "loading": "Cargando…",
+    "empty": "No hay datos para el rango pedido.",
+    "export": "Exportar CSV",
+    "partial": "parcial",
+    "total": "Total",
+    "backToCatalog": "Volver al catálogo de reportes",
+    "catalog": {
+      "status": {
+        "AVAILABLE": "Disponible",
+        "PARTIAL": "Parcial",
+        "PLANNED": "Planificado"
+      },
+      "open": "Abrir reporte",
+      "partial": "Ver la vista existente",
+      "planned": "Llega en la fase {phase}; sin cifras por ahora."
+    },
+    "filters": {
+      "title": "Filtros del reporte",
+      "from": "Desde (fecha de negocio)",
+      "to": "Hasta (fecha de negocio)",
+      "grouping": "Agrupar por",
+      "FINANCIAL_PERIOD": "Periodo financiero",
+      "CALENDAR_MONTH": "Mes calendario",
+      "granularity": "Granularidad",
+      "PERIOD": "Por periodo",
+      "WEEK": "Por semana ISO",
+      "DAY": "Por día",
+      "account": "Cuenta",
+      "accountPick": "Elige una cuenta",
+      "topN": "Mostrar solo las N primeras categorías",
+      "reportingCurrency": "Moneda de reporte",
+      "baseCurrency": "Moneda base del espacio",
+      "conversion": "Valoración de los flujos",
+      "HISTORICAL": "Tasa de la fecha de cada movimiento",
+      "CUTOFF": "Tasa de la fecha de corte",
+      "compare": "Comparar con",
+      "NONE": "Sin comparación",
+      "PREVIOUS_PERIOD": "Periodo anterior",
+      "PREVIOUS_YEAR": "Mismo periodo del año anterior",
+      "PREVIOUS_PERIOD_TO_DATE": "Periodo anterior a la fecha",
+      "CUSTOM": "Rango personalizado",
+      "compareFrom": "Comparar desde",
+      "compareTo": "Comparar hasta",
+      "normalize": "Normalizar por día",
+      "rolling": "Promedio móvil (periodos)",
+      "accounts": "Cuentas (ids separados por coma)",
+      "currencies": "Monedas (códigos separados por coma)",
+      "categories": "Categorías (ids; incluyen subcategorías)",
+      "tags": "Etiquetas (ids; cualquiera)",
+      "counterparties": "Contrapartes (ids)",
+      "idsHint": "opcional",
+      "apply": "Aplicar filtros",
+      "errors": {
+        "range": "La fecha inicial no puede ser posterior a la final.",
+        "custom": "El rango de comparación está incompleto o invertido."
+      }
+    },
+    "variation": {
+      "new": "nuevo",
+      "up": "Subió",
+      "down": "Bajó",
+      "same": "Sin cambio"
+    },
+    "incomplete": {
+      "short": "Sin tasa para: {amounts}",
+      "report": "Reporte incompleto: sin tasa de conversión para {amounts}. Esos montos no se estiman ni se convierten 1:1.",
+      "line": "(incompleto)"
+    },
+    "conversion": {
+      "title": "Cómo se convirtió",
+      "policy": {
+        "TRANSACTION_DATE": "Los flujos se valoran con la tasa vigente al cierre del día de cada movimiento y los saldos con la tasa de su fecha.",
+        "VALUATION_DATE": "Los saldos se valoran con la tasa de cada fecha.",
+        "CUTOFF_DATE": "Todos los flujos se valoran con la tasa vigente al cierre de la fecha de corte {date}."
+      },
+      "reporting": "Moneda de reporte {currency}; ventana de vigencia de tasas de {days} días.",
+      "none": "Este reporte no usó tasas de conversión.",
+      "rate": "1 {base} = {value} {quote} · tipo {type} · fuente {source} · al {date}"
+    },
+    "drill": {
+      "title": "Detalle de la cifra",
+      "close": "Cerrar detalle",
+      "open": "Ver el detalle de {cell}",
+      "totals": "{count, plural, one {# fila} other {# filas}} · total de la celda:",
+      "caption": "Filas que componen la cifra",
+      "date": "Fecha",
+      "description": "Descripción",
+      "amount": "Monto nativo",
+      "valued": "Valorado",
+      "more": "Cargar más filas",
+      "component": {
+        "operating": "Operativo",
+        "debt": "Deuda",
+        "savingsInvestments": "Ahorro e inversión",
+        "currencyExchange": "Cambio de moneda",
+        "adjustments": "Ajustes",
+        "INCOME": "Ingreso",
+        "EXPENSE": "Gasto",
+        "FX_TRADING": "Cambio de moneda",
+        "OPENING_BALANCE": "Saldo inicial",
+        "ADJUSTMENTS": "Ajuste",
+        "OUTSIDE_ASSET": "Transferencia a otra cuenta",
+        "OUTSIDE_LIABILITY": "Pago de deuda"
+      }
+    },
+    "income": {
+      "period": "Periodo",
+      "income": "Ingresos",
+      "expenses": "Gastos",
+      "savings": "Ahorro",
+      "savingsRate": "Tasa de ahorro",
+      "rateUndefined": "sin definir",
+      "vsExpenses": "Variación del gasto",
+      "baseline": "Promedio móvil del gasto",
+      "chartTitle": "Ingresos y gastos por periodo",
+      "chartDesc": "Barras agrupadas de {n} periodos en {currency}; la tabla siguiente tiene los mismos datos.",
+      "daysDiffer": "Los rangos tienen distinta cantidad de días: {current} y {compared}.",
+      "caption": "Ingresos, gastos, ahorro y tasa de ahorro por periodo"
+    },
+    "baseline": {
+      "insufficient": "Historial insuficiente para {n} periodos",
+      "value": "Promedio de {n}: {average}{delta}"
+    },
+    "category": {
+      "name": "Categoría",
+      "amount": "Gasto",
+      "vs": "Variación",
+      "caption": "Gasto por grupo, categoría y subcategoría",
+      "others": "Otras categorías",
+      "archived": "archivada",
+      "negativeNet": "neto negativo"
+    },
+    "budget": {
+      "noBudget": "Sin presupuesto",
+      "caption": "Líneas del presupuesto de {period} en {currency}",
+      "line": "Línea",
+      "reference": "Referencia",
+      "actual": "Real",
+      "status": "Estado",
+      "statuses": {
+        "UNDER": "Dentro del plan",
+        "ON_TARGET": "En la meta",
+        "OVER": "Excedido",
+        "WITHIN": "Dentro del rango",
+        "BELOW": "Por debajo",
+        "ABOVE": "Por encima",
+        "PENDING": "Pendiente",
+        "MET": "Cumplido",
+        "NO_BUDGET": "Sin presupuesto"
+      }
+    },
+    "cash": {
+      "chartTitle": "Saldo final de las cuentas líquidas por periodo",
+      "chartDesc": "Línea de {n} periodos en {currency}; la tabla de cada periodo tiene los mismos datos.",
+      "note": "Una conversión desde una cuenta líquida hacia una no líquida de otra moneda cuenta como cambio de moneda. Las transferencias entre cuentas líquidas no son flujo.",
+      "caption": "Flujo de caja de {period} por moneda",
+      "currency": "Moneda",
+      "opening": "Saldo inicial",
+      "operating": "Operativo",
+      "debt": "Deuda",
+      "savingsInvestments": "Ahorro e inversión",
+      "currencyExchange": "Cambio de moneda",
+      "adjustments": "Ajustes",
+      "closing": "Saldo final",
+      "consolidated": "Consolidado en {currency}",
+      "revaluation": "Revalorización (diferencia de valoración entre saldos y flujos): {amount}"
+    },
+    "history": {
+      "chartTitle": "Saldo diario de la cuenta",
+      "chartDesc": "Escalón de {n} días en {currency}; los puntos huecos son días con conciliación.",
+      "summary": "Saldo inicial {opening}; saldo final {closing}.",
+      "caption": "Días con movimientos o conciliación",
+      "date": "Fecha",
+      "balance": "Saldo",
+      "valued": "Valorado",
+      "marks": "Marca",
+      "reconciled": "Conciliado"
+    },
+    "worth": {
+      "chartTitle": "Patrimonio neto",
+      "chartDesc": "Línea de {n} puntos en {currency}; los puntos huecos son incompletos.",
+      "change": "El patrimonio pasó de {opening} a {closing}.",
+      "caption": "Descomposición del cambio de {period}",
+      "component": "Componente",
+      "amount": "Monto",
+      "savings": "Ahorro",
+      "conversionResult": "Resultado de conversiones",
+      "adjustments": "Ajustes y saldos iniciales",
+      "otherMovements": "Otros movimientos",
+      "fxRevaluation": "Revalorización cambiaria",
+      "assetRevaluation": "Revalorización de activos",
+      "byCurrency": "{currency} ({kind}): {amount}",
+      "kind": {
+        "FX": "cambiaria",
+        "ASSET": "de activos"
+      },
+      "incomplete": "Descomposición incompleta: sin tasa para {amounts}. No se calculó su revalorización ni se atribuyó a otro componente.",
+      "excludedNote": "El ahorro es el de las cuentas incluidas en el patrimonio: un gasto pagado desde una cuenta excluida no aparece aquí."
+    },
+    "names": {
+      "INCOME_EXPENSES": "Ingresos y gastos",
+      "BUDGET_VS_ACTUAL": "Presupuesto vs real",
+      "EXPENSES_BY_CATEGORY": "Gastos por categoría",
+      "EXPENSES_BY_TAG": "Gastos por etiqueta",
+      "EXPENSES_BY_ACCOUNT": "Gastos por cuenta",
+      "MONTHLY_TRENDS": "Tendencias mensuales",
+      "CASH_FLOW": "Flujo de caja",
+      "NET_WORTH": "Patrimonio neto",
+      "SAVINGS_GOALS": "Metas de ahorro",
+      "DEBT_EVOLUTION": "Evolución de deudas",
+      "RECURRING_COSTS": "Costos recurrentes y suscripciones",
+      "SUBSCRIPTION_EVOLUTION": "Evolución de suscripciones",
+      "FX_CONVERSIONS": "Conversiones de moneda y cripto",
+      "FEES": "Comisiones y cargos",
+      "ACCOUNT_BALANCE_HISTORY": "Historial de saldo de una cuenta",
+      "FORECAST_VS_ACTUAL": "Pronóstico vs real"
+    },
+    "purposes": {
+      "INCOME_EXPENSES": "Cuánto entró, cuánto salió y cuánto ahorraste en cada periodo.",
+      "BUDGET_VS_ACTUAL": "Cada línea del presupuesto contra lo gastado, periodo a periodo.",
+      "EXPENSES_BY_CATEGORY": "En qué se fue el gasto: grupo, categoría y subcategoría.",
+      "EXPENSES_BY_TAG": "El gasto agrupado por etiqueta.",
+      "EXPENSES_BY_ACCOUNT": "El gasto agrupado por cuenta.",
+      "MONTHLY_TRENDS": "Cómo evolucionan tus ingresos y gastos mes a mes.",
+      "CASH_FLOW": "De dónde viene y a dónde va el dinero de tus cuentas líquidas.",
+      "NET_WORTH": "Cuánto vale lo que tienes y por qué cambió: ahorro, conversiones y revalorización.",
+      "SAVINGS_GOALS": "El avance de tus metas de ahorro.",
+      "DEBT_EVOLUTION": "Cómo baja lo que debes.",
+      "RECURRING_COSTS": "Lo que pagas de forma recurrente.",
+      "SUBSCRIPTION_EVOLUTION": "Cómo cambia el costo de tus suscripciones.",
+      "FX_CONVERSIONS": "Lo que te cuesta convertir monedas y cripto.",
+      "FEES": "Comisiones, intereses y cargos pagados.",
+      "ACCOUNT_BALANCE_HISTORY": "El saldo de una cuenta, día a día, con sus conciliaciones.",
+      "FORECAST_VS_ACTUAL": "Lo pronosticado contra lo que pasó."
     }
   }
 }

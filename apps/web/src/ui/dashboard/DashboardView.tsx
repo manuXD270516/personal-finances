@@ -15,6 +15,8 @@ export interface DashboardViewProps extends FormatContext {
   readonly summary: ReportSummary;
   /** Destino de la acción "crear cuenta" (si existe la pantalla). */
   readonly createAccountHref?: string | undefined;
+  /** Ruta localizada del reporte de ingresos y gastos (enlace de Q7, add-financial-reports). */
+  readonly reportsPath?: string | undefined;
   /** Destino de la acción "registrar tasa" (si existe la pantalla). */
   readonly registerRateHref?: string | undefined;
   /** Destino de la acción "registrar un gasto" del estado vacío de categorías. */
@@ -52,6 +54,7 @@ const HomeStyles = () => <style>{HOME_CSS}</style>;
 export function DashboardView({
   summary,
   createAccountHref,
+  reportsPath,
   registerRateHref,
   registerExpenseHref,
   goalsHref,
@@ -143,7 +146,15 @@ export function DashboardView({
           <div className="pf-home-month">
             <div className="pf-home-kpis">
               <IncomeCard summary={summary} ctx={fctx} />
-              <ExpenseCard summary={summary} ctx={fctx} />
+              <ExpenseCard
+                summary={summary}
+                ctx={fctx}
+                reportsHref={
+                  reportsPath
+                    ? `${reportsPath}?grouping=CALENDAR_MONTH&compare=PREVIOUS_PERIOD_TO_DATE&from=${summary.period.from}&to=${summary.period.to}&reportingCurrency=${summary.meta.reportingCurrency}`
+                    : undefined
+                }
+              />
               <SavingsCard summary={summary} ctx={fctx} />
             </div>
             <div className="pf-home-tops">

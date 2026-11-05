@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: ["planning/budgets"]
 requirement: "Reporte de presupuesto vs real por periodos"
 scenario: "Septiembre con presupuesto y octubre sin presupuesto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-PLANNING-024"]
 nfr: []
 invariants: ["INV-034"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["budget-vs-actual"]
 error_code: "VALIDATION_FAILED"
@@ -34,7 +36,7 @@ expected_result:
   - "2026-10: NO_BUDGET sin referencias en cero"
   - "grouping=CALENDAR_MONTH ⇒ 400 VALIDATION_FAILED"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-007 — Presupuesto vs real por periodos reutiliza las cifras de planificación y marca los periodos sin presupuesto

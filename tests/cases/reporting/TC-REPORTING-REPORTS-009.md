@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: ["ledger/balances", "transactions/reconciliation"]
 requirement: "Reporte de historial de saldo de una cuenta"
 scenario: "Octubre de Banco BOB"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-LEDGER-012"]
 nfr: []
 invariants: ["INV-022"]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/financial-reports.api.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["balance-history"]
 error_code: null
@@ -33,7 +36,7 @@ expected_result:
   - "El 2026-10-10 lleva la marca de conciliación"
   - "Cada día coincide con el saldo contable a esa fecha"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-009 — El historial de saldo de una cuenta escalona los días y marca las conciliaciones cerradas
