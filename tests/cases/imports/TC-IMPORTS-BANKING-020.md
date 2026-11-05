@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Idempotencia por identificador del proveedor"
 scenario: "Ventana solapada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-010", "FR-TRANSACTIONS-032"]
 nfr: []
 invariants: ["INV-014"]
 priority: critical
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +37,7 @@ expected_result:
   - "Vista previa: 9 ya importados"
   - "Se crean 9; total 29"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-020 — Una ventana solapada no crea duplicados

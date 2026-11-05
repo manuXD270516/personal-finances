@@ -5,16 +5,19 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Trades del exchange como conversiones"
 scenario: "Compra de BTC con USDT"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-014", "FR-TRANSACTIONS-020", "FR-TRANSACTIONS-023"]
 nfr: []
 invariants: ["INV-001", "INV-003", "INV-004"]
 priority: high
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -37,7 +40,7 @@ expected_result:
   - "Detalle: cotizada 65000.00, fee PROVIDER 0.00001500 BTC como gasto Fees, instante del exchange"
   - "Asiento: suma cero en USDT y en BTC"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-023 — Un trade spot se propone como conversión con el detalle del exchange

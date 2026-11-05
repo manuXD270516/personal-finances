@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Puerto común de proveedores bancarios y de exchange"
 scenario: "Proveedor de prueba en la suite de contrato"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013", "FR-IMPORTS-002"]
 nfr: []
 invariants: ["INV-001"]
 priority: high
 type: integration
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/banking/fake-exchange.contract.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +36,7 @@ expected_result:
   - "La reanudación entrega cada registro una sola vez"
   - "Los registros llegan a la etapa normalize del import"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-001 — El proveedor simulado pasa la suite de contrato común

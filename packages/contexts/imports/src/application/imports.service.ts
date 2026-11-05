@@ -997,6 +997,10 @@ export class ImportsService {
       job.cancel({ actor: { type: 'USER', userId: cmd.userId }, now: deps.clock.now().toString() });
       await this.save(job);
       await deps.staging.deleteAll(cmd.workspaceId, job.id);
+      // Cancelar la vista previa de una sincronización NO mueve el cursor confirmado de la conexión.
+      if (job.state.connectionId && deps.connectionHooks) {
+        await deps.connectionHooks.onImportAbandoned(cmd.workspaceId, job.state.connectionId, job.id);
+      }
       await recordJob(deps, job, 'cancelled', {
         changes: [{ field: 'status', before, after: 'CANCELLED' }],
       });

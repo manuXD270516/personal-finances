@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Permisos y auditoría de las conexiones"
 scenario: "Auditoría de la creación"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: []
 invariants: ["INV-029"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -34,7 +36,7 @@ expected_result:
   - "Registro con proveedor, huella …a1b2 y mapeos"
   - "Sin secreto; recorrido PENDING_VERIFICATION"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-034 — La auditoría de la creación no contiene el secreto

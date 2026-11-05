@@ -16,6 +16,17 @@ import type {
   TransactionStatusQuery,
 } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
+import { ConnectionHooks } from '../application/banking/connection-hooks.js';
+import { ConnectionJobs } from '../application/banking/connection-jobs.js';
+import { ConnectionsService } from '../application/banking/connections.service.js';
+import { CredentialVault } from '../application/banking/credential-vault.js';
+import type {
+  BankingDeps,
+  BankingProvider,
+  ConnectionJobQueue,
+  ConnectionSettings,
+  ProviderAdapters,
+} from '../application/banking/ports.js';
 import { ImportsMaintenanceService } from '../application/imports-maintenance.service.js';
 import { ImportsQueries } from '../application/imports.queries.js';
 import { ImportsService } from '../application/imports.service.js';
@@ -38,6 +49,7 @@ import type {
   OutboxPort,
   ReferenceCatalogPort,
   RulesEvaluationPort,
+  SystemCategoriesPort,
 } from '../application/ports/index.js';
 import {
   IMPORTS_CONSUMERS,
@@ -55,12 +67,35 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-imports.js';
 import { PgMappingProfileRepository } from '../infrastructure/pg-mapping-profiles.js';
+import { PROVIDER_DESCRIPTORS } from '../infrastructure/banking/descriptors.js';
+import {
+  FAKE_HOST,
+  FAKE_EXCHANGE_FILE_DESCRIPTOR,
+  FakeExchangeBackend,
+  FakeExchangeFileProvider,
+  FakeExchangeProvider,
+  sampleRecords,
+} from '../infrastructure/banking/fake-exchange.js';
+import {
+  AllowlistedProviderHttp,
+  nodeHttpsTransport,
+  type ProviderTransport,
+} from '../infrastructure/banking/provider-http.js';
+import {
+  X25519CredentialKeyUnwrapper,
+  X25519CredentialKeyWrapper,
+  nodeSymmetricCipher,
+} from '../infrastructure/banking/x25519-key-wrapper.js';
+import { PgConnectionRepository } from '../infrastructure/pg-connections.js';
+import { ProviderRegistry, type ProviderEnvironment } from '../domain/index.js';
 import { PdfStatementReader } from '../application/pdf/pdf-statement-reader.js';
 import { FilePdfLayoutRegistry } from '../infrastructure/pdf/file-pdf-layout-registry.js';
 import { PdfjsTextExtractor } from '../infrastructure/pdf/pdfjs-text-extractor.js';
 import { DefaultStatementReader } from '../infrastructure/readers/statement-reader.js';
+import { CONNECTIONS_SERVICE, ConnectionCredentialGuard, ConnectionsController } from './connections-http.js';
 import {
   CsvUploadGuard,
+  IMPORTS_CONNECTIONS,
   IMPORTS_HTTP_SETTINGS,
   IMPORTS_QUERIES,
   IMPORTS_REVERT,
@@ -127,7 +162,43 @@ export interface ImportsRuntimeOptions {
   /** Validación de categorías, contrapartes y etiquetas editadas en la vista previa (CLASSIFICATION). */
   readonly refs: ReferenceCatalogPort;
   readonly settings?: Partial<ImportsSettings>;
+  /** Conexiones con proveedores (add-banking-providers); sin ella el módulo de conexiones queda deshabilitado. */
+  readonly banking?: BankingRuntimeOptions;
+  /** Categoría de sistema «comisiones» (CLASSIFICATION) para las filas de comisión de un exchange. */
+  readonly systemCategories?: SystemCategoriesPort;
 }
+
+export interface BankingRuntimeOptions {
+  readonly environment: ProviderEnvironment;
+  /** `IMPORTS_PROVIDER_FAKE_ENABLED`: prohibido en staging y producción (el arranque falla). */
+  readonly fakeEnabled: boolean;
+  /** `CONNECTION_CREDENTIALS_PUBLIC_KEYS` (`kid:clave`, la primera es la vigente). Sin ella no hay conexiones. */
+  readonly publicKeys?: string | undefined;
+  /** Claves privadas (`kid:clave`): SOLO el worker (D342: leídas de un archivo 0400 fuera del repositorio). */
+  readonly privateKeys?: string | null | undefined;
+  readonly queue: ConnectionJobQueue;
+  readonly settings?: Partial<ConnectionSettings>;
+  /** Transporte HTTP de los proveedores reales (por omisión `node:https`); los tests inyectan el suyo. */
+  readonly transport?: ProviderTransport;
+  /** Servidor del proveedor simulado (por omisión uno con el historial de ejemplo). */
+  readonly fakeBackend?: FakeExchangeBackend;
+  /** Adapters reales (puerta del owner, grupo 9); el simulado se agrega solo si está habilitado. */
+  readonly extraProviders?: readonly BankingProvider[];
+}
+
+export const DEFAULT_CONNECTION_SETTINGS: ConnectionSettings = {
+  syncMaxDays: 365,
+  requestsPerMinute: 10,
+  maxPages: 1000,
+};
+
+/** Cola que no hace nada útil: las conexiones sin cola configurada rechazan encolar. */
+const DISABLED_QUEUE: ConnectionJobQueue = {
+  enqueueVerify: () =>
+    Promise.reject(new DomainError('SERVICE_UNAVAILABLE', 'connection jobs are not enabled')),
+  enqueueSync: () =>
+    Promise.reject(new DomainError('SERVICE_UNAVAILABLE', 'connection jobs are not enabled')),
+};
 
 export interface ImportsRuntime {
   readonly service: ImportsService;
@@ -139,6 +210,12 @@ export interface ImportsRuntime {
   readonly profiles: ProfilesService;
   readonly maintenance: ImportsMaintenanceService;
   readonly settings: ImportsSettings;
+  /** Conexiones con proveedores y sus jobs (add-banking-providers). */
+  readonly connections: ConnectionsService;
+  readonly connectionJobs: ConnectionJobs;
+  readonly providers: ProviderRegistry;
+  /** El worker puede descifrar credenciales (tiene las claves privadas). */
+  readonly canDecryptCredentials: boolean;
 }
 
 /**
@@ -192,6 +269,9 @@ export function createImportsRuntime(options: ImportsRuntimeOptions): ImportsRun
         end: p.periodEnd,
       })),
   };
+  const connections = new PgConnectionRepository();
+  const holder: { deps?: ImportsDeps } = {};
+  const hooks = new ConnectionHooks(() => holder.deps as ImportsDeps, connections);
   const deps: ImportsDeps = {
     uow: new PgImportsUnitOfWork(options.pool),
     jobs: new PgImportJobRepository(),
@@ -220,6 +300,8 @@ export function createImportsRuntime(options: ImportsRuntimeOptions): ImportsRun
     occurrenceLinks: options.occurrenceLinks,
     institutions: options.institutions,
     conversions: options.transactions.importedConversions,
+    connectionHooks: hooks,
+    ...(options.systemCategories ? { systemCategories: options.systemCategories } : {}),
     readers: new DefaultStatementReader(),
     refs: options.refs,
     // Lector de extractos PDF (add-pdf-statement-parser): extracción en un hilo aislado, sin consumidores nuevos.
@@ -235,15 +317,66 @@ export function createImportsRuntime(options: ImportsRuntimeOptions): ImportsRun
       { minPageTextChars: settings.pdfMinPageTextChars },
     ),
   };
+  holder.deps = deps;
+  const banking = bankingRuntime(options.banking, connections);
+  const process = new ProcessImportService(deps);
   return {
     service: new ImportsService(deps),
     queries: new ImportsQueries(deps),
     persist: new PersistImportService(deps),
-    process: new ProcessImportService(deps),
+    process,
     revert: new RevertImportService(deps),
     profiles: new ProfilesService(deps),
     maintenance: new ImportsMaintenanceService(deps),
     settings,
+    connections: new ConnectionsService(deps, banking.deps),
+    connectionJobs: new ConnectionJobs(deps, banking.deps, process),
+    providers: banking.deps.registry,
+    canDecryptCredentials: banking.deps.vault.canDecrypt,
+  };
+}
+
+/** Registro de proveedores, adapters, cliente HTTP con allowlist y almacén de credenciales (decisiones 1–3 y 10). */
+function bankingRuntime(
+  options: BankingRuntimeOptions | undefined,
+  connections: PgConnectionRepository,
+): { readonly deps: BankingDeps } {
+  const environment = options?.environment ?? 'local';
+  const fakeEnabled = options?.fakeEnabled ?? false;
+  // Falla al arrancar si el simulado está habilitado en staging o producción, o si un descriptor es inválido.
+  const registry = ProviderRegistry.create(PROVIDER_DESCRIPTORS, { environment, fakeEnabled });
+  const backend = fakeEnabled ? (options?.fakeBackend ?? new FakeExchangeBackend(sampleRecords())) : null;
+  const real = options?.transport ?? nodeHttpsTransport;
+  // El host del simulado nunca sale a la red: se enruta al servidor simulado en proceso.
+  const transport: ProviderTransport = backend
+    ? (url, headers, timeoutMs) =>
+        url.hostname === FAKE_HOST
+          ? backend.transport(url, headers, timeoutMs)
+          : real(url, headers, timeoutMs)
+    : real;
+  const apis = new Map<string, BankingProvider>();
+  if (fakeEnabled) apis.set('FAKE_EXCHANGE', new FakeExchangeProvider());
+  for (const p of options?.extraProviders ?? []) apis.set(p.descriptor.id, p);
+  const adapters: ProviderAdapters = {
+    api: (id) => apis.get(id) ?? null,
+    file: (id) =>
+      fakeEnabled && id === FAKE_EXCHANGE_FILE_DESCRIPTOR.id ? new FakeExchangeFileProvider() : null,
+  };
+  const wrapper = options?.publicKeys ? new X25519CredentialKeyWrapper(options.publicKeys) : null;
+  const unwrapper =
+    options?.publicKeys && options.privateKeys
+      ? new X25519CredentialKeyUnwrapper(options.publicKeys, options.privateKeys)
+      : null;
+  return {
+    deps: {
+      registry,
+      adapters,
+      connections,
+      vault: new CredentialVault(nodeSymmetricCipher, wrapper, unwrapper),
+      queue: options?.queue ?? DISABLED_QUEUE,
+      http: new AllowlistedProviderHttp(transport),
+      settings: { ...DEFAULT_CONNECTION_SETTINGS, ...options?.settings },
+    },
   };
 }
 
@@ -259,9 +392,12 @@ export class ImportsModule {
     const http: ImportsHttpSettings = { maxBytes: options.runtime.settings.maxBytes };
     return {
       module: ImportsModule,
-      controllers: [ImportsController, ImportProfilesController],
+      controllers: [ConnectionsController, ImportsController, ImportProfilesController],
       providers: [
         CsvUploadGuard,
+        ConnectionCredentialGuard,
+        { provide: CONNECTIONS_SERVICE, useValue: options.runtime.connections },
+        { provide: IMPORTS_CONNECTIONS, useValue: options.runtime.connections },
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: IMPORTS_HTTP_SETTINGS, useValue: http },
         { provide: IMPORTS_SERVICE, useValue: options.runtime.service },
@@ -386,7 +522,35 @@ export function runImportsPurge(
 }
 
 export { IMPORTS_CONSUMERS, IMPORTS_EVENTS, IMPORTS_EXPIRE_JOB, IMPORTS_PURGE_JOB };
-export { IMPORTS_AUDIT_POLICY } from '../contracts/index.js';
+
+/**
+ * Gancho de importación del workspace (add-banking-providers): una conexión de API importada NO trae su credencial,
+ * así que queda `NEEDS_CREDENTIAL` (sin error ni cursor de sincronización en curso) hasta que el OWNER cargue una; las de
+ * archivo (sin credencial) y las revocadas no cambian.
+ */
+export function connectionRestoreHook(ctx: { readonly rows: Record<string, unknown>[] }): void {
+  const credentialed = new Set(
+    PROVIDER_DESCRIPTORS.filter((d) => d.credentialMode !== 'NONE').map((d) => d.id),
+  );
+  for (const row of ctx.rows) {
+    if (row['status'] === 'REVOKED' || !credentialed.has(String(row['provider_id']))) continue;
+    row['status'] = 'NEEDS_CREDENTIAL';
+    row['last_error_code'] = null;
+  }
+}
+export {
+  CONNECTION_SYNC_JOB,
+  CONNECTION_VERIFY_JOB,
+  CREDENTIALS_REWRAP_JOB,
+  type ConnectionJobs,
+} from '../application/banking/connection-jobs.js';
+export type { ConnectionJobPayload, ConnectionJobQueue } from '../application/banking/ports.js';
+export { FakeExchangeBackend, sampleRecords } from '../infrastructure/banking/fake-exchange.js';
+export {
+  generateCredentialKeyPair,
+  loadPrivateKeyring,
+} from '../infrastructure/banking/x25519-key-wrapper.js';
+export { IMPORTS_AUDIT_POLICY, IMPORTS_CONNECTION_RESTORE_HOOK } from '../contracts/index.js';
 export type { ImportsMaintenanceService } from '../application/imports-maintenance.service.js';
 export type { ImportsSettings, OutboxPort } from '../application/ports/index.js';
 
@@ -396,6 +560,10 @@ export const importJobExistenceQuery: ImportJobExistenceQuery = {
 };
 
 import { IMPORT_JOB_LIFECYCLE } from '../domain/import-job.js';
+import { CONNECTION_LIFECYCLE } from '../domain/banking/connection.js';
 
 /** Máquina `ImportJob` declarada (dato puro) para el recorrido (add-lifecycle-timeline, add-import-pipeline). */
 export const IMPORT_JOB_LIFECYCLE_MACHINE = IMPORT_JOB_LIFECYCLE.definition;
+
+/** Máquina `ImportConnection` declarada (dato puro) para el recorrido (add-banking-providers, D52). */
+export const IMPORT_CONNECTION_LIFECYCLE_MACHINE = CONNECTION_LIFECYCLE.definition;

@@ -117,6 +117,10 @@ export class PersistImportService {
         },
       });
       await this.save(job);
+      // El cursor confirmado de una conexión avanza SOLO al terminar el import (misma unidad de trabajo).
+      if (job.state.connectionId && deps.connectionHooks && status !== 'PARTIALLY_FAILED') {
+        await deps.connectionHooks.onImportCompleted(workspaceId, job.state.connectionId, job.state.id);
+      }
       const refs = [
         await publishCompleted(deps, job.state, await deps.staging.dateRange(workspaceId, input.importId)),
       ];
@@ -167,40 +171,61 @@ export class PersistImportService {
   ): Promise<readonly { rowId: string; transactionId: string; occurrenceId: string }[]> {
     const { deps } = this;
     const { workspaceId } = input;
-    const accountId = state.accountId;
     const rows = await deps.staging.loadBatch(workspaceId, input.importId, batchNo);
     if (rows.length === 0) return [];
-    const result = await deps.imported.recordBatch({
-      workspaceId,
-      accountId,
-      importJobId: input.importId,
-      actorUserId: approvedBy,
-      rows: rows.map((r) => this.toRecordRow(r, state.format, timeZone)),
-    });
+    // Un import de una conexión mezcla cuentas (cada activo mapea a la suya): un lote por cuenta, en el mismo lote de BD.
+    const groups = new Map<string, StagedRow[]>();
+    for (const row of rows) {
+      const key = row.accountId ?? state.accountId;
+      const group = groups.get(key);
+      if (group) group.push(row);
+      else groups.set(key, [row]);
+    }
     const byId = new Map(rows.map((r) => [r.id, r] as const));
-    const persisted = [...result.created, ...result.alreadyExisting];
-    await deps.staging.markPersisted(
-      workspaceId,
-      persisted.map((p) => ({ rowId: p.rowRef, transactionId: p.transactionId })),
-    );
-    await deps.links.insertMany(
-      workspaceId,
-      persisted.map((p) => {
-        const row = byId.get(p.rowRef) as StagedRow;
-        return {
-          id: deps.ids.next(),
-          accountId,
-          fingerprint: row.fingerprint as string,
-          transactionId: p.transactionId,
-          stagedTransactionId: p.rowRef,
-          kind: 'CREATED' as const,
-          importJobId: input.importId,
-          externalRef: row.externalId
-            ? { namespace: `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${state.format ?? 'CSV'}`, id: row.externalId }
-            : null,
-        };
-      }),
-    );
+    const result = {
+      created: [] as { rowRef: string; transactionId: string }[],
+      alreadyExisting: [] as { rowRef: string; transactionId: string }[],
+    };
+    for (const [accountId, groupRows] of groups) {
+      const part = await deps.imported.recordBatch({
+        workspaceId,
+        accountId,
+        importJobId: input.importId,
+        actorUserId: approvedBy,
+        rows: groupRows.map((r) => this.toRecordRow(r, state.format, timeZone)),
+      });
+      result.created.push(...part.created);
+      result.alreadyExisting.push(...part.alreadyExisting);
+      const persisted = [...part.created, ...part.alreadyExisting];
+      await deps.staging.markPersisted(
+        workspaceId,
+        persisted.map((p) => ({ rowId: p.rowRef, transactionId: p.transactionId })),
+      );
+      await deps.links.insertMany(
+        workspaceId,
+        persisted.map((p) => {
+          const row = byId.get(p.rowRef) as StagedRow;
+          return {
+            id: deps.ids.next(),
+            accountId,
+            fingerprint: row.fingerprint as string,
+            transactionId: p.transactionId,
+            stagedTransactionId: p.rowRef,
+            kind: 'CREATED' as const,
+            importJobId: input.importId,
+            externalRef: row.externalId
+              ? {
+                  // Filas de una conexión: el namespace del proveedor (archivo y API comparten referencia).
+                  namespace: row.external
+                    ? row.external.ref.namespace
+                    : `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${state.format ?? 'CSV'}`,
+                  id: row.externalId,
+                }
+              : null,
+          };
+        }),
+      );
+    }
     const job = await this.lock(workspaceId, input.importId);
     job.recordBatch({
       created: result.created.length,
@@ -271,10 +296,12 @@ export class PersistImportService {
       throw new DomainError('VALIDATION_FAILED', 'a staged row to create is incomplete');
     }
     const effective = effectiveRow(row.proposal ?? EMPTY_PROPOSAL, row.edits, row.description);
-    const kind = effective.kind ?? (row.direction === 'OUT' ? 'EXPENSE' : 'INCOME');
-    const externalRef = row.externalId
-      ? { namespace: `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${format ?? 'CSV'}`, id: row.externalId }
-      : { namespace: IMPORT_ROW_NAMESPACE, id: row.fingerprint };
+    const kind = effective.kind ?? row.external?.kind ?? (row.direction === 'OUT' ? 'EXPENSE' : 'INCOME');
+    const externalRef = row.external
+      ? row.external.ref
+      : row.externalId
+        ? { namespace: `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${format ?? 'CSV'}`, id: row.externalId }
+        : { namespace: IMPORT_ROW_NAMESPACE, id: row.fingerprint };
     const base = {
       rowRef: row.id,
       date: row.bookingDate,
@@ -285,6 +312,21 @@ export class PersistImportService {
     };
     if (kind === 'TRANSFER' && effective.transfer) {
       return { ...base, kind, transfer: { counterAccountId: effective.transfer.counterAccountId } };
+    }
+    if (kind === 'CONVERSION' && !effective.conversion && row.external?.conversion) {
+      // Trade del exchange: montos, comisión y tasa tal como los informa el exchange, con su instante de ejecución.
+      const c = row.external.conversion;
+      return {
+        ...base,
+        kind,
+        conversion: {
+          counterAccountId: c.counterAccountId,
+          counterAmount: c.counterAmount,
+          ...(c.fee ? { fee: c.fee } : {}),
+          ...(c.quotedRate ? { quotedRate: c.quotedRate } : {}),
+          executedAt: row.external.executedAt,
+        },
+      };
     }
     if (kind === 'CONVERSION' && effective.conversion) {
       const c = effective.conversion;

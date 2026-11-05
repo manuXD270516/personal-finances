@@ -5,16 +5,20 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Credenciales cifradas y nunca expuestas"
 scenario: "Crear una conexión con clave de API"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-SEC-007", "NFR-COMP-008"]
 invariants: []
 priority: critical
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/banking/credential-vault.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+  - apps/web/src/ui/imports/connections.test.tsx
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +39,7 @@ expected_result:
   - "Respuestas con fingerprint \"…a1b2\" y sin secreto"
   - "Fila con ciphertext y wrapped_dek; el secreto no aparece en claro"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-007 — La credencial se guarda cifrada y solo se muestra su huella

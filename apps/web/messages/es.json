@@ -4125,7 +4125,8 @@
       "pin": "Fijar el diseño {id} v{version} en esta cuenta",
       "pinHint": "Las próximas importaciones de esta cuenta usarán esa versión aunque el banco publique una nueva.",
       "pinned": "Diseño fijado en un perfil PDF de la cuenta."
-    }
+    },
+    "connectionsLink": "Conexiones con exchanges"
   },
   "Debt": {
     "title": "Deudas",
@@ -6428,6 +6429,72 @@
       "FEES": "Comisiones, intereses y cargos pagados.",
       "ACCOUNT_BALANCE_HISTORY": "El saldo de una cuenta, día a día, con sus conciliaciones.",
       "FORECAST_VS_ACTUAL": "Lo pronosticado contra lo que pasó."
+    }
+  },
+  "ImportConnections": {
+    "title": "Conexiones con exchanges",
+    "intro": "Conecta un exchange con una clave de SOLO LECTURA para traer su historial de trades, depósitos y retiros a PFOS. Nada se crea hasta que revises y apruebes la vista previa. Nunca ingreses usuario y contraseña del exchange: solo claves de API.",
+    "back": "Volver a importaciones",
+    "loading": "Cargando conexiones…",
+    "empty": "Todavía no hay conexiones.",
+    "ownerOnly": "Solo el propietario del workspace puede crear conexiones, reemplazar credenciales o revocarlas.",
+    "status": {
+      "PENDING_VERIFICATION": "Verificando",
+      "ACTIVE": "Activa",
+      "NEEDS_ATTENTION": "Requiere atención",
+      "REJECTED": "Rechazada",
+      "REVOKED": "Revocada",
+      "NEEDS_CREDENTIAL": "Requiere credencial"
+    },
+    "hint": {
+      "active": "Lista para sincronizar. Cada sincronización pasa por una vista previa antes de crear nada.",
+      "verifying": "Estamos comprobando con el exchange que la clave sea de solo lectura.",
+      "expired": "El exchange rechazó la clave (la borraste o venció). Reemplaza la credencial por una clave de solo lectura.",
+      "notReadOnly": "La clave permite operar, retirar o transferir. Crea en el exchange una clave de solo lectura y reemplaza la credencial.",
+      "attention": "La conexión necesita tu atención. Revisa el último error y reemplaza la credencial.",
+      "rejected": "La clave no es de solo lectura y se destruyó. Crea una clave de solo lectura en el exchange y reemplaza la credencial.",
+      "needsCredential": "La conexión se importó sin credencial. Carga una clave de solo lectura para volver a sincronizar.",
+      "revoked": "Conexión revocada: no vuelve a sincronizar. Lo ya importado se conserva."
+    },
+    "fingerprint": "Clave {fingerprint}",
+    "lastError": "Último error: {code}",
+    "mapping": "{asset} → {account}",
+    "cursor": "Sincronizado hasta {date}",
+    "cursorNone": "Todavía sin sincronizar",
+    "retryNotBefore": "el exchange pidió esperar hasta {at}",
+    "syncFrom": "Desde",
+    "syncFromHint": "Primera sincronización: hasta 365 días atrás.",
+    "sync": "Sincronizar",
+    "uploadHistory": "Subir historial",
+    "replace": "Reemplazar credencial",
+    "revoke": "Revocar",
+    "keep": "Conservar",
+    "revokeTitle": "¿Revocar «{name}»?",
+    "revokeBody": "La credencial se destruye de forma irrecuperable y la conexión no vuelve a sincronizar; lo ya importado se conserva. Recuerda borrar también la clave en el exchange.",
+    "replaceTitle": "Reemplazar la credencial de «{name}»",
+    "create": {
+      "title": "Nueva conexión",
+      "provider": "Proveedor",
+      "choose": "Elegir…",
+      "name": "Nombre",
+      "mappings": "Activos y cuentas",
+      "mappingsHint": "Cada activo del exchange va a una cuenta de PFOS de la misma moneda. Un activo sin cuenta no se importa.",
+      "asset": "Activo (p. ej. USDT)",
+      "account": "Cuenta",
+      "addMapping": "Agregar activo",
+      "credential": "Clave de API",
+      "readOnlyNotice": "Crea en el exchange una clave de SOLO LECTURA (sin operar, retirar ni transferir). Una clave con más permisos se rechaza y se destruye.",
+      "keyId": "Identificador de la clave",
+      "secret": "Secreto",
+      "secretHint": "No se vuelve a mostrar. Solo guardamos la huella de la clave.",
+      "submit": "Conectar",
+      "errors": {
+        "provider": "Elige un proveedor.",
+        "name": "Escribe un nombre de 1 a 80 caracteres.",
+        "mappings": "Mapea al menos un activo a una cuenta, sin repetir activos.",
+        "keyId": "Escribe el identificador de la clave.",
+        "secret": "Escribe el secreto de la clave."
+      }
     }
   },
   "Suggestions": {

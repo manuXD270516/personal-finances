@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Idempotencia por identificador del proveedor"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-010"]
 nfr: []
 invariants: ["INV-014"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.file.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -32,7 +33,7 @@ steps:
 expected_result:
   - "La propiedad se cumple"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-022 — Sincronizar dos veces el mismo rango crea cero transacciones (PBT)

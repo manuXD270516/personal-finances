@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Sincronización incremental con ventana y cursor"
 scenario: "Dos sincronizaciones a la vez"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -34,7 +36,7 @@ steps:
 expected_result:
   - "El segundo ⇒ 409 CONNECTION_SYNC_IN_PROGRESS"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-019 — Una conexión no admite dos sincronizaciones en curso

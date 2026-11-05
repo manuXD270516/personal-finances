@@ -5,16 +5,19 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Depósitos, retiros, comisiones y recompensas"
 scenario: "Retiro con comisión de red"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-014"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +38,7 @@ expected_result:
   - "Gasto Fees 1.000000 USDT"
   - "Saldo propuesto de Exchange USDT baja 201.000000 USDT"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-024 — Un retiro se propone como gasto con su comisión de red aparte

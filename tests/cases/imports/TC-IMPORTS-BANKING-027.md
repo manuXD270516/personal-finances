@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Importación por archivo del historial de un exchange"
 scenario: "Archivo de trades con formato verificado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-014", "FR-IMPORTS-004"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.file.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "3 conversiones propuestas con referencias externas del exchange"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-027 — Un archivo de historial con formato verificado produce conversiones
