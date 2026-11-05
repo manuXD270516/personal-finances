@@ -291,6 +291,8 @@ export const ERROR_CATALOG = {
     status: 409,
     title: 'A rule or a transaction changed after the dry-run; run it again',
   },
+  // rules (Phase 7, add-rule-suggestions)
+  RULE_SUGGESTION_DECIDED: { status: 409, title: 'The rule suggestion was already accepted or dismissed' },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

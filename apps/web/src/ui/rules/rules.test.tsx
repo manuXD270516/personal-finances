@@ -6,8 +6,9 @@ import { CoverageView } from './Coverage';
 import { DryRunTable } from './DryRun';
 import { PreviewResult } from './RuleEditor';
 import { RulesTable } from './RulesList';
+import { SuggestionCard, SuggestionPreviewView } from './Suggestions';
 import { CreateRuleLink, NeedsReviewBadge, ReviewBanner, SplitClassificationView } from './TransactionRules';
-import type { Coverage, DryRunItem, Rule, RulePreview } from './types';
+import type { Coverage, DryRunItem, Rule, RulePreview, RuleSuggestion, SuggestionPreview } from './types';
 
 const f = esContext('Rules');
 const tf = esContext('Transactions');
@@ -381,5 +382,175 @@ describe('crear regla desde una fila', () => {
       /href="\/es\/reglas\/nueva\?description=TIGO\+MONEY\+RECARGA\+77712345&amp;kind=EXPENSE&amp;categoryId=c1"/,
     );
     expect(textOf(html)).toContain('Crear regla desde esta transacción');
+  });
+});
+
+describe('sugerencias de reglas', () => {
+  const suggestion = (over: Partial<RuleSuggestion> = {}): RuleSuggestion => ({
+    suggestionId: 'a'.repeat(64),
+    pattern: { type: 'DESCRIPTION', value: 'pedidosya', kind: 'EXPENSE', categoryId: 'c1' },
+    categoryName: 'Restaurantes',
+    support: 4,
+    evidenceCount: 5,
+    confidence: '0.8000',
+    confidenceLevel: 'MEDIUM',
+    proposedRule: { name: 'Restaurantes: pedidosya', priority: 100 },
+    evidence: [
+      {
+        transactionId: 't1',
+        date: '2026-10-04',
+        description: 'PEDIDOSYA 1',
+        amount: { amount: '30.00', currency: 'BOB' },
+        accountId: 'a1',
+        categoryId: 'c1',
+        categoryOrigin: 'MANUAL',
+      },
+    ],
+    counterExamples: [
+      {
+        transactionId: 't2',
+        date: '2026-10-09',
+        description: 'PEDIDOSYA 2',
+        amount: { amount: '45.50', currency: 'BOB' },
+        accountId: 'a1',
+        categoryId: 'c2',
+        categoryOrigin: 'MANUAL',
+      },
+    ],
+    conflicts: [],
+    warnings: [],
+    status: 'OPEN',
+    ...over,
+  });
+  const snames = {
+    account: (id: string) => ({ a1: 'Banco BOB' })[id],
+    category: (id: string) => ({ c1: 'Restaurantes', c2: 'Supermercado' })[id],
+    tag: () => undefined,
+    counterparty: (id: string) => ({ cp1: 'Farmacorp' })[id],
+  };
+  const card = (s: RuleSuggestion, canEdit = true) =>
+    render(
+      <ul>
+        <SuggestionCard
+          suggestion={s}
+          f={f}
+          names={snames}
+          locale="es-BO"
+          canEdit={canEdit}
+          busy={false}
+          onTest={() => undefined}
+          acceptHref={(x) => `/es/reglas/nueva?suggestionId=${x.suggestionId}`}
+          onDismiss={() => undefined}
+          onRestore={() => undefined}
+        />
+      </ul>,
+    );
+
+  it('[TC-RULES-SUGGEST-015] muestra patrón, categoría, apoyo, confianza con texto e icono, evidencia y contraejemplo', () => {
+    const html = card(suggestion());
+    const text = textOf(html);
+    expect(text).toContain('La descripción contiene «pedidosya»');
+    expect(text).toContain('gasto → categoría «Restaurantes»');
+    expect(text).toContain('4 de 5 transacciones en esa categoría');
+    expect(html).toMatch(
+      /data-testid="suggestion-confidence"[^>]*><span aria-hidden="true">◐<\/span> Media · Confianza 80,00 %/,
+    );
+    expect(text).toContain('Evidencia (1)');
+    expect(text).toContain('PEDIDOSYA 1');
+    expect(text).toContain('En otras categorías (1)');
+    expect(text).toContain('en «Supermercado»');
+    expect(html).toContain('data-testid="suggestion-accept"');
+    expect(html).toContain('data-testid="suggestion-dismiss"');
+    expect(html).not.toContain('data-testid="suggestion-conflicts"');
+  });
+
+  it('[TC-RULES-SUGGEST-014] informa los conflictos con la prioridad propuesta y el aviso de que no puede quedar antes', () => {
+    const html = card(
+      suggestion({
+        conflicts: [
+          { ruleId: 'r1', name: 'Supermercado', version: 2, priority: 0, categoryId: 'c2', count: 3 },
+        ],
+        warnings: ['CANNOT_OUTRANK'],
+        proposedRule: { name: 'Restaurantes: pedidosya', priority: 0 },
+      }),
+    );
+    const text = textOf(html);
+    expect(text).toContain('Choca con reglas existentes');
+    expect(text).toContain(
+      '«Supermercado» (versión 2, prioridad 0) pondría 3 transacciones en «Supermercado».',
+    );
+    expect(text).toContain('Se propone la prioridad 0');
+    expect(html).toContain('data-testid="suggestion-cannot-outrank"');
+  });
+
+  it('[TC-RULES-SUGGEST-021] el VIEWER prueba pero no acepta ni descarta', () => {
+    const html = card(suggestion(), false);
+    expect(html).toContain('data-testid="suggestion-test"');
+    expect(html).not.toContain('data-testid="suggestion-accept"');
+    expect(html).not.toContain('data-testid="suggestion-dismiss"');
+  });
+
+  it('[TC-RULES-SUGGEST-028] una descartada ofrece restaurar, con texto e icono', () => {
+    const html = card(suggestion({ status: 'DISMISSED' }));
+    expect(html).toContain('data-testid="suggestion-restore"');
+    expect(html).not.toContain('data-testid="suggestion-accept"');
+    expect(html).toMatch(
+      /data-testid="suggestion-dismissed"[^>]*><span aria-hidden="true">✕<\/span> Descartada/,
+    );
+  });
+
+  it('[TC-RULES-SUGGEST-015] una sugerencia por contraparte muestra el nombre de la contraparte', () => {
+    const html = card(
+      suggestion({
+        pattern: { type: 'COUNTERPARTY', value: 'cp1', kind: 'EXPENSE', categoryId: 'c1' },
+        patternLabel: 'Farmacorp',
+      }),
+    );
+    expect(textOf(html)).toContain('La contraparte es Farmacorp');
+  });
+
+  it('[TC-RULES-SUGGEST-016] la vista previa muestra conteos y el resultado de cada transacción, también en inglés y portugués', () => {
+    const item = (
+      id: string,
+      outcome: string,
+      over: Partial<SuggestionPreview['items'][number]> = {},
+    ): SuggestionPreview['items'][number] => ({
+      transactionId: id,
+      date: '2026-10-01',
+      description: `PEDIDOSYA ${id}`,
+      amount: { amount: '30.00', currency: 'BOB' },
+      currentCategoryId: null,
+      currentOrigin: 'SYSTEM_DEFAULT',
+      proposedCategoryId: 'c1',
+      outcome,
+      reasons: [],
+      ...over,
+    });
+    const preview: SuggestionPreview = {
+      from: '2026-05-08',
+      to: '2026-11-04',
+      scanned: 10,
+      truncated: false,
+      matched: 3,
+      wouldFill: 1,
+      alreadyInCategory: 1,
+      otherCategory: 0,
+      notApplicable: 1,
+      items: [
+        item('t1', 'WOULD_FILL'),
+        item('t2', 'ALREADY_IN_CATEGORY', { currentCategoryId: 'c1', currentOrigin: 'MANUAL' }),
+        item('t3', 'NOT_APPLICABLE', { reasons: ['TRANSACTION_RECONCILED'] }),
+      ],
+    };
+    const html = render(<SuggestionPreviewView preview={preview} f={f} names={snames} locale="es-BO" />);
+    const text = textOf(html);
+    expect(text).toContain(
+      '3 coincidencias: completaría 1, 1 ya están en la categoría, 0 tienen otra y 1 no se pueden aplicar.',
+    );
+    expect(text).toContain('La completaría');
+    expect(text).toContain('Ya está en la categoría');
+    expect(text).toContain('está conciliada');
+    expect(html.match(/data-testid="suggestion-preview-row"/g)).toHaveLength(3);
+    expect(html).toContain('data-outcome="NOT_APPLICABLE"');
   });
 });

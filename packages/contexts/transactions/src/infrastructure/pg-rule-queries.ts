@@ -4,6 +4,7 @@ import { sql, type Kysely } from 'kysely';
 import type {
   CategoryOriginDto,
   ClassificationCoverageQuery,
+  ClassificationEvidenceDto,
   ClassificationSubjectDto,
   ClassificationSubjectsQuery,
 } from '../contracts/index.js';
@@ -104,6 +105,48 @@ export class PgClassificationSubjects implements ClassificationSubjectsQuery {
          AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED'
        ORDER BY t.transaction_date, t.id`.execute(db());
     return this.hydrate(input.workspaceId, rows);
+  }
+
+  /**
+   * Evidencia de clasificación manual (add-rule-suggestions, decisión 2): el filtro va en SQL. El origen desconocido
+   * (`category_origin IS NULL`, anterior al motor de reglas) solo cuenta en transacciones registradas a mano o
+   * importadas: recurrentes, deudas, metas y sistema las clasificó un proceso, no una persona.
+   */
+  async listEvidence(input: Parameters<ClassificationSubjectsQuery['listEvidence']>[0]) {
+    const limit = Math.min(Math.max(input.limit, 1), MAX_SUBJECTS);
+    const { rows } = await sql<SubjectRow>`
+      SELECT t.id, t.version, t.status, t.kind, t.account_id, t.currency, t.amount::text AS amount, c.scale,
+             t.description, t.notes, t.counterparty_id, t.source, t.external_ref_namespace,
+             t.transaction_date::text AS transaction_date, t.review_status
+        FROM txn.transaction t
+        JOIN fx.currency c ON c.code = t.currency
+        JOIN txn.transaction_split s
+          ON s.workspace_id = t.workspace_id AND s.transaction_id = t.id AND s.superseded_in_revision IS NULL
+        JOIN classification.category cat ON cat.id = s.category_id AND cat.workspace_id = s.workspace_id
+       WHERE t.workspace_id = ${input.workspaceId}
+         AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED'
+         AND t.transaction_date BETWEEN ${input.from}::date AND ${input.to}::date
+         AND t.source IN ('MANUAL', 'IMPORT', 'RECURRING', 'SYSTEM')
+         AND cat.system_code IS DISTINCT FROM 'UNCATEGORIZED'
+         AND cat.system_code IS DISTINCT FROM 'UNCATEGORIZED_INCOME'
+         AND (s.category_origin = 'MANUAL' OR (s.category_origin IS NULL AND t.source IN ('MANUAL', 'IMPORT')))
+         AND NOT EXISTS (
+           SELECT 1 FROM txn.transaction_split o
+            WHERE o.workspace_id = t.workspace_id AND o.transaction_id = t.id
+              AND o.superseded_in_revision IS NULL AND o.id <> s.id)
+       ORDER BY t.transaction_date DESC, t.id DESC
+       LIMIT ${limit + 1}`.execute(db());
+    const page = rows.slice(0, limit);
+    const sourceOf = new Map(page.map((r) => [r.id, r.source]));
+    const items = await this.hydrate(input.workspaceId, page);
+    // hydrate conserva el orden de las filas.
+    return {
+      items: items.map((i): ClassificationEvidenceDto => ({
+        ...i,
+        source: sourceOf.get(i.transactionId) ?? '',
+      })),
+      truncated: rows.length > limit,
+    };
   }
 
   private async hydrate(

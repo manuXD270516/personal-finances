@@ -5,7 +5,7 @@ import type {
 } from '@pf/classification/contracts';
 import { currentRequestContext } from '@pf/platform/api';
 import { DomainError } from '@pf/shared-kernel';
-import type { ReferenceCatalog } from '../application/ports/index.js';
+import type { ReferenceCatalog, ReferenceDescriptions } from '../application/ports/index.js';
 import { actionTargets, type Action, type ActionCatalog } from '../domain/index.js';
 
 /** Usuario de la petición en curso (`''` en procesos sin usuario: el contexto RLS lo trata como ausente). */
@@ -75,6 +75,30 @@ export class ClassificationReferenceCatalog implements ReferenceCatalog {
         throw err instanceof DomainError ? err.at(`/actions/${i}`) : err;
       }
     }
+  }
+
+  async describe(input: {
+    readonly workspaceId: string;
+    readonly categoryIds: readonly string[];
+    readonly counterpartyIds: readonly string[];
+  }): Promise<ReferenceDescriptions> {
+    const { workspaceId } = input;
+    const categoryIds = [...new Set(input.categoryIds)];
+    const counterpartyIds = [...new Set(input.counterpartyIds)];
+    const categories =
+      categoryIds.length === 0
+        ? []
+        : await this.categories.categoriesByIds({ userId: actorUserId(), workspaceId, categoryIds });
+    const counterparties =
+      counterpartyIds.length === 0
+        ? []
+        : await this.counterparties.counterpartiesByIds({ workspaceId, counterpartyIds });
+    return {
+      categories: new Map(categories.map((c) => [c.categoryId, { name: c.name, archived: c.archived }])),
+      counterparties: new Map(
+        counterparties.map((c) => [c.counterpartyId, { name: c.name, archived: c.archived }]),
+      ),
+    };
   }
 
   async load(input: {

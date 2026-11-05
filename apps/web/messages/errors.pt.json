@@ -167,6 +167,7 @@
   "RULE_INVALID_REGEX": "A expressão regular é inválida ou usa construções sem avaliação em tempo linear (referências para trás, lookaround ou mais de 200 caracteres).",
   "RULE_LIMIT_EXCEEDED": "O espaço de trabalho atingiu o máximo de regras. Arquive alguma para criar outra.",
   "RULE_DRY_RUN_STALE": "Uma regra ou uma transação mudou depois da execução. Nada foi aplicado: execute novamente.",
+  "RULE_SUGGESTION_DECIDED": "Essa sugestão já foi aceita ou descartada.",
   "IMPORT_PDF_NO_TEXT": "Este PDF não tem texto (parece digitalizado ou fotografado). Baixe o extrato digital no internet banking ou registre os lançamentos à mão.",
   "IMPORT_PDF_LAYOUT_UNKNOWN": "Este PDF tem texto, mas não corresponde a nenhum formato de extrato conhecido. Baixe o extrato da conta (não o do cartão) no internet banking; se o banco mudou o formato, avise-nos.",
   "IMPORT_PDF_EXTRACTION_FAILED": "Não conseguimos ler o PDF dentro dos limites de segurança (tempo, memória, páginas ou arquivo danificado). Baixe-o novamente no internet banking.",

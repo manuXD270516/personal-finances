@@ -42,7 +42,8 @@ import {
   NOTIFICATIONS_PORTABILITY_SECTIONS,
 } from '@pf/notifications/contracts';
 import { PLANNING_CLOSE_SNAPSHOT_HASH_HOOK, PLANNING_PORTABILITY_SECTIONS } from '@pf/planning/contracts';
-import { RULES_PORTABILITY_SECTIONS } from '@pf/rules/contracts';
+import { RULES_PORTABILITY_SECTIONS, RULES_SUGGESTION_FINGERPRINT_HOOK } from '@pf/rules/contracts';
+import { ruleSuggestionFingerprintHook } from '@pf/rules/interface/rules.module';
 import { closeSnapshotRestoreHook } from '@pf/planning/interface/planning.module';
 import { requireSqlExecutor } from '@pf/platform/api';
 import { currentCorrelation, uuidv7 } from '@pf/platform/logging';
@@ -194,6 +195,7 @@ export function portabilityOptions(input: PortabilityWiringInput): PortabilityOp
           sections: PORTABILITY_SECTIONS,
           hooks: {
             [PLANNING_CLOSE_SNAPSHOT_HASH_HOOK]: closeSnapshotRestoreHook,
+            [RULES_SUGGESTION_FINGERPRINT_HOOK]: ruleSuggestionFingerprintHook,
             [IMPORTS_CONNECTION_RESTORE_HOOK]: connectionRestoreHook,
             [DOCUMENTS_IMPORT_HOOKS.contentPending]: documentsContentPendingHook,
             [DOCUMENTS_IMPORT_HOOKS.usageRecompute]: documentsUsageRecomputeHook,

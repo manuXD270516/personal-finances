@@ -5,10 +5,12 @@ import {
   applicableItems,
   changeSummary,
   chunk,
+  confidenceIcon,
   coverageRows,
   draftBody,
   draftDefinition,
   draftFromSeed,
+  draftFromSuggestion,
   emptyAction,
   emptyCondition,
   emptyDraft,
@@ -19,9 +21,12 @@ import {
   ruleToDraft,
   seedFromQuery,
   seedQuery,
+  suggestionFromQuery,
+  suggestionQuery,
+  suggestionRuleBody,
   validateDraft,
 } from './logic';
-import type { Coverage, DryRunItem, Rule } from './types';
+import type { Coverage, DryRunItem, Rule, RuleSuggestion } from './types';
 
 const rule = (over: Partial<Rule> = {}): Rule => ({
   id: 'r1',
@@ -223,5 +228,96 @@ describe('crear regla desde una fila', () => {
     const seed = { description: 'NETFLIX 04', kind: 'EXPENSE' as const, accountId: 'a1', categoryId: 'c1' };
     expect(seedFromQuery(new URLSearchParams(seedQuery(seed)))).toEqual(seed);
     expect(seedFromQuery(new URLSearchParams('kind=OTRO&x=1'))).toEqual({});
+  });
+});
+
+describe('sugerencias de reglas', () => {
+  it('[TC-RULES-SUGGEST-007] la clave de descripción de la interfaz coincide con DescriptionKey del dominio', () => {
+    const vectors: Record<string, string> = {
+      'COMPRA TARJ ****1234 FARMACORP SUC 3': 'compra tarj farmacorp suc',
+      'TIGO MONEY RECARGA 77712345': 'tigo money recarga',
+      'PAGO QR  CAFÉ Alexander': 'pago qr cafe alexander',
+      'A 12345': '',
+      'uno dos tres cuatro cinco seis siete': 'uno dos tres cuatro cinco',
+      'ab 12 c': '',
+    };
+    for (const [raw, expected] of Object.entries(vectors)) {
+      expect(ruleTextFromDescription(raw), raw).toBe(expected);
+    }
+  });
+
+  const suggestion: RuleSuggestion = {
+    suggestionId: 'a'.repeat(64),
+    pattern: { type: 'DESCRIPTION', value: 'tigo money recarga', kind: 'EXPENSE', categoryId: 'cat-tel' },
+    categoryName: 'Telefonía',
+    support: 4,
+    evidenceCount: 4,
+    confidence: '1.0000',
+    confidenceLevel: 'MEDIUM',
+    proposedRule: { name: 'Telefonía: tigo money recarga', priority: 99 },
+    evidence: [],
+    counterExamples: [],
+    conflicts: [],
+    warnings: [],
+    status: 'OPEN',
+  };
+
+  it('[TC-RULES-SUGGEST-017] «Aceptar…» viaja por la URL y el editor arma el borrador y el cuerpo con fromSuggestion', () => {
+    const seed = suggestionFromQuery(new URLSearchParams(suggestionQuery(suggestion)));
+    expect(seed).toEqual({
+      suggestionId: suggestion.suggestionId,
+      pattern: suggestion.pattern,
+      name: 'Telefonía: tigo money recarga',
+      priority: 99,
+    });
+    const draft = draftFromSuggestion(seed!);
+    expect(draftBody(draft)).toMatchObject({
+      name: 'Telefonía: tigo money recarga',
+      priority: 99,
+      conditions: [
+        { field: 'DESCRIPTION', operator: 'contains', value: 'tigo money recarga' },
+        { field: 'KIND', operator: 'equals', value: 'EXPENSE' },
+      ],
+      actions: [{ type: 'SET_CATEGORY', categoryId: 'cat-tel' }],
+    });
+    expect(suggestionRuleBody(draft, seed!).fromSuggestion).toEqual({
+      suggestionId: suggestion.suggestionId,
+      pattern: suggestion.pattern,
+    });
+  });
+
+  it('[TC-RULES-SUGGEST-017] una sugerencia por contraparte arma la condición COUNTERPARTY', () => {
+    const seed = {
+      suggestionId: 'b'.repeat(64),
+      pattern: {
+        type: 'COUNTERPARTY' as const,
+        value: 'cp-1',
+        kind: 'EXPENSE' as const,
+        categoryId: 'cat-far',
+      },
+      name: 'Farmacia: Farmacorp',
+      priority: 100,
+    };
+    expect(draftBody(draftFromSuggestion(seed))).toMatchObject({
+      conditions: [
+        { field: 'COUNTERPARTY', operator: 'equals', value: 'cp-1' },
+        { field: 'KIND', operator: 'equals', value: 'EXPENSE' },
+      ],
+    });
+  });
+
+  it('[TC-RULES-SUGGEST-017] una URL incompleta o ajena no abre una sugerencia', () => {
+    expect(suggestionFromQuery(new URLSearchParams('suggestionId=xyz&ptype=DESCRIPTION'))).toBeUndefined();
+    const q = new URLSearchParams(suggestionQuery(suggestion));
+    q.set('ptype', 'OTRO');
+    expect(suggestionFromQuery(q)).toBeUndefined();
+    const k = new URLSearchParams(suggestionQuery(suggestion));
+    k.set('pkind', 'TRANSFER');
+    expect(suggestionFromQuery(k)).toBeUndefined();
+  });
+
+  it('[TC-RULES-SUGGEST-015] la confianza se presenta con dos decimales y el nivel con icono distinto', () => {
+    expect(percentText('0.8333', 'es-BO')).toBe('83,33 %');
+    expect(confidenceIcon('HIGH')).not.toBe(confidenceIcon('MEDIUM'));
   });
 });

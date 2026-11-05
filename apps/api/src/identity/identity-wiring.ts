@@ -377,6 +377,14 @@ export function financeRuntimes(input: {
         | 'RULES_DRY_RUN_MAX_DAYS'
         | 'RULES_DRY_RUN_MAX_TRANSACTIONS'
         | 'RULES_APPLY_MAX_ITEMS'
+        | 'RULES_SUGGEST_WINDOW_DAYS'
+        | 'RULES_SUGGEST_MAX_WINDOW_DAYS'
+        | 'RULES_SUGGEST_MIN_SUPPORT'
+        | 'RULES_SUGGEST_MIN_CONFIDENCE'
+        | 'RULES_SUGGEST_HIGH_CONFIDENCE'
+        | 'RULES_SUGGEST_HIGH_MIN_SUPPORT'
+        | 'RULES_SUGGEST_MAX_EVIDENCE'
+        | 'RULES_SUGGEST_MAX_RESULTS'
         | 'IMPORT_MAX_ROWS'
         | 'IMPORT_PROCESSING_TIMEOUT'
         | 'IMPORT_DUPLICATE_HIGH_SCORE'
@@ -529,6 +537,7 @@ export function financeRuntimes(input: {
     subjects: transactions.classificationSubjects,
     classifier: transactions.ruleClassification,
     coverage: transactions.classificationCoverage,
+    calendar: workspaceCalendar(input.pool, input.clock, input.config.APP_TIMEZONE),
     settings: rulesSettingsFrom(input.config),
   });
   deferred.rules = rules;
@@ -1140,6 +1149,14 @@ export function rulesSettingsFrom(
       | 'RULES_DRY_RUN_MAX_DAYS'
       | 'RULES_DRY_RUN_MAX_TRANSACTIONS'
       | 'RULES_APPLY_MAX_ITEMS'
+      | 'RULES_SUGGEST_WINDOW_DAYS'
+      | 'RULES_SUGGEST_MAX_WINDOW_DAYS'
+      | 'RULES_SUGGEST_MIN_SUPPORT'
+      | 'RULES_SUGGEST_MIN_CONFIDENCE'
+      | 'RULES_SUGGEST_HIGH_CONFIDENCE'
+      | 'RULES_SUGGEST_HIGH_MIN_SUPPORT'
+      | 'RULES_SUGGEST_MAX_EVIDENCE'
+      | 'RULES_SUGGEST_MAX_RESULTS'
     >
   >,
 ) {
@@ -1150,6 +1167,22 @@ export function rulesSettingsFrom(
       ? { dryRunMaxTransactions: config.RULES_DRY_RUN_MAX_TRANSACTIONS }
       : {}),
     ...(config.RULES_APPLY_MAX_ITEMS ? { applyMaxItems: config.RULES_APPLY_MAX_ITEMS } : {}),
+    suggest: {
+      ...(config.RULES_SUGGEST_WINDOW_DAYS ? { windowDays: config.RULES_SUGGEST_WINDOW_DAYS } : {}),
+      ...(config.RULES_SUGGEST_MAX_WINDOW_DAYS
+        ? { maxWindowDays: config.RULES_SUGGEST_MAX_WINDOW_DAYS }
+        : {}),
+      ...(config.RULES_SUGGEST_MIN_SUPPORT ? { minSupport: config.RULES_SUGGEST_MIN_SUPPORT } : {}),
+      ...(config.RULES_SUGGEST_MIN_CONFIDENCE ? { minConfidence: config.RULES_SUGGEST_MIN_CONFIDENCE } : {}),
+      ...(config.RULES_SUGGEST_HIGH_CONFIDENCE
+        ? { highConfidence: config.RULES_SUGGEST_HIGH_CONFIDENCE }
+        : {}),
+      ...(config.RULES_SUGGEST_HIGH_MIN_SUPPORT
+        ? { highMinSupport: config.RULES_SUGGEST_HIGH_MIN_SUPPORT }
+        : {}),
+      ...(config.RULES_SUGGEST_MAX_EVIDENCE ? { maxEvidence: config.RULES_SUGGEST_MAX_EVIDENCE } : {}),
+      ...(config.RULES_SUGGEST_MAX_RESULTS ? { maxResults: config.RULES_SUGGEST_MAX_RESULTS } : {}),
+    },
   };
 }
 

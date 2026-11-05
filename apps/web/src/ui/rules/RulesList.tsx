@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
@@ -23,6 +24,7 @@ import { CoveragePanel } from './Coverage';
 import { DryRunPanel } from './DryRun';
 import { actionTarget, moveId, rulesPath, type NameResolver } from './logic';
 import { RuleStatusBadge, TriggerList } from './parts';
+import { SuggestionsPanel } from './Suggestions';
 import type { Rule, RuleList } from './types';
 
 /** Tabla de reglas en orden de evaluación: estado, disparadores, resumen, estadísticas y acciones por regla. */
@@ -207,6 +209,9 @@ export function RulesPage() {
 
 function RulesHome({ ctx }: { ctx: WorkspaceContext }) {
   const f = useFormat('Rules', ctx);
+  const search = useSearchParams();
+  // Tras aceptar una sugerencia el editor vuelve con `?apply=<ruleId>`: abre «Ejecutar» solo con esa regla.
+  const applyRuleId = search?.get('apply') || undefined;
   return (
     <section aria-labelledby="rules-title" style={pageStyle} data-testid="rules-page">
       <h1 id="rules-title">{f.t('title')}</h1>
@@ -214,9 +219,15 @@ function RulesHome({ ctx }: { ctx: WorkspaceContext }) {
       <Tabs
         label={f.t('tabs.label')}
         idPrefix="rules"
+        initial={applyRuleId ? 'run' : undefined}
         tabs={[
           { id: 'rules', label: f.t('tabs.rules'), content: <RulesTab ctx={ctx} /> },
-          { id: 'run', label: f.t('tabs.run'), content: <DryRunPanel ctx={ctx} /> },
+          { id: 'suggestions', label: f.t('tabs.suggestions'), content: <SuggestionsPanel ctx={ctx} /> },
+          {
+            id: 'run',
+            label: f.t('tabs.run'),
+            content: <DryRunPanel ctx={ctx} {...(applyRuleId ? { onlyRuleId: applyRuleId } : {})} />,
+          },
           { id: 'coverage', label: f.t('tabs.coverage'), content: <CoveragePanel ctx={ctx} /> },
         ]}
       />

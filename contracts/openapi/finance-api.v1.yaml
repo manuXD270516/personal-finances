@@ -11727,7 +11727,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'NAME_TAKEN, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED or CUSTOM_FIELD_ARCHIVED.'
+          description: 'NAME_TAKEN, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED, CUSTOM_FIELD_ARCHIVED or RULE_SUGGESTION_DECIDED (the suggestion in `fromSuggestion` was already accepted or dismissed).'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'VALIDATION_FAILED, RULE_INVALID_REGEX, RULE_LIMIT_EXCEEDED, REFERENCE_NOT_FOUND, CUSTOM_FIELD_VALUE_INVALID or IDEMPOTENCY_KEY_REUSED.'
@@ -12095,6 +12095,142 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Rules]
+      operationId: listRuleSuggestions
+      summary: Suggested rules from repeated manual classifications
+      description: |
+        Computed on request (nothing runs in the background and nothing is stored): the manual classifications of the last `windowDays` days (180 by default, up to 366) are grouped by normalized description or by counterparty and by transaction kind; a pattern with at least 3 transactions in the same category and a confidence (support ÷ total of the pattern, 4 decimals HALF_EVEN) of at least 0.8000 becomes a suggestion. Only categories set by the user count (manual origin, or unknown origin before the rule engine on transactions entered by hand or imported); transactions with several splits, managed by another module or in an archived category do not. Patterns already covered by the active rules are not suggested; a rule that sets another category is reported in `conflicts` with a proposed priority one unit lower. Up to 5 000 transactions are read (`truncated`) and up to 50 suggestions are returned, by support, confidence and pattern. Dismissed suggestions only appear with `includeDismissed=true`; accepted ones never. No side effects and no audit.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - name: windowDays
+          in: query
+          description: Evidence window in days up to today in the workspace time zone (default 180).
+          schema: { type: integer, minimum: 1, maximum: 366 }
+        - name: includeDismissed
+          in: query
+          description: 'Also list the dismissed suggestions (`status: DISMISSED`).'
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Suggested rules from repeated manual classifications
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleSuggestionList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: previewRuleSuggestion
+      summary: Test a suggested rule over the existing transactions
+      description: |
+        Runs the suggestion as proposed, or the `definition` the user edited, over the non-voided income, expense and refund transactions of the window with the evaluator of the dry-run and a transient rule. Reports how many transactions match, how many it would fill (today uncategorized), how many already have the suggested category and how many have another one; a match that cannot be applied carries the same reasons as the dry-run. Up to 200 items. Persists nothing and does not audit; accepting is `createRule` with `fromSuggestion` and applying to the history is `dryRunRules` + `applyRuleDryRun`.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleSuggestionPreviewInput' }
+      responses:
+        '200':
+          description: Test a suggested rule over the existing transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleSuggestionPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (also a fingerprint that does not match the pattern) or RULE_INVALID_REGEX.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions/{suggestionId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleSuggestionId'
+    post:
+      tags: [Rules]
+      operationId: dismissRuleSuggestion
+      summary: Dismiss a suggested rule
+      description: |
+        A dismissed suggestion is not listed again, even if its evidence grows, except with `includeDismissed=true`; it can be restored. The server recomputes the fingerprint from `pattern`. Audited (entity `RuleSuggestion`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleSuggestionDismissInput' }
+      responses:
+        '204':
+          description: Dismiss a suggested rule
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'RULE_SUGGESTION_DECIDED or IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (also a fingerprint that does not match the pattern) or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions/{suggestionId}/restore:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleSuggestionId'
+    post:
+      tags: [Rules]
+      operationId: restoreRuleSuggestion
+      summary: Restore a dismissed suggested rule
+      description: |
+        Removes the dismissal, so the suggestion is listed again while its evidence holds. A suggestion that was accepted cannot be restored (`RULE_SUGGESTION_DECIDED`). Audited (entity `RuleSuggestion`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      responses:
+        '204':
+          description: Restore a dismissed suggested rule
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'RULE_SUGGESTION_DECIDED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED.'
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -13931,6 +14067,12 @@ components:
       required: true
       description: Classification rule UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
+    RuleSuggestionId:
+      name: suggestionId
+      in: path
+      required: true
+      description: Fingerprint of a rule suggestion (SHA-256 hexadecimal of the pattern).
+      schema: { type: string, pattern: '^[0-9a-f]{64}$' }
     GoalSuggestionId:
       name: suggestionId
       in: path
@@ -14411,6 +14553,7 @@ components:
         - RULE_INVALID_REGEX                     # 422 (add-rule-engine: the regular expression is invalid or uses constructs without linear-time evaluation; also rejects back-references, lookaround and patterns over 200 characters)
         - RULE_LIMIT_EXCEEDED                    # 422 (add-rule-engine: the workspace has the maximum of 500 non-archived rules)
         - RULE_DRY_RUN_STALE                     # 409 (add-rule-engine: a rule or a transaction changed after the dry-run; run it again)
+        - RULE_SUGGESTION_DECIDED                # 409 (add-rule-suggestions: the rule suggestion was already accepted or dismissed)
 
     # ── Identity ──
     WorkspaceRole:
@@ -15327,6 +15470,14 @@ components:
           type: boolean
           default: false
           description: When the rule matches, the rules of lower priority are not evaluated for that transaction.
+        fromSuggestion:
+          type: object
+          additionalProperties: false
+          required: [suggestionId, pattern]
+          description: The suggestion this rule accepts (see `listRuleSuggestions`). Registered in the same unit of work as the rule; it does not reclassify anything. A suggestion already accepted or dismissed answers `RULE_SUGGESTION_DECIDED`.
+          properties:
+            suggestionId: { type: string, pattern: '^[0-9a-f]{64}$' }
+            pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
     RuleUpdateInput:
       type: object
       additionalProperties: false
@@ -15387,6 +15538,151 @@ components:
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
         stats: { $ref: '#/components/schemas/RuleStats' }
+        fromSuggestion:
+          description: The suggestion this rule was created from, or null.
+          oneOf:
+            - type: object
+              required: [suggestionId, acceptedAt]
+              properties:
+                suggestionId: { type: string, pattern: '^[0-9a-f]{64}$' }
+                acceptedAt: { $ref: '#/components/schemas/Instant' }
+            - type: 'null'
+    RuleSuggestionPattern:
+      type: object
+      additionalProperties: false
+      required: [type, value, kind, categoryId]
+      properties:
+        type: { type: string, enum: [DESCRIPTION, COUNTERPARTY] }
+        value: { type: string, minLength: 1, maxLength: 200, description: 'Normalized description key or counterparty id.' }
+        kind: { type: string, enum: [INCOME, EXPENSE, REFUND] }
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+    RuleSuggestionEvidence:
+      type: object
+      required: [transactionId, date, description, amount, accountId, categoryId, categoryOrigin]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        date: { $ref: '#/components/schemas/LocalDate' }
+        description: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/Money' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        categoryOrigin: { $ref: '#/components/schemas/CategoryOrigin' }
+    RuleSuggestionConflict:
+      type: object
+      required: [ruleId, name, version, priority, categoryId, count]
+      properties:
+        ruleId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        version: { type: integer, minimum: 1 }
+        priority: { type: integer }
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        count: { type: integer, minimum: 1, description: Transactions of the evidence that this rule would put in another category. }
+    RuleSuggestion:
+      type: object
+      required: [suggestionId, pattern, categoryName, support, evidenceCount, confidence, confidenceLevel, proposedRule, evidence, counterExamples, conflicts, warnings, status]
+      properties:
+        suggestionId: { type: string, pattern: '^[0-9a-f]{64}$', description: Stable fingerprint of the suggestion. }
+        pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
+        patternLabel: { type: string, description: Counterparty name for `COUNTERPARTY` patterns. }
+        categoryName: { type: string }
+        support: { type: integer, minimum: 3, description: Evidence transactions of the pattern in the suggested category. }
+        evidenceCount: { type: integer, minimum: 3, description: 'Evidence transactions of the pattern and of the same kind, in any category (the denominator of the confidence).' }
+        confidence: { type: string, pattern: '^(0\.[0-9]{4}|1\.0000)$', description: support ÷ total with 4 decimals (HALF_EVEN). }
+        confidenceLevel: { type: string, x-extensible-enum: [HIGH, MEDIUM], description: '`HIGH` with a confidence of at least 0.9500 and 5 or more transactions. Presentation only.' }
+        proposedRule: { $ref: '#/components/schemas/RuleInput' }
+        evidence:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RuleSuggestionEvidence' }
+          description: The most recent transactions in favor.
+        counterExamples:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RuleSuggestionEvidence' }
+          description: The most recent transactions of the pattern classified in other categories.
+        conflicts:
+          type: array
+          items: { $ref: '#/components/schemas/RuleSuggestionConflict' }
+        warnings:
+          type: array
+          items: { type: string, x-extensible-enum: [CANNOT_OUTRANK], description: 'CANNOT_OUTRANK: a conflicting rule already has priority 0, so the new rule cannot be evaluated before it.' }
+        status: { type: string, x-extensible-enum: [OPEN, DISMISSED] }
+    RuleSuggestionList:
+      type: object
+      required: [generatedAt, from, to, scanned, truncated, items]
+      properties:
+        generatedAt: { $ref: '#/components/schemas/Instant' }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        scanned: { type: integer, minimum: 0, description: Evidence transactions read. }
+        truncated: { type: boolean, description: The window has more than 5 000 evidence transactions; only the most recent ones were used. }
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/RuleSuggestion' }
+    RuleSuggestionDismissInput:
+      type: object
+      additionalProperties: false
+      required: [pattern]
+      properties:
+        pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
+    RuleSuggestionPreviewInput:
+      type: object
+      additionalProperties: false
+      required: [suggestionId, pattern]
+      properties:
+        suggestionId: { type: string, pattern: '^[0-9a-f]{64}$' }
+        pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
+        definition:
+          type: object
+          additionalProperties: false
+          required: [conditions, actions]
+          description: Edited candidate; absent means the proposed rule.
+          properties:
+            matchMode: { $ref: '#/components/schemas/RuleMatchMode' }
+            conditions:
+              type: array
+              items: { $ref: '#/components/schemas/RuleConditionItem' }
+            actions:
+              type: array
+              items: { $ref: '#/components/schemas/RuleAction' }
+            triggers:
+              type: array
+              items: { $ref: '#/components/schemas/RuleTrigger' }
+            stopProcessing: { type: boolean }
+        windowDays: { type: integer, minimum: 1, maximum: 366 }
+    RuleSuggestionPreviewItem:
+      type: object
+      required: [transactionId, date, description, amount, currentCategoryId, currentOrigin, proposedCategoryId, outcome, reasons]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        date: { $ref: '#/components/schemas/LocalDate' }
+        description: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/Money' }
+        currentCategoryId: { type: [string, 'null'], format: uuid }
+        currentOrigin: { $ref: '#/components/schemas/CategoryOrigin' }
+        proposedCategoryId: { $ref: '#/components/schemas/Uuid' }
+        outcome: { type: string, x-extensible-enum: [WOULD_FILL, ALREADY_IN_CATEGORY, OTHER_CATEGORY, NOT_APPLICABLE] }
+        reasons:
+          type: array
+          items: { $ref: '#/components/schemas/RuleSkipReason' }
+    RuleSuggestionPreview:
+      type: object
+      required: [from, to, scanned, truncated, matched, wouldFill, alreadyInCategory, otherCategory, notApplicable, items]
+      properties:
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        scanned: { type: integer, minimum: 0 }
+        truncated: { type: boolean, description: The window has more than 5 000 transactions; only the first ones were evaluated. }
+        matched: { type: integer, minimum: 0 }
+        wouldFill: { type: integer, minimum: 0, description: Matches with no category today that the rule would fill. }
+        alreadyInCategory: { type: integer, minimum: 0 }
+        otherCategory: { type: integer, minimum: 0 }
+        notApplicable: { type: integer, minimum: 0 }
+        items:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/RuleSuggestionPreviewItem' }
     RuleList:
       type: object
       required: [data]

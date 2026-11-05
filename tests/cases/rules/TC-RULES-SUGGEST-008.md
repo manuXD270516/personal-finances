@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Evidencia de clasificación manual"
 scenario: "Transacciones de varios splits y préstamos excluidas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-011"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rule-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

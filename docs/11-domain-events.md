@@ -350,3 +350,5 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 
 > **Reglas de clasificación (`add-rule-engine`, Phase 6):** RULES no publica ni consume eventos (D338: sin aplicación asíncrona posterior ni consumidores nuevos). La aplicación de un dry-run reutiliza los eventos de la edición masiva: `transactions.TransactionCategorized.v1` con `appliedBy = RULE`, `ruleId` y el `bulkOperationId`, y `transactions.TransactionUpdated.v1`, sin cambio de esquema.
+
+> **Sugerencias de reglas (`add-rule-suggestions`, Phase 7):** sin eventos nuevos ni modificados. Las sugerencias se calculan a pedido; aceptar crea una regla (sin eventos de dominio de reglas, como hoy) y aplicarla a la historia es el dry-run, que emite los eventos de la edición masiva sin cambio de esquema. Las decisiones solo dejan auditoría (entidad `RuleSuggestion`).

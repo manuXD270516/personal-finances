@@ -97,12 +97,27 @@ export const RULES_AUDIT_POLICY = {
     version: 'plain',
   },
   RuleOrder: { ruleIds: 'plain', count: 'plain' },
+  /** Decisiones sobre sugerencias (add-rule-suggestions): el patrón es texto normalizado o un id, sin montos. */
+  RuleSuggestion: {
+    decision: 'plain',
+    patternType: 'plain',
+    patternValue: 'plain',
+    kind: 'plain',
+    categoryId: 'plain',
+    ruleId: 'plain',
+    support: 'plain',
+    evidenceCount: 'plain',
+    confidence: 'plain',
+  },
   RuleDryRunApplication: {
     bulkOperationId: 'plain',
     count: 'plain',
     ruleIds: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
+
+/** Gancho de importación que recalcula la huella de cada decisión tras el remapeo de ids (add-rule-suggestions). */
+export const RULES_SUGGESTION_FINGERPRINT_HOOK = 'rules.suggestion-fingerprint' as const;
 
 /**
  * Secciones de exportación del workspace (openspec add-rule-engine, tarea 4.4): reglas y sus versiones inmutables.
@@ -124,5 +139,17 @@ export const RULES_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     order: 361,
     orderBy: ['rule_id', 'version'],
     idColumns: [],
+  },
+  {
+    // add-rule-suggestions: decisiones (aceptadas y descartadas). La huella cubre la categoría y la contraparte, que se
+    // remapean al importar: el gancho la recalcula; `pattern_value` lleva el id de la contraparte (o la clave de texto).
+    name: 'rule-suggestion-decisions',
+    context: 'rules',
+    table: 'rules.rule_suggestion_decision',
+    order: 362,
+    orderBy: ['suggestion_id'],
+    idColumns: [],
+    textRefs: ['pattern_value'],
+    importHook: RULES_SUGGESTION_FINGERPRINT_HOOK,
   },
 ];
