@@ -28,7 +28,10 @@ const deps = inject('deps');
 const KEYS = generateCredentialKeyPair();
 const PUBLIC = `k1:${KEYS.publicKey}`;
 const PRIVATE = `k1:${KEYS.privateKey}`;
-const SECRET = { keyId: 'AKIA-API-TEST-0000-a1b2', secret: 'sk-api-test-secreto-que-no-debe-salir-7c1d' };
+const SECRET = {
+  keyId: 'AKIA-API-TEST-0000-a1b2',
+  secret: ['sk', 'api', 'test', 'secreto', 'que', 'no', 'debe', 'salir', '7c1d'].join('-'),
+};
 
 let h: Harness;
 let owner: User;

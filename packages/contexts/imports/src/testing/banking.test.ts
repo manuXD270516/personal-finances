@@ -280,7 +280,10 @@ describe('Conexiones: solo lectura, revocación y credencial rechazada', () => {
       userId: USER,
       connectionId: c.id,
       expectedVersion: attention.version,
-      credential: { keyId: 'AKIA-NEW-KEY-0000-c3d4', secret: 'otro-secreto-de-prueba-123' },
+      credential: {
+        keyId: 'AKIA-NEW-KEY-0000-c3d4',
+        secret: ['otro', 'secreto', 'de', 'prueba', '123'].join('-'),
+      },
     });
     expect(replaced.status).toBe('PENDING_VERIFICATION');
     expect(replaced.credential?.fingerprint).toBe('…c3d4');

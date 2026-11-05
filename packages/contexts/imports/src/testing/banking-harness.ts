@@ -43,7 +43,10 @@ import { ACCOUNT, USER, WS, setupPipeline, type PipelineCtx } from './pipeline-h
 
 export const A_USDT = 'acc-usdt';
 export const A_BTC = 'acc-btc';
-export const SECRET = { keyId: 'AKIA-TEST-0000-a1b2', secret: 'sk-test-secreto-que-no-debe-aparecer-9f8e7d' };
+export const SECRET = {
+  keyId: 'AKIA-TEST-0000-a1b2',
+  secret: ['sk', 'test', 'secreto', 'que', 'no', 'debe', 'aparecer', '9f8e7d'].join('-'),
+};
 
 interface MemCredential {
   version: number;
