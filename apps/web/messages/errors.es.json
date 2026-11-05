@@ -172,5 +172,9 @@
   "IMPORT_PDF_TOTALS_MISMATCH": "Los saldos y totales del extracto no cuadran con los movimientos que leímos, así que no importamos nada para no dejar un saldo erróneo. El detalle indica las páginas y líneas a revisar.",
   "IMPORT_PDF_PAGE_COUNT_MISMATCH": "El extracto declara más páginas de las que tiene el PDF. Descárgalo completo de nuevo.",
   "IMPORT_PDF_ACCOUNT_MISMATCH": "El extracto es de otra cuenta que la elegida (los últimos 4 dígitos no coinciden). Elige la cuenta correcta e inténtalo de nuevo.",
-  "REPORT_EXPORT_TOO_LARGE": "El reporte tiene más de 50 000 filas para exportar. Acota el rango de fechas o agrega filtros y vuelve a intentarlo."
+  "REPORT_EXPORT_TOO_LARGE": "El reporte tiene más de 50 000 filas para exportar. Acota el rango de fechas o agrega filtros y vuelve a intentarlo.",
+  "BANKING_PROVIDER_NOT_AVAILABLE": "Este proveedor todavía no está disponible: sus términos de uso o su formato aún no se verificaron. Elige otro o inténtalo más adelante.",
+  "CONNECTION_CREDENTIAL_NOT_READ_ONLY": "La clave de API permite operar, retirar o transferir. Crea en el exchange una clave de solo lectura y vuelve a conectarla; la clave anterior se destruyó.",
+  "CONNECTION_SYNC_IN_PROGRESS": "Esta conexión ya tiene una sincronización en curso. Espera a que termine o cancela su vista previa.",
+  "IMPORT_CONNECTION_EXPIRED": "El proveedor rechazó la clave de la conexión (fue borrada o venció). Reemplaza la credencial por una clave de solo lectura."
 }

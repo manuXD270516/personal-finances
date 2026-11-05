@@ -135,6 +135,8 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'Document',
   // add-import-pipeline (Phase 6): importación de IMPORTS.
   'ImportJob',
+  // add-banking-providers (Phase 6): conexión con un proveedor de movimientos externos.
+  'ImportConnection',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

@@ -66,7 +66,9 @@ import { RulesModule, createRulesRuntime, type RulesRuntime } from '@pf/rules/in
 import {
   createImportsRuntime,
   IMPORT_JOB_LIFECYCLE_MACHINE,
+  IMPORT_CONNECTION_LIFECYCLE_MACHINE,
   ImportsModule,
+  type BankingRuntimeOptions,
   type ImportsRuntime,
 } from '@pf/imports/interface/imports.module';
 import {
@@ -108,6 +110,7 @@ import {
 } from '@pf/platform/api';
 import { otelCounters, otelHistograms, type CounterMetrics } from '@pf/platform/otel';
 import { demoDataEnabled, type ApiConfig, type WorkerConfig } from '@pf/platform/config';
+import { bankingOptionsFrom, feesCategoryPort } from '../imports/banking-wiring.js';
 import type { JobQueue } from '@pf/platform/queue';
 import { DEMO_MANIFEST } from '../demo/dataset/demo-plan.js';
 import { demoJobsPort } from '../demo/demo-jobs-port.js';
@@ -255,6 +258,8 @@ export const LIFECYCLE_MACHINES = [
   DOCUMENT_LIFECYCLE_MACHINE,
   // add-import-pipeline (Phase 6): importación de IMPORTS (D151).
   IMPORT_JOB_LIFECYCLE_MACHINE,
+  // add-banking-providers (Phase 6): conexión con un proveedor de movimientos externos.
+  IMPORT_CONNECTION_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -385,6 +390,8 @@ export function financeRuntimes(input: {
   readonly outbox?: OutboxWriter;
   /** Runtime de DOCUMENTS (se crea después; IMPORTS lo consulta de forma diferida). */
   readonly documentsRef?: DocumentsRef;
+  /** Conexiones con proveedores (add-banking-providers); sin ellas el módulo queda deshabilitado. */
+  readonly banking?: BankingRuntimeOptions;
 }) {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
   // IDENTITY según el actor: la API lee el workspace con la membresía del usuario de la petición; el job y los
@@ -799,6 +806,8 @@ export function financeRuntimes(input: {
       accountCatalog: accounts.catalog,
     }),
     settings: importsSettingsFrom(input.config),
+    ...(input.banking ? { banking: input.banking } : {}),
+    systemCategories: feesCategoryPort(classification.queries),
   });
   return {
     classification,
@@ -883,6 +892,8 @@ export function identityImports(input: {
     logger: input.logger,
     config: input.config,
     documentsRef,
+    // La API cifra con la clave pública; NO lee las privadas (solo el worker puede descifrar).
+    banking: bankingOptionsFrom(input.config, input.queue, false),
   });
   // DOCUMENTS (add-document-attachments): sin DOCUMENT_ENCRYPTION_KEYS o sin cliente S3 queda deshabilitado (503).
   const documents = input.storage

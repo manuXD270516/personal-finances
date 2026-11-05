@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Privacidad de las solicitudes al proveedor"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-COMP-001"]
 invariants: []
 priority: high
 type: security
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -34,7 +35,7 @@ expected_result:
   - "Solo credencial de la conexión, ventana y cursor"
   - "Sin nombres de cuentas, montos, descripciones ni ids de workspace"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-032 — Las solicitudes no llevan datos de PFOS

@@ -1,8 +1,34 @@
-import { randomBytes } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { parseEnvLines } from './dotenv.js';
 
 /** Marcador de `.env.example` que `pnpm setup:env` reemplaza por un secreto de desarrollo aleatorio. */
 export const GENERATE_MARKER = '__generate__';
+
+// Prefijos DER fijos de X25519 (RFC 8410) para obtener las claves crudas de 32 bytes en base64url.
+const SPKI_PREFIX_LENGTH = 12;
+const PKCS8_PREFIX_LENGTH = 16;
+
+/**
+ * Par X25519 de DESARROLLO de las credenciales de exchanges (add-banking-providers, D342): la pública se deriva de la
+ * privada, así que se generan JUNTAS. `generateSecret` entrega cada mitad a su variable.
+ */
+const connectionKeyPair = (() => {
+  let pair: { publicKey: string; privateKey: string } | undefined;
+  return () => {
+    if (!pair) {
+      const k = generateKeyPairSync('x25519');
+      pair = {
+        publicKey: Buffer.from(k.publicKey.export({ format: 'der', type: 'spki' }))
+          .subarray(SPKI_PREFIX_LENGTH)
+          .toString('base64url'),
+        privateKey: Buffer.from(k.privateKey.export({ format: 'der', type: 'pkcs8' }))
+          .subarray(PKCS8_PREFIX_LENGTH)
+          .toString('base64url'),
+      };
+    }
+    return pair;
+  };
+})();
 
 /** Secreto aleatorio seguro dentro de URLs, SQL, JSON y placeholders de Keycloak (solo [A-Za-z0-9_-]). */
 export function generateSecret(key: string): string {
@@ -12,6 +38,8 @@ export function generateSecret(key: string): string {
   if (key === 'PF_DEV_EXPORT_MASTER_KEY' || key === 'PF_DEV_DOCUMENT_MASTER_KEY') {
     return randomBytes(32).toString('base64url');
   }
+  if (key === 'PF_DEV_CONNECTION_PRIVATE_KEY') return connectionKeyPair().privateKey;
+  if (key === 'PF_DEV_CONNECTION_PUBLIC_KEY') return connectionKeyPair().publicKey;
   return randomBytes(24).toString('base64url');
 }
 

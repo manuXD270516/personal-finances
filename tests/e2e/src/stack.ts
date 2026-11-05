@@ -63,6 +63,8 @@ export function createEnvFile(): string {
     ['COMMITMENTS_SCHEDULER_CRON', '* * * * *'],
     ['COMMITMENTS_SUBSCRIPTIONS_CRON', '* * * * *'],
     ['DEBT_CARDS_CRON', '* * * * *'],
+    // Proveedor de exchange SIMULADO (add-banking-providers): sin red; PROHIBIDO en staging y producción.
+    ['IMPORTS_PROVIDER_FAKE_ENABLED', 'true'],
   ]);
   const extra = new Map([
     ['FX_PROVIDER_PARALELO_BO_URL', simUrl],

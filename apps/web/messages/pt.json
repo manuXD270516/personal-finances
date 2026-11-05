@@ -4119,7 +4119,8 @@
       "pin": "Fixar o layout {id} v{version} nesta conta",
       "pinHint": "As próximas importações desta conta usarão essa versão mesmo que uma nova seja publicada.",
       "pinned": "Layout fixado em um perfil PDF da conta."
-    }
+    },
+    "connectionsLink": "Conexões com exchanges"
   },
   "Debt": {
     "title": "Dívidas",
@@ -6344,6 +6345,72 @@
       "FEES": "Tarifas, juros e encargos pagos.",
       "ACCOUNT_BALANCE_HISTORY": "O saldo de uma conta, dia a dia, com suas conciliações.",
       "FORECAST_VS_ACTUAL": "O previsto contra o que aconteceu."
+    }
+  },
+  "ImportConnections": {
+    "title": "Conexões com exchanges",
+    "intro": "Conecte um exchange com uma chave SOMENTE LEITURA para trazer o histórico de trades, depósitos e saques ao PFOS. Nada é criado até você revisar e aprovar a pré-visualização. Nunca informe usuário e senha do exchange: só chaves de API.",
+    "back": "Voltar às importações",
+    "loading": "Carregando conexões…",
+    "empty": "Ainda não há conexões.",
+    "ownerOnly": "Só o proprietário do workspace pode criar conexões, substituir credenciais ou revogá-las.",
+    "status": {
+      "PENDING_VERIFICATION": "Verificando",
+      "ACTIVE": "Ativa",
+      "NEEDS_ATTENTION": "Requer atenção",
+      "REJECTED": "Rejeitada",
+      "REVOKED": "Revogada",
+      "NEEDS_CREDENTIAL": "Requer credencial"
+    },
+    "hint": {
+      "active": "Pronta para sincronizar. Cada sincronização passa por uma pré-visualização antes de criar qualquer coisa.",
+      "verifying": "Estamos verificando com o exchange que a chave é somente leitura.",
+      "expired": "O exchange rejeitou a chave (foi apagada ou expirou). Substitua a credencial por uma chave somente leitura.",
+      "notReadOnly": "A chave permite operar, sacar ou transferir. Crie no exchange uma chave somente leitura e substitua a credencial.",
+      "attention": "A conexão precisa da sua atenção. Veja o último erro e substitua a credencial.",
+      "rejected": "A chave não é somente leitura e foi destruída. Crie uma chave somente leitura no exchange e substitua a credencial.",
+      "needsCredential": "A conexão foi importada sem credencial. Carregue uma chave somente leitura para sincronizar de novo.",
+      "revoked": "Conexão revogada: não sincroniza mais. O que já foi importado é mantido."
+    },
+    "fingerprint": "Chave {fingerprint}",
+    "lastError": "Último erro: {code}",
+    "mapping": "{asset} → {account}",
+    "cursor": "Sincronizado até {date}",
+    "cursorNone": "Ainda sem sincronizar",
+    "retryNotBefore": "o exchange pediu para esperar até {at}",
+    "syncFrom": "Desde",
+    "syncFromHint": "Primeira sincronização: até 365 dias atrás.",
+    "sync": "Sincronizar",
+    "uploadHistory": "Enviar histórico",
+    "replace": "Substituir credencial",
+    "revoke": "Revogar",
+    "keep": "Manter",
+    "revokeTitle": "Revogar «{name}»?",
+    "revokeBody": "A credencial é destruída de forma irrecuperável e a conexão não sincroniza mais; o que já foi importado é mantido. Lembre-se de apagar também a chave no exchange.",
+    "replaceTitle": "Substituir a credencial de «{name}»",
+    "create": {
+      "title": "Nova conexão",
+      "provider": "Provedor",
+      "choose": "Escolher…",
+      "name": "Nome",
+      "mappings": "Ativos e contas",
+      "mappingsHint": "Cada ativo do exchange vai para uma conta do PFOS na mesma moeda. Um ativo sem conta não é importado.",
+      "asset": "Ativo (ex.: USDT)",
+      "account": "Conta",
+      "addMapping": "Adicionar ativo",
+      "credential": "Chave de API",
+      "readOnlyNotice": "Crie no exchange uma chave SOMENTE LEITURA (sem operar, sacar nem transferir). Uma chave com mais permissões é rejeitada e destruída.",
+      "keyId": "Identificador da chave",
+      "secret": "Segredo",
+      "secretHint": "Não é mostrado de novo. Guardamos apenas a impressão digital da chave.",
+      "submit": "Conectar",
+      "errors": {
+        "provider": "Escolha um provedor.",
+        "name": "Informe um nome de 1 a 80 caracteres.",
+        "mappings": "Mapeie pelo menos um ativo para uma conta, sem repetir ativos.",
+        "keyId": "Informe o identificador da chave.",
+        "secret": "Informe o segredo da chave."
+      }
     }
   }
 }

@@ -47,7 +47,8 @@
     "reverted_by",
     "rules_summary",
     "failure",
-    "pdf"
+    "pdf",
+    "connection_id"
   ],
   "properties": {
     "id": {
@@ -222,7 +223,14 @@
     },
     "rules_summary": {},
     "failure": {},
-    "pdf": {}
+    "pdf": {},
+    "connection_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    }
   },
   "x-pfos-table": "imports.import_job",
   "x-pfos-context": "imports"

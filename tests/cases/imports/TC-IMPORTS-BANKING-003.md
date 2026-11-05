@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Proveedores habilitados solo con términos y formato verificados"
 scenario: "Proveedor simulado en producción"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+  - packages/platform/src/config/banking-config.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -27,7 +29,7 @@ steps:
 expected_result:
   - "Error de configuración en ambos entornos"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-003 — El proveedor simulado impide arrancar en staging o producción

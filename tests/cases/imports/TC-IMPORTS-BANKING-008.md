@@ -5,16 +5,19 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Credenciales cifradas y nunca expuestas"
 scenario: "El proceso de la API no puede descifrar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-SEC-007", "NFR-SEC-016"]
 invariants: []
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/banking/credential-vault.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -36,7 +39,7 @@ expected_result:
   - "pf_app recibe permission denied en esas columnas"
   - "El worker obtiene el secreto"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-008 — Solo el worker puede descifrar las credenciales

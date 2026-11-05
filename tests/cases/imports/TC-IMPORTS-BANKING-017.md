@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Sincronización incremental con ventana y cursor"
 scenario: "Primera y segunda sincronización"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013", "FR-IMPORTS-009"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +37,7 @@ expected_result:
   - "La segunda pide solo desde el cursor confirmado el 2026-10-20"
   - "Ambas pasan por vista previa"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-017 — La segunda sincronización continúa desde el cursor confirmado

@@ -270,3 +270,15 @@ Sin eventos nuevos ni consumidores nuevos. Las conversiones creadas emiten `tran
 - **docs/statement-formats/exchanges/:** fichas de formato con fixtures sintéticos.
 - **docs/38 §2:** puerta del owner (decisión, términos, muestras, fixtures).
 - **docs/03 §7:** orden en Phase 6 (después de `add-import-pipeline` para la integración).
+
+## Diferencias registradas al implementar (2026-11-04)
+
+- **Varias cuentas por import.** El pipeline de `add-import-pipeline` procesaba UNA cuenta por job, pero un exchange mueve varias. El import de una conexión se ancla a la primera cuenta mapeada y cada fila del staging lleva su `account_id`; las etapas de normalización, validación, clasificación, duplicados y coincidencias corren **una vez por cuenta** (`ProcessImportService.runConnectionPipeline`) y la persistencia hace un lote por cuenta. La conversión vive en la fila de la cuenta **origen**.
+- **`ImportStagingPort.stageExternalRecords`** no existía en el código del change 54 (solo estaba en su diseño): se implementó (`ExternalRecordStager`). El job de la conexión corre en la `JobQueue` (no en el consumidor de eventos), así que `processConnection` abre la unidad de trabajo ambiental que el consumidor aporta con su bandeja.
+- **Trades.** Se usa `ImportedTransactionsCommand.recordBatch` con `kind = CONVERSION` (comisión del exchange, tasa cotizada e instante de ejecución del exchange); `ImportedConversionsCommand` no se usa. Semántica: monto entregado BRUTO, monto recibido NETO; la comisión en el activo recibido se descuenta de lo recibido; en el entregado forma parte del bruto; en un tercer activo es un gasto `FEES` aparte.
+- **Categoría `FEES`.** La propuesta de categoría de sistema de las comisiones viaja con origen `COUNTERPARTY_DEFAULT`: en TRANSACTIONS `SYSTEM_DEFAULT` significa «sin categoría» y rechaza un id.
+- **Estados.** `REPLACE_CREDENTIAL` también se admite desde `REJECTED` (el diagrama no la mostraba y dejaba la conexión sin salida; el nombre queda ocupado). Verificar también cuenta en el presupuesto de solicitudes (10 por minuto).
+- **Cursor.** El cursor confirmado es la FECHA de fin de la ventana (`YYYY-MM-DD` en la zona del workspace) y la ventana siguiente la solapa a propósito (la idempotencia evita duplicados); una `from` explícita permite reimportar un rango.
+- **Cola.** Los jobs se encolan en la transacción del comando (`enqueueInTransaction`): existen solo si confirma. Las esperas del proveedor persisten `retry_not_before` y reprograman con `startAfter` en la misma unidad de trabajo.
+- **Contrato.** `ImportProposedField.value` tiene un `oneOf` que un id satisface dos veces (id y texto): un defecto previo de add-import-pipeline que `oasdiff` no deja corregir sin cambio incompatible; queda anotado en docs/38 §4 y los tests de API descartan solo ese error.
+- **Archivo.** `FAKE_EXCHANGE_FILE` (JSON `pfos.fake-exchange-history` v1) prueba la ruta de subida; los formatos de Binance y Bybit esperan las muestras del owner.

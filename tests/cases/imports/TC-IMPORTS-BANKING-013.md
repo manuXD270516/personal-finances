@@ -5,16 +5,19 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Revocación de una conexión"
 scenario: "Revocar la conexión del exchange"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-COMP-008"]
 invariants: ["INV-029"]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -37,7 +40,7 @@ expected_result:
   - "sync ⇒ 409 INVALID_STATUS_TRANSITION"
   - "Descifrado imposible; las 37 transacciones siguen"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-013 — Revocar destruye la credencial y conserva lo importado

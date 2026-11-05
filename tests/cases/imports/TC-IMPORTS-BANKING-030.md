@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Límites del proveedor y reintentos"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-REL-007", "NFR-REL-009"]
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +36,7 @@ expected_result:
   - "La vista previa final contiene cada registro una vez"
   - "El import no figura COMPLETED antes de terminar"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-030 — Una caída del worker a mitad de la sincronización se reanuda sin duplicados

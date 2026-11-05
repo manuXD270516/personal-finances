@@ -5,6 +5,7 @@ import type {
   CsvEncoding,
   CsvRecord,
   Decision,
+  ExternalRowData,
   ImportFailure,
   MappingProfileVersion,
   ParsedStatement,
@@ -197,6 +198,10 @@ export interface StagedInsert {
   readonly rowNumber: number;
   /** Celdas crudas (CSV/XLSX); `[]` en los formatos autodescritos. */
   readonly raw: readonly string[];
+  /** Cuenta de la fila (conexiones con varias cuentas); `undefined` = la del job. */
+  readonly accountId?: string | null;
+  /** Datos del proveedor de una fila de conexión (referencia externa, señal, conversión). */
+  readonly external?: ExternalRowData | null;
   /** Solo los formatos autodescritos traen la normalización ya hecha. */
   readonly record?: {
     readonly bookingDate: string | null;
