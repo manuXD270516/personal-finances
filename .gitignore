@@ -50,3 +50,6 @@ infra/**/backend.hcl
 # Extractos PDF: ningun PDF entra al repositorio (D255, D281, D282); los de prueba se generan por codigo.
 *.pdf
 *.PDF
+
+# Caché temporal de tsx cuando TMPDIR no está definido
+apps/*/undefined/
