@@ -1,4 +1,3 @@
-# Workspace del producto. `spikes/` queda FUERA a propósito (código descartable con sus propios workspaces).
 packages:
   - apps/*
   - packages/*
@@ -13,7 +12,7 @@ catalog:
   '@types/node': 24.19.1
   vitest: 5.0.3
   tsx: 4.23.15
-  zod: 4.6.5
+  zod: 4.6.6
   pino: 10.3.1
   pg: 8.23.1
   '@types/pg': 8.23.1
