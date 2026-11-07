@@ -259,20 +259,14 @@ afterAll(async () => {
 });
 
 describe('reportes financieros por HTTP (reporting/financial-reports)', () => {
-  it('[TC-REPORTING-REPORTS-001] el catálogo lista 16 reportes: seis disponibles y el pronóstico planificado para Phase 8', async () => {
+  it('[TC-REPORTING-REPORTS-001] el catálogo lista 16 reportes: con los ampliados quedan 15 disponibles y el pronóstico planificado para Phase 8', async () => {
     const r = await get(viewer, '/reports/catalog');
     expect(r.status).toBe(200);
     validate('getReportCatalog', r);
-    const reports = r.body['reports'] as {
-      number: number;
-      status: string;
-      phase: number;
-      viewPath: string | null;
-    }[];
+    const reports = r.body['reports'] as { number: number; status: string; phase: number }[];
     expect(reports).toHaveLength(16);
-    expect(reports.filter((x) => x.status === 'AVAILABLE').map((x) => x.number)).toEqual([1, 2, 3, 7, 8, 15]);
+    expect(reports.filter((x) => x.status === 'AVAILABLE')).toHaveLength(15);
     expect(reports[15]).toMatchObject({ status: 'PLANNED', phase: 8 });
-    expect(reports[12]).toMatchObject({ status: 'PARTIAL', viewPath: '/fx/costos' });
   });
 
   it('[TC-REPORTING-REPORTS-005] octubre: BOB nativo 12000.00/3300.00, USD 50.00 y consolidado 12000.00/3800.00/8200.00 con 68.3 %; el VIEWER ve lo mismo que el OWNER', async () => {

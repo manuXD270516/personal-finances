@@ -41,6 +41,7 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/imports', name: 'Importaciones' },
   { path: '/imports/nueva', name: 'Nueva importación CSV' },
   { path: '/imports/perfiles', name: 'Perfiles de importación' },
+  { path: '/imports/conexiones', name: 'Conexiones con exchanges' },
   // add-budgets 7.3: presupuestos del periodo (la versión con plan y línea la analiza budgets.spec.ts).
   { path: '/planificacion/presupuestos', name: 'Presupuestos' },
   // add-budget-templates 7.1: templates de presupuesto (la versión con datos y borrador la analiza templates.spec.ts).

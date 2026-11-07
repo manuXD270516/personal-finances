@@ -1,11 +1,12 @@
 import type { PortabilityExclusion, PortabilitySection } from '@pf/shared-kernel';
 
 /**
- * Secciones de exportación/importación del workspace que pertenecen a REPORTING (openspec add-cash-flow-forecast, design.md
- * decisión 12; D378): los ajustes del disponible (modo de horizonte y esenciales) y su lista de categorías esenciales. Las
- * categorías se remapean con el mapa de ids del import (las de CLASSIFICATION se importan antes, orden 300). Un archivo
- * exportado antes del cambio no trae ninguna de las dos secciones y se importa con los valores por omisión (periodo
- * financiero, sin esenciales).
+ * Secciones de exportación/importación del workspace que pertenecen a REPORTING (openspec add-financial-reports-extended,
+ * decisión del owner: las vistas guardadas viajan en el export). El export corre con el contexto RLS del solicitante, así
+ * que solo incluye SUS vistas (son personales); al importar se restauran las del usuario que importa (el único OWNER del
+ * workspace restaurado). Los ids de filtros que viajan dentro de `params` (jsonb) se reescriben con el mapa de ids. Orden
+ * 820: después de los documentos (810–812) y antes de la auditoría (900). `reporting.workspace_data_version` es derivada
+ * y no se exporta (se reconstruye con los eventos).
  */
 export const REPORTING_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   {
@@ -23,6 +24,14 @@ export const REPORTING_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     order: 746,
     orderBy: ['category_id'],
     idColumns: [],
+  },
+  {
+    name: 'saved-report-views',
+    context: 'reporting',
+    table: 'reporting.saved_report_view',
+    order: 820,
+    orderBy: ['user_id', 'report_id', 'id'],
+    importerColumn: 'user_id',
   },
 ];
 

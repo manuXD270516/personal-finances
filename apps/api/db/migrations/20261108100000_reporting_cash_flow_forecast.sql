@@ -97,10 +97,10 @@ GRANT SELECT, INSERT ON reporting.spendable_setting TO pf_app;
 GRANT UPDATE (horizon_mode, subtract_essentials, version, updated_at) ON reporting.spendable_setting TO pf_app;
 GRANT SELECT, INSERT, DELETE ON reporting.spendable_essential_category TO pf_app;
 
--- Purga del workspace demo (ADR-0026): después de `reporting.workspace_data_version` (170); sin FK entre ellas.
-SELECT platform.register_workspace_scoped_table('reporting.cash_flow_shortfall_episode'::regclass, 171, 'DELETE');
-SELECT platform.register_workspace_scoped_table('reporting.spendable_setting'::regclass, 172, 'DELETE');
-SELECT platform.register_workspace_scoped_table('reporting.spendable_essential_category'::regclass, 173, 'DELETE');
+-- Purga del workspace demo (ADR-0026): después de `reporting.workspace_data_version` (170) y de `saved_report_view` (171); sin FK entre ellas.
+SELECT platform.register_workspace_scoped_table('reporting.cash_flow_shortfall_episode'::regclass, 174, 'DELETE');
+SELECT platform.register_workspace_scoped_table('reporting.spendable_setting'::regclass, 175, 'DELETE');
+SELECT platform.register_workspace_scoped_table('reporting.spendable_essential_category'::regclass, 176, 'DELETE');
 
 -- Frecuencia del digest por email (D385: desactivado por omisión). La columna entra en la lista de UPDATE de `pf_app`.
 ALTER TABLE notifications.user_setting

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/saved-report-views.schema.json",
+  "title": "pfos-export v1 — saved-report-views",
+  "description": "Registro de la sección «saved-report-views» (tabla reporting.saved_report_view, contexto reporting). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "user_id",
+    "report_id",
+    "name",
+    "params",
+    "version",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "report_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "params": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "version": {
+      "type": "integer"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "reporting.saved_report_view",
+  "x-pfos-context": "reporting"
+}

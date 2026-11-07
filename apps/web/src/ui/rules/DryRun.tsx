@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import {
@@ -18,7 +18,9 @@ import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace
 import type { FormatContext } from '../dashboard/types';
 import { useCatalogs, type Catalogs } from '../transactions/catalogs';
 import { APPLY_PAGE_SIZE, applicableItems, changeFieldKey, chunk, rulesPath } from './logic';
-import type { DryRun, DryRunApplyResult, DryRunChange, DryRunItem, RuleMode } from './types';
+import type { DryRun, DryRunApplyResult, DryRunChange, DryRunItem, Rule, RuleMode } from './types';
+
+const ONLY_RULE_DAYS = 180;
 
 const addDays = (date: string, days: number): string => {
   const d = new Date(`${date}T00:00:00Z`);
@@ -143,11 +145,13 @@ export function DryRunTable({
 }
 
 /** Ejecuta las reglas sobre el historial sin cambiar nada y aplica el diff por páginas de 500 como edición masiva. */
-export function DryRunPanel({ ctx }: { ctx: WorkspaceContext }) {
+export function DryRunPanel({ ctx, onlyRuleId }: { ctx: WorkspaceContext; onlyRuleId?: string }) {
   const f = useFormat('Rules', ctx);
   const catalogs = useCatalogs(ctx);
   const today = new Date().toISOString().slice(0, 10);
-  const [from, setFrom] = useState(addDays(today, -30));
+  // Con una regla recién aceptada de una sugerencia la ventana es la de la evidencia (180 días).
+  const [from, setFrom] = useState(addDays(today, onlyRuleId ? -ONLY_RULE_DAYS : -30));
+  const [onlyRuleName, setOnlyRuleName] = useState<string | undefined>();
   const [to, setTo] = useState(today);
   const [mode, setMode] = useState<RuleMode>('FILL_EMPTY');
   const [result, setResult] = useState<DryRun | undefined>();
@@ -162,13 +166,26 @@ export function DryRunPanel({ ctx }: { ctx: WorkspaceContext }) {
   >();
   const { api, base } = ctx;
 
+  useEffect(() => {
+    if (!onlyRuleId) return;
+    api
+      .get<Rule>(rulesPath(base, `/${onlyRuleId}`))
+      .then((r) => setOnlyRuleName(r.data?.name))
+      .catch(() => undefined);
+  }, [api, base, onlyRuleId]);
+
   const run = async () => {
     setBusy(true);
     setSummary(undefined);
     setStale(false);
     try {
       const [dry, rules] = await Promise.all([
-        api.command<DryRun>('POST', rulesPath(base, '/dry-run'), { from, to, mode }, { idempotent: false }),
+        api.command<DryRun>(
+          'POST',
+          rulesPath(base, '/dry-run'),
+          { from, to, mode, ...(onlyRuleId ? { ruleIds: [onlyRuleId] } : {}) },
+          { idempotent: false },
+        ),
         api.get<{ data: { id: string; name: string }[] }>(`${rulesPath(base)}?includeArchived=true`),
       ]);
       setResult(dry.data);
@@ -197,6 +214,7 @@ export function DryRunPanel({ ctx }: { ctx: WorkspaceContext }) {
         const r = await api.command<DryRunApplyResult>('POST', rulesPath(base, '/dry-run/apply'), {
           token: result.token,
           mode,
+          ...(onlyRuleId ? { ruleIds: [onlyRuleId] } : {}),
           items: page.map((i) => ({ transactionId: i.transactionId, version: i.version })),
         });
         applied += r.data?.applied ?? 0;
@@ -233,6 +251,13 @@ export function DryRunPanel({ ctx }: { ctx: WorkspaceContext }) {
   return (
     <div style={{ display: 'grid', gap: 'var(--pf-space-3)' }} data-testid="dry-run-panel">
       <p style={mutedStyle}>{f.t('run.intro')}</p>
+      {onlyRuleId ? (
+        <p style={warningStyle} role="status" data-testid="run-only-rule">
+          {onlyRuleName
+            ? f.t('run.onlyRule', { name: onlyRuleName, days: ONLY_RULE_DAYS })
+            : f.t('run.onlyRuleUnknown', { days: ONLY_RULE_DAYS })}
+        </p>
+      ) : null}
       <div style={{ ...cardStyle, display: 'grid', gap: 'var(--pf-space-3)' }}>
         <div style={rowStyle}>
           <Field label={f.t('run.from')}>

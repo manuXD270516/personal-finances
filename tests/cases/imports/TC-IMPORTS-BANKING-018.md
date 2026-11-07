@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Sincronización incremental con ventana y cursor"
 scenario: "Import cancelado no avanza el cursor"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/domain/banking/banking.test.ts
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -36,7 +38,7 @@ expected_result:
   - "sync_cursor sin cambio"
   - "La nueva sincronización trae los mismos registros"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-018 — Cancelar la vista previa no mueve el cursor confirmado

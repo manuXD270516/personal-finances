@@ -39,6 +39,7 @@ const catRest = randomUUID();
 const catFees = randomUUID();
 const catSueldo = randomUUID();
 const tag = randomUUID();
+const tag2 = randomUUID();
 const cp = randomUUID();
 const repo = new PgTransactionRepository();
 const inWs = <T>(id: string, fn: () => Promise<T>) => uow.run({ userId: u1, workspaceId: id }, fn);
@@ -122,7 +123,7 @@ beforeAll(async () => {
   await save(
     spend('2026-10-15', '600.00', catSuper, {
       splits: [
-        { id: randomUUID(), amount: bob('400.00'), categoryId: catSuper, tagIds: [tag] },
+        { id: randomUUID(), amount: bob('400.00'), categoryId: catSuper, tagIds: [tag, tag2] },
         { id: randomUUID(), amount: bob('200.00'), categoryId: catRest },
       ],
     }),
@@ -209,6 +210,50 @@ describe('summarizeNominalFlows con filtros y groupBy (aditivo)', () => {
     const byCp = await summarize({ groupBy: ['COUNTERPARTY'], categoryIds: [catSuper] });
     expect(byCp.find((r) => r.counterpartyId === cp)?.amount.amount).toBe('3500.00');
     expect(byCp.some((r) => r.counterpartyId === null)).toBe(true);
+  });
+});
+
+describe('summarizeNominalFlows: coincidencia de etiquetas y origen (add-financial-reports-extended)', () => {
+  it('[TC-REPORTING-REPORTS-039] con ALL solo cuentan las porciones con todas las etiquetas pedidas', async () => {
+    expect(sum(await summarize({ tagIds: [tag, tag2], tagMatch: 'ALL' }))).toBe('400.00');
+    expect(await summarize({ tagIds: [tag, randomUUID()], tagMatch: 'ALL' })).toEqual([]);
+    expect(sum(await summarize({ tagIds: [tag, randomUUID()], tagMatch: 'ANY' }))).toBe('400.00');
+    expect(sum(await summarize({ tagIds: [tag2] }))).toBe('400.00');
+  });
+
+  it('[TC-REPORTING-REPORTS-039] el drill-down con ALL usa el mismo predicado que la celda', async () => {
+    const page = await portions.listPortions({
+      workspaceId: ws,
+      ...range,
+      tagIds: [tag, tag2],
+      tagMatch: 'ALL',
+      limit: 50,
+    });
+    expect(sum(page.rows)).toBe('400.00');
+    expect(
+      (
+        await portions.listPortions({
+          workspaceId: ws,
+          ...range,
+          tagIds: [tag, randomUUID()],
+          tagMatch: 'ALL',
+          limit: 50,
+        })
+      ).count,
+    ).toBe(0);
+  });
+
+  it('[TC-REPORTING-REPORTS-042] groupBy ORIGIN informa el tipo de la transacción y el rol de la porción', async () => {
+    const rows = await summarize({ groupBy: ['ORIGIN'] });
+    const fee = rows.find((r) => r.categoryId === catFees);
+    expect(fee?.origin).toEqual({ transactionKind: 'TRANSFER', portionRole: 'FEE' });
+    const refund = rows.find((r) => r.amount.amount === '-200.00');
+    expect(refund?.origin).toEqual({ transactionKind: 'REFUND', portionRole: 'NOMINAL' });
+    expect(rows.find((r) => r.nature === 'INCOME')?.origin).toEqual({
+      transactionKind: 'INCOME',
+      portionRole: 'NOMINAL',
+    });
+    expect((await summarize()).every((r) => r.origin === undefined)).toBe(true);
   });
 });
 

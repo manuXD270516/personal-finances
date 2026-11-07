@@ -210,4 +210,114 @@ describe('Portabilidad de reglas y de la clasificación', () => {
     );
     expect(counts).toBe(3 + 5);
   }, 360_000);
+
+  it('[TC-RULES-SUGGEST-025] ida y vuelta: una sugerencia descartada sigue descartada y la regla aceptada conserva su origen', async () => {
+    const owner = await h.user(`kc-sugg-port-${randomUUID()}`);
+    const acc = ok(
+      await post(owner, '/accounts', {
+        name: 'Banco BOB',
+        type: 'BANK',
+        currency: 'BOB',
+        openingBalance: { amount: money('4000.00'), date: '2026-04-30' },
+      }),
+      201,
+    )['id'] as string;
+    const cats = ok(await call(owner, 'GET', '/categories?kind=EXPENSE&limit=200'))['data'] as {
+      id: string;
+      name: string;
+    }[];
+    const cat = (n: string) => cats.find((c) => c.name === n)!.id;
+    const far = ok(await post(owner, '/counterparties', { name: 'Farmacorp' }), 201)['id'] as string;
+    const mk = async (date: string, description: string, categoryId: string, extra: Json = {}) =>
+      ok(
+        await post(owner, '/transactions', {
+          kind: 'EXPENSE',
+          transactionDate: date,
+          accountId: acc,
+          amount: money('30.00'),
+          description,
+          splits: [{ amount: money('30.00'), categoryId }],
+          ...extra,
+        }),
+        201,
+      );
+    for (let i = 1; i <= 4; i += 1) await mk(`2026-10-0${i}`, 'PEDIDOSYA', cat('Restaurantes'));
+    for (let i = 1; i <= 3; i += 1)
+      await mk(`2026-10-1${i}`, 'TIGO MONEY RECARGA 777', cat('Servicios básicos'));
+    for (let i = 1; i <= 3; i += 1) {
+      await mk(`2026-10-2${i}`, `FARMACORP SUC ${i}`, cat('Farmacia'), { counterpartyId: far });
+    }
+    type Item = {
+      suggestionId: string;
+      status: string;
+      pattern: { type: string; value: string; kind: string; categoryId: string };
+      proposedRule: Json;
+    };
+    const list = async (u: User) =>
+      ok(await call(u, 'GET', '/rules/suggestions?includeDismissed=true'))['items'] as Item[];
+    const before = await list(owner);
+    expect(before.map((s) => s.pattern.value).sort()).toEqual(
+      [far, 'pedidosya', 'tigo money recarga'].sort(),
+    );
+    const byValue = (items: Item[], v: string) => items.find((s) => s.pattern.value === v)!;
+    for (const value of ['pedidosya', far]) {
+      const s = byValue(before, value);
+      const r = await post(owner, `/rules/suggestions/${s.suggestionId}/dismiss`, { pattern: s.pattern });
+      expect(r.status, JSON.stringify(r.body)).toBe(204);
+    }
+    const tigo = byValue(before, 'tigo money recarga');
+    const accepted = ok(
+      await post(owner, '/rules', {
+        name: 'Recargas Tigo',
+        conditions: tigo.proposedRule['conditions'],
+        actions: tigo.proposedRule['actions'],
+        fromSuggestion: { suggestionId: tigo.suggestionId, pattern: tigo.pattern },
+      }),
+      201,
+    );
+
+    const exported = await exportAndWait(h, owner, owner.ws);
+    const zip = (await downloadExport(h, owner, owner.ws, exported['id'] as string)).raw;
+    const done = await importAndWait(h, owner, zip);
+    expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED', errorCode: null });
+    const restored: User = { ...owner, ws: done['workspaceId'] as string };
+
+    // Las decisiones viajan; las huellas se recalculan con los ids nuevos (categoría y contraparte).
+    const decisions = await asAdmin(h, (c) =>
+      c.query<{ decision: string; pattern_type: string; category_id: string; suggestion_id: string }>(
+        `SELECT decision, pattern_type, category_id, suggestion_id FROM rules.rule_suggestion_decision
+          WHERE workspace_id = $1 ORDER BY pattern_type, decision`,
+        [restored.ws],
+      ),
+    );
+    expect(decisions.rows.map((r) => [r.pattern_type, r.decision])).toEqual([
+      ['COUNTERPARTY', 'DISMISSED'],
+      ['DESCRIPTION', 'ACCEPTED'],
+      ['DESCRIPTION', 'DISMISSED'],
+    ]);
+    // Las sugerencias descartadas siguen sin mostrarse y aparecen como descartadas con las categorías y contrapartes nuevas.
+    expect(ok(await call(restored, 'GET', '/rules/suggestions'))['items']).toEqual([]);
+    const after = await list(restored);
+    expect(after.map((s) => [s.status, s.pattern.type]).sort()).toEqual([
+      ['DISMISSED', 'COUNTERPARTY'],
+      ['DISMISSED', 'DESCRIPTION'],
+    ]);
+    const restoredFar = after.find((s) => s.pattern.type === 'COUNTERPARTY')!;
+    expect(restoredFar.pattern.value).not.toBe(far);
+    // La regla creada desde la sugerencia conserva su origen.
+    const rules = ok(await call(restored, 'GET', '/rules'))['data'] as Json[];
+    const rule = rules.find((r) => r['name'] === 'Recargas Tigo')!;
+    expect(rule['id']).not.toBe(accepted['id']);
+    const origin = rule['fromSuggestion'] as { suggestionId: string };
+    expect(origin.suggestionId).toMatch(/^[0-9a-f]{64}$/u);
+    expect(origin.suggestionId).not.toBe(tigo.suggestionId);
+    // La huella recalculada es utilizable: restaurar la sugerencia importada funciona.
+    const restore = await post(restored, `/rules/suggestions/${restoredFar.suggestionId}/restore`);
+    expect(restore.status, JSON.stringify(restore.body)).toBe(204);
+    expect((await list(restored)).some((s) => s.status === 'OPEN' && s.pattern.type === 'COUNTERPARTY')).toBe(
+      true,
+    );
+    // El original no cambió.
+    expect((await list(owner)).filter((s) => s.status === 'DISMISSED')).toHaveLength(2);
+  }, 360_000);
 });

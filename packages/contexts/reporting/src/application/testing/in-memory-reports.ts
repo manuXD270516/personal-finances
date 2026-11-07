@@ -8,6 +8,8 @@ import type {
 import { currency as makeCurrency, dec, Money, type Decimal } from '@pf/shared-kernel';
 import type { NominalFlowRowDto, NominalPortionDto } from '@pf/transactions/contracts';
 import type { BudgetVsActualRow, FinancialReportsDeps } from '../ports/financial-reports.js';
+import { ConversionCostQueries } from '../conversion-cost.queries.js';
+import type { ExtendedReportDeps, SavedViewRecord, SavedViewRepository } from '../ports/extended-reports.js';
 import { InMemoryReporting } from './in-memory.js';
 
 export interface LedgerLeg {
@@ -26,6 +28,18 @@ export interface LedgerEntry {
 
 export interface PortionFact extends NominalPortionDto {
   readonly tagIds: readonly string[];
+  /** Tipo de la transacción y rol de la porción (por omisión `EXPENSE`/`NOMINAL`). */
+  readonly origin?: { readonly transactionKind: string; readonly portionRole: 'NOMINAL' | 'FEE' };
+}
+
+/** Datos que sirven los puertos de los reportes ampliados (cada contexto dueño los calcula en producción). */
+export interface ExtendedFakes {
+  goals: Awaited<ReturnType<ExtendedReportDeps['goals']['monthly']>>;
+  loans: Awaited<ReturnType<ExtendedReportDeps['portfolio']['listLoans']>>;
+  cards: Awaited<ReturnType<ExtendedReportDeps['portfolio']['listCards']>>;
+  debtPayments: Awaited<ReturnType<ExtendedReportDeps['debtHistory']['monthly']>>;
+  recurringCosts: Awaited<ReturnType<ExtendedReportDeps['recurring']['listCosts']>>;
+  subscriptionEvents: Awaited<ReturnType<ExtendedReportDeps['subscriptions']['listEvents']>>;
 }
 
 /**
@@ -41,6 +55,17 @@ export class InMemoryFinancialReports extends InMemoryReporting {
   readonly budgetByPeriod = new Map<string, BudgetVsActualRow>();
   readonly reconciledDates = new Map<string, string[]>();
   firstEntryDate: string | null = null;
+  readonly fakes: ExtendedFakes = {
+    goals: [],
+    loans: [],
+    cards: [],
+    debtPayments: [],
+    recurringCosts: [],
+    subscriptionEvents: [],
+  };
+  readonly savedViewRows: SavedViewRecord[] = [];
+  /** Cuántas veces se pidió cada puerto de los reportes ampliados (secuencialidad, una resolución por petición). */
+  readonly extendedCalls: string[] = [];
   auditLog: { reportId: string; filters: string; rowCount: number }[] = [];
   readonly budgetCalls: string[] = [];
   readonly durations: { name: string; value: number; report: string | undefined }[] = [];
@@ -79,13 +104,15 @@ export class InMemoryFinancialReports extends InMemoryReporting {
     return [...sums.entries()].map(([key, v]) => {
       const [account, code] = key.split('|') as [string, string];
       const m = this.money(v, code);
+      const nature = this.accounts.find((a) => a.accountId === account)?.nature ?? 'ASSET';
       return {
         ledgerAccountId: `la-${account}`,
         code: `USER:${account}`,
-        nature: this.accounts.find((a) => a.accountId === account)?.nature ?? 'ASSET',
+        nature,
         accountId: account,
         balance: m,
-        presented: m,
+        // Saldo presentado: un pasivo se presenta positivo (lo que se debe), con el signo opuesto al contable.
+        presented: nature === 'LIABILITY' ? this.money(v.times(-1), code) : m,
       };
     });
   }
@@ -128,6 +155,7 @@ export class InMemoryFinancialReports extends InMemoryReporting {
       accountIds?: readonly string[] | undefined;
       counterpartyIds?: readonly string[] | undefined;
       tagIds?: readonly string[] | undefined;
+      tagMatch?: 'ANY' | 'ALL' | undefined;
       currencies?: readonly string[] | undefined;
       nature?: 'INCOME' | 'EXPENSE' | undefined;
     },
@@ -137,7 +165,10 @@ export class InMemoryFinancialReports extends InMemoryReporting {
       (f.accountIds === undefined || f.accountIds.includes(p.accountId)) &&
       (f.counterpartyIds === undefined ||
         (p.counterpartyId !== null && f.counterpartyIds.includes(p.counterpartyId))) &&
-      (f.tagIds === undefined || p.tagIds.some((t) => f.tagIds?.includes(t))) &&
+      (f.tagIds === undefined ||
+        (f.tagMatch === 'ALL'
+          ? f.tagIds.every((t) => p.tagIds.includes(t))
+          : p.tagIds.some((t) => f.tagIds?.includes(t)))) &&
       (f.currencies === undefined || f.currencies.includes(p.amount.currency)) &&
       (f.nature === undefined || p.nature === f.nature)
     );
@@ -178,6 +209,87 @@ export class InMemoryFinancialReports extends InMemoryReporting {
     return { currencies: [...byCurrency.entries()].map(([currency, lines]) => ({ currency, lines })) };
   }
 
+  /** Repositorio en memoria de vistas guardadas con las mismas reglas de visibilidad que la RLS (workspace y usuario). */
+  savedViewRepository(): SavedViewRepository {
+    const own = (r: SavedViewRecord, i: { workspaceId: string; userId: string }) =>
+      r.workspaceId === i.workspaceId && r.userId === i.userId;
+    return {
+      list: async (i) =>
+        this.savedViewRows
+          .filter((r) => own(r, i) && (i.reportId === undefined || r.reportId === i.reportId))
+          .sort((a, b) => a.name.localeCompare(b.name, 'es')),
+      find: async (i) => this.savedViewRows.find((r) => own(r, i) && r.id === i.id) ?? null,
+      lockAndCount: async (i) => this.savedViewRows.filter((r) => own(r, i)).length,
+      nameTaken: async (i) =>
+        this.savedViewRows.some(
+          (r) =>
+            own(r, i) &&
+            r.reportId === i.reportId &&
+            r.id !== i.exceptId &&
+            r.name.toLowerCase() === i.name.toLowerCase(),
+        ),
+      insert: async (r) => void this.savedViewRows.push(r),
+      update: async (i) => {
+        const idx = this.savedViewRows.findIndex(
+          (r) => own(r, i) && r.id === i.id && r.version === i.expectedVersion,
+        );
+        if (idx < 0) return false;
+        const prev = this.savedViewRows[idx]!;
+        this.savedViewRows[idx] = {
+          ...prev,
+          name: i.name,
+          params: i.params,
+          version: prev.version + 1,
+          updatedAt: i.updatedAt,
+        };
+        return true;
+      },
+      delete: async (i) => {
+        const idx = this.savedViewRows.findIndex((r) => own(r, i) && r.id === i.id);
+        if (idx < 0) return false;
+        this.savedViewRows.splice(idx, 1);
+        return true;
+      },
+    };
+  }
+
+  extendedDeps(): ExtendedReportDeps {
+    const record = <T>(name: string, value: T): T => {
+      this.extendedCalls.push(name);
+      return value;
+    };
+    return {
+      goals: {
+        monthly: async ({ goalIds }) =>
+          record(
+            'goals',
+            this.fakes.goals.filter((g) => goalIds === undefined || goalIds.includes(g.goalId)),
+          ),
+      },
+      debtHistory: { monthly: async () => record('debtHistory', this.fakes.debtPayments) },
+      portfolio: {
+        listLoans: async () => record('loans', this.fakes.loans),
+        listCards: async () => record('cards', this.fakes.cards),
+      },
+      recurring: { listCosts: async () => record('recurring', this.fakes.recurringCosts) },
+      subscriptions: {
+        listEvents: async ({ to }) =>
+          record(
+            'subscriptions',
+            this.fakes.subscriptionEvents.filter((e) => e.date <= to),
+          ),
+      },
+      conversions: {
+        listForCostAnalysis: async ({ from, to, includeVoided }) =>
+          this.conversionRows.filter(
+            (r) => r.businessDate >= from && r.businessDate <= to && (includeVoided === true || !r.voided),
+          ),
+      },
+      conversionCosts: new ConversionCostQueries(this.conversionCostDeps()),
+      savedViews: this.savedViewRepository(),
+    };
+  }
+
   financialDeps(): FinancialReportsDeps {
     const base = this.deps();
     return {
@@ -194,16 +306,33 @@ export class InMemoryFinancialReports extends InMemoryReporting {
       flows: {
         summarizeNominalFlows: async (input) => {
           const groups = new Map<string, NominalFlowRowDto>();
+          const groupBy = input.groupBy ?? [];
           for (const p of this.portions) {
             if (p.businessDate < input.dateFrom || p.businessDate > input.dateTo) continue;
             if (!this.matches(p, input)) continue;
-            const key = `${p.businessDate}|${p.nature}|${p.categoryId}|${p.amount.currency}`;
+            const tags = input.withTags ? [...p.tagIds].sort() : null;
+            const origin = p.origin ?? {
+              transactionKind: p.nature === 'INCOME' ? 'INCOME' : 'EXPENSE',
+              portionRole: 'NOMINAL' as const,
+            };
+            const key = [
+              p.businessDate,
+              p.nature,
+              p.categoryId,
+              p.amount.currency,
+              tags?.join(',') ?? '',
+              groupBy.includes('ACCOUNT') ? p.accountId : '',
+              groupBy.includes('ORIGIN') ? `${origin.transactionKind}:${origin.portionRole}` : '',
+            ].join('|');
             const prev = groups.get(key);
             groups.set(key, {
               businessDate: p.businessDate,
               nature: p.nature,
               categoryId: p.categoryId,
               amount: this.money(dec(prev?.amount.amount ?? '0').plus(p.amount.amount), p.amount.currency),
+              ...(tags ? { tagIds: tags } : {}),
+              ...(groupBy.includes('ACCOUNT') ? { accountId: p.accountId } : {}),
+              ...(groupBy.includes('ORIGIN') ? { origin } : {}),
             });
           }
           return [...groups.values()];
@@ -323,6 +452,7 @@ export class InMemoryFinancialReports extends InMemoryReporting {
         observe: (name, value, attributes) =>
           void this.durations.push({ name, value, report: attributes?.report }),
       },
+      extended: this.extendedDeps(),
       ...(this.rateValidityWindowDays === undefined
         ? {}
         : { rateValidityWindowDays: this.rateValidityWindowDays }),

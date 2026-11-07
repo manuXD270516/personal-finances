@@ -1,3 +1,4 @@
+import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseArgs, listOption, option } from '../src/lib/args.js';
@@ -7,6 +8,25 @@ import { ENV_EXAMPLE } from '../src/lib/paths.js';
 import { parseExcludedRanges } from '../src/lib/ports.js';
 
 const example = readFileSync(ENV_EXAMPLE, 'utf8');
+
+describe('par X25519 de las credenciales de exchanges (add-banking-providers, D342)', () => {
+  it('setup:env genera la clave privada y la pública JUNTAS: la pública se deriva de la privada', () => {
+    const rendered = renderEnv(example);
+    const env = interpolateEnv(parseEnvLines(rendered.text));
+    const publicRing = env['CONNECTION_CREDENTIALS_PUBLIC_KEYS'] ?? '';
+    const privateRing = env['CONNECTION_CREDENTIALS_PRIVATE_KEYS'] ?? '';
+    expect(publicRing).toMatch(/^dev1:[A-Za-z0-9_-]{43}$/);
+    expect(privateRing).toMatch(/^dev1:[A-Za-z0-9_-]{43}$/);
+    const raw = Buffer.from(privateRing.slice('dev1:'.length), 'base64url');
+    const pkcs8 = Buffer.concat([Buffer.from('302e020100300506032b656e04220420', 'hex'), raw]);
+    const derived = createPublicKey(createPrivateKey({ key: pkcs8, format: 'der', type: 'pkcs8' }))
+      .export({ format: 'der', type: 'spki' })
+      .subarray(-32)
+      .toString('base64url');
+    expect(publicRing).toBe(`dev1:${derived}`);
+    expect(env['IMPORTS_PROVIDER_FAKE_ENABLED']).toBe('false');
+  });
+});
 
 describe('.env.example y pnpm setup:env (docs/19 §0.3)', () => {
   it('.env.example no contiene secretos: toda variable PF_DEV_* es el marcador __generate__', () => {

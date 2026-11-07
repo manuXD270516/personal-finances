@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Reportes ampliados en el catálogo"
 scenario: "Catálogo completo de Phase 7"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-001"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/reports.domain.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["catalog"]
 error_code: null
@@ -28,7 +30,7 @@ expected_result:
   - "15 reportes AVAILABLE"
   - "\"Pronóstico vs real\" PLANNED para Phase 8"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-048 — Con los reportes ampliados el catálogo informa 15 disponibles y el pronóstico vs real planificado

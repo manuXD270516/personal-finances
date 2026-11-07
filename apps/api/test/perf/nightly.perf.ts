@@ -813,6 +813,85 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
   });
 
+  it('[TC-REPORTING-REPORTS-053] NFR-PERF-006 (add-financial-reports-extended 4.3): los nueve reportes ampliados, con 5 metas y 2 préstamos creados por la prueba (bloqueantes, p95 ≤ 800 ms)', async () => {
+    // El Large Seed no tiene metas ni préstamos: 5 metas con 24 reservas mensuales y 2 préstamos con 12 pagos cada uno.
+    const bank = dataOf(await ok('GET', `${W}/accounts?limit=200`)).find(
+      (a) => a['type'] === 'BANK' && a['currency'] === 'BOB' && a['status'] === 'ACTIVE',
+    );
+    if (!bank)
+      throw new Error('el Large Seed no tiene una cuenta bancaria en BOB para las metas y los préstamos');
+    const bankId = String(bank['id']);
+    const month = (i: number, day = 1) => {
+      const at = monthAt(2024, 10, i);
+      return ymd(at.y, at.m, day);
+    };
+    for (let g = 1; g <= 5; g += 1) {
+      const goal = await ok('POST', `${W}/goals`, {
+        name: `Meta del benchmark ${g}`,
+        type: 'CUSTOM',
+        target: { amount: '24000.00', currency: 'BOB' },
+        startDate: month(0),
+        targetDate: month(35),
+      });
+      for (let i = 0; i < 24; i += 1) {
+        await ok('POST', `${W}/goals/${String(goal['id'])}/contributions`, {
+          fund: 'EARMARK',
+          amount: { amount: '100.00', currency: 'BOB' },
+          sourceAccountId: bankId,
+          businessDate: month(i),
+        });
+      }
+    }
+    dataset['metas del benchmark de reportes'] = 5;
+    for (let l = 1; l <= 2; l += 1) {
+      const loan = await ok('POST', `${W}/loans`, {
+        name: `Préstamo del benchmark ${l}`,
+        account: { create: { name: `Préstamo del benchmark ${l} (${String(Date.now())})` } },
+        disbursementAccountId: bankId,
+        principal: { amount: '20000.00', currency: 'BOB' },
+        annualRate: '0.12',
+        termInstallments: 36,
+        disbursementDate: '2025-09-15',
+        firstDueDate: '2025-10-15',
+      });
+      await ok('POST', `${W}/loans/${String(loan['id'])}/disburse`, {});
+      const first = dataOf(await ok('GET', `${W}/loans/${String(loan['id'])}/installments`))[0]!;
+      for (let i = 0; i < 12; i += 1) {
+        await ok('POST', `${W}/loans/${String(loan['id'])}/payments`, {
+          amount: { amount: String(first['total']), currency: 'BOB' },
+          businessDate: month(12 + i, 15),
+          accountId: bankId,
+        });
+      }
+    }
+    dataset['préstamos del benchmark de reportes'] = 2;
+
+    const rows: readonly (readonly [string, string, string])[] = [
+      [
+        'report-expenses-by-tag-12m',
+        'GET /reports/expenses/by-tag (12 periodos)',
+        `expenses/by-tag?${REPORT_RANGE}`,
+      ],
+      [
+        'report-expenses-by-account-12m',
+        'GET /reports/expenses/by-account (12 periodos)',
+        `expenses/by-account?${REPORT_RANGE}`,
+      ],
+      [
+        'report-trends-24m',
+        'GET /reports/trends (24 meses calendario)',
+        'trends?from=2024-10-01&to=2026-09-30&grouping=CALENDAR_MONTH',
+      ],
+      ['report-fees-12m', 'GET /reports/fees (12 periodos)', `fees?${REPORT_RANGE}`],
+      ['report-goals-12m', 'GET /reports/goals (12 meses, 5 metas)', `goals?${REPORT_RANGE}`],
+      ['report-debts-12m', 'GET /reports/debts (12 meses, 2 préstamos y tarjetas)', `debts?${REPORT_RANGE}`],
+      ['report-recurring', 'GET /reports/recurring', 'recurring'],
+      ['report-subscriptions-12m', 'GET /reports/subscriptions (12 meses)', `subscriptions?${REPORT_RANGE}`],
+      ['report-conversions-12m', 'GET /reports/conversions (12 periodos)', `conversions?${REPORT_RANGE}`],
+    ];
+    for (const [id, title, path] of rows) await reportRow(id, title, path);
+  }, 900_000);
+
   it('[TC-REPORTING-REPORTS-029] NFR-PERF-006 (add-financial-reports 5.3): reconciliación reporte↔ledger sobre los 60 meses del Large Seed', async () => {
     const reconciliation = new ReportsReconciliation(
       httpReports(

@@ -196,6 +196,218 @@ export interface DrillDownPage {
   readonly rows: readonly DrillRow[];
   readonly nextCursor: string | null;
 }
+export interface TagsReport {
+  readonly meta: ReportMeta;
+  readonly nonAdditive: true;
+  readonly tagMatch: 'ANY' | 'ALL';
+  readonly tags: readonly {
+    readonly tagId: string;
+    readonly name: string;
+    readonly archived: boolean;
+    readonly amount: ReportAmount;
+    readonly comparison: ReportVariation | null;
+  }[];
+}
+export interface AccountsReport {
+  readonly meta: ReportMeta;
+  readonly accounts: readonly {
+    readonly accountId: string;
+    readonly name: string;
+    readonly type: string;
+    readonly institutionId: string | null;
+    readonly amount: ReportAmount;
+    readonly comparison: ReportVariation | null;
+    readonly byCategory: readonly {
+      readonly categoryId: string;
+      readonly name: string;
+      readonly amount: ReportAmount;
+    }[];
+  }[];
+  readonly total: ReportAmount;
+  readonly totalComparison: ReportVariation | null;
+}
+export interface TrendsReport {
+  readonly meta: ReportMeta;
+  readonly normalized: boolean;
+  readonly series: readonly {
+    readonly categoryId: string | null;
+    readonly name: string;
+    readonly total: ReportAmount;
+    readonly cells: readonly { readonly period: ReportPeriod; readonly amount: ReportAmount }[];
+  }[];
+}
+export interface FeesReport {
+  readonly meta: ReportMeta;
+  readonly months: readonly {
+    readonly period: ReportPeriod;
+    readonly byType: readonly { readonly type: string; readonly amount: ReportAmount }[];
+    readonly total: ReportAmount;
+  }[];
+  readonly last12Months: ReportAmount;
+}
+export interface GoalsReport {
+  readonly meta: ReportMeta;
+  readonly goals: readonly {
+    readonly goalId: string;
+    readonly name: string;
+    readonly currency: string;
+    readonly target: Money;
+    readonly months: readonly {
+      readonly period: string;
+      readonly monthEnd: string;
+      readonly contributions: Money;
+      readonly withdrawals: Money;
+      readonly accumulated: Money;
+      readonly percent: string | null;
+      readonly expected: Money | null;
+      readonly status: 'BEHIND' | 'ON_TRACK' | 'AHEAD' | null;
+      readonly complete: boolean;
+    }[];
+  }[];
+}
+export interface DebtsReport {
+  readonly meta: ReportMeta;
+  readonly debts: readonly {
+    readonly debtId: string;
+    readonly kind: 'LOAN' | 'CARD';
+    readonly name: string;
+    readonly currency: string;
+    readonly months: readonly {
+      readonly period: ReportPeriod;
+      readonly outstanding: Money;
+      readonly principalPaid: Money | null;
+      readonly interestPaid: Money | null;
+      readonly chargesPaid: Money | null;
+    }[];
+  }[];
+  readonly consolidated: readonly {
+    readonly period: ReportPeriod;
+    readonly outstanding: ReportAmount;
+    readonly principalPaid: ReportAmount;
+    readonly interestPaid: ReportAmount;
+  }[];
+}
+export interface RecurringCostsReport {
+  readonly meta: ReportMeta;
+  readonly items: readonly {
+    readonly definitionId: string;
+    readonly name: string;
+    readonly cadence: string;
+    readonly interval: number;
+    readonly variable: boolean;
+    readonly monthly: Money | null;
+    readonly annual: Money | null;
+    readonly monthlyReporting: Money | null;
+  }[];
+  readonly totals: { readonly monthly: ReportAmount; readonly annual: ReportAmount };
+  readonly variableCount: number;
+}
+export interface SubscriptionsReport {
+  readonly meta: ReportMeta;
+  readonly months: readonly {
+    readonly period: ReportPeriod;
+    readonly monthlyCost: ReportAmount;
+    readonly active: number;
+    readonly events: readonly {
+      readonly date: string;
+      readonly subscriptionId: string;
+      readonly name: string;
+      readonly kind: 'STARTED' | 'CANCELLED' | 'PRICE_CHANGED';
+      readonly previousPrice: Money | null;
+      readonly newPrice: Money | null;
+    }[];
+  }[];
+}
+export interface ConversionsReport {
+  readonly meta: ReportMeta;
+  readonly points: readonly {
+    readonly transactionId: string;
+    readonly date: string;
+    readonly pair: string;
+    readonly effectiveRate: string;
+    readonly referenceRate: string | null;
+  }[];
+  readonly months: readonly {
+    readonly period: ReportPeriod;
+    readonly cost: Money;
+    readonly conversions: number;
+    readonly excluded: number;
+    readonly costComplete: boolean;
+  }[];
+  readonly costTotal: Money;
+  readonly costComplete: boolean;
+}
+
+/** Vista guardada (FR-REPORTING-019): solo ids y parámetros; al abrirla trae la consulta lista y sus avisos. */
+export interface SavedViewLite {
+  readonly id: string;
+  readonly reportId: string;
+  readonly name: string;
+  readonly version: number;
+}
+export interface OpenedSavedView extends SavedViewLite {
+  readonly query: Readonly<Record<string, string | readonly string[]>>;
+  readonly warnings: readonly {
+    readonly code: 'ARCHIVED_FILTER' | 'MISSING_FILTER';
+    readonly kind: 'CATEGORY' | 'ACCOUNT' | 'TAG' | 'COUNTERPARTY';
+    readonly id: string;
+    readonly name: string | null;
+  }[];
+}
+
+/** Parámetros de una vista guardada desde los filtros aplicados: rango fijo o relativo (últimos N periodos). */
+export function savedViewParams(
+  f: ReportFilters,
+  range: 'FIXED' | 'LAST_3' | 'LAST_6' | 'LAST_12',
+  slug: ReportSlug,
+): Record<string, unknown> {
+  const list = (v: string) =>
+    v
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+  const out: Record<string, unknown> = {};
+  const allowed = SLUG_PARAMS[slug];
+  if (!RANGELESS_SLUGS.includes(slug)) {
+    out['range'] =
+      range === 'FIXED'
+        ? { kind: 'FIXED', from: f.from, to: f.to }
+        : { kind: 'LAST_N_PERIODS', periods: Number(range.slice(5)) };
+  }
+  const put = (key: string, value: unknown, param: string) => {
+    if (value === '' || (Array.isArray(value) && value.length === 0)) return;
+    if (allowed && !allowed.includes(param)) return;
+    out[key] = value;
+  };
+  put('grouping', f.grouping === 'CALENDAR_MONTH' ? 'CALENDAR_MONTH' : '', 'grouping');
+  put('compare', f.compare === 'NONE' || f.compare === 'CUSTOM' ? '' : f.compare, 'compare');
+  put('normalize', f.normalize ? 'PER_DAY' : '', 'normalize');
+  put('rolling', f.rolling ? Number(f.rolling) : '', 'rolling');
+  put('reportingCurrency', f.reportingCurrency, 'reportingCurrency');
+  put('conversion', f.conversion === 'CUTOFF' ? 'CUTOFF' : '', 'conversion');
+  put('accountIds', list(f.accountIds), 'accountId');
+  put('currencies', list(f.currencies), 'currency');
+  put('categoryIds', list(f.categoryIds), 'categoryId');
+  put('tagIds', list(f.tagIds), 'tagId');
+  put('counterpartyIds', list(f.counterpartyIds), 'counterpartyId');
+  put('tagMatch', f.tagMatch === 'ALL' ? 'ALL' : '', 'tagMatch');
+  put('debtKind', f.debtKind, 'debtKind');
+  return out;
+}
+
+/** Filtros desde la consulta ya calculada de una vista guardada (el rango relativo viene resuelto por la API). */
+export function filtersFromView(
+  query: Readonly<Record<string, string | readonly string[]>>,
+  today: string,
+): ReportFilters {
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (Array.isArray(v)) for (const item of v) search.append(k, item);
+    else search.set(k, String(v));
+  }
+  return filtersFromSearch(search, today);
+}
+
 export interface CatalogEntry {
   readonly reportId: string;
   readonly number: number;
@@ -214,7 +426,59 @@ export const REPORT_SLUGS = {
   'flujo-de-caja': { id: 'CASH_FLOW', api: 'cash-flow' },
   patrimonio: { id: 'NET_WORTH', api: 'net-worth' },
   'historial-de-saldo': { id: 'ACCOUNT_BALANCE_HISTORY', api: 'accounts/{accountId}/balance-history' },
+  // add-financial-reports-extended
+  'gastos-por-etiqueta': { id: 'EXPENSES_BY_TAG', api: 'expenses/by-tag' },
+  'gastos-por-cuenta': { id: 'EXPENSES_BY_ACCOUNT', api: 'expenses/by-account' },
+  tendencias: { id: 'MONTHLY_TRENDS', api: 'trends' },
+  comisiones: { id: 'FEES', api: 'fees' },
+  metas: { id: 'SAVINGS_GOALS', api: 'goals' },
+  deudas: { id: 'DEBT_EVOLUTION', api: 'debts' },
+  'costos-recurrentes': { id: 'RECURRING_COSTS', api: 'recurring' },
+  suscripciones: { id: 'SUBSCRIPTION_EVOLUTION', api: 'subscriptions' },
+  conversiones: { id: 'FX_CONVERSIONS', api: 'conversions' },
 } as const;
+
+const COMMON_PARAMS = [
+  'from',
+  'to',
+  'grouping',
+  'compare',
+  'compareFrom',
+  'compareTo',
+  'normalize',
+  'rolling',
+  'reportingCurrency',
+  'conversion',
+  'accountId',
+  'currency',
+  'categoryId',
+  'tagId',
+  'tagMatch',
+  'counterpartyId',
+];
+/** Parámetros que acepta la API de cada reporte ampliado (los demás se omiten: el contrato rechaza lo desconocido). */
+const SLUG_PARAMS: Partial<Record<string, readonly string[]>> = {
+  'gastos-por-etiqueta': COMMON_PARAMS,
+  'gastos-por-cuenta': COMMON_PARAMS,
+  tendencias: COMMON_PARAMS,
+  comisiones: COMMON_PARAMS,
+  conversiones: COMMON_PARAMS,
+  metas: ['from', 'to', 'reportingCurrency'],
+  deudas: ['from', 'to', 'reportingCurrency', 'conversion', 'debtKind'],
+  'costos-recurrentes': ['reportingCurrency', 'currency', 'categoryId'],
+  suscripciones: ['from', 'to', 'reportingCurrency'],
+};
+/** Reportes ampliados sin rango (la vista no pide fechas). */
+export const RANGELESS_SLUGS: readonly string[] = ['costos-recurrentes'];
+
+/** Deja solo los parámetros que acepta la API del reporte. */
+function forSlug(q: URLSearchParams, slug: string): URLSearchParams {
+  const allowed = SLUG_PARAMS[slug];
+  if (!allowed) return q;
+  const out = new URLSearchParams();
+  for (const [k, v] of q) if (allowed.includes(k)) out.append(k, v);
+  return out;
+}
 export type ReportSlug = keyof typeof REPORT_SLUGS;
 export const isReportSlug = (slug: string): slug is ReportSlug => slug in REPORT_SLUGS;
 export const slugOf = (id: string): ReportSlug | undefined =>
@@ -233,6 +497,9 @@ export interface ReportFilters {
   readonly conversion: 'HISTORICAL' | 'CUTOFF';
   readonly granularity: string;
   readonly topN: string;
+  /** Coincidencia de etiquetas (`ANY` por omisión) y tipo de deuda del reporte de deudas. */
+  readonly tagMatch: 'ANY' | 'ALL';
+  readonly debtKind: '' | 'LOAN' | 'CARD';
   readonly accountId: string;
   /** Listas separadas por coma (uuid o códigos) para cuentas, monedas, categorías, etiquetas y contrapartes. */
   readonly accountIds: string;
@@ -260,6 +527,8 @@ export function defaultFilters(today: string): ReportFilters {
     conversion: 'HISTORICAL',
     granularity: '',
     topN: '',
+    tagMatch: 'ANY',
+    debtKind: '',
     accountId: '',
     accountIds: '',
     currencies: '',
@@ -296,6 +565,8 @@ export function filtersFromSearch(search: URLSearchParams, today: string): Repor
     conversion: (get('conversion') as ReportFilters['conversion'] | undefined) ?? 'HISTORICAL',
     granularity: get('granularity') ?? '',
     topN: get('topN') ?? '',
+    tagMatch: get('tagMatch') === 'ALL' ? 'ALL' : 'ANY',
+    debtKind: (get('debtKind') as ReportFilters['debtKind'] | undefined) ?? '',
     accountId: get('historyAccount') ?? '',
     accountIds: list('accountId'),
     currencies: list('currency'),
@@ -306,7 +577,12 @@ export function filtersFromSearch(search: URLSearchParams, today: string): Repor
 }
 
 /** Parámetros de consulta de los filtros (estado de la URL y petición a la API comparten la serialización). */
-export function filtersToParams(f: ReportFilters, defaults: ReportFilters, forApi = false): URLSearchParams {
+export function filtersToParams(
+  f: ReportFilters,
+  defaults: ReportFilters,
+  forApi = false,
+  slug?: ReportSlug,
+): URLSearchParams {
   const q = new URLSearchParams();
   q.set('from', f.from);
   q.set('to', f.to);
@@ -319,11 +595,14 @@ export function filtersToParams(f: ReportFilters, defaults: ReportFilters, forAp
     }
     if (f.normalize) q.set('normalize', 'PER_DAY');
   }
+  if (f.normalize && f.compare === 'NONE' && slug === 'tendencias') q.set('normalize', 'PER_DAY');
   if (f.rolling) q.set('rolling', f.rolling);
   if (f.reportingCurrency) q.set('reportingCurrency', f.reportingCurrency);
   if (f.conversion === 'CUTOFF') q.set('conversion', 'CUTOFF');
   if (f.granularity) q.set('granularity', f.granularity);
   if (f.topN) q.set('topN', f.topN);
+  if (f.tagMatch === 'ALL') q.set('tagMatch', 'ALL');
+  if (f.debtKind) q.set('debtKind', f.debtKind);
   for (const [key, param] of LIST_PARAMS) {
     for (const v of f[key]
       .split(',')
@@ -349,9 +628,9 @@ export function reportApiPath(
   f: ReportFilters,
   defaults: ReportFilters,
 ): string {
-  const q = filtersToParams(f, defaults, true).toString();
+  const q = forSlug(filtersToParams(f, defaults, true, slug), slug).toString();
   const api = REPORT_SLUGS[slug].api.replace('{accountId}', f.accountId);
-  return `${base}/reports/${api}?${q}`;
+  return `${base}/reports/${api}${q ? `?${q}` : ''}`;
 }
 
 export function exportApiPath(
@@ -360,9 +639,9 @@ export function exportApiPath(
   f: ReportFilters,
   defaults: ReportFilters,
 ): string {
-  const q = filtersToParams(f, defaults, true).toString();
+  const q = forSlug(filtersToParams(f, defaults, true, slug), slug).toString();
   const api = REPORT_SLUGS[slug].api.replace('{accountId}', f.accountId);
-  return `${base}/reports/${api}/export?${q}`;
+  return `${base}/reports/${api}/export${q ? `?${q}` : ''}`;
 }
 
 /** Celda abierta en el panel de drill-down. */
@@ -381,6 +660,8 @@ export function drillQuery(cell: DrillCell, f: ReportFilters, defaults: ReportFi
     true,
   );
   q.set('report', cell.report);
+  // Una celda de etiqueta se abre solo con esa etiqueta (sin los demás filtros de etiquetas ni su coincidencia).
+  if (cell.extra['tagId']) q.delete('tagMatch');
   for (const [k, v] of Object.entries(cell.extra)) q.set(k, v);
   return q;
 }

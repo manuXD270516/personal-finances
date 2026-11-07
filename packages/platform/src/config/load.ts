@@ -259,6 +259,29 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
     });
   }
 
+  // add-banking-providers: el proveedor simulado y la clave privada en claro no existen en cloud (D342).
+  if (
+    names.includes('IMPORTS_PROVIDER_FAKE_ENABLED') &&
+    cloud &&
+    values['IMPORTS_PROVIDER_FAKE_ENABLED'] === true
+  ) {
+    problems.push({
+      variable: 'IMPORTS_PROVIDER_FAKE_ENABLED',
+      reason: 'prohibido con PFOS_ENV=staging|production (proveedor simulado solo para pruebas)',
+    });
+  }
+  if (
+    names.includes('CONNECTION_CREDENTIALS_PRIVATE_KEYS') &&
+    cloud &&
+    values['CONNECTION_CREDENTIALS_PRIVATE_KEYS'] !== undefined
+  ) {
+    problems.push({
+      variable: 'CONNECTION_CREDENTIALS_PRIVATE_KEYS',
+      reason:
+        'solo se permite con PFOS_ENV=local|ci (en cloud use CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE, D342)',
+    });
+  }
+
   // Providers de tasas simulados (pruebas E2E): una URL alternativa de provider solo se acepta en local/ci.
   for (const name of ['FX_PROVIDER_PARALELO_BO_URL', 'FX_PROVIDER_DOLARAPI_BO_URL'] as const) {
     if (names.includes(name) && cloud && values[name] !== undefined) {

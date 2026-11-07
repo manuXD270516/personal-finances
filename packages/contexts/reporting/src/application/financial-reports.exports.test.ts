@@ -327,3 +327,58 @@ describe('Drill-down del patrimonio (reporting/net-worth)', () => {
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 });
+
+describe('exportación CSV de los reportes ampliados', () => {
+  it('[TC-REPORTING-REPORTS-040] gastos por cuenta: una fila nativa y una consolidada por cuenta, categoría y total, con auditoría sin contenido', async () => {
+    portion('2026-10-10', SUPER, '3300.00');
+    portion('2026-10-18', FARMACIA, '500.00', { accountId: TARJETA });
+    const file = await svc.exportExpensesByAccount({ ...base, from: '2026-10-01', to: '2026-10-31' });
+    const lines = file.body.toString('utf8').slice(1).trimEnd().split('\r\n');
+    expect(lines[0]).toBe(
+      'account,account_type,institution_id,category,row_kind,currency,amount,conversion_policy,reporting_currency,complete',
+    );
+    expect(lines).toContain('Banco BOB,BANK,,,CONSOLIDATED,BOB,3300.00,TRANSACTION_DATE,BOB,true');
+    expect(lines).toContain(
+      'Tarjeta Andina,CREDIT_CARD,,Farmacia,NATIVE,BOB,500.00,TRANSACTION_DATE,BOB,true',
+    );
+    expect(lines.at(-1)).toBe(',,,,CONSOLIDATED,BOB,3800.00,TRANSACTION_DATE,BOB,true');
+    expect(file.fileName).toBe('expenses-by-account-2026-10-01-2026-10-31.csv');
+    expect(mem.auditLog).toEqual([
+      expect.objectContaining({ reportId: 'EXPENSES_BY_ACCOUNT', rowCount: lines.length - 1 }),
+    ]);
+    expect(JSON.stringify(mem.auditLog)).not.toContain('3300');
+  });
+
+  it('[TC-REPORTING-REPORTS-039] gastos por etiqueta: el nombre de la etiqueta se neutraliza contra fórmulas', async () => {
+    mem.tree = {
+      ...mem.tree,
+      tags: [{ tagId: '0190a000-0000-7000-8000-0000000000e1', name: '=SUMA(A1)', archived: false }],
+    };
+    portion('2026-10-10', SUPER, '100.00', { tagIds: ['0190a000-0000-7000-8000-0000000000e1'] });
+    const file = await svc.exportExpensesByTag({ ...base, from: '2026-10-01', to: '2026-10-31' });
+    expect(file.body.toString('utf8')).toContain("'=SUMA(A1)");
+  });
+
+  it('[TC-REPORTING-REPORTS-045] costos recurrentes: encabezado estable y fila de total', async () => {
+    mem.fakes.recurringCosts = [
+      {
+        definitionId: 'd1',
+        name: 'Streaming',
+        categoryId: null,
+        cadence: 'MONTHLY',
+        interval: 1,
+        currency: 'BOB',
+        renewalsPerYear: '12',
+        price: '69.00',
+        variable: false,
+      },
+    ];
+    const file = await svc.exportRecurringCosts({ ...base });
+    const lines = file.body.toString('utf8').slice(1).trimEnd().split('\r\n');
+    expect(lines[0]).toBe(
+      'commitment,cadence,interval,variable,currency,monthly,annual,monthly_reporting,conversion_policy,reporting_currency',
+    );
+    expect(lines[1]).toBe('Streaming,MONTHLY,1,false,BOB,69.00,828.00,69.00,VALUATION_DATE,BOB');
+    expect(lines[2]).toBe('TOTAL,,,false,BOB,69.00,828.00,69.00,VALUATION_DATE,BOB');
+  });
+});

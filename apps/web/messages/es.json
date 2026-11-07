@@ -4220,7 +4220,8 @@
       "pin": "Fijar el diseño {id} v{version} en esta cuenta",
       "pinHint": "Las próximas importaciones de esta cuenta usarán esa versión aunque el banco publique una nueva.",
       "pinned": "Diseño fijado en un perfil PDF de la cuenta."
-    }
+    },
+    "connectionsLink": "Conexiones con exchanges"
   },
   "Debt": {
     "title": "Deudas",
@@ -5911,7 +5912,8 @@
       "label": "Secciones de reglas",
       "rules": "Reglas",
       "run": "Ejecutar sobre el historial",
-      "coverage": "Cobertura"
+      "coverage": "Cobertura",
+      "suggestions": "Sugerencias"
     },
     "list": {
       "new": "Nueva regla",
@@ -6045,7 +6047,8 @@
       "save": "Guardar regla",
       "saving": "Guardando…",
       "saved": "Regla guardada.",
-      "errorsTitle": "Revisa estos datos antes de guardar:"
+      "errorsTitle": "Revisa estos datos antes de guardar:",
+      "fromSuggestion": "Regla prellenada desde una sugerencia: revísala, edítala si quieres y guárdala. Crearla no reclasifica nada; después podrás aplicarla a las transacciones existentes."
     },
     "errors": {
       "nameRequired": "El nombre es obligatorio (hasta 80 caracteres).",
@@ -6154,7 +6157,9 @@
       "pages": "Se aplican por páginas de {size}.",
       "progress": "Progreso de la aplicación",
       "summary": "Se aplicaron {applied} transacciones; {notApplicable} no se pudieron aplicar (periodo cerrado, conciliadas o administradas por otro módulo).",
-      "stale": "Una regla o una transacción cambió después de la ejecución y no se aplicó nada de esa página. Vuelve a ejecutar para ver el resultado actual."
+      "stale": "Una regla o una transacción cambió después de la ejecución y no se aplicó nada de esa página. Vuelve a ejecutar para ver el resultado actual.",
+      "onlyRule": "Ejecutando solo la regla «{name}» sobre los últimos {days} días: revisa el resultado y aplícalo.",
+      "onlyRuleUnknown": "Ejecutando solo la regla recién creada sobre los últimos {days} días: revisa el resultado y aplícalo."
     },
     "coverage": {
       "intro": "Mide cuántas transacciones importadas tienen hoy su categoría fijada por una regla. Una categoría que corregiste a mano después no cuenta. Meta de la fase: 70 %.",
@@ -6206,6 +6211,80 @@
       "resolved": "Se quitó la marca de revisión.",
       "marked": "La transacción quedó pendiente de revisión.",
       "createRule": "Crear regla desde esta transacción"
+    },
+    "suggestions": {
+      "intro": "Patrones que repetiste a mano: si clasificaste 3 o más transacciones parecidas en la misma categoría, te sugerimos la regla. Nada se crea ni se aplica solo.",
+      "window": "Ventana de evidencia",
+      "windowOption": "{days, plural, one {# día} other {# días}}",
+      "range": "Del {from} al {to}; {scanned, plural, one {# transacción leída} other {# transacciones leídas}}.",
+      "includeDismissed": "Ver también las descartadas",
+      "truncated": "Hay más evidencia que el tope de lectura: se usaron las {scanned} transacciones más recientes.",
+      "empty": "No hay sugerencias. Aparecen cuando clasificas a mano al menos 3 transacciones parecidas en la misma categoría.",
+      "emptyDismissed": "No hay sugerencias descartadas en esta ventana.",
+      "list": "Sugerencias de reglas",
+      "pattern": {
+        "DESCRIPTION": "La descripción contiene «{value}»",
+        "COUNTERPARTY": "La contraparte es {value}"
+      },
+      "kinds": {
+        "INCOME": "ingreso",
+        "EXPENSE": "gasto",
+        "REFUND": "reembolso"
+      },
+      "summary": "{kind} → categoría «{category}»",
+      "support": "{support} de {total} transacciones en esa categoría",
+      "confidence": "Confianza {confidence}",
+      "level": {
+        "HIGH": "Alta",
+        "MEDIUM": "Media"
+      },
+      "proposedName": "Nombre propuesto: {name}",
+      "status": {
+        "DISMISSED": "Descartada"
+      },
+      "evidence": "Evidencia ({count})",
+      "counterExamples": "En otras categorías ({count})",
+      "evidenceItem": "{date} · {description} · {amount} · {account}",
+      "counterItem": "{date} · {description} · {amount} · en «{category}»",
+      "noDescription": "(sin descripción)",
+      "conflicts": "Choca con reglas existentes",
+      "conflictItem": "«{name}» (versión {version}, prioridad {priority}) pondría {count, plural, one {# transacción} other {# transacciones}} en «{category}».",
+      "proposedPriority": "Se propone la prioridad {priority} para que se evalúe antes.",
+      "cannotOutrank": "No puede quedar antes: una regla en conflicto ya tiene prioridad 0 y el desempate es por antigüedad.",
+      "test": "Probar",
+      "accept": "Aceptar…",
+      "dismiss": "Descartar",
+      "restore": "Restaurar",
+      "testing": "Probando…",
+      "dismissed": "Sugerencia «{name}» descartada.",
+      "restored": "Sugerencia «{name}» restaurada.",
+      "viewerNotice": "Tu rol es de lectura: puedes ver y probar las sugerencias, pero no aceptarlas ni descartarlas.",
+      "preview": {
+        "title": "Vista previa (no cambia nada)",
+        "counts": "{matched, plural, one {# coincidencia} other {# coincidencias}}: completaría {wouldFill}, {alreadyInCategory} ya están en la categoría, {otherCategory} tienen otra y {notApplicable} no se pueden aplicar.",
+        "truncated": "La ventana tiene más de 5 000 transacciones: solo se evaluaron las primeras.",
+        "none": "Ninguna transacción de la ventana coincide con esta sugerencia.",
+        "region": "Resultado de la vista previa",
+        "caption": "Transacciones que coinciden con la sugerencia",
+        "date": "Fecha",
+        "transaction": "Transacción",
+        "current": "Categoría actual",
+        "outcome": "Resultado",
+        "uncategorized": "(sin categoría)",
+        "outcomes": {
+          "WOULD_FILL": "La completaría",
+          "ALREADY_IN_CATEGORY": "Ya está en la categoría",
+          "OTHER_CATEGORY": "Tiene otra categoría",
+          "NOT_APPLICABLE": "No se puede aplicar"
+        },
+        "shown": "Se muestran las primeras {shown} de {total}."
+      },
+      "apply": {
+        "title": "Regla «{name}» creada",
+        "body": "Crearla no reclasificó nada. ¿La aplicas ahora a las transacciones existentes? Verás primero qué cambiaría.",
+        "go": "Aplicar a transacciones existentes",
+        "later": "Ahora no"
+      }
     }
   },
   "Reports": {
@@ -6266,7 +6345,12 @@
       "errors": {
         "range": "La fecha inicial no puede ser posterior a la final.",
         "custom": "El rango de comparación está incompleto o invertido."
-      }
+      },
+      "tagMatch": "Coincidencia de etiquetas",
+      "ANY": "Cualquiera de las etiquetas",
+      "ALL": "Todas las etiquetas",
+      "debtKind": "Tipo de deuda",
+      "debtAll": "Préstamos y tarjetas"
     },
     "variation": {
       "new": "nuevo",
@@ -6445,6 +6529,241 @@
       "FEES": "Comisiones, intereses y cargos pagados.",
       "ACCOUNT_BALANCE_HISTORY": "El saldo de una cuenta, día a día, con sus conciliaciones.",
       "FORECAST_VS_ACTUAL": "Lo pronosticado contra lo que pasó."
+    },
+    "tags": {
+      "caption": "Gasto por etiqueta",
+      "tag": "Etiqueta",
+      "amount": "Gasto",
+      "vs": "Variación",
+      "archived": "archivada",
+      "nonAdditive": "Una porción con varias etiquetas suma en cada una: los totales por etiqueta no son aditivos y su suma no es el gasto total.",
+      "chartTitle": "Gasto por etiqueta",
+      "chartDesc": "Barras de {n} etiquetas en {currency}; la tabla siguiente tiene las mismas cifras.",
+      "matchAll": "Solo porciones que tienen todas las etiquetas pedidas.",
+      "byCategory": "Ver por categoría",
+      "byCategoryOf": "Ver las categorías de {name}"
+    },
+    "accounts": {
+      "caption": "Gasto por cuenta pagadora, con su desglose por categoría",
+      "account": "Cuenta",
+      "type": "Tipo",
+      "amount": "Gasto",
+      "category": "Categoría",
+      "vs": "Variación",
+      "total": "Total de las cuentas",
+      "chartTitle": "Gasto por cuenta",
+      "chartDesc": "Barras de {n} cuentas en {currency}; la tabla siguiente tiene las mismas cifras."
+    },
+    "trends": {
+      "caption": "Gasto por categoría y periodo",
+      "category": "Categoría",
+      "total": "Total",
+      "others": "Otras categorías",
+      "chartTitle": "Gasto de {name} por periodo",
+      "chartDesc": "Línea de {n} periodos en {currency}; la tabla siguiente tiene todas las categorías.",
+      "normalized": "Cifras por día: cada periodo se divide por sus días."
+    },
+    "fees": {
+      "caption": "Comisiones y cargos por tipo y periodo",
+      "period": "Periodo",
+      "CONVERSION": "Comisión de conversión",
+      "TRANSFER": "Comisión de transferencia",
+      "LOAN": "Intereses y cargos de préstamos",
+      "FEE_CATEGORY": "Categorías de comisiones",
+      "total": "Total",
+      "last12": "Últimos 12 periodos completos: {amount}",
+      "cardNote": "Los intereses de tarjeta no se registran como gasto y no figuran aquí; el saldo de la tarjeta está en la evolución de deudas.",
+      "chartTitle": "Total de comisiones por periodo",
+      "chartDesc": "Barras de {n} periodos en {currency}; la tabla siguiente separa cada tipo."
+    },
+    "goals": {
+      "caption": "{name}: avance por mes en {currency}",
+      "target": "Objetivo {target}",
+      "month": "Mes",
+      "contributions": "Aportes",
+      "withdrawals": "Retiros",
+      "accumulated": "Acumulado",
+      "percent": "Avance",
+      "expected": "Esperado",
+      "status": "Estado",
+      "statuses": {
+        "BEHIND": "Atrasada",
+        "ON_TRACK": "En camino",
+        "AHEAD": "Adelantada",
+        "NONE": "Sin seguimiento"
+      },
+      "incomplete": "Falta la tasa de conversión de algún movimiento de este mes.",
+      "chartTitle": "Acumulado de {name}",
+      "chartDesc": "Línea de {n} meses en {currency}; la tabla siguiente tiene el esperado y el estado.",
+      "movements": "Ver los movimientos de la meta"
+    },
+    "debts": {
+      "caption": "{name}: saldo y pagos por mes en {currency}",
+      "month": "Mes",
+      "outstanding": "Saldo pendiente",
+      "principalPaid": "Principal pagado",
+      "interestPaid": "Interés pagado",
+      "chargesPaid": "Cargos pagados",
+      "kind": {
+        "LOAN": "Préstamo",
+        "CARD": "Tarjeta"
+      },
+      "consolidated": "Consolidado en {currency}",
+      "chartTitle": "Saldo pendiente de {name}",
+      "chartDesc": "Línea de {n} meses en {currency}; la tabla siguiente tiene los pagos.",
+      "cardNote": "Las tarjetas muestran solo el saldo pendiente."
+    },
+    "recurring": {
+      "caption": "Costo mensual y anual de los compromisos recurrentes activos",
+      "commitment": "Compromiso",
+      "cadence": "Frecuencia",
+      "monthly": "Mensual",
+      "annual": "Anual",
+      "monthlyReporting": "Mensual en {currency}",
+      "variable": "Monto variable",
+      "totals": "Total mensual y anualizado",
+      "variableCount": "{count, plural, one {# compromiso de monto variable no suma} other {# compromisos de monto variable no suman}}",
+      "every": "cada {n}",
+      "cadences": {
+        "DAILY": "diaria",
+        "WEEKLY": "semanal",
+        "BIWEEKLY": "quincenal",
+        "SEMIMONTHLY": "dos veces al mes",
+        "MONTHLY": "mensual",
+        "BIMONTHLY": "bimestral",
+        "QUARTERLY": "trimestral",
+        "SEMIANNUAL": "semestral",
+        "ANNUAL": "anual",
+        "CUSTOM": "personalizada"
+      },
+      "chartTitle": "Costo mensual por compromiso",
+      "chartDesc": "Barras de {n} compromisos en {currency}; la tabla siguiente tiene el costo anual."
+    },
+    "subs": {
+      "caption": "Costo mensual al cierre de cada mes y eventos de suscripciones",
+      "month": "Mes",
+      "monthlyCost": "Costo mensual",
+      "active": "Activas",
+      "events": "Eventos",
+      "noEvents": "Sin eventos",
+      "STARTED": "{name}: alta a {price}",
+      "CANCELLED": "{name}: baja",
+      "PRICE_CHANGED": "{name}: de {previous} a {price}",
+      "chartTitle": "Costo mensual de suscripciones",
+      "chartDesc": "Línea de {n} meses en {currency}; la tabla siguiente lista los eventos."
+    },
+    "conv": {
+      "pointsCaption": "Tasa efectiva y tasa de referencia de cada conversión",
+      "date": "Fecha",
+      "pair": "Par",
+      "effective": "Tasa efectiva",
+      "reference": "Referencia",
+      "noReference": "sin referencia",
+      "monthsCaption": "Costo de convertir por mes (spread más comisiones)",
+      "month": "Periodo",
+      "cost": "Costo",
+      "conversions": "Conversiones",
+      "excluded": "Excluidas",
+      "detail": "Ver el detalle por canal y cuenta",
+      "chartTitle": "Costo de convertir por periodo",
+      "chartDesc": "Barras de {n} periodos en {currency}; las tablas siguientes tienen cada conversión."
+    },
+    "views": {
+      "title": "Vistas guardadas",
+      "empty": "Todavía no guardaste vistas de este reporte.",
+      "name": "Nombre de la vista",
+      "range": "Rango a guardar",
+      "ranges": {
+        "FIXED": "Rango fijo",
+        "LAST_3": "Últimos 3 periodos",
+        "LAST_6": "Últimos 6 periodos",
+        "LAST_12": "Últimos 12 periodos"
+      },
+      "save": "Guardar vista",
+      "saved": "Vista guardada.",
+      "open": "Abrir {name}",
+      "rename": "Renombrar {name}",
+      "renameLabel": "Nuevo nombre",
+      "renameDo": "Renombrar",
+      "delete": "Borrar {name}",
+      "deleted": "Vista borrada.",
+      "pick": "Elige una vista",
+      "warning": {
+        "ARCHIVED_FILTER": "El filtro usa {kind} archivada: {name}.",
+        "MISSING_FILTER": "El filtro apunta a {kind} que ya no existe."
+      },
+      "kinds": {
+        "CATEGORY": "una categoría",
+        "ACCOUNT": "una cuenta",
+        "TAG": "una etiqueta",
+        "COUNTERPARTY": "una contraparte"
+      }
+    }
+  },
+  "ImportConnections": {
+    "title": "Conexiones con exchanges",
+    "intro": "Conecta un exchange con una clave de SOLO LECTURA para traer su historial de trades, depósitos y retiros a PFOS. Nada se crea hasta que revises y apruebes la vista previa. Nunca ingreses usuario y contraseña del exchange: solo claves de API.",
+    "back": "Volver a importaciones",
+    "loading": "Cargando conexiones…",
+    "empty": "Todavía no hay conexiones.",
+    "ownerOnly": "Solo el propietario del workspace puede crear conexiones, reemplazar credenciales o revocarlas.",
+    "status": {
+      "PENDING_VERIFICATION": "Verificando",
+      "ACTIVE": "Activa",
+      "NEEDS_ATTENTION": "Requiere atención",
+      "REJECTED": "Rechazada",
+      "REVOKED": "Revocada",
+      "NEEDS_CREDENTIAL": "Requiere credencial"
+    },
+    "hint": {
+      "active": "Lista para sincronizar. Cada sincronización pasa por una vista previa antes de crear nada.",
+      "verifying": "Estamos comprobando con el exchange que la clave sea de solo lectura.",
+      "expired": "El exchange rechazó la clave (la borraste o venció). Reemplaza la credencial por una clave de solo lectura.",
+      "notReadOnly": "La clave permite operar, retirar o transferir. Crea en el exchange una clave de solo lectura y reemplaza la credencial.",
+      "attention": "La conexión necesita tu atención. Revisa el último error y reemplaza la credencial.",
+      "rejected": "La clave no es de solo lectura y se destruyó. Crea una clave de solo lectura en el exchange y reemplaza la credencial.",
+      "needsCredential": "La conexión se importó sin credencial. Carga una clave de solo lectura para volver a sincronizar.",
+      "revoked": "Conexión revocada: no vuelve a sincronizar. Lo ya importado se conserva."
+    },
+    "fingerprint": "Clave {fingerprint}",
+    "lastError": "Último error: {code}",
+    "mapping": "{asset} → {account}",
+    "cursor": "Sincronizado hasta {date}",
+    "cursorNone": "Todavía sin sincronizar",
+    "retryNotBefore": "el exchange pidió esperar hasta {at}",
+    "syncFrom": "Desde",
+    "syncFromHint": "Primera sincronización: hasta 365 días atrás.",
+    "sync": "Sincronizar",
+    "uploadHistory": "Subir historial",
+    "replace": "Reemplazar credencial",
+    "revoke": "Revocar",
+    "keep": "Conservar",
+    "revokeTitle": "¿Revocar «{name}»?",
+    "revokeBody": "La credencial se destruye de forma irrecuperable y la conexión no vuelve a sincronizar; lo ya importado se conserva. Recuerda borrar también la clave en el exchange.",
+    "replaceTitle": "Reemplazar la credencial de «{name}»",
+    "create": {
+      "title": "Nueva conexión",
+      "provider": "Proveedor",
+      "choose": "Elegir…",
+      "name": "Nombre",
+      "mappings": "Activos y cuentas",
+      "mappingsHint": "Cada activo del exchange va a una cuenta de PFOS de la misma moneda. Un activo sin cuenta no se importa.",
+      "asset": "Activo (p. ej. USDT)",
+      "account": "Cuenta",
+      "addMapping": "Agregar activo",
+      "credential": "Clave de API",
+      "readOnlyNotice": "Crea en el exchange una clave de SOLO LECTURA (sin operar, retirar ni transferir). Una clave con más permisos se rechaza y se destruye.",
+      "keyId": "Identificador de la clave",
+      "secret": "Secreto",
+      "secretHint": "No se vuelve a mostrar. Solo guardamos la huella de la clave.",
+      "submit": "Conectar",
+      "errors": {
+        "provider": "Elige un proveedor.",
+        "name": "Escribe un nombre de 1 a 80 caracteres.",
+        "mappings": "Mapea al menos un activo a una cuenta, sin repetir activos.",
+        "keyId": "Escribe el identificador de la clave.",
+        "secret": "Escribe el secreto de la clave."
+      }
     }
   },
   "Suggestions": {

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/rule-suggestion-decisions.schema.json",
+  "title": "pfos-export v1 — rule-suggestion-decisions",
+  "description": "Registro de la sección «rule-suggestion-decisions» (tabla rules.rule_suggestion_decision, contexto rules). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "suggestion_id",
+    "pattern_type",
+    "pattern_value",
+    "kind",
+    "category_id",
+    "decision",
+    "rule_id",
+    "support",
+    "evidence_count",
+    "confidence",
+    "decided_at",
+    "decided_by"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "suggestion_id": {
+      "type": "string"
+    },
+    "pattern_type": {
+      "type": "string"
+    },
+    "pattern_value": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "category_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "rule_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "support": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "evidence_count": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "confidence": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "decided_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "decided_by": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "rules.rule_suggestion_decision",
+  "x-pfos-context": "rules"
+}

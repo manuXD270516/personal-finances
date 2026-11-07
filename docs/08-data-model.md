@@ -1557,8 +1557,8 @@ erDiagram
     uuid workspace_id FK
     text provider
     uuid institution_id
-    text status "ACTIVE EXPIRED REVOKED ERROR"
-    text secret_ref "Secrets Manager"
+    text status "PENDING_VERIFICATION ACTIVE NEEDS_ATTENTION REJECTED REVOKED NEEDS_CREDENTIAL"
+    jsonb asset_mappings "activo a cuenta de la misma moneda"
     text sync_cursor
     timestamptz consent_expires_at
     timestamptz last_sync_at
@@ -1582,7 +1582,8 @@ erDiagram
 | `import_job` | `(workspace_id, id)` | `source='FILE'` ⇒ `file_checksum IS NOT NULL` (tras `UPLOADED`); `source='CONNECTION'` ⇒ `connection_id IS NOT NULL` | `(workspace_id, status)`; `(workspace_id, target_account_id, file_checksum)` **no único** (reimport permitido, se advierte) | WS | `version` |
 | `staged_transaction` | `(import_job_id, row_number)` | `classification IN (...)`; `decision IN (...)` | `(import_job_id, classification)`; `(workspace_id, fingerprint)` | WS | Purgado 90 días tras `COMPLETED*` (dato técnico) |
 | `row_link` | **`(workspace_id, account_id, fingerprint) WHERE status='ACTIVE'`** — idempotencia de filas entre jobs (INV-014). Al anular la transacción vinculada pasa a `SUPERSEDED` y deja de bloquear | — | `(workspace_id, transaction_id)` | WS | Se conserva |
-| `connection` | `(workspace_id, provider, institution_id)` | — | — | WS | `version` (Phase 6+); `DELETE` API = revocar (soft) |
+| `connection` | `(workspace_id, lower(name)) WHERE status <> 'REVOKED'` | `(status = 'REVOKED') = (revoked_at IS NOT NULL)` | `(workspace_id, created_at DESC, id DESC)` | WS | `version`; `DELETE` API ⇒ 405, se revoca (`POST …/revoke`) |
+| `connection_credential` | `connection_id` (PK) | `(destroyed_at IS NULL) = (wrapped_dek IS NOT NULL AND ciphertext IS NOT NULL)` | — | WS + **grants por columna** (`pf_app` no lee `wrapped_dek` ni `ciphertext`; solo `pf_worker`) | Credencial cifrada con sobre X25519 (**reemplaza `secret_ref`**); excluida del export; revocar = destrucción criptográfica |
 | `import_error` | — | — | `(import_job_id, stage)` | WS | Purgado con staging |
 
 El nivel proveedor (`external_id` estable) se garantiza en `txn.transaction` con `UNIQUE (workspace_id, primary_account_id, external_namespace, external_id)` (13 §7.3).
@@ -1640,12 +1641,15 @@ erDiagram
 |-------|--------|-------|---------|-----|-------------------|
 | `rule` | `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `jsonb_typeof(conditions)='array' AND jsonb_array_length(conditions) BETWEEN 1 AND 20`; `jsonb_typeof(actions)='array' AND jsonb_array_length(actions) BETWEEN 1 AND 10`; `triggers` subconjunto no vacío; archivada ⇒ desactivada | `(workspace_id, priority, created_at, id) WHERE enabled AND archived_at IS NULL`; `gin (actions jsonb_path_ops)` ("¿qué reglas usan la categoría X?") | WS | `version` (definición), `row_version` (ETag), `archived_at` |
 | `rule_version` | PK `(workspace_id, rule_id, version)` | `snapshot` objeto | — | **WS-RO** (SELECT, INSERT; `forbid_mutation`) | Inmutable |
+| `rule_suggestion_decision` (`add-rule-suggestions`, Phase 7) | PK `(workspace_id, suggestion_id)` (huella SHA-256 de `v1\|tipo\|valor\|kind\|categoría`) | `pattern_type` ∈ `DESCRIPTION`/`COUNTERPARTY`; `kind` ∈ `INCOME`/`EXPENSE`/`REFUND`; `decision` ∈ `ACCEPTED`/`DISMISSED`; `(decision = 'ACCEPTED') = (rule_id IS NOT NULL)`; FK diferible `(workspace_id, rule_id)` → `rules.rule` | `(workspace_id, rule_id) WHERE rule_id IS NOT NULL` | **WS** (SELECT, INSERT, DELETE; forzada y fail-closed `PF002`; `pf_worker` hereda SELECT) | Una fila por sugerencia decidida; las sugerencias en sí no se guardan (se calculan a pedido). Restaurar borra la descartada; la aceptada conserva el origen de la regla. `support`/`total`/`confidence` son la instantánea al decidir (nulos si ya no se calculaba). Registrada en `platform.workspace_scoped_table` (orden 193, antes de `rules.rule`); sección `rule-suggestion-decisions` del export (orden 362) con el gancho `rules.suggestion-fingerprint`, que recalcula la huella tras remapear categoría y contraparte. Migración `20261106120000_rules_suggestion_decision.sql` |
 
 **Decisión JSONB vs tablas `rule_condition`/`rule_action`:** se elige **JSONB con JSON Schema versionado**. Razones: (1) la regla es un agregado que siempre se carga y evalúa completo en memoria — nunca se consultan condiciones sueltas por SQL; (2) operandos heterogéneos (texto, regex, rango de montos, moneda, cuenta, día de la semana) obligarían a columnas `value_text/value_num/...` o EAV; (3) evolución del DSL vía `schema_version` + migración en lectura, sin DDL; (4) el orden de condiciones/acciones es intrínseco al array. Costes aceptados: sin FK hacia categorías (ya imposibles por ser cross-schema), validación en dominio + CHECK estructural, índice GIN para búsquedas inversas. Esquemas en `contracts/rules/` (`conditions.v1.schema.json`, `actions.v1.schema.json`; las acciones no tienen propiedades de monto, moneda, cuenta, fecha, tipo ni estado).
 
 ### 5.14 `reporting` — Read models **DERIVADOS** (Phase 1 básico / Phase 7)
 
 > Todas las tablas de este schema son **derivadas y reconstruibles** desde `ledger`/`txn`/`fx`/otros contextos vía eventos. No son fuente de verdad, no tienen `version` ni audit, y pueden truncarse y reconstruirse (`job reporting.rebuild`). Escritas solo por `pf_worker` (política **DRV**). Catálogo funcional completo y consumidores en [14-reporting.md](14-reporting.md) §2; aquí se fija la forma física de las principales.
+
+> **As-built (Phase 7, `add-financial-reports-extended`): `reporting.saved_report_view` no es derivada.** Es una preferencia personal con `WS + USR`: `id uuid PK`, `workspace_id` (FK `iam.workspace`), `user_id` (FK `iam."user"`), `report_id text`, `name text (1..80)`, `params jsonb` (objeto; solo ids y filtros, nunca montos), `version int`, `created_at`, `updated_at`; `UNIQUE (workspace_id, user_id, report_id, lower(name))`. RLS **forzada** con la política `workspace_id = platform.current_workspace_id() AND user_id = platform.current_user_id()` (fail-closed: sin contexto, `PF002`); grants `SELECT, INSERT, UPDATE, DELETE` a `pf_app`; registrada en `platform.workspace_scoped_table` (orden 171) y exportada en la sección de portabilidad `saved-report-views` (solo las del usuario que exporta; al importar, las del importador con los ids remapeados). Borrado físico y sin auditoría (preferencia personal sin valor contable). Los read models siguientes siguen sin implementarse.
 
 ```mermaid
 erDiagram
@@ -2325,7 +2329,7 @@ Migración `20261004170000_identity_demo_data.sql` (expand):
 
 ## Pronóstico de flujo de caja (`add-cash-flow-forecast`, Phase 7)
 
-Migración expand `20261105120000_reporting_cash_flow_forecast.sql`. Las tres tablas nuevas tienen `workspace_id`, RLS `ENABLE` + `FORCE` fail-closed (`platform.current_workspace_id()` lanza `PF002` sin contexto) y están registradas en `platform.workspace_scoped_table` (purga del demo, órdenes 171–173).
+Migración expand `20261108100000_reporting_cash_flow_forecast.sql`. Las tres tablas nuevas tienen `workspace_id`, RLS `ENABLE` + `FORCE` fail-closed (`platform.current_workspace_id()` lanza `PF002` sin contexto) y están registradas en `platform.workspace_scoped_table` (purga del demo, órdenes 174–176).
 
 | Tabla | PK / unicidad | Contenido | Acceso | Notas |
 |---|---|---|---|---|
@@ -2334,3 +2338,5 @@ Migración expand `20261105120000_reporting_cash_flow_forecast.sql`. Las tres ta
 | `reporting.spendable_essential_category` | `(workspace_id, category_id)` | Categorías de gasto esenciales (hasta 50) | `pf_app` SELECT/INSERT/DELETE | Sin FK a CLASSIFICATION; exportada con el remapeo de ids (`spendable-essential-categories`). |
 
 `pf_workspace_directory` gana `SELECT (min_liquidity_reserve_amount, min_liquidity_reserve_currency)` en `iam.workspace`: el worker (sin usuario) lee la reserva mínima, umbral del riesgo de déficit.
+
+**As-built Phase 6 (`add-banking-providers`, migraciones `20261104100000`–`20261104100200`).** `imports.connection` e `imports.connection_credential` (RLS forzada, registradas en `platform.workspace_scoped_table`; las credenciales con grants por columna); `import_job.connection_id` (nullable) y las fuentes `EXCHANGE_API`/`EXCHANGE_FILE`; `staged_transaction.account_id` y `external` (cuenta de la fila en un import de varias cuentas, y referencia externa, señal y conversión propuesta del registro del proveedor); índices únicos parciales `import_job_connection_active_uk` (una sincronización en curso por conexión) y `txn.transaction_provider_ref_uk` (referencia `imports.provider:<exchange>:<tipo>`, compartida entre archivo y API), ambos `CONCURRENTLY`. El export lleva la sección `import-connections` sin credenciales; al importar, las conexiones de API quedan `NEEDS_CREDENTIAL`.

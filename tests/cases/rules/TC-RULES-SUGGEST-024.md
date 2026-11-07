@@ -5,16 +5,17 @@ spec: rules/rule-engine
 related_specs: []
 requirement: "Límites y rendimiento de las sugerencias"
 scenario: "Cálculo con 200 reglas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-011","FR-RULES-006"]
 nfr: []
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/rules.perf.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

@@ -63,5 +63,6 @@ describe('[TC-AUDIT-GLOBAL-006] catálogo de categorías de las acciones de audi
     expect(emitted.size).toBeGreaterThan(50);
     const uncataloged = [...emitted].filter(([action]) => !isCatalogedAction(action));
     expect(uncataloged.map(([action, file]) => `${action} (${file})`)).toEqual([]);
-  });
+    // Lee todo el código fuente del repositorio: en CI y en Windows tarda más que el timeout por omisión.
+  }, 60_000);
 });

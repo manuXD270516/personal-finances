@@ -9,8 +9,12 @@ import type {
   RuleCondition,
   RuleConditionItem,
   RuleMatchMode,
+  RuleSuggestion,
   RuleTrigger,
   SplitRuleRef,
+  SuggestionKind,
+  SuggestionPattern,
+  SuggestionPreview,
 } from './types';
 
 /** Lógica pura de la pantalla de reglas (sin React): matriz de operadores, borradores del editor y vistas derivadas. */
@@ -509,16 +513,21 @@ export function percentText(ratio: string, locale: string): string {
 
 // ───────────────────────────────────────────────────────────────────── crear regla desde una fila
 
-/** Descripción normalizada para una regla: sin acentos, en minúsculas y sin números de referencia ni dígitos de tarjeta. */
+/**
+ * Descripción normalizada para una regla: sin acentos, en minúsculas, sin palabras con dígitos o asteriscos ni de un solo
+ * carácter, hasta 5 palabras y con al menos 3 letras (vectores compartidos con `DescriptionKey`, TC-RULES-SUGGEST-007).
+ */
 export function ruleTextFromDescription(description: string): string {
-  return description
+  const key = description
     .normalize('NFD')
     .replace(/\p{M}+/gu, '')
     .toLowerCase()
     .split(/\s+/u)
-    .filter((token) => token.length > 0 && !/\d/u.test(token))
-    .join(' ')
-    .trim();
+    .filter((token) => token.length > 1 && !/[\d*]/u.test(token))
+    .slice(0, 5)
+    .join(' ');
+  // Misma clave canónica que `DescriptionKey` de RULES (add-rule-suggestions): al menos 3 letras en total.
+  return (key.match(/\p{L}/gu)?.length ?? 0) >= 3 ? key : '';
 }
 
 export interface RuleSeed {
@@ -581,3 +590,95 @@ export function seedFromQuery(q: URLSearchParams): RuleSeed {
 }
 
 export const rulesPath = (base: string, suffix = ''): string => `${base}/rules${suffix}`;
+
+// ───────────────────────────────────────────────────────────────────── sugerencias (add-rule-suggestions)
+
+export const suggestionsPath = (base: string, suffix = ''): string =>
+  rulesPath(base, `/suggestions${suffix}`);
+
+/** Ventanas de evidencia que ofrece la interfaz (días); el servidor acepta de 1 a 366. */
+export const SUGGESTION_WINDOWS: readonly number[] = [30, 90, 180, 366];
+export const DEFAULT_SUGGESTION_WINDOW = 180;
+
+/** Sugerencia que prellena el editor de reglas: el patrón (la huella) y el nombre y la prioridad propuestos. */
+export interface SuggestionSeed {
+  readonly suggestionId: string;
+  readonly pattern: SuggestionPattern;
+  readonly name: string;
+  readonly priority: number;
+}
+
+const SUGGESTION_KINDS: readonly string[] = ['INCOME', 'EXPENSE', 'REFUND'];
+
+/** Parámetros de la URL de «Aceptar…»: abre el editor prellenado con la regla propuesta (no guarda nada). */
+export function suggestionQuery(s: RuleSuggestion): string {
+  const q = new URLSearchParams();
+  q.set('suggestionId', s.suggestionId);
+  q.set('ptype', s.pattern.type);
+  q.set('pvalue', s.pattern.value);
+  q.set('pkind', s.pattern.kind);
+  q.set('pcategory', s.pattern.categoryId);
+  q.set('name', s.proposedRule.name);
+  q.set('priority', String(s.proposedRule.priority));
+  return q.toString();
+}
+
+export function suggestionFromQuery(q: URLSearchParams): SuggestionSeed | undefined {
+  const suggestionId = q.get('suggestionId');
+  const type = q.get('ptype');
+  const value = q.get('pvalue');
+  const kind = q.get('pkind');
+  const categoryId = q.get('pcategory');
+  if (
+    !suggestionId ||
+    !/^[0-9a-f]{64}$/u.test(suggestionId) ||
+    (type !== 'DESCRIPTION' && type !== 'COUNTERPARTY') ||
+    !value ||
+    !kind ||
+    !SUGGESTION_KINDS.includes(kind) ||
+    !categoryId
+  ) {
+    return undefined;
+  }
+  const priority = Number(q.get('priority') ?? 100);
+  return {
+    suggestionId,
+    pattern: { type, value, kind: kind as SuggestionKind, categoryId },
+    name: q.get('name') ?? '',
+    priority: Number.isInteger(priority) && priority >= 0 ? priority : 100,
+  };
+}
+
+/** Borrador de la regla propuesta: patrón y tipo como condiciones, fijar la categoría como acción. */
+export function draftFromSuggestion(seed: SuggestionSeed): RuleDraft {
+  const first =
+    seed.pattern.type === 'DESCRIPTION'
+      ? emptyCondition({ field: 'DESCRIPTION', operator: 'contains', value: seed.pattern.value })
+      : emptyCondition({ field: 'COUNTERPARTY', operator: 'equals', value: seed.pattern.value });
+  return emptyDraft({
+    name: seed.name,
+    priority: String(seed.priority),
+    conditions: [
+      { kind: 'condition', ...first },
+      {
+        kind: 'condition',
+        ...emptyCondition({ field: 'KIND', operator: 'equals', value: seed.pattern.kind }),
+      },
+    ],
+    actions: [emptyAction({ type: 'SET_CATEGORY', categoryId: seed.pattern.categoryId })],
+  });
+}
+
+/** Cuerpo de `createRule` con la sugerencia de origen: el servidor verifica la huella y registra la aceptación. */
+export function suggestionRuleBody(draft: RuleDraft, seed: SuggestionSeed) {
+  return {
+    ...draftBody(draft),
+    fromSuggestion: { suggestionId: seed.suggestionId, pattern: seed.pattern },
+  };
+}
+
+/** Texto del resumen de una sugerencia, sin color como única señal (icono y texto). */
+export const confidenceIcon = (level: string): string => (level === 'HIGH' ? '●' : '◐');
+
+/** Cantidad de ítems de la vista previa que no se muestran (el servidor devuelve hasta 200). */
+export const hiddenPreviewItems = (p: SuggestionPreview): number => Math.max(0, p.matched - p.items.length);

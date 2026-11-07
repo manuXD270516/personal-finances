@@ -116,10 +116,22 @@ export interface NominalFlowRowDto {
   readonly accountId?: string;
   /** Contraparte de la porción (o, si no tiene, la de la transacción). Solo con `groupBy` `COUNTERPARTY`. */
   readonly counterpartyId?: string | null;
+  /**
+   * Origen de la porción (add-financial-reports-extended, reporte de comisiones): tipo de la transacción y rol de la
+   * porción (`FEE` = comisión de una transferencia o conversión). Solo con `groupBy` `ORIGIN`.
+   */
+  readonly origin?: {
+    readonly transactionKind: string;
+    readonly portionRole: 'NOMINAL' | 'FEE';
+    readonly loanComponent?: 'INTEREST' | 'CHARGES' | 'INSURANCE' | 'TAXES' | null;
+  };
 }
 
-/** Dimensiones adicionales por las que `summarizeNominalFlows` puede agrupar (add-financial-reports). */
-export type NominalFlowGroupBy = 'ACCOUNT' | 'COUNTERPARTY';
+/** Dimensiones adicionales por las que `summarizeNominalFlows` puede agrupar (add-financial-reports[-extended]). */
+export type NominalFlowGroupBy = 'ACCOUNT' | 'COUNTERPARTY' | 'ORIGIN';
+
+/** Coincidencia con las etiquetas pedidas: cualquiera (por omisión) o todas. */
+export type NominalFlowTagMatch = 'ANY' | 'ALL';
 
 /** Query pública `SummarizeNominalFlows` (sin efectos; en la unidad de trabajo del llamador si existe). */
 export interface NominalFlowQuery {
@@ -136,11 +148,13 @@ export interface NominalFlowQuery {
     readonly accountIds?: readonly string[];
     /** Solo las porciones de estas contrapartes (la de la porción o, si no tiene, la de la transacción). */
     readonly counterpartyIds?: readonly string[];
-    /** Solo las porciones con CUALQUIERA de estas etiquetas. */
+    /** Solo las porciones con CUALQUIERA de estas etiquetas (o con TODAS si `tagMatch` es `ALL`). */
     readonly tagIds?: readonly string[];
+    /** Con `tagIds`: `ANY` (por omisión) o `ALL` (add-financial-reports-extended). */
+    readonly tagMatch?: NominalFlowTagMatch;
     /** Solo las porciones en estas monedas. */
     readonly currencies?: readonly string[];
-    /** Agrega además por cuenta y/o contraparte; sin él la agrupación no cambia. */
+    /** Agrega además por cuenta, contraparte y/u origen; sin él la agrupación no cambia. */
     readonly groupBy?: readonly NominalFlowGroupBy[];
   }): Promise<readonly NominalFlowRowDto[]>;
 }
@@ -186,6 +200,8 @@ export interface NominalPortionQuery {
     readonly accountIds?: readonly string[];
     readonly counterpartyIds?: readonly string[];
     readonly tagIds?: readonly string[];
+    /** Con `tagIds`: `ANY` (por omisión) o `ALL`, igual que `summarizeNominalFlows`. */
+    readonly tagMatch?: NominalFlowTagMatch;
     readonly currencies?: readonly string[];
     /** 1..200. */
     readonly limit: number;
@@ -465,9 +481,17 @@ export type ImportExternalNamespace = `imports.ext:${ImportExternalFormat}`;
 export const importExternalNamespace = (format: ImportExternalFormat): ImportExternalNamespace =>
   `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${format}`;
 
+/**
+ * Prefijo de las referencias de un proveedor de movimientos externos (`imports.provider:<exchange>:<tipo>`,
+ * add-banking-providers decisión 8): el archivo y la API del mismo exchange comparten el espacio de nombres.
+ */
+export const PROVIDER_RECORD_NAMESPACE_PREFIX = 'imports.provider:' as const;
+const PROVIDER_RECORD_NAMESPACE = /^imports\.provider:[A-Z0-9_]{1,40}:(TRADE|DEPOSIT|WITHDRAWAL|FEE|REWARD)$/;
+
 /** ¿Es un espacio de nombres de referencia importada que `recordBatch` acepta? */
 export function isImportRefNamespace(namespace: string): boolean {
   if (namespace === IMPORT_ROW_NAMESPACE) return true;
+  if (PROVIDER_RECORD_NAMESPACE.test(namespace)) return true;
   return (
     namespace.startsWith(IMPORT_EXTERNAL_NAMESPACE_PREFIX) &&
     (IMPORT_EXTERNAL_FORMATS as readonly string[]).includes(
@@ -903,6 +927,12 @@ export interface ClassificationSubjectDto {
   readonly needsReview: boolean;
 }
 
+/** Evidencia de clasificación manual (add-rule-suggestions): un sujeto con el `source` de su transacción. */
+export interface ClassificationEvidenceDto extends ClassificationSubjectDto {
+  /** `source` de la transacción (`MANUAL`, `IMPORT`, …). */
+  readonly source: string;
+}
+
 /**
  * Sujetos de clasificación para RULES (dry-run, aplicación y vista previa). Sin efectos; en la unidad de trabajo del
  * llamador si existe. `list` recorre por keyset `(fecha, id)`, hasta 5 000, solo `INCOME`/`EXPENSE`/`REFUND` no anuladas.
@@ -922,6 +952,18 @@ export interface ClassificationSubjectsQuery {
     readonly workspaceId: string;
     readonly transactionIds: readonly string[];
   }): Promise<readonly ClassificationSubjectDto[]>;
+  /**
+   * Evidencia de clasificación manual (add-rule-suggestions): transacciones no anuladas `INCOME`/`EXPENSE`/`REFUND` de
+   * un solo split, sin `managedBy`, con categoría distinta de «sin categoría» y origen `MANUAL`, o desconocido (anterior
+   * al motor de reglas) con `source` `MANUAL` o `IMPORT`. Orden (fecha DESC, id DESC), hasta `limit` (≤ 5 000);
+   * `truncated` indica que había más. Sin efectos; en la unidad de trabajo del llamador.
+   */
+  listEvidence(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly limit: number;
+  }): Promise<{ readonly items: readonly ClassificationEvidenceDto[]; readonly truncated: boolean }>;
 }
 
 export const CLASSIFICATION_SUBJECTS_QUERY = Symbol.for('pf.transactions.ClassificationSubjectsQuery');

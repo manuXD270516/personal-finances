@@ -55,6 +55,18 @@ export const IMPORTS_AUDIT_POLICY = {
     ruleCount: 'plain',
     ruleCoverage: 'plain',
   },
+  // add-banking-providers: nunca credenciales; solo la huella enmascarada y los permisos (compuestos como texto JSON).
+  ImportConnection: {
+    providerId: 'plain',
+    name: 'plain',
+    status: 'plain',
+    assetMappings: 'plain',
+    fingerprint: 'plain',
+    permissions: 'plain',
+    lastError: 'plain',
+    syncCursor: 'plain',
+    syncWindow: 'plain',
+  },
   ImportProfile: {
     name: 'plain',
     format: 'plain',
@@ -106,9 +118,28 @@ export const IMPORTS_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     orderBy: ['id', 'version'],
     idColumns: ['id'],
   },
+  {
+    // add-banking-providers: la conexión viaja SIN credenciales (la tabla `connection_credential` se excluye) y sin la
+    // sincronización en curso ni la espera; al importar, las de API quedan «requiere credencial» (gancho).
+    name: 'import-connections',
+    context: 'imports',
+    table: 'imports.connection',
+    order: 773,
+    orderBy: ['id'],
+    omit: ['pending_sync', 'retry_not_before'],
+    importHook: 'imports.connection-restore',
+  },
 ];
 
+/** Gancho de importación del workspace: las conexiones con credencial quedan en `NEEDS_CREDENTIAL`. */
+export const IMPORTS_CONNECTION_RESTORE_HOOK = 'imports.connection-restore' as const;
+
 export const IMPORTS_PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
+  {
+    table: 'imports.connection_credential',
+    reason:
+      'Credenciales cifradas de proveedores (add-banking-providers, NFR-SEC-007): nunca viajan; la conexión importada queda «requiere credencial».',
+  },
   {
     table: 'imports.staged_transaction',
     reason:

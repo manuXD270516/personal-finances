@@ -52,6 +52,8 @@ export interface ReportParams {
   readonly currencies?: readonly string[];
   readonly categoryIds?: readonly string[];
   readonly tagIds?: readonly string[];
+  /** Con `tagIds`: cualquiera (por omisión) o todas las etiquetas (add-financial-reports-extended). */
+  readonly tagMatch?: 'ANY' | 'ALL';
   readonly counterpartyIds?: readonly string[];
 }
 
@@ -66,6 +68,7 @@ export interface ReportFilters {
   /** Ids pedidos (sin expandir), para informarlos en `meta.filters`. */
   readonly requestedCategoryIds: readonly string[];
   readonly tagIds: readonly string[];
+  readonly tagMatch: 'ANY' | 'ALL';
   readonly counterpartyIds: readonly string[];
 }
 
@@ -147,6 +150,30 @@ export class ReportContext {
     readonly cutoff: string | null,
   ) {}
 
+  /** Calendario de periodos del workspace y hoy en su zona (vistas guardadas con rango relativo). */
+  static async calendarFor(
+    deps: FinancialReportsDeps,
+    workspaceId: string,
+    grouping: ReportGrouping,
+  ): Promise<{ calendar: ReportPeriodCalendar; today: string }> {
+    const settings = await deps.workspaces.settingsOf(workspaceId);
+    const today = LocalDate.ofInstant(deps.clock.now(), settings.timeZone).toString();
+    const known = await deps.periods.listPeriods({ workspaceId });
+    const startDay = deps.calendar ? (await deps.calendar.calendarOf(workspaceId)).fiscalMonthStartDay : null;
+    const calendar = ReportPeriodCalendar.of(
+      grouping,
+      known.map((p) => ({
+        label: p.label,
+        periodStart: p.periodStart,
+        periodEnd: p.periodEnd,
+        ...(p.startDay !== undefined ? { startDay: p.startDay } : {}),
+      })),
+      startDay,
+      today,
+    );
+    return { calendar, today };
+  }
+
   static async create(deps: FinancialReportsDeps, params: ReportParams): Promise<ReportContext> {
     const ws = params.workspaceId;
     const settings = await deps.workspaces.settingsOf(ws);
@@ -194,6 +221,9 @@ export class ReportContext {
         ]),
       ),
     ];
+    if (params.tagMatch !== undefined && params.tagMatch !== 'ANY' && params.tagMatch !== 'ALL') {
+      throw invalid('tagMatch must be ANY or ALL', '/tagMatch');
+    }
     for (const c of params.currencies ?? []) {
       if (!/^[A-Z0-9]{2,16}$/u.test(c)) throw invalid('the currency filter is malformed', '/currency');
     }
@@ -216,6 +246,7 @@ export class ReportContext {
         categoryIds: expanded,
         requestedCategoryIds: requested,
         tagIds: params.tagIds ?? [],
+        tagMatch: params.tagMatch ?? 'ANY',
         counterpartyIds: params.counterpartyIds ?? [],
       },
       cutoff,

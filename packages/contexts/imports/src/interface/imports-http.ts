@@ -30,6 +30,7 @@ import {
 } from '@pf/platform/nest';
 import { isDomainError } from '@pf/shared-kernel';
 import Busboy from 'busboy';
+import type { ConnectionsService } from '../application/banking/connections.service.js';
 import type { ImportsQueries } from '../application/imports.queries.js';
 import type { ImportsService, RowPatch } from '../application/imports.service.js';
 import type { RevertImportService } from '../application/revert-import.service.js';
@@ -40,6 +41,7 @@ export const IMPORTS_SERVICE = Symbol('IMPORTS_SERVICE');
 export const IMPORTS_QUERIES = Symbol('IMPORTS_QUERIES');
 export const IMPORTS_REVERT = Symbol('IMPORTS_REVERT');
 export const IMPORTS_HTTP_SETTINGS = Symbol('IMPORTS_HTTP_SETTINGS');
+export const IMPORTS_CONNECTIONS = Symbol('IMPORTS_CONNECTIONS');
 
 /** Ajustes HTTP de IMPORTS: tope del archivo (`IMPORT_CSV_MAX_BYTES`). */
 export interface ImportsHttpSettings {
@@ -187,6 +189,7 @@ export class ImportsController {
     @Inject(IMPORTS_QUERIES) private readonly queries: ImportsQueries,
     @Inject(IMPORTS_REVERT) private readonly reverts: RevertImportService,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
+    @Inject(IMPORTS_CONNECTIONS) private readonly connections: ConnectionsService,
   ) {}
 
   /**
@@ -204,6 +207,23 @@ export class ImportsController {
   ) {
     const state = apiState(req);
     const meta = state.uploadMeta;
+    if (
+      !state.upload &&
+      body &&
+      typeof body['documentId'] === 'string' &&
+      typeof body['connectionId'] === 'string'
+    ) {
+      // Historial de un exchange subido a una conexión de archivo (add-banking-providers): mismo flujo, con su mapeo.
+      const started = await this.connections.createFileImport({
+        workspaceId,
+        userId: userIdOf(req),
+        connectionId: body['connectionId'],
+        documentId: body['documentId'],
+      });
+      res.statusCode = 202;
+      res.setHeader('location', `/api/v1/workspaces/${workspaceId}/imports/${started.importJobId}`);
+      return this.queries.get(workspaceId, started.importJobId);
+    }
     if (!state.upload && body && typeof body['documentId'] === 'string') {
       const accountId = str(body, 'accountId');
       if (!accountId) throw new ApiProblem('VALIDATION_FAILED', 'accountId is required');

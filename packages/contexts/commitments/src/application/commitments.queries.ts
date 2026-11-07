@@ -20,6 +20,8 @@ import type {
   CommittedRangeDto,
   DefinitionStatsQuery,
   MoneyDto,
+  RecurringCostDto,
+  RecurringCostQuery,
   ResolvedOccurrencesQuery,
   ResolvedOutflowDto,
   UpcomingPaymentDto,
@@ -29,6 +31,8 @@ import {
   computeCommitted,
   countsAsCommittedOutflow,
   projectedAmount,
+  renewalsPerYear,
+  buildSchedule,
   type AccountClass,
   type CommittedLine,
   type DefinitionStatus,
@@ -89,13 +93,60 @@ const rateKey = (r: ResolvedRateDto) =>
  * (RISK-022): nada se proyecta ni se cachea.
  */
 export class CommitmentsQueries
-  implements CommittedQuery, UpcomingPaymentsQuery, ResolvedOccurrencesQuery, DefinitionStatsQuery
+  implements
+    CommittedQuery,
+    UpcomingPaymentsQuery,
+    ResolvedOccurrencesQuery,
+    DefinitionStatsQuery,
+    RecurringCostQuery
 {
   constructor(private readonly deps: CommitmentsDeps) {}
 
   private async todayOf(workspaceId: string): Promise<LocalDate> {
     const calendar = await this.deps.calendar.calendarOf(workspaceId);
     return LocalDate.ofInstant(this.deps.clock.now(), calendar.timeZone);
+  }
+
+  /**
+   * `RecurringCostQuery.listCosts` (add-financial-reports-extended, reporte 11): las definiciones activas de egreso con
+   * lo necesario para normalizarlas a costo mensual y anual (regla de `GetSubscriptionCostSummary`). Sin efectos.
+   */
+  async listCosts(input: { workspaceId: string }): Promise<readonly RecurringCostDto[]> {
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const today = await this.todayOf(input.workspaceId);
+      const rows = await this.deps.definitions.list(input.workspaceId, { status: 'ACTIVE', kind: 'EXPENSE' });
+      const out: RecurringCostDto[] = [];
+      for (const { definition } of rows) {
+        const v = definition.current;
+        const cadence = v.schedule.cadence;
+        if (cadence === 'EXPLICIT') continue;
+        const schedule = buildSchedule({
+          cadence,
+          interval: v.schedule.interval,
+          monthDays: v.schedule.monthDays,
+          rrule: v.schedule.rrule,
+          startDate: today.toString(),
+        });
+        const type = v.amount.type;
+        const own = type === 'MIN_MAX' ? v.amount.max : v.amount.amount;
+        const indexed = v.indexedPrice ?? null;
+        const price = indexed ? indexed.amount : type === 'VARIABLE' ? null : own;
+        out.push({
+          definitionId: definition.id,
+          name: definition.name,
+          categoryId: v.categoryId,
+          cadence,
+          interval: v.schedule.interval,
+          currency: indexed ? indexed.currency : v.currency,
+          renewalsPerYear: renewalsPerYear(schedule, today).toString(),
+          price,
+          variable: price === null,
+        });
+      }
+      return out.sort(
+        (a, b) => a.name.localeCompare(b.name, 'es') || a.definitionId.localeCompare(b.definitionId),
+      );
+    });
   }
 
   // ───────────────────────────────────────────────────────────── definiciones

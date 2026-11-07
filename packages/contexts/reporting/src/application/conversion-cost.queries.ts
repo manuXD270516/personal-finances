@@ -40,6 +40,8 @@ export interface GetConversionCostAnalysisQuery {
   readonly grouping?: ConversionCostGroupingDto;
   /** Could (D247): spread alternativo contra la compra/venta paralela del día. */
   readonly compareWith?: 'PARALLEL_SIDE';
+  /** Moneda de reporte (habilitada); por omisión la moneda base del workspace (add-financial-reports-extended). */
+  readonly reportingCurrency?: string;
 }
 
 export interface ConversionCostExport {
@@ -96,9 +98,10 @@ export class ConversionCostQueries {
     const timeZone = settings.timeZone;
     const catalog = await deps.rates.workspaceCurrencies(ws);
     const known = new Map<string, Currency>(catalog.map((c) => [c.code, makeCurrency(c.code, c.scale)]));
-    const reporting = known.get(settings.baseCurrency);
+    const reportingCode = query.reportingCurrency ?? settings.baseCurrency;
+    const reporting = known.get(reportingCode);
     if (!reporting) {
-      throw new DomainError('CURRENCY_NOT_ENABLED', `currency ${settings.baseCurrency} is not enabled`);
+      throw new DomainError('CURRENCY_NOT_ENABLED', `currency ${reportingCode} is not enabled`);
     }
     const now = deps.clock.now();
     const today = LocalDate.ofInstant(now, timeZone).toString();

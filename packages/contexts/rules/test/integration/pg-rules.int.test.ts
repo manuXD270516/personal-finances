@@ -3,7 +3,12 @@ import { PgUnitOfWork, requireSqlExecutor, runWithRequestContext } from '@pf/pla
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { Rule, parseDefinition } from '../../src/domain/index.js';
-import { PgRuleRepository, PgRulesUnitOfWork } from '../../src/infrastructure/pg-rules.js';
+import type { RuleProposalDecisionRecord } from '../../src/application/ports/index.js';
+import {
+  PgRuleProposalDecisionRepository,
+  PgRuleRepository,
+  PgRulesUnitOfWork,
+} from '../../src/infrastructure/pg-rules.js';
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -23,6 +28,7 @@ const w1 = randomUUID();
 const w2 = randomUUID();
 let uow: PgRulesUnitOfWork;
 const rules = new PgRuleRepository();
+const decisions = new PgRuleProposalDecisionRepository();
 const AT = '2026-10-20T14:00:00.000Z';
 
 const asUser = <T>(fn: () => Promise<T>): Promise<T> =>
@@ -196,6 +202,116 @@ describe('rules.rule', () => {
     const { rows } = await migrator.query<{ table_name: string; schema_name: string }>(
       `SELECT schema_name, table_name FROM platform.workspace_scoped_table WHERE schema_name = 'rules' ORDER BY table_name`,
     );
-    expect(rows.map((r) => `${r.schema_name}.${r.table_name}`)).toEqual(['rules.rule', 'rules.rule_version']);
+    expect(rows.map((r) => `${r.schema_name}.${r.table_name}`)).toEqual([
+      'rules.rule',
+      'rules.rule_suggestion_decision',
+      'rules.rule_version',
+    ]);
+  });
+});
+
+// rules.rule_suggestion_decision (openspec add-rule-suggestions, tarea 4.1; TC-RULES-SUGGEST-022 y -018): clave primaria
+// (workspace, huella) que serializa las decisiones concurrentes, aislamiento entre workspaces, RLS fail-closed (PF002) y
+// permisos de pf_app (SELECT, INSERT, DELETE; sin UPDATE).
+describe('rules.rule_suggestion_decision', () => {
+  const fingerprint = () => randomUUID().replaceAll('-', '').repeat(2);
+  const record = (over: Partial<RuleProposalDecisionRecord> = {}): RuleProposalDecisionRecord => ({
+    suggestionId: fingerprint(),
+    patternType: 'DESCRIPTION',
+    patternValue: 'tigo money recarga',
+    kind: 'EXPENSE',
+    categoryId: randomUUID(),
+    decision: 'DISMISSED',
+    ruleId: null,
+    support: 4,
+    evidenceCount: 5,
+    confidence: '0.8000',
+    decidedAt: AT,
+    decidedBy: user,
+    ...over,
+  });
+
+  it('[TC-RULES-SUGGEST-018] inserta una vez por huella: la segunda decisión, previa o simultánea, no escribe', async () => {
+    const r = record();
+    expect(await inWs(w1, () => decisions.insert(w1, r))).toBe(true);
+    expect(await inWs(w1, () => decisions.insert(w1, { ...r, decision: 'DISMISSED' }))).toBe(false);
+    const found = await inWs(w1, () => decisions.find(w1, r.suggestionId));
+    expect(found).toMatchObject({
+      decision: 'DISMISSED',
+      support: 4,
+      evidenceCount: 5,
+      confidence: '0.8000',
+      decidedAt: AT,
+    });
+    // dos escrituras simultáneas de la misma huella: una gana
+    const racing = record();
+    const results = await Promise.all([
+      inWs(w1, () => decisions.insert(w1, racing)),
+      inWs(w1, () => decisions.insert(w1, { ...racing, decidedBy: user })),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('una aceptada guarda la regla; solo se borra una descartada; las aceptadas se leen por regla', async () => {
+    const rule = newRule(w1, 'Origen sugerencia');
+    await inWs(w1, async () => {
+      await rules.insert(rule, user);
+      await rules.insertVersion(rule.snapshot, user);
+    });
+    const accepted = record({ decision: 'ACCEPTED', ruleId: rule.id });
+    expect(await inWs(w1, () => decisions.insert(w1, accepted))).toBe(true);
+    expect(await inWs(w1, () => decisions.deleteDismissed(w1, accepted.suggestionId))).toBe(false);
+    const origins = await inWs(w1, () => decisions.acceptedByRules(w1, [rule.id, randomUUID()]));
+    expect([...origins.entries()]).toEqual([
+      [rule.id, { suggestionId: accepted.suggestionId, acceptedAt: AT }],
+    ]);
+    const dismissed = record();
+    await inWs(w1, () => decisions.insert(w1, dismissed));
+    expect(await inWs(w1, () => decisions.deleteDismissed(w1, dismissed.suggestionId))).toBe(true);
+    expect(await inWs(w1, () => decisions.find(w1, dismissed.suggestionId))).toBeNull();
+    // una aceptada exige la regla y una descartada no puede llevarla (CHECK)
+    const bad = (r: RuleProposalDecisionRecord) => sqlState(() => inWs(w1, () => decisions.insert(w1, r)));
+    expect(await bad(record({ decision: 'ACCEPTED', ruleId: null }))).toBe('23514');
+    expect(await bad(record({ decision: 'DISMISSED', ruleId: rule.id }))).toBe('23514');
+  });
+
+  it('[TC-RULES-SUGGEST-022] las decisiones de un workspace no se ven en otro y sin contexto RLS falla cerrado (PF002)', async () => {
+    const mine = record();
+    await inWs(w1, () => decisions.insert(w1, mine));
+    expect(await inWs(w2, () => decisions.find(w2, mine.suggestionId))).toBeNull();
+    expect(await inWs(w2, () => decisions.find(w1, mine.suggestionId))).toBeNull();
+    expect((await inWs(w2, () => decisions.list(w2))).map((d) => d.suggestionId)).not.toContain(
+      mine.suggestionId,
+    );
+    // w2 puede decidir la misma huella: la clave incluye el workspace
+    expect(await inWs(w2, () => decisions.insert(w2, { ...mine }))).toBe(true);
+    // un INSERT con el workspace de otro contexto lo rechaza la política
+    expect(await sqlState(() => inWs(w2, () => decisions.insert(w1, record())))).toBe('42501');
+    const client = await app.connect();
+    try {
+      expect(await sqlState(() => client.query(`SELECT * FROM rules.rule_suggestion_decision`))).toBe(
+        'PF002',
+      );
+    } finally {
+      client.release();
+    }
+  });
+
+  it('pf_app no puede actualizar una decisión (solo SELECT, INSERT y DELETE)', async () => {
+    const r = record();
+    await inWs(w1, () => decisions.insert(w1, r));
+    const attempt = (query: string) =>
+      sqlState(() =>
+        asUser(() =>
+          uow.run(w1, async () => {
+            await requireSqlExecutor().query(query, [r.suggestionId]);
+          }),
+        ),
+      );
+    expect(
+      await attempt(
+        `UPDATE rules.rule_suggestion_decision SET decision = 'DISMISSED' WHERE suggestion_id = $1`,
+      ),
+    ).toBe('42501');
   });
 });

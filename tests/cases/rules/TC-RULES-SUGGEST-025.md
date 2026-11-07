@@ -5,16 +5,17 @@ spec: identity/workspace-portability
 related_specs: ["rules/rule-engine"]
 requirement: "Decisiones sobre sugerencias de reglas en el export"
 scenario: "Ida y vuelta con una sugerencia descartada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-010","FR-IDENTITY-017","FR-RULES-011"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rules-portability.api.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

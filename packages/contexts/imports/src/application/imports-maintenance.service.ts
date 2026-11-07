@@ -55,6 +55,9 @@ export class ImportsMaintenanceService {
           if (!(await deps.jobs.save(job))) return 0;
           job.markPersisted();
           await deps.staging.deleteAll(workspaceId, id);
+          if (job.state.connectionId && deps.connectionHooks) {
+            await deps.connectionHooks.onImportAbandoned(workspaceId, job.state.connectionId, id);
+          }
           await this.audit({
             workspaceId,
             action: 'imports.import.expired',

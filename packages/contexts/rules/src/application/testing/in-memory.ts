@@ -2,6 +2,7 @@ import type { AuditEntry } from '@pf/audit/contracts';
 import { DomainError, FixedClock, Instant } from '@pf/shared-kernel';
 import type {
   ClassificationCoverageQuery,
+  ClassificationEvidenceDto,
   ClassificationSubjectDto,
   RuleClassificationCommand,
 } from '@pf/transactions/contracts';
@@ -17,6 +18,9 @@ import {
 import {
   DEFAULT_RULES_SETTINGS,
   type ReferenceCatalog,
+  type ReferenceDescriptions,
+  type RuleProposalDecisionRecord,
+  type RuleProposalDecisionRepository,
   type RuleNameRecord,
   type RuleRepository,
   type RuleVersionRecord,
@@ -108,9 +112,9 @@ export class InMemoryRuleRepository implements RuleRepository {
 
 /** Catálogo en memoria: categorías con tipo, etiquetas, contrapartes y campos; todo lo no listado "no existe". */
 export class InMemoryReferenceCatalog implements ReferenceCatalog {
-  readonly categories = new Map<string, { kind: 'EXPENSE' | 'INCOME'; archived: boolean }>();
+  readonly categories = new Map<string, { kind: 'EXPENSE' | 'INCOME'; archived: boolean; name?: string }>();
   readonly tags = new Map<string, { archived: boolean }>();
-  readonly counterparties = new Map<string, { archived: boolean }>();
+  readonly counterparties = new Map<string, { archived: boolean; name?: string }>();
   readonly customFields = new Map<string, { archived: boolean }>();
   loads = 0;
 
@@ -138,6 +142,27 @@ export class InMemoryReferenceCatalog implements ReferenceCatalog {
     }
   }
 
+  async describe(input: {
+    workspaceId: string;
+    categoryIds: readonly string[];
+    counterpartyIds: readonly string[];
+  }): Promise<ReferenceDescriptions> {
+    return {
+      categories: new Map(
+        input.categoryIds.flatMap((id) => {
+          const c = this.categories.get(id);
+          return c ? [[id, { name: c.name ?? id, archived: c.archived }] as const] : [];
+        }),
+      ),
+      counterparties: new Map(
+        input.counterpartyIds.flatMap((id) => {
+          const c = this.counterparties.get(id);
+          return c ? [[id, { name: c.name ?? id, archived: c.archived }] as const] : [];
+        }),
+      ),
+    };
+  }
+
   async load(): Promise<ActionCatalog> {
     this.loads += 1;
     return {
@@ -159,9 +184,43 @@ export class InMemoryAudit {
   }
 }
 
+/** Decisiones sobre sugerencias en memoria (la clave es la huella). */
+export class InMemoryDecisions implements RuleProposalDecisionRepository {
+  readonly byId = new Map<string, RuleProposalDecisionRecord>();
+
+  async list(): Promise<RuleProposalDecisionRecord[]> {
+    return [...this.byId.values()];
+  }
+  async find(_workspaceId: string, suggestionId: string): Promise<RuleProposalDecisionRecord | null> {
+    return this.byId.get(suggestionId) ?? null;
+  }
+  async insert(_workspaceId: string, record: RuleProposalDecisionRecord): Promise<boolean> {
+    if (this.byId.has(record.suggestionId)) return false;
+    this.byId.set(record.suggestionId, record);
+    return true;
+  }
+  async deleteDismissed(_workspaceId: string, suggestionId: string): Promise<boolean> {
+    if (this.byId.get(suggestionId)?.decision !== 'DISMISSED') return false;
+    return this.byId.delete(suggestionId);
+  }
+  async acceptedByRules(_workspaceId: string, ruleIds: readonly string[]) {
+    const out = new Map<string, { suggestionId: string; acceptedAt: string }>();
+    for (const d of this.byId.values()) {
+      if (d.decision === 'ACCEPTED' && d.ruleId !== null && ruleIds.includes(d.ruleId)) {
+        out.set(d.ruleId, { suggestionId: d.suggestionId, acceptedAt: d.decidedAt });
+      }
+    }
+    return out;
+  }
+}
+
 /** Transacciones sintéticas para el dry-run, la vista previa y la aplicación. */
 export class InMemorySubjects {
   readonly byId = new Map<string, ClassificationSubjectDto>();
+  /** `source` de la transacción (por omisión `MANUAL`) para la evidencia de sugerencias. */
+  readonly sources = new Map<string, string>();
+  /** Cada consulta de evidencia (el listado hace UNA por llamada). */
+  evidenceQueries = 0;
 
   add(s: Partial<ClassificationSubjectDto> & { transactionId: string }): ClassificationSubjectDto {
     const full: ClassificationSubjectDto = {
@@ -205,6 +264,32 @@ export class InMemorySubjects {
 
   async byIds(input: { transactionIds: readonly string[] }) {
     return input.transactionIds.flatMap((id) => this.byId.get(id) ?? []);
+  }
+
+  /** Mismo filtro que `PgClassificationSubjects.listEvidence`. */
+  async listEvidence(input: { from: string; to: string; limit: number }) {
+    this.evidenceQueries += 1;
+    const all = [...this.byId.values()]
+      .filter((s) => {
+        const source = this.sources.get(s.transactionId) ?? 'MANUAL';
+        return (
+          s.date >= input.from &&
+          s.date <= input.to &&
+          s.status !== 'VOIDED' &&
+          s.splitCount === 1 &&
+          s.managedBy === null &&
+          s.categoryId !== null &&
+          (s.categoryOrigin === 'MANUAL' ||
+            (s.categoryOrigin === 'UNKNOWN' && (source === 'MANUAL' || source === 'IMPORT')))
+        );
+      })
+      .sort((a, b) =>
+        a.date === b.date ? (a.transactionId < b.transactionId ? 1 : -1) : a.date < b.date ? 1 : -1,
+      );
+    const items: ClassificationEvidenceDto[] = all
+      .slice(0, input.limit)
+      .map((s) => ({ ...s, source: this.sources.get(s.transactionId) ?? 'MANUAL' }));
+    return { items, truncated: all.length > input.limit };
   }
 }
 
@@ -269,6 +354,8 @@ export function createRulesWorld(now = '2026-10-20T14:00:00.000Z') {
   const catalog = new InMemoryReferenceCatalog();
   const audit = new InMemoryAudit();
   const subjects = new InMemorySubjects();
+  const decisions = new InMemoryDecisions();
+  const calendar = { current: '2026-11-04', today: async () => calendar.current };
   const classifier = new InMemoryClassifier(subjects);
   const coverage = new InMemoryCoverage();
   const clock = new FixedClock(Instant.parse(now));
@@ -276,6 +363,8 @@ export function createRulesWorld(now = '2026-10-20T14:00:00.000Z') {
   const deps: RulesDeps = {
     uow: { run: (_ws, fn) => fn() },
     rules,
+    decisions,
+    calendar,
     catalog,
     subjects: subjects as unknown as RulesDeps['subjects'],
     coverage,
@@ -290,5 +379,5 @@ export function createRulesWorld(now = '2026-10-20T14:00:00.000Z') {
   catalog.categories.set('cat-reembolsos', { kind: 'INCOME', archived: false });
   catalog.tags.set('tag-hogar', { archived: false });
   catalog.counterparties.set('cp-hipermaxi', { archived: false });
-  return { deps, rules, catalog, audit, subjects, classifier, coverage, clock };
+  return { deps, rules, catalog, audit, subjects, classifier, coverage, clock, decisions, calendar };
 }

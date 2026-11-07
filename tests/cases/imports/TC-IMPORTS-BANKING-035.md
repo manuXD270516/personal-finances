@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Permisos y auditoría de las conexiones"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: critical
 type: security
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -31,7 +32,7 @@ expected_result:
   - "W2 no ve la conexión"
   - "Sin contexto: PF002 (fail-closed)"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-035 — Las conexiones de un workspace no se ven en otro

@@ -9,7 +9,19 @@ import { problemOf, listAll, useFormat, WithWorkspace, type WorkspaceContext } f
 import { todayIn } from '../common/dates';
 import { BFF_API } from '../session-context';
 import { REPORT_CHART_CSS } from './ReportChart';
+import {
+  AccountsView,
+  ConversionsView,
+  DebtsView,
+  FeesView,
+  GoalsView,
+  RecurringCostsView,
+  SubscriptionsView,
+  TagsView,
+  TrendsView,
+} from './ExtendedViews';
 import { ConversionBlock, DrillDownPanel, FiltersBar, REPORTS_CSS } from './ReportParts';
+import { SavedViewsPanel } from './SavedViewsPanel';
 import {
   AccountHistoryView,
   BudgetVsActualView,
@@ -25,7 +37,9 @@ import {
   exportApiPath,
   filterError,
   filtersFromSearch,
+  filtersFromView,
   filtersToParams,
+  RANGELESS_SLUGS,
   reportApiPath,
   REPORT_SLUGS,
   slugOf,
@@ -123,7 +137,8 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
     };
   }, [ctx.api, ctx.base, needsAccount]);
 
-  const ready = !filterError(applied) && (!needsAccount || applied.accountId !== '');
+  const rangeless = RANGELESS_SLUGS.includes(slug);
+  const ready = (rangeless || !filterError(applied)) && (!needsAccount || applied.accountId !== '');
   useEffect(() => {
     if (!ready) return undefined;
     let cancelled = false;
@@ -141,8 +156,8 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
   const apply = useCallback(() => {
     setApplied(draft);
     setCell(undefined);
-    window.history.replaceState(null, '', `?${filtersToParams(draft, defaults).toString()}`);
-  }, [draft, defaults]);
+    window.history.replaceState(null, '', `?${filtersToParams(draft, defaults, false, slug).toString()}`);
+  }, [draft, defaults, slug]);
 
   const openDrill = useCallback(
     (next: DrillCell) => {
@@ -166,13 +181,48 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
       .finally(() => setLoadingMore(false));
   }, [ctx.api, ctx.base, cell, drill, applied, defaults]);
 
+  const openView = useCallback(
+    (query: Readonly<Record<string, string | readonly string[]>>) => {
+      const next = filtersFromView(query, today);
+      setDraft(next);
+      setApplied(next);
+      setCell(undefined);
+      window.history.replaceState(null, '', `?${filtersToParams(next, defaults, false, slug).toString()}`);
+    },
+    [today, defaults, slug],
+  );
+
+  // Reportes por mes calendario (metas, deudas y suscripciones) y reportes sin agrupación elegible.
+  const monthly = slug === 'metas' || slug === 'deudas' || slug === 'suscripciones';
   const show = {
     // El presupuesto vs real agrupa siempre por periodo financiero (la API rechaza el mes calendario).
-    grouping: slug !== 'historial-de-saldo' && slug !== 'presupuesto-vs-real',
-    compare: slug === 'ingresos-gastos' || slug === 'gastos-por-categoria' || slug === 'flujo-de-caja',
+    grouping: slug !== 'historial-de-saldo' && slug !== 'presupuesto-vs-real' && !monthly && !rangeless,
+    compare:
+      slug === 'ingresos-gastos' ||
+      slug === 'gastos-por-categoria' ||
+      slug === 'flujo-de-caja' ||
+      slug === 'gastos-por-etiqueta' ||
+      slug === 'gastos-por-cuenta',
     rolling: slug === 'ingresos-gastos',
-    conversion: slug === 'ingresos-gastos' || slug === 'gastos-por-categoria',
-    lists: slug === 'ingresos-gastos' || slug === 'gastos-por-categoria',
+    conversion:
+      slug === 'ingresos-gastos' ||
+      slug === 'gastos-por-categoria' ||
+      slug === 'gastos-por-etiqueta' ||
+      slug === 'gastos-por-cuenta' ||
+      slug === 'tendencias' ||
+      slug === 'comisiones' ||
+      slug === 'deudas',
+    lists:
+      slug === 'ingresos-gastos' ||
+      slug === 'gastos-por-categoria' ||
+      slug === 'gastos-por-etiqueta' ||
+      slug === 'gastos-por-cuenta' ||
+      slug === 'tendencias' ||
+      slug === 'comisiones',
+    range: !rangeless,
+    tagMatch: slug === 'gastos-por-etiqueta',
+    debtKind: slug === 'deudas',
+    normalize: slug === 'tendencias',
     ...(slug === 'ingresos-gastos' ? { granularity: ['PERIOD', 'WEEK'] as const } : {}),
     ...(slug === 'patrimonio' ? { granularity: ['PERIOD', 'DAY'] as const } : {}),
     ...(slug === 'gastos-por-categoria' ? { topN: true } : {}),
@@ -192,6 +242,24 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
         return <CashFlowView {...props} data={data as never} />;
       case 'historial-de-saldo':
         return <AccountHistoryView {...props} data={data as never} />;
+      case 'gastos-por-etiqueta':
+        return <TagsView {...props} data={data as never} href={ctx.href} />;
+      case 'gastos-por-cuenta':
+        return <AccountsView {...props} data={data as never} />;
+      case 'tendencias':
+        return <TrendsView {...props} data={data as never} />;
+      case 'comisiones':
+        return <FeesView {...props} data={data as never} />;
+      case 'metas':
+        return <GoalsView {...props} data={data as never} href={ctx.href} />;
+      case 'deudas':
+        return <DebtsView {...props} data={data as never} />;
+      case 'costos-recurrentes':
+        return <RecurringCostsView {...props} data={data as never} />;
+      case 'suscripciones':
+        return <SubscriptionsView {...props} data={data as never} />;
+      case 'conversiones':
+        return <ConversionsView {...props} data={data as never} href={ctx.href} />;
       default:
         return <NetWorthReportView {...props} data={data as never} />;
     }
@@ -216,6 +284,7 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
         currencies={ctx.currencies.filter((c) => c.enabled !== false).map((c) => c.code)}
         show={show}
       />
+      <SavedViewsPanel ctx={ctx} f={f} slug={slug} applied={applied} onOpen={openView} />
       {needsAccount && applied.accountId === '' && <p>{f.t('filters.accountPick')}</p>}
       {problem && <ProblemMessage problem={problem} locale={ctx.uiLocale} />}
       {ready && !data && !problem && (

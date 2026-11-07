@@ -459,6 +459,14 @@ El editor (`/reglas/nueva`, `/reglas/{id}`) agrupa nombre, prioridad, disparador
 - **Tipos nuevos en la tabla de canales.** "Riesgo de déficit en el flujo de caja" y "Resumen periódico del inicio (email)", con los mismos canales y el mismo horario de silencio.
 - **Riesgo de déficit.** La notificación (crítica si el saldo más bajo es negativo, advertencia si solo queda bajo la reserva) enlaza al calendario `/flujo-de-caja?horizonte=<días>&moneda=<código>`; el detalle ofrece "Ver el calendario de flujo de caja". El email sin opt-in dice solo la moneda y la primera fecha bajo el umbral y enlaza a la notificación en la app autenticada.
 - **Plantilla del digest.** Email con una sección por pregunta Q1–Q9 (título y viñetas): cantidades ("3 pagos en los próximos 7 días"), porcentajes ("Tasa de ahorro: 41,5 %"), estados ("Disponible para gastar: positivo") y fechas ("Riesgo de déficit alto en BOB desde el 15/11/2026"); una pregunta sin datos lo dice ("Aún no tienes metas.", sin 0 %); con opt-in suma los montos. Idioma y formato del locale del destinatario (es/en/pt, respaldo en español), enlace al Home y a las preferencias.
+## Sugerencias de reglas (`add-rule-suggestions`, Phase 7)
+
+Cuarta pestaña de Reglas («Sugerencias», entre «Reglas» y «Ejecutar sobre el historial»). Se calcula al abrirla (a pedido, nunca en segundo plano) con la ventana de evidencia elegible (30, 90, 180 por omisión o 366 días) y la casilla «Ver también las descartadas».
+
+- **Tarjeta por sugerencia:** el patrón («La descripción contiene «tigo money recarga»» o «La contraparte es Farmacorp»), el tipo y la categoría, el apoyo («4 de 5 transacciones en esa categoría»), la confianza con su nivel en texto e icono (● alta, ◐ media; nunca solo color), el nombre propuesto, la evidencia reciente y los contraejemplos en `<details>` y, si hay conflictos, un aviso con cada regla, la cantidad de transacciones, la prioridad propuesta y el aviso de que no puede quedar antes.
+- **Acciones:** «Probar» (vista previa sin efectos: conteos «completaría / ya están en la categoría / tienen otra / no aplicables» y la tabla de transacciones con el resultado y los motivos del dry-run), «Aceptar…» (abre el editor de reglas prellenado con el patrón, el tipo, la categoría, el nombre y la prioridad propuestos; nada se guarda hasta «Guardar regla», que envía `fromSuggestion`), «Descartar» y, en el listado de descartadas, «Restaurar». El VIEWER ve y prueba, pero no acepta ni descarta.
+- **Aceptar → aplicar:** tras guardar, el editor vuelve a `/reglas?apply=<ruleId>` con «Ejecutar sobre el historial» abierta solo para esa regla (ventana de 180 días): el dry-run muestra qué cambiaría y se aplica como edición masiva auditada. Crear la regla no reclasifica nada.
+- Textos armados desde códigos y datos en es/en/pt, fechas y montos en es-BO, regiones con nombre accesible y sin violaciones serias de axe.
 
 ## Reportes (`add-financial-reports`, Phase 7)
 

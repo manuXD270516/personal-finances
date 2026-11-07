@@ -669,6 +669,41 @@ export class PgPaymentRepository implements PaymentRepository {
     );
   }
 
+  async paidByDate(workspaceId: string, range: { from: string; to: string }) {
+    const { rows } = await sql<{
+      loan_id: string;
+      pay_date: string;
+      currency: string;
+      scale: number;
+      principal: string;
+      interest: string;
+      fees: string;
+      insurance: string;
+      taxes: string;
+    }>`
+      SELECT p.loan_id, ${D('p.business_date')} AS pay_date, l.currency, MAX(c.scale) AS scale,
+             SUM(p.principal) AS principal, SUM(p.interest) AS interest, SUM(p.fees) AS fees,
+             SUM(p.insurance) AS insurance, SUM(p.taxes) AS taxes
+        ${FROM_PAYMENT}
+       WHERE p.workspace_id = ${workspaceId} AND p.status = 'ACTIVE'
+         AND p.business_date BETWEEN ${range.from}::date AND ${range.to}::date
+       GROUP BY p.loan_id, p.business_date, l.currency
+       ORDER BY p.loan_id, p.business_date`.execute(db());
+    return rows.map((r) => {
+      const scale = Number(r.scale);
+      return {
+        loanId: r.loan_id,
+        date: r.pay_date,
+        currency: r.currency,
+        principal: money(r.principal, scale),
+        interest: money(r.interest, scale),
+        fees: money(r.fees, scale),
+        insurance: money(r.insurance, scale),
+        taxes: money(r.taxes, scale),
+      };
+    });
+  }
+
   async interestPaid(workspaceId: string, range: { from: string; to: string }) {
     const { rows } = await sql<{ loan_id: string; amount: string; currency: string; scale: number }>`
       SELECT p.loan_id, SUM(p.interest) AS amount, l.currency, MAX(c.scale) AS scale

@@ -5,17 +5,21 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Reporte de comisiones"
 scenario: "Comisiones de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: []
 invariants: ["INV-016"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/transactions/test/integration/pg-nominal-portions.int.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["fees"]
 error_code: null
@@ -30,7 +34,7 @@ expected_result:
   - "Total 422.00 BOB"
   - "Ninguna porción aparece en dos tipos"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-042 — Las comisiones se clasifican en un solo tipo cada una y suman el total del mes

@@ -500,6 +500,7 @@ export {
   DEBT_CARD_DAILY_JOB,
   DEBT_CONSUMERS,
   DEBT_EVENTS,
+  DEBT_HISTORY_QUERY,
   LOAN_PORTFOLIO_QUERY,
 } from '../contracts/index.js';
 export type { OutboxPort } from '../application/ports/index.js';

@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Vistas guardadas de reportes"
 scenario: "Guardar y abrir los gastos del viaje"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-019"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/saved-report-views.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+  - apps/web/src/ui/reports/extended-reports.test.tsx
+status: automated
+regression_suite: true
 phase: 7
 tags: ["saved-views"]
 error_code: "SAVED_VIEW_LIMIT_EXCEEDED"
@@ -38,7 +41,7 @@ expected_result:
   - "Vista 51 ⇒ 422 SAVED_VIEW_LIMIT_EXCEEDED"
   - "La vista no guarda montos"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-049 — Una vista guardada se abre con sus parámetros y los nombres repetidos y la vista 51 se rechazan

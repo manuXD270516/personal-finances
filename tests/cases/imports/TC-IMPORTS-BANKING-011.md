@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Solo credenciales de solo lectura"
 scenario: "Clave con permiso de retiro"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-COMP-008"]
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +36,7 @@ expected_result:
   - "Estado REJECTED con lastError.code CONNECTION_CREDENTIAL_NOT_READ_ONLY"
   - "wrapped_dek y ciphertext nulos"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-011 — Una clave con permisos de retiro se rechaza y se destruye

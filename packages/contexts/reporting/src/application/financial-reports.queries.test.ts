@@ -769,9 +769,13 @@ describe('GetNetWorthReport', () => {
 });
 
 describe('Catálogo', () => {
-  it('[TC-REPORTING-REPORTS-001] lista 16 reportes con 6 disponibles', () => {
+  it('[TC-REPORTING-REPORTS-001] lista 16 reportes: con los ampliados quedan 15 disponibles y el pronóstico planificado', () => {
     const { reports } = q.getCatalog();
     expect(reports).toHaveLength(16);
-    expect(reports.filter((r) => r.status === 'AVAILABLE')).toHaveLength(6);
+    expect(reports.filter((r) => r.status === 'AVAILABLE')).toHaveLength(15);
+    expect(reports.find((r) => r.reportId === 'FORECAST_VS_ACTUAL')).toMatchObject({
+      status: 'PLANNED',
+      phase: 8,
+    });
   });
 });

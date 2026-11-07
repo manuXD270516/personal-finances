@@ -136,4 +136,65 @@ export const ReportReconciler = {
   ): ReconciliationMismatch[] {
     return diff(report, period, currency, 'consolidated=recomputed', recomputed, reported);
   },
+
+  // ───────────────────────────── identidades de los reportes ampliados (add-financial-reports-extended)
+
+  /** Gastos por cuenta: Σ de las cuentas (nativo) = gasto del rango con los mismos filtros. */
+  accountSum(period: string, expenses: Money, accounts: readonly Money[]): ReconciliationMismatch[] {
+    const sum = accounts.reduce((a, m) => a.plus(m.toDecimal()), dec('0'));
+    return diff(
+      'EXPENSES_BY_ACCOUNT',
+      period,
+      expenses.currency.code,
+      'sum(accounts)=expenses',
+      expenses.toDecimal(),
+      sum,
+    );
+  },
+
+  /**
+   * Comisiones: Σ de los tipos no supera el gasto (cada porción cuenta en un solo tipo). Con un gasto neto negativo
+   * (reembolsos mayores al gasto) la comparación no aplica: un reembolso de otra categoría puede dejar el neto por debajo
+   * de las comisiones sin que haya un error.
+   */
+  feeTypesWithinExpenses(period: string, expenses: Money, fees: readonly Money[]): ReconciliationMismatch[] {
+    if (expenses.isNegative()) return [];
+    const sum = fees.reduce((a, m) => a.plus(m.toDecimal()), dec('0'));
+    if (sum.lte(expenses.toDecimal())) return [];
+    return [
+      {
+        report: 'FEES',
+        period,
+        currency: expenses.currency.code,
+        identity: 'sum(fee types)<=expenses',
+        expected: expenses.toFixed(),
+        actual: sum.toFixed(Math.max(sum.decimalPlaces(), 2)),
+      },
+    ];
+  },
+
+  /** Evolución de deudas: el pendiente de cada cierre = saldo contable (presentado) de la cuenta de la deuda. */
+  debtOutstanding(period: string, reported: Money, ledger: Money): ReconciliationMismatch[] {
+    return diff(
+      'DEBT_EVOLUTION',
+      period,
+      reported.currency.code,
+      'outstanding=ledger balance',
+      ledger.toDecimal(),
+      reported.toDecimal(),
+    );
+  },
+
+  /** Metas: el acumulado de cada cierre = Σ de los movimientos de la meta a esa fecha (INV-018). */
+  goalAccumulated(period: string, reported: Money, movements: readonly Money[]): ReconciliationMismatch[] {
+    const sum = movements.reduce((a, m) => a.plus(m.toDecimal()), dec('0'));
+    return diff(
+      'SAVINGS_GOALS',
+      period,
+      reported.currency.code,
+      'accumulated=sum(movements)',
+      sum,
+      reported.toDecimal(),
+    );
+  },
 } as const;

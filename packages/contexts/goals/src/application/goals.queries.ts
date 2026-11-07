@@ -1,4 +1,4 @@
-import { DomainError, FlowValuation, Money, dec, type Decimal } from '@pf/shared-kernel';
+import { DomainError, FlowValuation, LocalDate, Money, dec, type Decimal } from '@pf/shared-kernel';
 import type { LifecycleDto } from '@pf/audit/contracts';
 import type {
   AccountReservationDto,
@@ -7,6 +7,8 @@ import type {
   GoalHomeSummaryDto,
   GoalPlanPeriodDto,
   GoalPlansQuery,
+  GoalProgressHistoryDto,
+  GoalProgressHistoryQuery,
   GoalReservationsQuery,
   GoalSummaryQuery,
 } from '../contracts/index.js';
@@ -14,6 +16,7 @@ import {
   GOAL_LIFECYCLE,
   RESERVING_STATUSES,
   calculateVoidImpact,
+  evaluateTracking,
   type GoalMovement,
   type GoalStatus,
   type SavingsGoal,
@@ -57,7 +60,9 @@ function decodeCursor(raw: string): { occurredOn: string; recordedAt: string; id
 }
 
 /** Consultas de GOALS (lecturas con VIEWER+) y contratos públicos para PLANNING, REPORTING y `add-spendable-amount`. */
-export class GoalsQueries implements GoalReservationsQuery, GoalPlansQuery, GoalSummaryQuery, GoalFlowsQuery {
+export class GoalsQueries
+  implements GoalReservationsQuery, GoalPlansQuery, GoalSummaryQuery, GoalFlowsQuery, GoalProgressHistoryQuery
+{
   private readonly assembler: GoalAssembler;
 
   constructor(private readonly deps: GoalsDeps) {
@@ -502,6 +507,139 @@ export class GoalsQueries implements GoalReservationsQuery, GoalPlansQuery, Goal
         goalCount: goals.length,
         ratesUsed: meta.ratesUsed,
       };
+    });
+  }
+
+  /**
+   * `GoalProgressHistoryQuery.monthly` (add-financial-reports-extended, reporte 9): historial mensual de cada meta. El
+   * acumulado es Σ de todos los movimientos a la fecha de cierre (INV-018) y el seguimiento usa la MISMA regla de
+   * `evaluateTracking` con el cierre del mes como "hoy" (la meta se evalúa como `ACTIVE`: el estado de ciclo de vida de
+   * hoy no reescribe la historia). Una resolución de tasas por petición; lecturas secuenciales.
+   */
+  async monthly(input: {
+    workspaceId: string;
+    goalIds?: readonly string[];
+    from: string;
+    to: string;
+  }): Promise<readonly GoalProgressHistoryDto[]> {
+    const from = parseDate(input.from, '/from');
+    const to = parseDate(input.to, '/to');
+    if (from.compare(to) > 0) {
+      throw new DomainError('VALIDATION_FAILED', 'from must not be after to').at('/from');
+    }
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const { deps } = this;
+      const wanted = input.goalIds ? new Set(input.goalIds) : null;
+      const goals = sortGoals(
+        await deps.goals.list(input.workspaceId, { statuses: [...LIVE, 'CLOSED'], includeArchived: false }),
+      ).filter((g) => wanted === null || wanted.has(g.id));
+      const cal = await this.assembler.calendar(input.workspaceId);
+      // Cierres de mes calendario de [from, to] (el último recortado a `to`).
+      const monthEnds: string[] = [];
+      let y = from.year;
+      let m = from.month;
+      while (y < to.year || (y === to.year && m <= to.month)) {
+        const end = LocalDate.of(y, m, LocalDate.daysInMonth(y, m)).toString();
+        monthEnds.push(end > to.toString() ? to.toString() : end);
+        if (m === 12) {
+          y += 1;
+          m = 1;
+        } else {
+          m += 1;
+        }
+      }
+      const perGoal: {
+        goal: (typeof goals)[number];
+        movements: Awaited<ReturnType<typeof deps.movements.listAll>>;
+        ends: string[];
+      }[] = [];
+      const flowNeeds = new Map<string, { from: string; to: string; date: string }>();
+      for (const goal of goals) {
+        const s = goal.snapshot;
+        const movements = await deps.movements.listAll(input.workspaceId, goal.id);
+        const ends = monthEnds.filter((e) => e >= s.startDate);
+        perGoal.push({ goal, movements, ends });
+        for (const mv of movements) {
+          if (mv.amount.currency.code === s.currency) continue;
+          for (const e of ends) {
+            flowNeeds.set(`${mv.amount.currency.code}|${s.currency}|${e}`, {
+              from: mv.amount.currency.code,
+              to: s.currency,
+              date: e,
+            });
+          }
+        }
+      }
+      const book = await RateBook.resolve({
+        valuation: deps.valuation,
+        workspaceId: input.workspaceId,
+        needs: { stock: [], flows: [...flowNeeds.values()] },
+        timeZone: cal.timeZone,
+        now: deps.clock.now(),
+        windowDays: deps.settings.rateValidityWindowDays,
+      });
+      const out: GoalProgressHistoryDto[] = [];
+      for (const { goal, movements, ends } of perGoal) {
+        const s = goal.snapshot;
+        const currency = await this.assembler.currencyOf(s.currency);
+        const target = Money.parse(s.targetAmount, currency);
+        const value = (rows: { amount: Money }[], date: string) =>
+          FlowValuation.consolidate(
+            rows.map((r) => ({ date, amount: r.amount })),
+            currency,
+            (code, d) => book.flow(code, currency.code, d),
+          );
+        const months = ends.map((end) => {
+          const start = `${end.slice(0, 8)}01`;
+          const accumulated = value(
+            movements.filter((mv) => mv.occurredOn <= end),
+            end,
+          );
+          const inMonth = movements.filter(
+            (mv) =>
+              mv.occurredOn >= start &&
+              mv.occurredOn <= end &&
+              mv.kind !== 'REASSIGN_IN' &&
+              mv.kind !== 'REASSIGN_OUT',
+          );
+          const inflow = value(
+            inMonth.filter((mv) => mv.amount.isPositive()),
+            end,
+          );
+          const outflow = value(
+            inMonth.filter((mv) => mv.amount.isNegative()),
+            end,
+          );
+          const tracking = evaluateTracking({
+            lifecycleStatus: 'ACTIVE',
+            target,
+            progress: accumulated.total,
+            startDate: LocalDate.parse(s.startDate),
+            targetDate: s.targetDate ? LocalDate.parse(s.targetDate) : null,
+            today: LocalDate.parse(end),
+            tolerancePercent: s.tolerancePercent,
+          });
+          return {
+            monthEnd: end,
+            contributions: moneyDto(Money.roundToScale(inflow.total, currency)),
+            withdrawals: moneyDto(Money.roundToScale(outflow.total.negated(), currency)),
+            accumulated: moneyDto(Money.roundToScale(accumulated.total, currency)),
+            expected: tracking.expected ? moneyDto(tracking.expected) : null,
+            status: tracking.status,
+            complete: accumulated.complete && inflow.complete && outflow.complete,
+          };
+        });
+        out.push({
+          goalId: goal.id,
+          name: s.name,
+          currency: s.currency,
+          target: moneyDto(target),
+          startDate: s.startDate,
+          targetDate: s.targetDate,
+          months,
+        });
+      }
+      return out;
     });
   }
 

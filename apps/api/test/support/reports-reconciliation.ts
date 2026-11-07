@@ -49,6 +49,9 @@ export function httpReports(call: Caller, token: string, workspaceId: string): R
       get('drill-down', rename({ ...p, historyAccountId: p.accountId, accountId: undefined })),
     getAccountBalanceHistory: (p: P) =>
       get(`accounts/${String(p.accountId)}/balance-history`, { from: p.from, to: p.to }),
+    getExpensesByAccount: (p: P) => get('expenses/by-account', rename(p)),
+    getFees: (p: P) => get('fees', rename(p)),
+    getDebts: (p: P) => get('debts', rename(p)),
   } as unknown as ReconciliationReports;
 }
 

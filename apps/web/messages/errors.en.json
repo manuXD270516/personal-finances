@@ -167,11 +167,18 @@
   "RULE_INVALID_REGEX": "The regular expression is invalid or uses constructs without linear-time evaluation (back-references, lookaround or more than 200 characters).",
   "RULE_LIMIT_EXCEEDED": "The workspace reached the maximum number of rules. Archive one to create another.",
   "RULE_DRY_RUN_STALE": "A rule or a transaction changed after the run. Nothing was applied: run it again.",
+  "RULE_SUGGESTION_DECIDED": "That suggestion was already accepted or dismissed.",
   "IMPORT_PDF_NO_TEXT": "This PDF has no text (it looks scanned or photographed). Download the digital statement from your online banking or enter the movements by hand.",
   "IMPORT_PDF_LAYOUT_UNKNOWN": "This PDF has text but matches no known statement layout. Download the account statement (not the card one) from online banking; if the bank changed its format, let us know.",
   "IMPORT_PDF_EXTRACTION_FAILED": "We could not read the PDF within the safety limits (time, memory, pages or a damaged file). Download it again from online banking.",
   "IMPORT_PDF_TOTALS_MISMATCH": "The balances and totals of the statement do not match the rows we read, so we imported nothing to avoid a wrong balance. The details list the pages and lines to check.",
   "IMPORT_PDF_PAGE_COUNT_MISMATCH": "The statement declares more pages than the PDF has. Download it again in full.",
   "IMPORT_PDF_ACCOUNT_MISMATCH": "The statement belongs to a different account than the chosen one (the last 4 digits differ). Choose the right account and try again.",
-  "REPORT_EXPORT_TOO_LARGE": "The report has more than 50,000 rows to export. Narrow the date range or add filters and try again."
+  "REPORT_EXPORT_TOO_LARGE": "The report has more than 50,000 rows to export. Narrow the date range or add filters and try again.",
+  "SAVED_VIEW_NAME_TAKEN": "You already have a view of this report with that name. Choose another name.",
+  "SAVED_VIEW_LIMIT_EXCEEDED": "You reached the limit of 50 saved views in this workspace. Delete one to save another.",
+  "BANKING_PROVIDER_NOT_AVAILABLE": "This provider is not available yet: its terms of use or its format have not been verified. Choose another one or try again later.",
+  "CONNECTION_CREDENTIAL_NOT_READ_ONLY": "The API key can trade, withdraw or transfer. Create a read-only key at the exchange and connect again; the previous key was destroyed.",
+  "CONNECTION_SYNC_IN_PROGRESS": "This connection already has a synchronization in progress. Wait for it to finish or cancel its preview.",
+  "IMPORT_CONNECTION_EXPIRED": "The provider rejected the key of the connection (it was deleted or expired). Replace the credential with a read-only key."
 }

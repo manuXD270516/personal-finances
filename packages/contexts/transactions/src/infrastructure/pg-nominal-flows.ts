@@ -8,6 +8,7 @@ import type {
   NominalFlowGroupBy,
   NominalFlowQuery,
   NominalFlowRowDto,
+  NominalFlowTagMatch,
   NominalPortionDto,
   NominalPortionPageDto,
   NominalPortionQuery,
@@ -21,6 +22,7 @@ interface FlowRow {
   tag_ids: string[] | null;
   account_id?: string;
   counterparty_id?: string | null;
+  tx_kind?: string;
   amount: string;
 }
 
@@ -57,6 +59,7 @@ interface PortionFilters {
   readonly accountIds?: readonly string[] | undefined;
   readonly counterpartyIds?: readonly string[] | undefined;
   readonly tagIds?: readonly string[] | undefined;
+  readonly tagMatch?: NominalFlowTagMatch | undefined;
   readonly currencies?: readonly string[] | undefined;
 }
 
@@ -70,7 +73,13 @@ function filterSql(f: PortionFilters) {
   if (f.accountIds !== undefined) parts.push(sql`AND ${ACCOUNT_EXPR} = ANY(${[...f.accountIds]}::uuid[])`);
   if (f.counterpartyIds !== undefined)
     parts.push(sql`AND ${COUNTERPARTY_EXPR} = ANY(${[...f.counterpartyIds]}::uuid[])`);
-  if (f.tagIds !== undefined)
+  if (f.tagIds !== undefined && f.tagMatch === 'ALL' && f.tagIds.length > 0)
+    // Todas las etiquetas pedidas: la porción tiene tantas distintas como ids únicos pedidos.
+    parts.push(sql`AND (
+        SELECT count(DISTINCT fst.tag_id) FROM txn.split_tag fst
+         WHERE fst.workspace_id = s.workspace_id AND fst.split_id = s.id
+           AND fst.tag_id = ANY(${[...f.tagIds]}::uuid[])) = ${new Set(f.tagIds).size}`);
+  else if (f.tagIds !== undefined)
     parts.push(sql`AND EXISTS (
         SELECT 1 FROM txn.split_tag fst
          WHERE fst.workspace_id = s.workspace_id AND fst.split_id = s.id
@@ -123,6 +132,7 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
     readonly accountIds?: readonly string[];
     readonly counterpartyIds?: readonly string[];
     readonly tagIds?: readonly string[];
+    readonly tagMatch?: NominalFlowTagMatch;
     readonly currencies?: readonly string[];
     readonly groupBy?: readonly NominalFlowGroupBy[];
   }): Promise<readonly NominalFlowRowDto[]> {
@@ -132,6 +142,7 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
     const groupBy = input.groupBy ?? [];
     const byAccount = groupBy.includes('ACCOUNT');
     const byCounterparty = groupBy.includes('COUNTERPARTY');
+    const byOrigin = groupBy.includes('ORIGIN');
     // Con `withTags` la porción se agrupa también por su conjunto de tags (subconsulta lateral, ids ordenados).
     const tagJoin = withTags
       ? sql`LEFT JOIN LATERAL (
@@ -146,10 +157,11 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
     const extraSelect = [
       ...(byAccount ? [sql`${ACCOUNT_EXPR}::text AS account_id`] : []),
       ...(byCounterparty ? [sql`${COUNTERPARTY_EXPR}::text AS counterparty_id`] : []),
+      ...(byOrigin ? [sql`t.kind AS tx_kind`] : []),
     ];
     const extraSelectSql = extraSelect.length > 0 ? sql`, ${sql.join(extraSelect)}` : sql``;
     const groupPositions = ['1', '2', '3', '4', '5', ...extraSelect.map((_, i) => String(6 + i))].join(', ');
-    const orderExtra = `${byAccount ? ', 6' : ''}${byCounterparty ? `, ${byAccount ? 7 : 6}` : ''}`;
+    const orderExtra = extraSelect.map((_, i) => `, ${6 + i}`).join('');
     return this.uow.run(input.workspaceId, async () => {
       const { rows } = await sql<FlowRow>`
         SELECT t.transaction_date::text AS business_date,
@@ -180,6 +192,15 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
           ...(withTags ? { tagIds: r.tag_ids ?? [] } : {}),
           ...(byAccount && r.account_id !== undefined ? { accountId: r.account_id } : {}),
           ...(byCounterparty ? { counterpartyId: r.counterparty_id ?? null } : {}),
+          ...(byOrigin && r.tx_kind !== undefined
+            ? {
+                origin: {
+                  transactionKind: r.tx_kind,
+                  // Las únicas porciones de transferencias y conversiones son comisiones.
+                  portionRole: r.tx_kind === 'TRANSFER' || r.tx_kind === 'CONVERSION' ? 'FEE' : 'NOMINAL',
+                },
+              }
+            : {}),
         });
       }
       return out;

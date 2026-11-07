@@ -979,6 +979,61 @@ export const VARIABLES = {
       'Puntaje bajo el cual un posible duplicado se rotula «confianza baja» (0.60): sigue exigiendo decisión (docs/57 D325); solo cambia el rótulo.',
     default: '0.60',
   }),
+  // ── Imports: conexiones con proveedores de movimientos (openspec add-banking-providers decisiones 3, 6, 7 y 10) ──
+  CONNECTION_CREDENTIALS_PUBLIC_KEYS: variable(
+    z
+      .string()
+      .regex(
+        /^[A-Za-z0-9_-]{1,32}:[A-Za-z0-9_-]{43}(,[A-Za-z0-9_-]{1,32}:[A-Za-z0-9_-]{43})*$/,
+        'formato kid:clave[,kid:clave…] con claves X25519 públicas de 32 bytes en base64url (43 caracteres)',
+      ),
+    {
+      group: 'Imports',
+      description:
+        'Claves PÚBLICAS X25519 con las que la API cifra las credenciales de los proveedores (`kid:clave`, separadas por coma; la primera es la vigente). La API cifra pero NO puede descifrar: la clave privada solo la tiene el worker. Sin ella el módulo de conexiones queda deshabilitado (`BANKING_PROVIDER_NOT_AVAILABLE`) sin afectar al resto. En desarrollo la genera `pnpm setup:env`; nunca valores reales en el repositorio.',
+      optional: true,
+    },
+  ),
+  CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE: variable(z.string().min(1), {
+    group: 'Imports',
+    description:
+      'Ruta del archivo con las claves PRIVADAS X25519 (una `kid:clave` por línea) del worker (D342): montado con permisos 0400 fuera del repositorio, así no aparece en `docker inspect`. Solo el worker; obligatorio en staging/production para poder verificar y sincronizar conexiones.',
+    optional: true,
+  }),
+  CONNECTION_CREDENTIALS_PRIVATE_KEYS: variable(
+    z.string().regex(/^[A-Za-z0-9_-]{1,32}:[A-Za-z0-9_-]{43}(,[A-Za-z0-9_-]{1,32}:[A-Za-z0-9_-]{43})*$/),
+    {
+      group: 'Imports',
+      description:
+        'Solo local/CI: claves privadas X25519 en la variable (`kid:clave`, separadas por coma), solo del worker. Rechazada en staging/production (allí se usa `CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE`). `pnpm setup:env` genera un valor de desarrollo.',
+      secret: true,
+      optional: true,
+    },
+  ),
+  CONNECTION_SYNC_MAX_DAYS: variable(
+    positiveInt.refine((n) => n <= 3650, 'hasta 3650 días'),
+    {
+      group: 'Imports',
+      description:
+        'Ventana máxima de la primera sincronización de una conexión, en días hacia atrás (365, D345). Las siguientes continúan desde el cursor confirmado.',
+      default: '365',
+    },
+  ),
+  CONNECTION_PROVIDER_REQUESTS_PER_MINUTE: variable(
+    positiveInt.refine((n) => n <= 600, 'hasta 600'),
+    {
+      group: 'Imports',
+      description:
+        'Presupuesto de solicitudes por minuto y por conexión a un proveedor (10, ADR-0029). Un 429 o 418 espera su `Retry-After`; un 403 de Bybit, 30 minutos; la espera se persiste.',
+      default: '10',
+    },
+  ),
+  IMPORTS_PROVIDER_FAKE_ENABLED: variable(bool, {
+    group: 'Imports',
+    description:
+      'Habilita el proveedor simulado `FAKE_EXCHANGE` (pruebas y E2E, sin red). PROHIBIDO en staging y producción: el arranque falla.',
+    default: 'false',
+  }),
   // ── Imports: lectura de extractos PDF (openspec add-pdf-statement-parser decisión 3, D351) ──
   IMPORT_PDF_EXTRACTION_TIMEOUT: variable(
     z
@@ -1080,6 +1135,77 @@ export const VARIABLES = {
       description:
         'Transacciones máximas por aplicación de un dry-run (500, igual que la edición masiva): la interfaz aplica por páginas.',
       default: '500',
+    },
+  ),
+  RULES_SUGGEST_WINDOW_DAYS: variable(
+    positiveInt.refine((n) => n <= 366, 'hasta 366 días'),
+    {
+      group: 'Rules',
+      description:
+        'Ventana por omisión en días de la evidencia de las sugerencias de reglas (180, docs/62 D396): se cuentan las clasificaciones manuales de los últimos N días. Se puede pedir otra ventana por petición, hasta `RULES_SUGGEST_MAX_WINDOW_DAYS`.',
+      default: '180',
+    },
+  ),
+  RULES_SUGGEST_MAX_WINDOW_DAYS: variable(
+    positiveInt.refine((n) => n <= 3660, 'hasta 3660 días'),
+    {
+      group: 'Rules',
+      description:
+        'Ventana máxima en días que una petición puede pedir a las sugerencias de reglas (366): más ⇒ 422 `VALIDATION_FAILED`.',
+      default: '366',
+    },
+  ),
+  RULES_SUGGEST_MIN_SUPPORT: variable(
+    positiveInt.refine((n) => n <= 100, 'hasta 100 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Apoyo mínimo de una sugerencia de regla (3, FR-RULES-011): transacciones de evidencia del patrón en la categoría sugerida.',
+      default: '3',
+    },
+  ),
+  RULES_SUGGEST_MIN_CONFIDENCE: variable(
+    z.string().regex(/^(0.[0-9]{1,4}|1(.0{1,4})?)$/u, 'decimal entre 0 y 1 con hasta 4 decimales'),
+    {
+      group: 'Rules',
+      description:
+        'Confianza mínima de una sugerencia de regla (0.8000): apoyo ÷ total de evidencia del patrón y del mismo tipo, con 4 decimales HALF_EVEN.',
+      default: '0.8000',
+    },
+  ),
+  RULES_SUGGEST_HIGH_CONFIDENCE: variable(
+    z.string().regex(/^(0.[0-9]{1,4}|1(.0{1,4})?)$/u, 'decimal entre 0 y 1 con hasta 4 decimales'),
+    {
+      group: 'Rules',
+      description:
+        'Confianza desde la cual una sugerencia es de nivel "alta" (0.9500), siempre que alcance `RULES_SUGGEST_HIGH_MIN_SUPPORT`. Es solo presentación.',
+      default: '0.9500',
+    },
+  ),
+  RULES_SUGGEST_HIGH_MIN_SUPPORT: variable(
+    positiveInt.refine((n) => n <= 1000, 'hasta 1000 transacciones'),
+    {
+      group: 'Rules',
+      description: 'Apoyo mínimo para el nivel "alta" de una sugerencia de regla (5).',
+      default: '5',
+    },
+  ),
+  RULES_SUGGEST_MAX_EVIDENCE: variable(
+    positiveInt.refine((n) => n <= 5000, 'hasta 5000 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Máximo de transacciones de evidencia que lee el cálculo de sugerencias de reglas (5000, las más recientes de la ventana): si hay más, la respuesta se marca `truncated`.',
+      default: '5000',
+    },
+  ),
+  RULES_SUGGEST_MAX_RESULTS: variable(
+    positiveInt.refine((n) => n <= 200, 'hasta 200 sugerencias'),
+    {
+      group: 'Rules',
+      description:
+        'Máximo de sugerencias de reglas por listado (50), ordenadas por apoyo, confianza y patrón.',
+      default: '50',
     },
   ),
   IMPORT_PERSIST_BATCH_SIZE: variable(
@@ -1543,6 +1669,11 @@ export const APP_VARIABLES = {
     'IMPORT_PROCESSING_TIMEOUT',
     'IMPORT_DUPLICATE_HIGH_SCORE',
     'IMPORT_DUPLICATE_LOW_SCORE',
+    // add-banking-providers: la API cifra con la clave pública y crea el import de la sincronización.
+    'CONNECTION_CREDENTIALS_PUBLIC_KEYS',
+    'CONNECTION_SYNC_MAX_DAYS',
+    'CONNECTION_PROVIDER_REQUESTS_PER_MINUTE',
+    'IMPORTS_PROVIDER_FAKE_ENABLED',
     // add-pdf-statement-parser: límites del lector de extractos PDF.
     'IMPORT_PDF_EXTRACTION_TIMEOUT',
     'IMPORT_PDF_MAX_PAGES',
@@ -1558,6 +1689,15 @@ export const APP_VARIABLES = {
     'RULES_DRY_RUN_MAX_DAYS',
     'RULES_DRY_RUN_MAX_TRANSACTIONS',
     'RULES_APPLY_MAX_ITEMS',
+    // add-rule-suggestions: umbrales y límites del cálculo de sugerencias (a pedido; sin jobs ni consumidores).
+    'RULES_SUGGEST_WINDOW_DAYS',
+    'RULES_SUGGEST_MAX_WINDOW_DAYS',
+    'RULES_SUGGEST_MIN_SUPPORT',
+    'RULES_SUGGEST_MIN_CONFIDENCE',
+    'RULES_SUGGEST_HIGH_CONFIDENCE',
+    'RULES_SUGGEST_HIGH_MIN_SUPPORT',
+    'RULES_SUGGEST_MAX_EVIDENCE',
+    'RULES_SUGGEST_MAX_RESULTS',
     // add-workspace-export: la API solicita, descarga (descifra en streaming) e importa.
     ...EXPORT_PORTABILITY,
     'REAUTH_MAX_AGE',
@@ -1602,6 +1742,13 @@ export const APP_VARIABLES = {
     'IMPORT_PROCESSING_TIMEOUT',
     'IMPORT_DUPLICATE_HIGH_SCORE',
     'IMPORT_DUPLICATE_LOW_SCORE',
+    // add-banking-providers: solo el worker tiene las claves privadas y habla con los proveedores.
+    'CONNECTION_CREDENTIALS_PUBLIC_KEYS',
+    'CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE',
+    'CONNECTION_CREDENTIALS_PRIVATE_KEYS',
+    'CONNECTION_SYNC_MAX_DAYS',
+    'CONNECTION_PROVIDER_REQUESTS_PER_MINUTE',
+    'IMPORTS_PROVIDER_FAKE_ENABLED',
     // add-pdf-statement-parser: el hilo aislado de extracción corre en el consumidor `imports.persist`.
     'IMPORT_PDF_EXTRACTION_TIMEOUT',
     'IMPORT_PDF_MAX_PAGES',

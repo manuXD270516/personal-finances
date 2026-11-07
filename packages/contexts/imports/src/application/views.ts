@@ -52,6 +52,7 @@ export interface ImportJobView {
   // ── Phase 6
   readonly source: ImportSource;
   readonly documentId: string | null;
+  readonly connectionId: string | null;
   readonly format: StatementFormat | null;
   readonly stage: ImportProgress['stage'] | null;
   readonly failure: ImportFailure | null;
@@ -127,6 +128,7 @@ export function toJobView(s: ImportJobState, currency = ''): ImportJobView {
     version: s.version,
     source: s.source,
     documentId: s.documentId,
+    connectionId: s.connectionId,
     format: s.format,
     stage: s.progress.stage ?? null,
     failure: s.failure,
@@ -309,4 +311,6 @@ export interface RowPhase6View {
   readonly occurrenceLink: OccurrenceLinkState | null;
   readonly transfer: { readonly counterAccountId: string } | null;
   readonly conversion: NonNullable<RowEdits['conversion']> | null;
+  /** Cuenta de la fila en un import de una conexión (varias cuentas); `null` = la cuenta del import. */
+  readonly accountId?: string | null;
 }

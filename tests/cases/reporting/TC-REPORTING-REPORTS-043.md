@@ -5,17 +5,21 @@ spec: reporting/financial-reports
 related_specs: ["goals/savings-goals"]
 requirement: "Reporte de metas de ahorro"
 scenario: "Meta de viaje"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-GOALS-003"]
 nfr: []
 invariants: ["INV-018"]
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/goals/src/application/goals.queries.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["goals"]
 error_code: null
@@ -31,7 +35,7 @@ expected_result:
   - "Esperado y estado iguales a los del seguimiento de GOALS a cada cierre"
   - "Una reasignación entre metas no suma aportes"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-043 — El reporte de metas informa el acumulado mensual sin contar reasignaciones como aportes
