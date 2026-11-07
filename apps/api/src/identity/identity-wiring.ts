@@ -37,6 +37,8 @@ import {
   createCardsRuntime,
   createDebtRuntime,
   createDebtSummaryRuntime,
+  type CardsRuntime,
+  type DebtRuntime,
 } from '@pf/debt/interface/debt.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
 import { GOALS_AUDIT_POLICY } from '@pf/goals/contracts';
@@ -423,6 +425,8 @@ export function financeRuntimes(input: {
     budgetVsActual?: BudgetVsActualQuery;
     commitments?: CommitmentsRuntime;
     goals?: GoalsRuntime;
+    debt?: DebtRuntime;
+    cards?: CardsRuntime;
     accounts?: AccountsRuntime;
     rules?: RulesRuntime;
   } = {};
@@ -609,6 +613,23 @@ export function financeRuntimes(input: {
       getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
     },
     reconciliationMarks: transactions.reconciliationMarks,
+    // add-financial-reports-extended: historial de metas, pagos y cartera de deudas, costos recurrentes y eventos de
+    // suscripciones por contratos públicos (GOALS, DEBT y COMMITMENTS se componen después de REPORTING).
+    extended: {
+      goals: { monthly: (query) => deferred.goals?.queries.monthly(query) ?? Promise.resolve([]) },
+      debtHistory: { monthly: (query) => deferred.debt?.queries.monthly(query) ?? Promise.resolve([]) },
+      portfolio: {
+        listLoans: (query) => deferred.debt?.queries.listLoans(query) ?? Promise.resolve([]),
+        listCards: (query) => deferred.cards?.queries.listCards(query) ?? Promise.resolve([]),
+      },
+      recurring: {
+        listCosts: (query) => deferred.commitments?.recurringCosts.listCosts(query) ?? Promise.resolve([]),
+      },
+      subscriptions: {
+        listEvents: (query) =>
+          deferred.commitments?.subscriptionHistory.listEvents(query) ?? Promise.resolve([]),
+      },
+    },
     // La exportación de un reporte se audita sin su contenido: reporte, filtros (texto JSON) y cantidad de filas.
     reportAudit: {
       exported: async (entry) => {
@@ -731,6 +752,7 @@ export function financeRuntimes(input: {
     transactions: transactions.loans,
     recurring: commitments.recurringDefinitions,
   });
+  deferred.debt = debt;
   // DEBT (add-credit-cards): tarjetas de crédito sobre los mismos contratos públicos (movimientos por cuenta de
   // TRANSACTIONS, saldos históricos del ledger, valoración de FX y el puerto de definiciones administradas).
   const cards = createCardsRuntime({
@@ -751,6 +773,7 @@ export function financeRuntimes(input: {
     rates: fx.valuation,
     rateValidityWindowDays,
   });
+  deferred.cards = cards;
   // DEBT (add-debt-summary): resumen de deudas de solo lectura sobre `LoanPortfolioQuery` y `CardPortfolioQuery` del
   // propio contexto y los contratos públicos de ACCOUNTS, LEDGER, TRANSACTIONS, CLASSIFICATION, FX e IDENTITY.
   const debtSummary = createDebtSummaryRuntime({

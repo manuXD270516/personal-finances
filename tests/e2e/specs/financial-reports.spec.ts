@@ -72,11 +72,11 @@ test.describe('Reportes financieros (reporting/financial-reports)', () => {
       splits: [{ amount: bob('12000.00'), categoryId: salary!.id }],
     });
 
-    // Catálogo: 16 reportes, seis disponibles y el pronóstico planificado sin cifras.
+    // Catálogo: 16 reportes, quince disponibles y el pronóstico planificado sin cifras.
     await go(page, '/reportes');
     const catalog = page.getByTestId('reports-catalog');
     await expect(catalog.getByTestId('catalog-entry')).toHaveCount(16);
-    await expect(catalog.locator('[data-status="AVAILABLE"]')).toHaveCount(6);
+    await expect(catalog.locator('[data-status="AVAILABLE"]')).toHaveCount(15);
     await expect(catalog.locator('[data-status="PLANNED"]').last()).toContainText('Pronóstico vs real');
     await catalog.getByRole('link', { name: 'Abrir reporte' }).nth(2).click();
     await expect(page).toHaveURL(/\/reportes\/gastos-por-categoria/u);
@@ -111,6 +111,67 @@ test.describe('Reportes financieros (reporting/financial-reports)', () => {
     const compared = view.getByTestId('cat-row').filter({ hasText: food!.name }).getByTestId('variation');
     await expect(compared).toContainText('+2.300,00 BOB');
     await expect(compared).toContainText('%');
+
+    const axe = await new AxeBuilder({ page }).analyze();
+    expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([]);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expectNoHorizontalScroll(page);
+    await context.close();
+  });
+
+  test('[TC-REPORTING-REPORTS-054] de la etiqueta a la porción, guardar la vista y volver a abrirla; axe y móvil', async ({
+    browser,
+  }) => {
+    const { context, page, W } = await newFinanceUser(browser, 'reportstag');
+    const bank = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '10000.00');
+    const [lodging, meals] = await userCategories(page, W, 'EXPENSE');
+    const trip = await api(page, 'POST', `${W}/tags`, { name: 'Viaje Cusco' });
+    const work = await api(page, 'POST', `${W}/tags`, { name: 'Trabajo' });
+    await expense(page, W, bank, lodging!.id, '800.00', monthStart, {
+      splits: [{ amount: bob('800.00'), categoryId: lodging!.id, tagIds: [trip['id'], work['id']] }],
+    });
+    await expense(page, W, bank, meals!.id, '200.00', monthStart, {
+      splits: [{ amount: bob('200.00'), categoryId: meals!.id, tagIds: [trip['id']] }],
+    });
+
+    // Gastos por etiqueta: Viaje Cusco 1.000,00 y Trabajo 800,00 con el aviso de que no son aditivos.
+    const tagsUrl = `/reportes/gastos-por-etiqueta?from=${monthStart}&to=${today}&grouping=CALENDAR_MONTH`;
+    await go(page, tagsUrl);
+    const view = page.getByTestId('report-by-tag');
+    await expect(view.getByTestId('non-additive-note')).toBeVisible();
+    await expect(view.getByTestId('tag-row').filter({ hasText: 'Viaje Cusco' })).toContainText(
+      '1.000,00 BOB',
+    );
+    await expect(view.getByTestId('tag-row').filter({ hasText: 'Trabajo' })).toContainText('800,00 BOB');
+
+    // De la etiqueta a sus categorías y a la porción de 800,00 con su transacción.
+    await view
+      .getByTestId('tag-row')
+      .filter({ hasText: 'Viaje Cusco' })
+      .getByTestId('tag-by-category')
+      .click();
+    await expect(page).toHaveURL(/\/reportes\/gastos-por-categoria\?.*tagId=/u);
+    const byCategory = page.getByTestId('report-by-category');
+    const row = byCategory.getByTestId('cat-row').filter({ hasText: lodging!.name });
+    await expect(row).toContainText('800,00 BOB');
+    await row.getByTestId('drill-open').first().click();
+    const panel = page.getByTestId('drill-down');
+    await expect(panel.getByTestId('drill-row')).toHaveCount(1);
+    await expect(panel.getByTestId('drill-totals')).toContainText('800,00 BOB');
+    await panel.getByTestId('drill-row').first().getByRole('link').click();
+    await expect(page).toHaveURL(/\/transacciones\/[0-9a-f-]{36}/u);
+
+    // Guardar la vista con un rango relativo y reabrirla desde el menú: restaura los filtros.
+    await go(page, `${tagsUrl}&tagId=${trip['id']}`);
+    const saved = page.getByTestId('saved-views');
+    await saved.getByLabel('Nombre de la vista').fill('Gastos del viaje');
+    await saved.getByLabel('Rango a guardar').selectOption('LAST_3');
+    await saved.getByTestId('saved-view-save').click();
+    await expect(saved.getByTestId('saved-view')).toContainText('Gastos del viaje');
+    await go(page, '/reportes/gastos-por-etiqueta');
+    await page.getByTestId('saved-views').getByRole('button', { name: 'Abrir Gastos del viaje' }).click();
+    await expect(page.getByLabel('Desde (fecha de negocio)')).not.toHaveValue('');
+    await expect(page.getByTestId('report-by-tag').getByTestId('tag-row')).toHaveCount(1);
 
     const axe = await new AxeBuilder({ page }).analyze();
     expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([]);

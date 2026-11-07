@@ -6171,7 +6171,12 @@
       "errors": {
         "range": "The start date cannot be after the end date.",
         "custom": "The comparison range is incomplete or inverted."
-      }
+      },
+      "tagMatch": "Tag matching",
+      "ANY": "Any of the tags",
+      "ALL": "All the tags",
+      "debtKind": "Debt type",
+      "debtAll": "Loans and cards"
     },
     "variation": {
       "new": "new",
@@ -6350,6 +6355,175 @@
       "FEES": "Fees, interest and charges paid.",
       "ACCOUNT_BALANCE_HISTORY": "The balance of one account, day by day, with its reconciliations.",
       "FORECAST_VS_ACTUAL": "What was forecast against what happened."
+    },
+    "tags": {
+      "caption": "Spending by tag",
+      "tag": "Tag",
+      "amount": "Spending",
+      "vs": "Change",
+      "archived": "archived",
+      "nonAdditive": "A portion with several tags counts in each one: the totals per tag are not additive and their sum is not the total spending.",
+      "chartTitle": "Spending by tag",
+      "chartDesc": "Bars of {n} tags in {currency}; the table below has the same figures.",
+      "matchAll": "Only portions that have all the requested tags.",
+      "byCategory": "See by category",
+      "byCategoryOf": "See the categories of {name}"
+    },
+    "accounts": {
+      "caption": "Spending by paying account, with its breakdown by category",
+      "account": "Account",
+      "type": "Type",
+      "amount": "Spending",
+      "category": "Category",
+      "vs": "Change",
+      "total": "Total of the accounts",
+      "chartTitle": "Spending by account",
+      "chartDesc": "Bars of {n} accounts in {currency}; the table below has the same figures."
+    },
+    "trends": {
+      "caption": "Spending by category and period",
+      "category": "Category",
+      "total": "Total",
+      "others": "Other categories",
+      "chartTitle": "Spending on {name} per period",
+      "chartDesc": "Line of {n} periods in {currency}; the table below has every category.",
+      "normalized": "Per-day figures: each period is divided by its days."
+    },
+    "fees": {
+      "caption": "Fees and charges by type and period",
+      "period": "Period",
+      "CONVERSION": "Conversion fee",
+      "TRANSFER": "Transfer fee",
+      "LOAN": "Loan interest and charges",
+      "FEE_CATEGORY": "Fee categories",
+      "total": "Total",
+      "last12": "Last 12 complete periods: {amount}",
+      "cardNote": "Credit card interest is not recorded as spending and is not listed here; the card balance is in the debt evolution report.",
+      "chartTitle": "Total fees per period",
+      "chartDesc": "Bars of {n} periods in {currency}; the table below separates each type."
+    },
+    "goals": {
+      "caption": "{name}: progress by month in {currency}",
+      "target": "Target {target}",
+      "month": "Month",
+      "contributions": "Contributions",
+      "withdrawals": "Withdrawals",
+      "accumulated": "Accumulated",
+      "percent": "Progress",
+      "expected": "Expected",
+      "status": "Status",
+      "statuses": {
+        "BEHIND": "Behind",
+        "ON_TRACK": "On track",
+        "AHEAD": "Ahead",
+        "NONE": "Not tracked"
+      },
+      "incomplete": "A movement of this month is missing its conversion rate.",
+      "chartTitle": "Accumulated amount of {name}",
+      "chartDesc": "Line of {n} months in {currency}; the table below has the expected amount and the status.",
+      "movements": "See the goal movements"
+    },
+    "debts": {
+      "caption": "{name}: balance and payments by month in {currency}",
+      "month": "Month",
+      "outstanding": "Outstanding balance",
+      "principalPaid": "Principal paid",
+      "interestPaid": "Interest paid",
+      "chargesPaid": "Charges paid",
+      "kind": {
+        "LOAN": "Loan",
+        "CARD": "Card"
+      },
+      "consolidated": "Consolidated in {currency}",
+      "chartTitle": "Outstanding balance of {name}",
+      "chartDesc": "Line of {n} months in {currency}; the table below has the payments.",
+      "cardNote": "Cards show only the outstanding balance."
+    },
+    "recurring": {
+      "caption": "Monthly and annual cost of the active recurring commitments",
+      "commitment": "Commitment",
+      "cadence": "Frequency",
+      "monthly": "Monthly",
+      "annual": "Annual",
+      "monthlyReporting": "Monthly in {currency}",
+      "variable": "Variable amount",
+      "totals": "Monthly and annualized total",
+      "variableCount": "{count, plural, one {# variable-amount commitment is not added} other {# variable-amount commitments are not added}}",
+      "every": "every {n}",
+      "cadences": {
+        "DAILY": "daily",
+        "WEEKLY": "weekly",
+        "BIWEEKLY": "biweekly",
+        "SEMIMONTHLY": "twice a month",
+        "MONTHLY": "monthly",
+        "BIMONTHLY": "every two months",
+        "QUARTERLY": "quarterly",
+        "SEMIANNUAL": "semiannual",
+        "ANNUAL": "annual",
+        "CUSTOM": "custom"
+      },
+      "chartTitle": "Monthly cost per commitment",
+      "chartDesc": "Bars of {n} commitments in {currency}; the table below has the annual cost."
+    },
+    "subs": {
+      "caption": "Monthly cost at the end of each month and subscription events",
+      "month": "Month",
+      "monthlyCost": "Monthly cost",
+      "active": "Active",
+      "events": "Events",
+      "noEvents": "No events",
+      "STARTED": "{name}: started at {price}",
+      "CANCELLED": "{name}: cancelled",
+      "PRICE_CHANGED": "{name}: from {previous} to {price}",
+      "chartTitle": "Monthly cost of subscriptions",
+      "chartDesc": "Line of {n} months in {currency}; the table below lists the events."
+    },
+    "conv": {
+      "pointsCaption": "Effective and reference rate of each conversion",
+      "date": "Date",
+      "pair": "Pair",
+      "effective": "Effective rate",
+      "reference": "Reference",
+      "noReference": "no reference",
+      "monthsCaption": "Cost of converting by month (spread plus fees)",
+      "month": "Period",
+      "cost": "Cost",
+      "conversions": "Conversions",
+      "excluded": "Excluded",
+      "detail": "See the detail by channel and account",
+      "chartTitle": "Cost of converting per period",
+      "chartDesc": "Bars of {n} periods in {currency}; the tables below have every conversion."
+    },
+    "views": {
+      "title": "Saved views",
+      "empty": "You have not saved any view of this report yet.",
+      "name": "View name",
+      "range": "Range to save",
+      "ranges": {
+        "FIXED": "Fixed range",
+        "LAST_3": "Last 3 periods",
+        "LAST_6": "Last 6 periods",
+        "LAST_12": "Last 12 periods"
+      },
+      "save": "Save view",
+      "saved": "View saved.",
+      "open": "Open {name}",
+      "rename": "Rename {name}",
+      "renameLabel": "New name",
+      "renameDo": "Rename",
+      "delete": "Delete {name}",
+      "deleted": "View deleted.",
+      "pick": "Choose a view",
+      "warning": {
+        "ARCHIVED_FILTER": "The filter uses an archived {kind}: {name}.",
+        "MISSING_FILTER": "The filter points to a {kind} that no longer exists."
+      },
+      "kinds": {
+        "CATEGORY": "category",
+        "ACCOUNT": "account",
+        "TAG": "tag",
+        "COUNTERPARTY": "counterparty"
+      }
     }
   },
   "Suggestions": {

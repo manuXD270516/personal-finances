@@ -116,10 +116,22 @@ export interface NominalFlowRowDto {
   readonly accountId?: string;
   /** Contraparte de la porción (o, si no tiene, la de la transacción). Solo con `groupBy` `COUNTERPARTY`. */
   readonly counterpartyId?: string | null;
+  /**
+   * Origen de la porción (add-financial-reports-extended, reporte de comisiones): tipo de la transacción y rol de la
+   * porción (`FEE` = comisión de una transferencia o conversión). Solo con `groupBy` `ORIGIN`.
+   */
+  readonly origin?: {
+    readonly transactionKind: string;
+    readonly portionRole: 'NOMINAL' | 'FEE';
+    readonly loanComponent?: 'INTEREST' | 'CHARGES' | 'INSURANCE' | 'TAXES' | null;
+  };
 }
 
-/** Dimensiones adicionales por las que `summarizeNominalFlows` puede agrupar (add-financial-reports). */
-export type NominalFlowGroupBy = 'ACCOUNT' | 'COUNTERPARTY';
+/** Dimensiones adicionales por las que `summarizeNominalFlows` puede agrupar (add-financial-reports[-extended]). */
+export type NominalFlowGroupBy = 'ACCOUNT' | 'COUNTERPARTY' | 'ORIGIN';
+
+/** Coincidencia con las etiquetas pedidas: cualquiera (por omisión) o todas. */
+export type NominalFlowTagMatch = 'ANY' | 'ALL';
 
 /** Query pública `SummarizeNominalFlows` (sin efectos; en la unidad de trabajo del llamador si existe). */
 export interface NominalFlowQuery {
@@ -136,11 +148,13 @@ export interface NominalFlowQuery {
     readonly accountIds?: readonly string[];
     /** Solo las porciones de estas contrapartes (la de la porción o, si no tiene, la de la transacción). */
     readonly counterpartyIds?: readonly string[];
-    /** Solo las porciones con CUALQUIERA de estas etiquetas. */
+    /** Solo las porciones con CUALQUIERA de estas etiquetas (o con TODAS si `tagMatch` es `ALL`). */
     readonly tagIds?: readonly string[];
+    /** Con `tagIds`: `ANY` (por omisión) o `ALL` (add-financial-reports-extended). */
+    readonly tagMatch?: NominalFlowTagMatch;
     /** Solo las porciones en estas monedas. */
     readonly currencies?: readonly string[];
-    /** Agrega además por cuenta y/o contraparte; sin él la agrupación no cambia. */
+    /** Agrega además por cuenta, contraparte y/u origen; sin él la agrupación no cambia. */
     readonly groupBy?: readonly NominalFlowGroupBy[];
   }): Promise<readonly NominalFlowRowDto[]>;
 }
@@ -186,6 +200,8 @@ export interface NominalPortionQuery {
     readonly accountIds?: readonly string[];
     readonly counterpartyIds?: readonly string[];
     readonly tagIds?: readonly string[];
+    /** Con `tagIds`: `ANY` (por omisión) o `ALL`, igual que `summarizeNominalFlows`. */
+    readonly tagMatch?: NominalFlowTagMatch;
     readonly currencies?: readonly string[];
     /** 1..200. */
     readonly limit: number;

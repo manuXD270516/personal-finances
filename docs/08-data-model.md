@@ -1647,6 +1647,8 @@ erDiagram
 
 > Todas las tablas de este schema son **derivadas y reconstruibles** desde `ledger`/`txn`/`fx`/otros contextos vía eventos. No son fuente de verdad, no tienen `version` ni audit, y pueden truncarse y reconstruirse (`job reporting.rebuild`). Escritas solo por `pf_worker` (política **DRV**). Catálogo funcional completo y consumidores en [14-reporting.md](14-reporting.md) §2; aquí se fija la forma física de las principales.
 
+> **As-built (Phase 7, `add-financial-reports-extended`): `reporting.saved_report_view` no es derivada.** Es una preferencia personal con `WS + USR`: `id uuid PK`, `workspace_id` (FK `iam.workspace`), `user_id` (FK `iam."user"`), `report_id text`, `name text (1..80)`, `params jsonb` (objeto; solo ids y filtros, nunca montos), `version int`, `created_at`, `updated_at`; `UNIQUE (workspace_id, user_id, report_id, lower(name))`. RLS **forzada** con la política `workspace_id = platform.current_workspace_id() AND user_id = platform.current_user_id()` (fail-closed: sin contexto, `PF002`); grants `SELECT, INSERT, UPDATE, DELETE` a `pf_app`; registrada en `platform.workspace_scoped_table` (orden 171) y exportada en la sección de portabilidad `saved-report-views` (solo las del usuario que exporta; al importar, las del importador con los ids remapeados). Borrado físico y sin auditoría (preferencia personal sin valor contable). Los read models siguientes siguen sin implementarse.
+
 ```mermaid
 erDiagram
   TXN_FACT {

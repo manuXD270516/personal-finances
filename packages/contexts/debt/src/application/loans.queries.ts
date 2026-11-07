@@ -1,6 +1,12 @@
 import type { LifecycleDto } from '@pf/audit/contracts';
 import { DomainError, LocalDate, dec, type Decimal } from '@pf/shared-kernel';
-import type { LoanPortfolioItemDto, LoanPortfolioQuery, LoanStatusDto } from '../contracts/index.js';
+import type {
+  DebtHistoryQuery,
+  DebtHistoryRowDto,
+  LoanPortfolioItemDto,
+  LoanPortfolioQuery,
+  LoanStatusDto,
+} from '../contracts/index.js';
 import { Loan, PAYMENT_COMPONENTS } from '../domain/index.js';
 import type { LoanTermsCommand } from './loans.service.js';
 import type { DebtDeps } from './ports/index.js';
@@ -42,7 +48,7 @@ const daysBetween = (from: string, to: LocalDate): number =>
   Math.max(0, to.toEpochDay() - LocalDate.parse(from).toEpochDay());
 
 /** Consultas de DEBT (sin efectos) y el contrato público `LoanPortfolioQuery`. */
-export class LoansQueries implements LoanPortfolioQuery {
+export class LoansQueries implements LoanPortfolioQuery, DebtHistoryQuery {
   constructor(private readonly deps: DebtDeps) {}
 
   private async scaleOf(code: string): Promise<number> {
@@ -442,6 +448,73 @@ export class LoansQueries implements LoanPortfolioQuery {
       return out;
     };
     return deps.uow.run(workspaceId, run);
+  }
+
+  /** `DebtHistoryQuery.monthly`: principal, interés y cargos pagados por préstamo y mes (pagos vigentes). */
+  async monthly(input: {
+    workspaceId: string;
+    from: string;
+    to: string;
+  }): Promise<readonly DebtHistoryRowDto[]> {
+    LocalDate.parse(input.from);
+    LocalDate.parse(input.to);
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const rows = await this.deps.payments.paidByDate(input.workspaceId, {
+        from: input.from,
+        to: input.to,
+      });
+      const byKey = new Map<
+        string,
+        {
+          loanId: string;
+          month: string;
+          currency: string;
+          principal: Decimal;
+          interest: Decimal;
+          charges: Decimal;
+          scale: number;
+          payments: DebtHistoryRowDto['payments'][number][];
+        }
+      >();
+      for (const r of rows) {
+        const month = r.date.slice(0, 7);
+        const key = `${r.loanId}|${month}`;
+        const charges = dec(r.fees).plus(dec(r.insurance)).plus(dec(r.taxes));
+        const scale = r.principal.split('.')[1]?.length ?? 0;
+        const prev = byKey.get(key);
+        const acc = prev ?? {
+          loanId: r.loanId,
+          month,
+          currency: r.currency,
+          principal: dec('0'),
+          interest: dec('0'),
+          charges: dec('0'),
+          scale,
+          payments: [],
+        };
+        acc.principal = acc.principal.plus(dec(r.principal));
+        acc.interest = acc.interest.plus(dec(r.interest));
+        acc.charges = acc.charges.plus(charges);
+        acc.payments.push({
+          date: r.date,
+          principal: r.principal,
+          interest: r.interest,
+          charges: fixed(charges, scale),
+        });
+        byKey.set(key, acc);
+      }
+      return [...byKey.values()]
+        .sort((a, b) => a.loanId.localeCompare(b.loanId) || a.month.localeCompare(b.month))
+        .map((a) => ({
+          loanId: a.loanId,
+          month: a.month,
+          currency: a.currency,
+          principal: fixed(a.principal, a.scale),
+          interest: fixed(a.interest, a.scale),
+          charges: fixed(a.charges, a.scale),
+          payments: a.payments,
+        }));
+    });
   }
 
   async interestPaid(input: { workspaceId: string; from: string; to: string }) {

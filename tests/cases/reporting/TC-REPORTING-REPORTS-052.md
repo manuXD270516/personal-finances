@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: ["ledger/balances"]
 requirement: "Reconciliación de los reportes ampliados con el ledger"
 scenario: "Gasto por cuenta igual al total"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-010"]
 nfr: ["NFR-DATA-008"]
 invariants: ["INV-018", "INV-021", "INV-022"]
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - packages/contexts/reporting/src/application/reports-reconciliation.test.ts
+  - apps/api/test/demo/demo-v2.int.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["reconciliation", "pbt"]
 error_code: null
@@ -32,7 +35,7 @@ expected_result:
   - "Acumulado de cada meta = Σ movimientos"
   - "Σ drill-down = celda"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-052 — Los reportes ampliados cuadran con el ledger: cuentas, comisiones, deudas, metas y drill-down

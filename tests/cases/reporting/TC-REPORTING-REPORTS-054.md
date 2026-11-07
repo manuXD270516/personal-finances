@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Vistas de los reportes ampliados en la aplicación"
 scenario: "De la etiqueta a la porción"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-REPORTING-019"]
 nfr: ["NFR-USAB-101", "NFR-USAB-105"]
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/reports/extended-reports.test.tsx
+  - tests/e2e/specs/financial-reports.spec.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["ui", "e2e", "a11y"]
 error_code: null
@@ -32,7 +34,7 @@ expected_result:
   - "La vista reabierta restaura los filtros"
   - "Sin violaciones de axe; textos en es/en/pt"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-054 — El owner navega de una etiqueta a la porción, guarda la vista y la vuelve a abrir

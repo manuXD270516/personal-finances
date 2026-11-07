@@ -425,3 +425,79 @@ describe('Lecturas de una meta', () => {
     expect(await codeOf(() => w.queries.get(WS, 'desconocida'))).toBe('RESOURCE_NOT_FOUND');
   });
 });
+
+describe('Historial mensual para reportes (TC-REPORTING-REPORTS-043)', () => {
+  /** "Viaje": 5000.00 BOB del 2026-07-01 al 2027-06-30; aportes 500/500/—/1000 y un retiro de 200.00 en octubre. */
+  async function viaje() {
+    const w = new GoalsWorld('2026-11-05T16:00:00.000Z');
+    const trip = await w.createGoal({
+      name: 'Viaje',
+      target: bob('5000.00'),
+      startDate: '2026-07-01',
+      targetDate: '2027-06-30',
+      linkedAccountIds: [SAVINGS],
+    });
+    const seed = (amount: string, occurredOn: string, extra: object = {}) =>
+      w.seedMovement({ goalId: trip.id, fund: 'REAL', amount, accountId: SAVINGS, occurredOn, ...extra });
+    seed('500.00', '2026-07-10');
+    seed('500.00', '2026-08-10');
+    seed('1000.00', '2026-10-05');
+    seed('-200.00', '2026-10-20');
+    return { w, trip, seed };
+  }
+
+  it('[TC-REPORTING-REPORTS-043] informa acumulados de 500.00, 1000.00, 1000.00 y 1800.00 BOB con aportes y retiros del mes', async () => {
+    const { w, trip } = await viaje();
+    const [goal] = await w.queries.monthly({ workspaceId: WS, from: '2026-07-01', to: '2026-10-31' });
+    expect(goal?.goalId).toBe(trip.id);
+    expect(goal?.months.map((m) => m.accumulated.amount)).toEqual([
+      '500.00',
+      '1000.00',
+      '1000.00',
+      '1800.00',
+    ]);
+    expect(goal?.months.map((m) => m.contributions.amount)).toEqual(['500.00', '500.00', '0.00', '1000.00']);
+    expect(goal?.months.map((m) => m.withdrawals.amount)).toEqual(['0.00', '0.00', '0.00', '200.00']);
+    expect(goal?.months.every((m) => m.complete)).toBe(true);
+  });
+
+  it('[TC-REPORTING-REPORTS-043] esperado y estado son los del seguimiento de la meta a cada cierre', async () => {
+    const { w } = await viaje();
+    const [goal] = await w.queries.monthly({ workspaceId: WS, from: '2026-07-01', to: '2026-10-31' });
+    // 5000.00 × 30/364 = 412.09 al 2026-07-31 (30 de 364 días); acumulado 500.00 ⇒ por encima de la tolerancia.
+    expect(goal?.months[0]).toMatchObject({ expected: bob('412.09'), status: 'AHEAD' });
+    expect(goal?.months[3]?.expected).toEqual(bob('1675.82'));
+    expect(goal?.months.map((m) => m.status)).toEqual(['AHEAD', 'AHEAD', 'BEHIND', 'AHEAD']);
+  });
+
+  it('[TC-REPORTING-REPORTS-043] una reasignación entre metas no cuenta como aporte, pero sí en el acumulado', async () => {
+    const { w, trip, seed } = await viaje();
+    seed('300.00', '2026-10-25', { kind: 'REASSIGN_IN' });
+    const [goal] = await w.queries.monthly({
+      workspaceId: WS,
+      goalIds: [trip.id],
+      from: '2026-10-01',
+      to: '2026-10-31',
+    });
+    expect(goal?.months).toHaveLength(1);
+    expect(goal?.months[0]).toMatchObject({
+      accumulated: bob('2100.00'),
+      contributions: bob('1000.00'),
+      withdrawals: bob('200.00'),
+    });
+  });
+
+  it('[TC-REPORTING-REPORTS-043] los meses anteriores al inicio de la meta no aparecen y un id ajeno no devuelve metas', async () => {
+    const { w } = await viaje();
+    const [goal] = await w.queries.monthly({ workspaceId: WS, from: '2026-05-01', to: '2026-08-31' });
+    expect(goal?.months.map((m) => m.monthEnd)).toEqual(['2026-07-31', '2026-08-31']);
+    expect(
+      await w.queries.monthly({
+        workspaceId: WS,
+        goalIds: ['desconocida'],
+        from: '2026-07-01',
+        to: '2026-08-31',
+      }),
+    ).toEqual([]);
+  });
+});

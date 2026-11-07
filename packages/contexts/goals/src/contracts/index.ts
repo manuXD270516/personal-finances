@@ -197,6 +197,44 @@ export interface GoalFlowsQuery {
   }): Promise<readonly GoalFlowDto[]>;
 }
 
+/**
+ * Historial mensual de una meta para REPORTING (add-financial-reports-extended, reporte 9). Por meta y mes calendario:
+ * aportes y retiros del mes (sin reasignaciones como aportes, INV-018), acumulado al cierre (Σ de TODOS los movimientos
+ * a esa fecha) en la moneda de la meta, y el seguimiento (`expected`, `status`) que GOALS calcula para el cierre del mes.
+ * Los movimientos en otra moneda se convierten con la tasa del cierre del mes (`FlowValuation`); sin tasa el mes queda
+ * `complete: false` y esa parte no se suma (nunca 1:1).
+ */
+export interface GoalProgressMonthDto {
+  readonly monthEnd: string;
+  readonly contributions: MoneyDto;
+  readonly withdrawals: MoneyDto;
+  readonly accumulated: MoneyDto;
+  readonly expected: MoneyDto | null;
+  readonly status: GoalTrackingStatusDto | null;
+  readonly complete: boolean;
+}
+
+export interface GoalProgressHistoryDto {
+  readonly goalId: string;
+  readonly name: string;
+  readonly currency: string;
+  readonly target: MoneyDto;
+  readonly startDate: string;
+  readonly targetDate: string | null;
+  readonly months: readonly GoalProgressMonthDto[];
+}
+
+export interface GoalProgressHistoryQuery {
+  /** Metas vivas o cerradas, no archivadas (o las pedidas); meses calendario de `[from, to]` desde el inicio de cada meta. */
+  monthly(input: {
+    readonly workspaceId: string;
+    readonly goalIds?: readonly string[];
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly GoalProgressHistoryDto[]>;
+}
+
+export const GOAL_PROGRESS_HISTORY_QUERY = Symbol.for('pf.goals.GoalProgressHistoryQuery');
 export const GOAL_RESERVATIONS_QUERY = Symbol.for('pf.goals.GoalReservationsQuery');
 export const GOAL_PLANS_QUERY = Symbol.for('pf.goals.GoalPlansQuery');
 export const GOAL_SUMMARY_QUERY = Symbol.for('pf.goals.GoalSummaryQuery');

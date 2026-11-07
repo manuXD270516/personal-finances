@@ -12,7 +12,13 @@ import {
   type Decimal,
   type ExactRate,
 } from '@pf/shared-kernel';
-import type { ActiveSubscriptionDto, MoneyDto, SubscriptionsQuery } from '../contracts/index.js';
+import type {
+  ActiveSubscriptionDto,
+  MoneyDto,
+  SubscriptionHistoryEventDto,
+  SubscriptionHistoryQuery,
+  SubscriptionsQuery,
+} from '../contracts/index.js';
 import {
   SubscriptionCostCalculator,
   buildSchedule,
@@ -86,7 +92,7 @@ function convert(value: Decimal, from: string, target: string, rate: ExactRate):
  * Consultas de suscripciones (openspec add-subscriptions decisiones 5, 11 y 14): listado, detalle, cargos, costo
  * mensualizado/anualizado y recorrido. Lectura directa de la fuente de verdad; el costo no se persiste.
  */
-export class SubscriptionsQueries implements SubscriptionsQuery {
+export class SubscriptionsQueries implements SubscriptionsQuery, SubscriptionHistoryQuery {
   constructor(private readonly deps: SubscriptionsDeps) {}
 
   private async todayOf(workspaceId: string): Promise<LocalDate> {
@@ -163,6 +169,71 @@ export class SubscriptionsQueries implements SubscriptionsQuery {
           nextRenewalOn: r.subscription.snapshot.nextRenewalOn,
         };
       });
+    });
+  }
+
+  /**
+   * `SubscriptionHistoryQuery.listEvents` (add-financial-reports-extended, reporte 12): alta, cambios de precio (entradas
+   * vigentes del historial, sin las reemplazadas por correcciones) y baja de cada suscripción, con fecha ≤ `to`.
+   */
+  listEvents(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly SubscriptionHistoryEventDto[]> {
+    LocalDate.parse(input.from);
+    const to = LocalDate.parse(input.to).toString();
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const today = await this.todayOf(input.workspaceId);
+      const rows = await this.deps.subscriptions.list(input.workspaceId, {
+        statuses: ['TRIAL', 'ACTIVE', 'PAUSED', 'CANCELLED'],
+      });
+      const out: SubscriptionHistoryEventDto[] = [];
+      for (const r of rows) {
+        const sub = r.subscription;
+        const schedule = buildSchedule({
+          cadence: r.cadence,
+          interval: r.interval,
+          monthDays: r.monthDays,
+          rrule: r.rrule,
+          startDate: today.toString(),
+        });
+        const renewals = renewalsPerYear(schedule, today).toString();
+        const dto = (m: { toFixed(): string; currency: { code: string } }): MoneyDto => ({
+          amount: m.toFixed(),
+          currency: m.currency.code,
+        });
+        const base = { subscriptionId: sub.id, name: sub.snapshot.name, renewalsPerYear: renewals };
+        const entries = sub.history.active;
+        entries.forEach((entry, i) => {
+          if (entry.effectiveFrom > to) return;
+          const previous = entries[i - 1];
+          out.push({
+            ...base,
+            date: entry.effectiveFrom,
+            kind: previous ? 'PRICE_CHANGED' : 'STARTED',
+            previousPrice: previous ? dto(previous.price) : null,
+            newPrice: dto(entry.price),
+          });
+        });
+        const cancelledOn = sub.snapshot.cancelledOn;
+        if (cancelledOn !== null && cancelledOn <= to) {
+          const last = entries.filter((e) => e.effectiveFrom <= cancelledOn).at(-1);
+          out.push({
+            ...base,
+            date: cancelledOn,
+            kind: 'CANCELLED',
+            previousPrice: last ? dto(last.price) : null,
+            newPrice: null,
+          });
+        }
+      }
+      return out.sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) ||
+          a.subscriptionId.localeCompare(b.subscriptionId) ||
+          a.kind.localeCompare(b.kind),
+      );
     });
   }
 

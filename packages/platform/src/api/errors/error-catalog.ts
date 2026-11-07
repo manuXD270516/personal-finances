@@ -97,6 +97,11 @@ export const ERROR_CATALOG = {
   CURRENCY_NOT_ENABLED: { status: 422, title: 'Currency not enabled in this workspace' },
   // reporting (Phase 7)
   REPORT_EXPORT_TOO_LARGE: { status: 422, title: 'The report export exceeds the synchronous row limit' },
+  SAVED_VIEW_NAME_TAKEN: { status: 409, title: 'A saved view of this report already has that name' },
+  SAVED_VIEW_LIMIT_EXCEEDED: {
+    status: 422,
+    title: 'The saved views limit per user and workspace was reached',
+  },
   // planning (Phase 2)
   PERIOD_NOT_STARTED: { status: 409, title: 'Financial period has not started yet' },
   PERIOD_NOT_ENDED: { status: 409, title: 'Financial period has not ended yet' },

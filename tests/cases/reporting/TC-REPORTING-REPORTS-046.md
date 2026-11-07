@@ -5,17 +5,21 @@ spec: reporting/financial-reports
 related_specs: ["commitments/subscriptions"]
 requirement: "Reporte de evolución de suscripciones"
 scenario: "Aumento, alta y baja"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-COMMITMENTS-011"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/commitments/src/application/recurring-cost.queries.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["subscriptions"]
 error_code: null
@@ -30,7 +34,7 @@ expected_result:
   - "Costo mensual al cierre 94.00, 99.00, 149.00 y 80.00 BOB"
   - "Eventos: aumento 25.00 → 30.00 BOB (ago), alta (sep), baja (oct)"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-046 — La evolución de suscripciones informa el costo mensual al cierre con altas, bajas y cambios de precio

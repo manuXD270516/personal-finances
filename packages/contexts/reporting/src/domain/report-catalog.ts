@@ -41,15 +41,6 @@ const available = (reportId: ReportId, number: number, endpoint: string): Catalo
   endpoint,
   viewPath: null,
 });
-const partial = (reportId: ReportId, number: number, viewPath: string): CatalogEntry => ({
-  reportId,
-  number,
-  status: 'PARTIAL',
-  phase: 7,
-  plannedIn: 'add-financial-reports-extended',
-  endpoint: null,
-  viewPath,
-});
 const planned = (reportId: ReportId, number: number, phase: number, plannedIn: string): CatalogEntry => ({
   reportId,
   number,
@@ -61,25 +52,24 @@ const planned = (reportId: ReportId, number: number, phase: number, plannedIn: s
 });
 
 /**
- * Catálogo estático de los 16 reportes (design decisión 14). Este change deja disponibles los seis Must (1, 2, 3, 7, 8
- * y 15); los parciales enlazan a la vista existente; el resto lo trae `add-financial-reports-extended` y el pronóstico
- * vs real, Phase 8. Un reporte planificado nunca muestra cifras.
+ * Catálogo estático de los 16 reportes (design decisión 14). Con `add-financial-reports-extended` quedan disponibles
+ * 15; el pronóstico vs real, Phase 8, sigue planificado. Un reporte planificado nunca muestra cifras.
  */
 export const REPORT_CATALOG: readonly CatalogEntry[] = [
   available('INCOME_EXPENSES', 1, '/reports/income-expenses'),
   available('BUDGET_VS_ACTUAL', 2, '/reports/budget-vs-actual'),
   available('EXPENSES_BY_CATEGORY', 3, '/reports/expenses/by-category'),
-  planned('EXPENSES_BY_TAG', 4, 7, 'add-financial-reports-extended'),
-  planned('EXPENSES_BY_ACCOUNT', 5, 7, 'add-financial-reports-extended'),
-  planned('MONTHLY_TRENDS', 6, 7, 'add-financial-reports-extended'),
+  available('EXPENSES_BY_TAG', 4, '/reports/expenses/by-tag'),
+  available('EXPENSES_BY_ACCOUNT', 5, '/reports/expenses/by-account'),
+  available('MONTHLY_TRENDS', 6, '/reports/trends'),
   available('CASH_FLOW', 7, '/reports/cash-flow'),
   available('NET_WORTH', 8, '/reports/net-worth'),
-  partial('SAVINGS_GOALS', 9, '/goals'),
-  partial('DEBT_EVOLUTION', 10, '/debts'),
-  partial('RECURRING_COSTS', 11, '/recurring/suscripciones'),
-  planned('SUBSCRIPTION_EVOLUTION', 12, 7, 'add-financial-reports-extended'),
-  partial('FX_CONVERSIONS', 13, '/fx/costos'),
-  planned('FEES', 14, 7, 'add-financial-reports-extended'),
+  available('SAVINGS_GOALS', 9, '/reports/goals'),
+  available('DEBT_EVOLUTION', 10, '/reports/debts'),
+  available('RECURRING_COSTS', 11, '/reports/recurring'),
+  available('SUBSCRIPTION_EVOLUTION', 12, '/reports/subscriptions'),
+  available('FX_CONVERSIONS', 13, '/reports/conversions'),
+  available('FEES', 14, '/reports/fees'),
   available('ACCOUNT_BALANCE_HISTORY', 15, '/reports/accounts/{accountId}/balance-history'),
   planned('FORECAST_VS_ACTUAL', 16, 8, 'phase-8'),
 ];

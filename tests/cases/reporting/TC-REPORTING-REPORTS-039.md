@@ -5,17 +5,23 @@ spec: reporting/financial-reports
 related_specs: ["classification/tags"]
 requirement: "Reporte de gastos por etiqueta"
 scenario: "Viaje con un gasto compartido con trabajo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+  - packages/contexts/transactions/test/integration/pg-nominal-portions.int.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+  - apps/web/src/ui/reports/extended-reports.test.tsx
+status: automated
+regression_suite: true
 phase: 7
 tags: ["by-tag"]
 error_code: null
@@ -32,7 +38,7 @@ expected_result:
   - "Con todas: 800.00 BOB"
   - "Nunca se presenta 1800.00 BOB como gasto total"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-039 — Gastos por etiqueta con coincidencia cualquiera o todas y aviso de no aditividad

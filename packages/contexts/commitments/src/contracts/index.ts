@@ -218,6 +218,55 @@ export interface SubscriptionsQuery {
   listActive(input: { readonly workspaceId: string }): Promise<readonly ActiveSubscriptionDto[]>;
 }
 
+/**
+ * Costo recurrente de una definición activa de egreso para el reporte 11 de REPORTING (add-financial-reports-extended).
+ * `renewalsPerYear` es la regla as-built de `GetSubscriptionCostSummary` (tabla de la cadencia ÷ intervalo; una regla
+ * personalizada cuenta las fechas de los próximos 12 meses); el costo mensual es `price × renewalsPerYear ÷ 12`. Un monto
+ * `VARIABLE` va con `price: null` y `variable: true` (se cuenta aparte, sin monto); `MIN_MAX` usa su máximo. Un precio
+ * indexado se informa en su moneda. Solo definiciones `ACTIVE` de tipo egreso (las pausadas y terminadas no suman).
+ */
+export interface RecurringCostDto {
+  readonly definitionId: string;
+  readonly name: string;
+  readonly categoryId: string | null;
+  readonly cadence: string;
+  readonly interval: number;
+  readonly currency: string;
+  readonly renewalsPerYear: string | null;
+  readonly price: string | null;
+  readonly variable: boolean;
+}
+
+export interface RecurringCostQuery {
+  listCosts(input: { readonly workspaceId: string }): Promise<readonly RecurringCostDto[]>;
+}
+
+/**
+ * Eventos del historial de suscripciones para el reporte 12: alta (`STARTED`, primer precio), cambio de precio
+ * (`PRICE_CHANGED` con el precio anterior y el nuevo, fecha de vigencia) y baja (`CANCELLED`). Devuelve TODOS los eventos
+ * con fecha ≤ `to` (el estado de cada cierre se reconstruye desde el principio); `from` solo acota los que se muestran.
+ */
+export interface SubscriptionHistoryEventDto {
+  readonly subscriptionId: string;
+  readonly name: string;
+  readonly date: string;
+  readonly kind: 'STARTED' | 'CANCELLED' | 'PRICE_CHANGED';
+  readonly previousPrice: MoneyDto | null;
+  readonly newPrice: MoneyDto | null;
+  readonly renewalsPerYear: string;
+}
+
+export interface SubscriptionHistoryQuery {
+  listEvents(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly SubscriptionHistoryEventDto[]>;
+}
+
+export const RECURRING_COST_QUERY = Symbol.for('pf.commitments.RecurringCostQuery');
+export const SUBSCRIPTION_HISTORY_QUERY = Symbol.for('pf.commitments.SubscriptionHistoryQuery');
+
 // ───────────────────────────────────────────── consultas públicas
 
 export interface CommittedItemDto {

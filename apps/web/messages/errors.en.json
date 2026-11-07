@@ -173,5 +173,7 @@
   "IMPORT_PDF_TOTALS_MISMATCH": "The balances and totals of the statement do not match the rows we read, so we imported nothing to avoid a wrong balance. The details list the pages and lines to check.",
   "IMPORT_PDF_PAGE_COUNT_MISMATCH": "The statement declares more pages than the PDF has. Download it again in full.",
   "IMPORT_PDF_ACCOUNT_MISMATCH": "The statement belongs to a different account than the chosen one (the last 4 digits differ). Choose the right account and try again.",
-  "REPORT_EXPORT_TOO_LARGE": "The report has more than 50,000 rows to export. Narrow the date range or add filters and try again."
+  "REPORT_EXPORT_TOO_LARGE": "The report has more than 50,000 rows to export. Narrow the date range or add filters and try again.",
+  "SAVED_VIEW_NAME_TAKEN": "You already have a view of this report with that name. Choose another name.",
+  "SAVED_VIEW_LIMIT_EXCEEDED": "You reached the limit of 50 saved views in this workspace. Delete one to save another."
 }

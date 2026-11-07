@@ -281,3 +281,194 @@ export interface ReportDrillDownPageDto {
   readonly rows: readonly ReportDrillDownRowDto[];
   readonly nextCursor: string | null;
 }
+
+// ───────────────────────────────────────────── reportes ampliados (add-financial-reports-extended)
+
+export interface ExpensesByTagReportDto {
+  readonly meta: ReportMetaDto;
+  /** Una porción con varias etiquetas suma en cada una: la suma de las etiquetas NO es el gasto total. */
+  readonly nonAdditive: true;
+  readonly tagMatch: 'ANY' | 'ALL';
+  readonly tags: readonly {
+    readonly tagId: string;
+    readonly name: string;
+    readonly archived: boolean;
+    readonly amount: ReportAmountDto;
+    readonly comparison: ReportVariationDto | null;
+  }[];
+}
+
+export interface ExpensesByAccountReportDto {
+  readonly meta: ReportMetaDto;
+  readonly accounts: readonly {
+    readonly accountId: string;
+    readonly name: string;
+    readonly type: string;
+    readonly institutionId: string | null;
+    readonly amount: ReportAmountDto;
+    readonly comparison: ReportVariationDto | null;
+    readonly byCategory: readonly {
+      readonly categoryId: string;
+      readonly name: string;
+      readonly amount: ReportAmountDto;
+    }[];
+  }[];
+  readonly total: ReportAmountDto;
+  readonly totalComparison: ReportVariationDto | null;
+}
+
+export interface TrendsReportDto {
+  readonly meta: ReportMetaDto;
+  readonly normalized: boolean;
+  readonly series: readonly {
+    /** `null` = la serie "Otras categorías". */
+    readonly categoryId: string | null;
+    readonly name: string;
+    readonly total: ReportAmountDto;
+    readonly cells: readonly { readonly period: ReportPeriodDto; readonly amount: ReportAmountDto }[];
+  }[];
+}
+
+export type FeeTypeDto = 'CONVERSION' | 'TRANSFER' | 'LOAN' | 'FEE_CATEGORY';
+
+export interface FeesReportDto {
+  readonly meta: ReportMetaDto;
+  readonly months: readonly {
+    readonly period: ReportPeriodDto;
+    readonly byType: readonly { readonly type: FeeTypeDto; readonly amount: ReportAmountDto }[];
+    readonly total: ReportAmountDto;
+  }[];
+  /** Total de los 12 periodos completos anteriores al que contiene hoy. */
+  readonly last12Months: ReportAmountDto;
+}
+
+export interface GoalsReportDto {
+  readonly meta: ReportMetaDto;
+  readonly goals: readonly {
+    readonly goalId: string;
+    readonly name: string;
+    readonly currency: string;
+    readonly target: MoneyDto;
+    readonly startDate: string;
+    readonly targetDate: string | null;
+    readonly months: readonly {
+      readonly period: string;
+      readonly monthEnd: string;
+      readonly contributions: MoneyDto;
+      readonly withdrawals: MoneyDto;
+      readonly accumulated: MoneyDto;
+      readonly percent: string | null;
+      readonly expected: MoneyDto | null;
+      readonly status: 'BEHIND' | 'ON_TRACK' | 'AHEAD' | null;
+      readonly complete: boolean;
+    }[];
+  }[];
+}
+
+export interface DebtsReportDto {
+  readonly meta: ReportMetaDto;
+  readonly debts: readonly {
+    readonly debtId: string;
+    readonly kind: 'LOAN' | 'CARD';
+    readonly name: string;
+    readonly currency: string;
+    readonly accountId: string;
+    readonly months: readonly {
+      readonly period: ReportPeriodDto;
+      readonly outstanding: MoneyDto;
+      readonly principalPaid: MoneyDto | null;
+      readonly interestPaid: MoneyDto | null;
+      readonly chargesPaid: MoneyDto | null;
+    }[];
+  }[];
+  readonly consolidated: readonly {
+    readonly period: ReportPeriodDto;
+    readonly outstanding: ReportAmountDto;
+    readonly principalPaid: ReportAmountDto;
+    readonly interestPaid: ReportAmountDto;
+  }[];
+}
+
+export interface RecurringCostsReportDto {
+  readonly meta: ReportMetaDto;
+  readonly items: readonly {
+    readonly definitionId: string;
+    readonly name: string;
+    readonly categoryId: string | null;
+    readonly cadence: string;
+    readonly interval: number;
+    readonly variable: boolean;
+    readonly monthly: MoneyDto | null;
+    readonly annual: MoneyDto | null;
+    readonly monthlyReporting: MoneyDto | null;
+  }[];
+  readonly totals: { readonly monthly: ReportAmountDto; readonly annual: ReportAmountDto };
+  readonly variableCount: number;
+}
+
+export interface SubscriptionsReportDto {
+  readonly meta: ReportMetaDto;
+  readonly months: readonly {
+    readonly period: ReportPeriodDto;
+    readonly monthlyCost: ReportAmountDto;
+    readonly active: number;
+    readonly events: readonly {
+      readonly date: string;
+      readonly subscriptionId: string;
+      readonly name: string;
+      readonly kind: 'STARTED' | 'CANCELLED' | 'PRICE_CHANGED';
+      readonly previousPrice: MoneyDto | null;
+      readonly newPrice: MoneyDto | null;
+    }[];
+  }[];
+}
+
+export interface ConversionsReportDto {
+  readonly meta: ReportMetaDto;
+  readonly points: readonly {
+    readonly transactionId: string;
+    readonly date: string;
+    readonly pair: string;
+    readonly effectiveRate: string;
+    readonly referenceRate: string | null;
+  }[];
+  readonly months: readonly {
+    readonly period: ReportPeriodDto;
+    readonly cost: MoneyDto;
+    readonly conversions: number;
+    readonly excluded: number;
+    readonly costComplete: boolean;
+  }[];
+  readonly costTotal: MoneyDto;
+  readonly costComplete: boolean;
+}
+
+export type SavedViewRangeDto =
+  | { readonly kind: 'FIXED'; readonly from: string; readonly to: string }
+  | { readonly kind: 'LAST_N_PERIODS'; readonly periods: number }
+  | { readonly kind: 'CURRENT_PERIOD' }
+  | { readonly kind: 'PREVIOUS_PERIOD' };
+
+export interface SavedReportViewDto {
+  readonly id: string;
+  readonly reportId: string;
+  readonly name: string;
+  /** Rango y filtros guardados; nunca montos ni resultados. */
+  readonly params: Readonly<Record<string, unknown>>;
+  readonly version: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface SavedViewWarningDto {
+  readonly code: 'ARCHIVED_FILTER' | 'MISSING_FILTER';
+  readonly kind: 'CATEGORY' | 'ACCOUNT' | 'TAG' | 'COUNTERPARTY';
+  readonly id: string;
+  readonly name: string | null;
+}
+
+export interface OpenedSavedReportViewDto extends SavedReportViewDto {
+  /** Parámetros de consulta listos para pedir el reporte, con el rango relativo calculado desde hoy. */
+  readonly query: Readonly<Record<string, string | readonly string[]>>;
+  readonly warnings: readonly SavedViewWarningDto[];
+}

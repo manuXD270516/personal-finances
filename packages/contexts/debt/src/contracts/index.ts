@@ -191,6 +191,38 @@ export interface LoanPortfolioQuery {
 
 export const LOAN_PORTFOLIO_QUERY = Symbol.for('pf.debt.LoanPortfolioQuery');
 
+/**
+ * Pagos de préstamos por mes para el reporte de evolución de deudas (add-financial-reports-extended, reporte 10): por
+ * préstamo y mes, principal, interés y cargos (comisiones + seguro + impuestos) de los pagos vigentes (desglose de cada
+ * pago, INV-016) y cada pago con su fecha para valorarlo con la tasa de ese día. Sin efectos; en la unidad de trabajo
+ * del llamador si existe.
+ */
+export interface DebtHistoryRowDto {
+  readonly loanId: string;
+  /** `YYYY-MM`. */
+  readonly month: string;
+  readonly currency: string;
+  readonly principal: string;
+  readonly interest: string;
+  readonly charges: string;
+  readonly payments: readonly {
+    readonly date: string;
+    readonly principal: string;
+    readonly interest: string;
+    readonly charges: string;
+  }[];
+}
+
+export interface DebtHistoryQuery {
+  monthly(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly DebtHistoryRowDto[]>;
+}
+
+export const DEBT_HISTORY_QUERY = Symbol.for('pf.debt.DebtHistoryQuery');
+
 // ───────────────────────────────────────────── tarjetas de crédito (add-credit-cards)
 
 export type CardStatementStatusDto = 'OPEN' | 'ISSUED' | 'PAID' | 'PARTIALLY_PAID' | 'OVERDUE';

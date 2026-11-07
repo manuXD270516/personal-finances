@@ -5,17 +5,21 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Reporte de gastos por cuenta"
 scenario: "Banco y tarjeta en octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/reporting/src/application/financial-reports.exports.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["by-account"]
 error_code: null
@@ -29,7 +33,7 @@ expected_result:
   - "\"Banco BOB\" 3300.00 BOB; \"Tarjeta Andina\" 500.00 BOB (tarjeta de crédito)"
   - "Σ cuentas = 3800.00 BOB = gasto total"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-040 — Gastos por cuenta con tipo e institución y suma igual al gasto total

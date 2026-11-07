@@ -114,7 +114,7 @@ export class FinancialReportsQueries {
         ...(f.requestedCategoryIds.length > 0 ? { categoryIds: f.categoryIds } : {}),
         ...(f.accountIds.length > 0 ? { accountIds: f.accountIds } : {}),
         ...(f.counterpartyIds.length > 0 ? { counterpartyIds: f.counterpartyIds } : {}),
-        ...(f.tagIds.length > 0 ? { tagIds: f.tagIds } : {}),
+        ...(f.tagIds.length > 0 ? { tagIds: f.tagIds, tagMatch: f.tagMatch } : {}),
         ...(f.currencies.length > 0 ? { currencies: f.currencies } : {}),
       });
       for (const r of rows) {
@@ -313,6 +313,38 @@ export class FinancialReportsQueries {
     });
   }
 
+  /**
+   * Rango comparado de un reporte de rango único: el bloque de periodos inmediatamente anterior, el mismo tramo un año
+   * antes, el mismo tramo a la fecha o el pedido (`CUSTOM`). `null` sin comparación.
+   */
+  protected comparedSpan(
+    ctx: ReportContext,
+    params: ReportParams,
+    periods: readonly ReportPeriod[],
+  ): { from: string; to: string; days: number } | null {
+    const mode = params.compare ?? 'NONE';
+    let compared: { from: string; to: string; days: number } | null = null;
+    if (mode === 'PREVIOUS_PERIOD') {
+      const prior = ctx.calendar.priorPeriods(periods[0]!, periods.length);
+      compared = { from: prior.at(-1)!.from, to: prior[0]!.to, days: 0 };
+    } else if (mode === 'PREVIOUS_YEAR') {
+      compared = {
+        from: ctx.calendar.yearAgo(periods[0]!).from,
+        to: ctx.calendar.yearAgo(periods.at(-1)!).to,
+        days: 0,
+      };
+    } else if (mode === 'PREVIOUS_PERIOD_TO_DATE') {
+      if (periods.length !== 1) throw invalid('compare to date needs a single period', '/compare');
+      const [pair] = ReportComparator.pairs('PREVIOUS_PERIOD_TO_DATE', periods, ctx.calendar);
+      compared = { from: pair!.compared.from, to: pair!.compared.to, days: pair!.compared.days };
+    } else if (mode === 'CUSTOM') {
+      const custom = ReportComparator.customRange(params.compareFrom, params.compareTo, ctx.calendar);
+      compared = { from: params.compareFrom!, to: params.compareTo!, days: custom.days };
+    }
+    if (compared) compared = { ...compared, days: daysBetween(compared.from, compared.to) };
+    return compared;
+  }
+
   /** Reporte 3: gasto por grupo → categoría → subcategoría del rango, con top N y comparación de rango. */
   getExpensesByCategory(
     params: ExpensesByCategoryParams,
@@ -327,26 +359,7 @@ export class FinancialReportsQueries {
         throw invalid('topN must be between 1 and 50', '/topN');
       }
       const periods = ctx.calendar.periods(params.from, params.to);
-      // Rango comparado: el bloque de periodos inmediatamente anterior, el mismo tramo un año antes o el pedido.
-      let compared: { from: string; to: string; days: number } | null = null;
-      if (mode === 'PREVIOUS_PERIOD') {
-        const prior = ctx.calendar.priorPeriods(periods[0]!, periods.length);
-        compared = { from: prior.at(-1)!.from, to: prior[0]!.to, days: 0 };
-      } else if (mode === 'PREVIOUS_YEAR') {
-        compared = {
-          from: ctx.calendar.yearAgo(periods[0]!).from,
-          to: ctx.calendar.yearAgo(periods.at(-1)!).to,
-          days: 0,
-        };
-      } else if (mode === 'PREVIOUS_PERIOD_TO_DATE') {
-        if (periods.length !== 1) throw invalid('compare to date needs a single period', '/compare');
-        const [pair] = ReportComparator.pairs('PREVIOUS_PERIOD_TO_DATE', periods, ctx.calendar);
-        compared = { from: pair!.compared.from, to: pair!.compared.to, days: pair!.compared.days };
-      } else if (mode === 'CUSTOM') {
-        const custom = ReportComparator.customRange(params.compareFrom, params.compareTo, ctx.calendar);
-        compared = { from: params.compareFrom!, to: params.compareTo!, days: custom.days };
-      }
-      if (compared) compared = { ...compared, days: daysBetween(compared.from, compared.to) };
+      const compared = this.comparedSpan(ctx, params, periods);
       const spans: Span[] = [{ from: params.from, to: params.to }];
       if (compared) spans.push(compared);
       const facts = await this.loadFacts(ctx, spans, 'EXPENSE');

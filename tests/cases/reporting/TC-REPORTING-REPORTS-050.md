@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: ["security/access-control"]
 requirement: "Vistas guardadas personales y aisladas"
 scenario: "Vista de otro miembro"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-019"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: high
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/saved-report-views.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["saved-views", "rls"]
 error_code: null
@@ -33,7 +35,7 @@ expected_result:
   - "El usuario de otro workspace no la ve"
   - "El owner ve el reporte con el aviso de etiqueta archivada"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-050 — Las vistas guardadas son personales: otro miembro no las ve y un filtro archivado se avisa

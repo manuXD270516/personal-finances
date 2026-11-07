@@ -12,7 +12,9 @@ export type ReconciliationReports = Pick<
   | 'getNetWorth'
   | 'getDrillDown'
   | 'getAccountBalanceHistory'
->;
+> &
+  /** Reportes ampliados (add-financial-reports-extended): si el adaptador los ofrece, se verifican sus identidades. */
+  Partial<Pick<FinancialReportsService, 'getExpensesByAccount' | 'getFees' | 'getDebts'>>;
 
 /** Lo que la reconciliación necesita del ledger: el balance de comprobación a una fecha (`BalanceQuery.getTrialBalance`). */
 export interface LedgerTrialPort {
@@ -189,6 +191,55 @@ export class ReportsReconciliation {
             mk(catSum.get(c) ?? dec('0')),
           ]),
         );
+      }
+      // ---- reportes ampliados: Σ cuentas = gasto, Σ comisiones ≤ gasto y pendiente de cada deuda = saldo contable
+      const scaleOf = (c: string) =>
+        ie.rows
+          .flatMap((r) => r.expenses.byCurrency)
+          .find((m) => m.currency === c)
+          ?.amount.split('.')[1]?.length ?? 2;
+      const money = (c: string, d: Decimal) => Money.parse(d.toFixed(scaleOf(c)), c, scaleOf(c));
+      const label = `${chunk.from}..${chunk.to}`;
+      if (this.reports.getExpensesByAccount) {
+        const accounts = (await this.reports.getExpensesByAccount(params)).report;
+        for (const [c, total] of spent) {
+          const sum = accounts.accounts.reduce(
+            (a, x) => a.plus(x.amount.byCurrency.find((m) => m.currency === c)?.amount ?? '0'),
+            dec('0'),
+          );
+          mismatches.push(...ReportReconciler.accountSum(label, money(c, total), [money(c, sum)]));
+        }
+      }
+      if (this.reports.getFees) {
+        const fees = (await this.reports.getFees(params)).report;
+        for (const [c, total] of spent) {
+          const sum = fees.months
+            .flatMap((m) => m.byType)
+            .reduce(
+              (a, t) => a.plus(t.amount.byCurrency.find((m) => m.currency === c)?.amount ?? '0'),
+              dec('0'),
+            );
+          mismatches.push(
+            ...ReportReconciler.feeTypesWithinExpenses(label, money(c, total), [money(c, sum)]),
+          );
+        }
+      }
+      if (this.reports.getDebts) {
+        const debts = (await this.reports.getDebts(params)).report;
+        for (const d of debts.debts) {
+          for (const m of d.months) {
+            const ledger = await this.userBalance(ws, m.period.to, d.accountId);
+            if (ledger) {
+              mismatches.push(
+                ...ReportReconciler.debtOutstanding(
+                  `${d.name} ${m.period.label}`,
+                  moneyOf(m.outstanding),
+                  ledger.negate(),
+                ),
+              );
+            }
+          }
+        }
       }
       // ---- flujo de caja: inicial + componentes = final por moneda
       const cash = (
