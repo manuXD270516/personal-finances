@@ -212,6 +212,8 @@ Convenciones de gráficos: ECharts, colores de categoría estables, signos segú
 | 15 | **Account Balance History** | Evolución del saldo de una cuenta | `daily_balance` (ledger directo para el rango reciente) | cuenta × día | cuenta, moneda nativa / RC | Línea escalonada (step) con marcadores de reconciliación | Día → transacciones del día | 1 |
 | 16 | **Forecast vs Actual** | ¿Qué tan bueno es el pronóstico? | `forecast_vs_actual` + forecasting results | scope (total/categoría/cuenta) × periodo | modelo/versión | Línea actual vs predicción con banda de intervalo; tabla de errores (MAE/MASE) | Periodo → categoría → transacciones | 8 |
 
+**As-built de `add-financial-reports-extended` (reportes 4–6 y 9–14).** Todos se calculan desde la fuente de verdad (sin read models ni consumidores) con la infraestructura del núcleo: 4 y 5 sobre `summarizeNominalFlows` (`withTags` + `tagMatch`, `groupBy ACCOUNT`; la cuenta es la de la pata de usuario o la que cobra la comisión); 6 sobre la misma consulta con las categorías de primer nivel (7 series más «Otras categorías»); 14 con `groupBy ORIGIN` (tipo de la transacción y rol de la porción) y la clasificación exclusiva conversión → transferencia → pago de préstamo → categorías `FEES`; 9 con `GoalProgressHistoryQuery.monthly` (GOALS calcula `expected` y `status` con su regla de seguimiento a cada cierre, la meta evaluada como activa); 10 con `AccountBalanceHistoryQuery` sobre la cuenta de cada préstamo y tarjeta (`presented`) y `DebtHistoryQuery.monthly` (principal, interés y cargos de cada pago con su fecha); 11 con `RecurringCostQuery.listCosts` (precio × renovaciones por año ÷ 12; los de monto variable se cuentan aparte; `MIN_MAX` usa el máximo); 12 con `SubscriptionHistoryQuery.listEvents` (todos los eventos hasta el cierre; el estado de cada mes se reconstruye); 13 reutiliza `ConversionDetailQuery` y `ConversionCostQueries` (mismas exclusiones). Los intereses de tarjeta **no** son porciones de gasto en el ledger (`debt/credit-cards` no los registra), así que el reporte de comisiones y el de deudas informan solo el saldo de la tarjeta; registrarlos requeriría un change en DEBT.
+
 ## 8. Cash Flow Calendar
 
 ### 8.1 Entradas
@@ -348,7 +350,7 @@ Phase 1 expone solo `GET …/reports/summary` (Home) y Phase 2 añade `GET …/r
 | CSV | 2 | Por reporte y lista de transacciones. UTF-8 con BOM (Excel en Windows), separador `;` y coma decimal **o** `,` y punto (setting por locale). Montos como texto decimal exacto. Escape de CSV injection (`= + - @` → prefijo `'`). |
 | CSV y PDF del **recorrido** de un elemento | 1 | Descarga síncrona por elemento (transacción, cuenta, tasa, categoría, contraparte), VIEWER+, sin job ni Object Storage: CSV UTF-8 con BOM, `,` y punto decimal, encabezado estable, instantes en la TZ del workspace con desfase, escape de CSV injection; PDF generado en la API sin navegador headless (pdfkit); cada descarga se audita (`audit.lifecycle.exported`, sin el contenido del archivo) (FR-AUDIT-013, docs/31 D52; spec `audit/lifecycle-timeline`). |
 | XLSX | 7 (Could) | Hojas por reporte, celdas numéricas con formato de moneda. |
-| PDF | 7 / later | Render server-side (headless Chromium en worker) de la vista del reporte; job asíncrono → archivo en Object Storage → link presigned (expira 15 min). |
+| PDF | 7 / later (**diferido** en `add-financial-reports-extended`; pregunta 8 cerrada: no entra en Phase 7) | Render server-side (headless Chromium en worker) de la vista del reporte; job asíncrono → archivo en Object Storage → link presigned (expira 15 min). |
 | JSON | 7 | Export completo del workspace (portabilidad); formato compatible con el import JSON (13-import-architecture.md). |
 
 Exports grandes son jobs BullMQ (`reporting.export`) con notificación al terminar; auditados (exportar datos financieros es acción sensible).
@@ -371,7 +373,7 @@ Exports grandes son jobs BullMQ (`reporting.export`) con notificación al termin
 5. ¿Safe to spend debe restar "esenciales presupuestados restantes" por defecto?
 6. Clasificación de liquidez de wallets cripto: ¿USDT es `LIQUID` y BTC `SEMI_LIQUID`?
 7. Atribución de refunds: ¿al periodo del refund (default) o al del gasto original?
-8. ¿PDF export en Phase 7 o posterior?
+8. ~~¿PDF export en Phase 7 o posterior?~~ — **Cerrada (2026-11-05, D376):** se intentaría en `add-financial-reports-extended` solo si sobraba tiempo (Could); no se implementó y queda diferido a una fase posterior.
 9. ~~**Valoración USDT↔BOB**~~ — **Resuelta por el owner el 2026-10-02** (docs/31 D29, ADR-0025), cerrando la pregunta abierta de D26: USD y USDT se valoran con la **tasa `PARALLEL` del provider** (paralelo.bo, respaldo bo.dolarapi.com) con fallback a la última tasa conocida (marcada obsoleta) o manual; la tasa manual prevalece como referencia de una operación concreta. El promedio de conversiones propias no se adopta como default (podría revisarse como vista informativa en el reporte FX, Phase 7).
 
 ## As-built de Phase 7: núcleo de reportes (`add-financial-reports`, 2026-11-05)

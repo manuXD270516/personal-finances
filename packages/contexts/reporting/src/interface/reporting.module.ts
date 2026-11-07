@@ -21,8 +21,18 @@ import { NetWorthAtQueries, PeriodFlowsQueries } from '../application/closing-fi
 import { ConversionCostQueries } from '../application/conversion-cost.queries.js';
 import { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
 import { FinancialReportsService } from '../application/financial-reports.exports.js';
+import { SavedReportViewsService } from '../application/saved-report-views.js';
+import type {
+  DebtHistoryPort,
+  DebtPortfolioPort,
+  GoalHistoryPort,
+  RecurringCostPort,
+  SubscriptionHistoryPort,
+} from '../application/ports/extended-reports.js';
+import { PgSavedViewRepository } from '../infrastructure/pg-saved-views.js';
 import type {
   BudgetVsActualPort,
+  FinancialReportsDeps,
   LedgerActivityPort,
   ReconciliationMarksPort,
   ReportAuditPort,
@@ -55,7 +65,11 @@ import {
   type PeriodFlowsQuery,
 } from '../contracts/index.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
-import { FINANCIAL_REPORTS, FinancialReportsController } from './financial-reports-http.js';
+import {
+  FINANCIAL_REPORTS,
+  FinancialReportsController,
+  SAVED_REPORT_VIEWS,
+} from './financial-reports-http.js';
 import {
   CONVERSION_COST_QUERIES,
   NET_WORTH_HISTORY_QUERIES,
@@ -138,6 +152,18 @@ export interface ReportingRuntimeOptions {
   readonly reconciliationMarks: ReconciliationMarksPort;
   /** Auditoría de las exportaciones (`reporting.report.exported`); opcional en pruebas. */
   readonly reportAudit?: ReportAuditPort;
+  /**
+   * Reportes ampliados (add-financial-reports-extended): historial de metas (GOALS), pagos de préstamos y cartera de
+   * deudas (DEBT), costos recurrentes y eventos de suscripciones (COMMITMENTS). Se componen después de REPORTING, así que
+   * la composición los entrega con resolución tardía. Opcionales: sin ellos esos reportes responden 503.
+   */
+  readonly extended?: {
+    readonly goals: GoalHistoryPort;
+    readonly debtHistory: DebtHistoryPort;
+    readonly portfolio: DebtPortfolioPort;
+    readonly recurring: RecurringCostPort;
+    readonly subscriptions: SubscriptionHistoryPort;
+  };
 }
 
 export interface ReportingRuntime {
@@ -156,6 +182,8 @@ export interface ReportingRuntime {
   readonly netWorth: NetWorthQuery;
   /** Reportes financieros, drill-down y exportaciones CSV (add-financial-reports). */
   readonly reports: FinancialReportsService;
+  /** Vistas guardadas de reportes, personales por usuario (add-financial-reports-extended). */
+  readonly savedViews: SavedReportViewsService;
   /** Ventana de vigencia efectiva (días). */
   readonly rateValidityWindowDays: number;
 }
@@ -188,48 +216,62 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
       ...(options.metrics ? { metrics: options.metrics } : {}),
     },
   };
+  const conversionCosts = new ConversionCostQueries({
+    uow: deps.uow,
+    workspaces: options.workspaces,
+    accounts: options.accounts,
+    counterparties: options.counterparties,
+    conversions: options.conversions,
+    rates: options.rates,
+    ...(options.quoteSide ? { quoteSide: options.quoteSide } : {}),
+    periods: options.periods,
+    ...(options.financialCalendar ? { calendar: options.financialCalendar } : {}),
+    clock: options.clock,
+    rateValidityWindowDays,
+  });
+  const reportDeps: FinancialReportsDeps = {
+    uow: deps.uow,
+    workspaces: options.workspaces,
+    accounts: options.accounts,
+    categories: options.categories,
+    rates: options.rates,
+    versions: deps.versions,
+    clock: options.clock,
+    flows: options.flows,
+    portions: options.portions,
+    accountFlows: options.accountFlows,
+    balanceHistory: options.balanceHistory,
+    periods: options.periods,
+    ...(options.financialCalendar ? { calendar: options.financialCalendar } : {}),
+    activity: options.activity,
+    budgets: options.budgets,
+    marks: options.reconciliationMarks,
+    ...(options.reportAudit ? { audit: options.reportAudit } : {}),
+    ...(options.metrics ? { metrics: options.metrics } : {}),
+    rateValidityWindowDays,
+    ...(options.extended
+      ? {
+          extended: {
+            ...options.extended,
+            conversions: options.conversions,
+            conversionCosts,
+            counterparties: options.counterparties,
+            savedViews: new PgSavedViewRepository(),
+          },
+        }
+      : {}),
+  };
   return {
     rateValidityWindowDays,
-    reports: new FinancialReportsService({
-      uow: deps.uow,
-      workspaces: options.workspaces,
-      accounts: options.accounts,
-      categories: options.categories,
-      rates: options.rates,
-      versions: deps.versions,
-      clock: options.clock,
-      flows: options.flows,
-      portions: options.portions,
-      accountFlows: options.accountFlows,
-      balanceHistory: options.balanceHistory,
-      periods: options.periods,
-      ...(options.financialCalendar ? { calendar: options.financialCalendar } : {}),
-      activity: options.activity,
-      budgets: options.budgets,
-      marks: options.reconciliationMarks,
-      ...(options.reportAudit ? { audit: options.reportAudit } : {}),
-      ...(options.metrics ? { metrics: options.metrics } : {}),
-      rateValidityWindowDays,
-    }),
+    reports: new FinancialReportsService(reportDeps),
+    savedViews: new SavedReportViewsService(reportDeps),
     summary: new ReportSummaryQueries(deps),
     history: new NetWorthHistoryQueries(deps),
     upcoming: new UpcomingPaymentsQueries(deps),
     spendable: new SpendableQueries(deps, deps.spendable as SpendableDeps),
     periodFlows: new PeriodFlowsQueries(deps),
     netWorth: new NetWorthAtQueries(deps),
-    conversionCosts: new ConversionCostQueries({
-      uow: deps.uow,
-      workspaces: options.workspaces,
-      accounts: options.accounts,
-      counterparties: options.counterparties,
-      conversions: options.conversions,
-      rates: options.rates,
-      ...(options.quoteSide ? { quoteSide: options.quoteSide } : {}),
-      periods: options.periods,
-      ...(options.financialCalendar ? { calendar: options.financialCalendar } : {}),
-      clock: options.clock,
-      rateValidityWindowDays,
-    }),
+    conversionCosts,
   };
 }
 
@@ -269,6 +311,7 @@ export class ReportingModule {
         { provide: SPENDABLE_QUERIES, useValue: options.runtime.spendable },
         { provide: CONVERSION_COST_QUERIES, useValue: options.runtime.conversionCosts },
         { provide: FINANCIAL_REPORTS, useValue: options.runtime.reports },
+        { provide: SAVED_REPORT_VIEWS, useValue: options.runtime.savedViews },
       ],
     };
   }

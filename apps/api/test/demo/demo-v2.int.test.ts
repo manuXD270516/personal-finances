@@ -552,7 +552,7 @@ describe('otra fecha ancla e independencia del catálogo (TC-IDENTITY-DEMO-020)'
 });
 
 describe('dataset Demo v2: reconciliación de los reportes con el ledger', () => {
-  it('[TC-REPORTING-REPORTS-028] ingresos, gastos, categorías, flujo de caja, historial, patrimonio y drill-down cuadran con el ledger', async () => {
+  it('[TC-REPORTING-REPORTS-028] [TC-REPORTING-REPORTS-052] ingresos, gastos, categorías, cuentas, comisiones, deudas, flujo de caja, historial, patrimonio y drill-down cuadran con el ledger', async () => {
     // El ledger se lee por SQL directo (superusuario, sin RLS) y los reportes por HTTP: caminos independientes.
     const admin = await connect(deps.superuserUrl);
     try {

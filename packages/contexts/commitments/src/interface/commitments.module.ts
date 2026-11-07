@@ -45,11 +45,13 @@ import {
   type DefinitionStatsQuery,
   type OccurrenceLinkPort,
   type OccurrenceMatchCandidatesQuery,
+  type RecurringCostQuery,
   type RecurringDefinitionPort,
   type RecurringDefinitionQuery,
   RECURRING_DEFINITION_PORT,
   RECURRING_DEFINITION_QUERY,
   type ResolvedOccurrencesQuery,
+  type SubscriptionHistoryQuery,
   type SubscriptionsQuery,
   type UpcomingPaymentsQuery,
   type SubscriptionExistenceQuery,
@@ -148,6 +150,9 @@ export interface CommitmentsRuntime {
   readonly subscriptionDaily: SubscriptionDailyService;
   /** Contrato público para lectores futuros (Reporting, Planning). */
   readonly subscriptionsQuery: SubscriptionsQuery;
+  /** Contratos públicos para los reportes de REPORTING (add-financial-reports-extended). */
+  readonly recurringCosts: RecurringCostQuery;
+  readonly subscriptionHistory: SubscriptionHistoryQuery;
 }
 
 /**
@@ -211,6 +216,8 @@ export function createCommitmentsRuntime(options: CommitmentsRuntimeOptions): Co
     subscriptionCharges: new SubscriptionChargesService(subscriptionDeps),
     subscriptionDaily: new SubscriptionDailyService(subscriptionDeps),
     subscriptionsQuery: subscriptionQueries,
+    recurringCosts: queries,
+    subscriptionHistory: subscriptionQueries,
     queries,
     matching: new MatchingService(deps, occurrences),
     matchingQueries,
@@ -555,6 +562,7 @@ export async function runSubscriptionDaily(
 }
 
 export { RECURRING_DEFINITION_PORT, RECURRING_DEFINITION_QUERY };
+export { RECURRING_COST_QUERY, SUBSCRIPTION_HISTORY_QUERY } from '../contracts/index.js';
 export { COMMITMENTS_CONSUMERS, COMMITMENTS_GENERATE_JOB, COMMITMENTS_SUBSCRIPTION_JOB };
 export { COMMITMENTS_AUDIT_POLICY } from '../contracts/index.js';
 export type { GenerateOccurrencesService } from '../application/generate-occurrences.service.js';

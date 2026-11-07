@@ -19,7 +19,25 @@ import {
 } from '../domain/index.js';
 import { csvCell, UTF8_BOM } from './csv.js';
 import {
-  FinancialReportsQueries,
+  conversionsLines,
+  debtsLines,
+  expensesByAccountLines,
+  expensesByTagLines,
+  feesLines,
+  goalsLines,
+  recurringCostsLines,
+  subscriptionsLines,
+  trendsLines,
+} from './extended-reports.csv.js';
+import {
+  ExtendedReportsQueries,
+  type DebtsParams,
+  type ExpensesByTagParams,
+  type GoalsParams,
+  type RecurringCostsParams,
+  type TrendsParams,
+} from './extended-reports.queries.js';
+import {
   type ExpensesByCategoryParams,
   type IncomeExpensesParams,
   type NetWorthParams,
@@ -33,7 +51,10 @@ export type DrillDownReport =
   | 'BUDGET_VS_ACTUAL'
   | 'CASH_FLOW'
   | 'ACCOUNT_BALANCE_HISTORY'
-  | 'NET_WORTH';
+  | 'NET_WORTH'
+  | 'EXPENSES_BY_TAG'
+  | 'EXPENSES_BY_ACCOUNT'
+  | 'MONTHLY_TRENDS';
 
 /** Componentes de la descomposición del patrimonio que se pueden abrir hasta las cuentas (reporting/net-worth). */
 export type NetWorthComponent =
@@ -88,7 +109,7 @@ const csv = (rows: readonly (readonly (string | number | boolean | null)[])[]): 
  * síncronas con tope de 50 000 filas (`REPORT_EXPORT_TOO_LARGE`, D370), se auditan sin contenido y neutralizan las
  * celdas de texto contra fórmulas.
  */
-export class FinancialReportsService extends FinancialReportsQueries {
+export class FinancialReportsService extends ExtendedReportsQueries {
   // ───────────────────────────────────────────── drill-down
 
   getDrillDown(params: DrillDownParams): Promise<ReportResult<ReportDrillDownPageDto>> {
@@ -230,7 +251,14 @@ export class FinancialReportsService extends FinancialReportsQueries {
           ];
         }
       }
-      if (p.report === 'EXPENSES_BY_CATEGORY') nature = 'EXPENSE';
+      if (
+        p.report === 'EXPENSES_BY_CATEGORY' ||
+        p.report === 'EXPENSES_BY_TAG' ||
+        p.report === 'EXPENSES_BY_ACCOUNT' ||
+        p.report === 'MONTHLY_TRENDS'
+      ) {
+        nature = 'EXPENSE';
+      }
       const filters = {
         workspaceId: ws,
         dateFrom: from,
@@ -239,7 +267,7 @@ export class FinancialReportsService extends FinancialReportsQueries {
         ...(categoryIds ? { categoryIds } : {}),
         ...(f.accountIds.length > 0 ? { accountIds: f.accountIds } : {}),
         ...(f.counterpartyIds.length > 0 ? { counterpartyIds: f.counterpartyIds } : {}),
-        ...(tagIds ? { tagIds } : {}),
+        ...(tagIds ? { tagIds, tagMatch: f.tagMatch } : {}),
         ...(f.currencies.length > 0 ? { currencies: f.currencies } : {}),
       };
       const page = await this.deps.portions.listPortions({
@@ -273,7 +301,7 @@ export class FinancialReportsService extends FinancialReportsQueries {
         ...(categoryIds ? { categoryIds } : {}),
         ...(f.accountIds.length > 0 ? { accountIds: f.accountIds } : {}),
         ...(f.counterpartyIds.length > 0 ? { counterpartyIds: f.counterpartyIds } : {}),
-        ...(tagIds ? { tagIds } : {}),
+        ...(tagIds ? { tagIds, tagMatch: f.tagMatch } : {}),
         ...(f.currencies.length > 0 ? { currencies: f.currencies } : {}),
       })) {
         if (nature && r.nature !== nature) continue;
@@ -440,7 +468,7 @@ export class FinancialReportsService extends FinancialReportsQueries {
 
   // ───────────────────────────────────────────── exportación CSV
 
-  private async finish(
+  protected async finish(
     result: ReportResult<{
       readonly meta: { readonly filters: unknown; readonly from: string; readonly to: string };
     }>,
@@ -830,6 +858,75 @@ export class FinancialReportsService extends FinancialReportsQueries {
       'net-worth',
       lines,
     );
+  }
+
+  // ───────────────────────────────────────────── exportación CSV de los reportes ampliados
+
+  private exportOf(
+    res: Parameters<FinancialReportsService['finish']>[0],
+    p: { userId: string | null; workspaceId: string },
+    reportId: string,
+    slug: string,
+    lines: readonly (readonly (string | number | boolean | null)[])[],
+  ): Promise<ReportExport> {
+    return this.finish(res, { reportId, userId: p.userId, workspaceId: p.workspaceId }, slug, lines);
+  }
+
+  async exportExpensesByTag(p: ExpensesByTagParams): Promise<ReportExport> {
+    const res = await this.getExpensesByTag(p);
+    return this.exportOf(res, p, 'EXPENSES_BY_TAG', 'expenses-by-tag', expensesByTagLines(res.report));
+  }
+
+  async exportExpensesByAccount(p: ReportParams): Promise<ReportExport> {
+    const res = await this.getExpensesByAccount(p);
+    return this.exportOf(
+      res,
+      p,
+      'EXPENSES_BY_ACCOUNT',
+      'expenses-by-account',
+      expensesByAccountLines(res.report),
+    );
+  }
+
+  async exportTrends(p: TrendsParams): Promise<ReportExport> {
+    const res = await this.getTrends(p);
+    return this.exportOf(res, p, 'MONTHLY_TRENDS', 'trends', trendsLines(res.report));
+  }
+
+  async exportFees(p: ReportParams): Promise<ReportExport> {
+    const res = await this.getFees(p);
+    return this.exportOf(res, p, 'FEES', 'fees', feesLines(res.report));
+  }
+
+  async exportGoals(p: GoalsParams): Promise<ReportExport> {
+    const res = await this.getGoals(p);
+    return this.exportOf(res, p, 'SAVINGS_GOALS', 'savings-goals', goalsLines(res.report));
+  }
+
+  async exportDebts(p: DebtsParams): Promise<ReportExport> {
+    const res = await this.getDebts(p);
+    return this.exportOf(res, p, 'DEBT_EVOLUTION', 'debt-evolution', debtsLines(res.report));
+  }
+
+  async exportRecurringCosts(p: RecurringCostsParams): Promise<ReportExport> {
+    const res = await this.getRecurringCosts(p);
+    return this.exportOf(res, p, 'RECURRING_COSTS', 'recurring-costs', recurringCostsLines(res.report));
+  }
+
+  async exportSubscriptions(p: ReportParams): Promise<ReportExport> {
+    const res = await this.getSubscriptions(p);
+    return this.exportOf(
+      res,
+      p,
+      'SUBSCRIPTION_EVOLUTION',
+      'subscription-evolution',
+      subscriptionsLines(res.report),
+    );
+  }
+
+  async exportConversions(p: ReportParams): Promise<ReportExport> {
+    const res = await this.getConversions(p);
+    return this.exportOf(res, p, 'FX_CONVERSIONS', 'fx-conversions', conversionsLines(res.report));
   }
 
   /** CSV de TODAS las filas de un drill-down (no solo la página visible): se pagina por cursor de a 200. */

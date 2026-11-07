@@ -6250,7 +6250,12 @@
       "errors": {
         "range": "A data inicial não pode ser posterior à final.",
         "custom": "O intervalo de comparação está incompleto ou invertido."
-      }
+      },
+      "tagMatch": "Correspondência de etiquetas",
+      "ANY": "Qualquer uma das etiquetas",
+      "ALL": "Todas as etiquetas",
+      "debtKind": "Tipo de dívida",
+      "debtAll": "Empréstimos e cartões"
     },
     "variation": {
       "new": "novo",
@@ -6429,6 +6434,175 @@
       "FEES": "Tarifas, juros e encargos pagos.",
       "ACCOUNT_BALANCE_HISTORY": "O saldo de uma conta, dia a dia, com suas conciliações.",
       "FORECAST_VS_ACTUAL": "O previsto contra o que aconteceu."
+    },
+    "tags": {
+      "caption": "Gasto por etiqueta",
+      "tag": "Etiqueta",
+      "amount": "Gasto",
+      "vs": "Variação",
+      "archived": "arquivada",
+      "nonAdditive": "Uma parcela com várias etiquetas soma em cada uma: os totais por etiqueta não são aditivos e sua soma não é o gasto total.",
+      "chartTitle": "Gasto por etiqueta",
+      "chartDesc": "Barras de {n} etiquetas em {currency}; a tabela a seguir tem os mesmos valores.",
+      "matchAll": "Somente parcelas que têm todas as etiquetas pedidas.",
+      "byCategory": "Ver por categoria",
+      "byCategoryOf": "Ver as categorias de {name}"
+    },
+    "accounts": {
+      "caption": "Gasto por conta pagadora, com o detalhamento por categoria",
+      "account": "Conta",
+      "type": "Tipo",
+      "amount": "Gasto",
+      "category": "Categoria",
+      "vs": "Variação",
+      "total": "Total das contas",
+      "chartTitle": "Gasto por conta",
+      "chartDesc": "Barras de {n} contas em {currency}; a tabela a seguir tem os mesmos valores."
+    },
+    "trends": {
+      "caption": "Gasto por categoria e período",
+      "category": "Categoria",
+      "total": "Total",
+      "others": "Outras categorias",
+      "chartTitle": "Gasto de {name} por período",
+      "chartDesc": "Linha de {n} períodos em {currency}; a tabela a seguir tem todas as categorias.",
+      "normalized": "Valores por dia: cada período é dividido pelos seus dias."
+    },
+    "fees": {
+      "caption": "Tarifas e encargos por tipo e período",
+      "period": "Período",
+      "CONVERSION": "Tarifa de conversão",
+      "TRANSFER": "Tarifa de transferência",
+      "LOAN": "Juros e encargos de empréstimos",
+      "FEE_CATEGORY": "Categorias de tarifas",
+      "total": "Total",
+      "last12": "Últimos 12 períodos completos: {amount}",
+      "cardNote": "Os juros do cartão não são registrados como gasto e não aparecem aqui; o saldo do cartão está na evolução de dívidas.",
+      "chartTitle": "Total de tarifas por período",
+      "chartDesc": "Barras de {n} períodos em {currency}; a tabela a seguir separa cada tipo."
+    },
+    "goals": {
+      "caption": "{name}: avanço por mês em {currency}",
+      "target": "Objetivo {target}",
+      "month": "Mês",
+      "contributions": "Aportes",
+      "withdrawals": "Retiradas",
+      "accumulated": "Acumulado",
+      "percent": "Avanço",
+      "expected": "Esperado",
+      "status": "Situação",
+      "statuses": {
+        "BEHIND": "Atrasada",
+        "ON_TRACK": "No caminho",
+        "AHEAD": "Adiantada",
+        "NONE": "Sem acompanhamento"
+      },
+      "incomplete": "Falta a taxa de conversão de algum movimento deste mês.",
+      "chartTitle": "Acumulado de {name}",
+      "chartDesc": "Linha de {n} meses em {currency}; a tabela a seguir tem o esperado e a situação.",
+      "movements": "Ver os movimentos da meta"
+    },
+    "debts": {
+      "caption": "{name}: saldo e pagamentos por mês em {currency}",
+      "month": "Mês",
+      "outstanding": "Saldo devedor",
+      "principalPaid": "Principal pago",
+      "interestPaid": "Juros pagos",
+      "chargesPaid": "Encargos pagos",
+      "kind": {
+        "LOAN": "Empréstimo",
+        "CARD": "Cartão"
+      },
+      "consolidated": "Consolidado em {currency}",
+      "chartTitle": "Saldo devedor de {name}",
+      "chartDesc": "Linha de {n} meses em {currency}; a tabela a seguir tem os pagamentos.",
+      "cardNote": "Os cartões mostram apenas o saldo devedor."
+    },
+    "recurring": {
+      "caption": "Custo mensal e anual dos compromissos recorrentes ativos",
+      "commitment": "Compromisso",
+      "cadence": "Frequência",
+      "monthly": "Mensal",
+      "annual": "Anual",
+      "monthlyReporting": "Mensal em {currency}",
+      "variable": "Valor variável",
+      "totals": "Total mensal e anualizado",
+      "variableCount": "{count, plural, one {# compromisso de valor variável não soma} other {# compromissos de valor variável não somam}}",
+      "every": "a cada {n}",
+      "cadences": {
+        "DAILY": "diária",
+        "WEEKLY": "semanal",
+        "BIWEEKLY": "quinzenal",
+        "SEMIMONTHLY": "duas vezes por mês",
+        "MONTHLY": "mensal",
+        "BIMONTHLY": "bimestral",
+        "QUARTERLY": "trimestral",
+        "SEMIANNUAL": "semestral",
+        "ANNUAL": "anual",
+        "CUSTOM": "personalizada"
+      },
+      "chartTitle": "Custo mensal por compromisso",
+      "chartDesc": "Barras de {n} compromissos em {currency}; a tabela a seguir tem o custo anual."
+    },
+    "subs": {
+      "caption": "Custo mensal no fim de cada mês e eventos das assinaturas",
+      "month": "Mês",
+      "monthlyCost": "Custo mensal",
+      "active": "Ativas",
+      "events": "Eventos",
+      "noEvents": "Sem eventos",
+      "STARTED": "{name}: início a {price}",
+      "CANCELLED": "{name}: cancelamento",
+      "PRICE_CHANGED": "{name}: de {previous} para {price}",
+      "chartTitle": "Custo mensal das assinaturas",
+      "chartDesc": "Linha de {n} meses em {currency}; a tabela a seguir lista os eventos."
+    },
+    "conv": {
+      "pointsCaption": "Taxa efetiva e taxa de referência de cada conversão",
+      "date": "Data",
+      "pair": "Par",
+      "effective": "Taxa efetiva",
+      "reference": "Referência",
+      "noReference": "sem referência",
+      "monthsCaption": "Custo de converter por mês (spread mais tarifas)",
+      "month": "Período",
+      "cost": "Custo",
+      "conversions": "Conversões",
+      "excluded": "Excluídas",
+      "detail": "Ver o detalhe por canal e conta",
+      "chartTitle": "Custo de converter por período",
+      "chartDesc": "Barras de {n} períodos em {currency}; as tabelas a seguir têm cada conversão."
+    },
+    "views": {
+      "title": "Visões salvas",
+      "empty": "Você ainda não salvou visões deste relatório.",
+      "name": "Nome da visão",
+      "range": "Período a salvar",
+      "ranges": {
+        "FIXED": "Período fixo",
+        "LAST_3": "Últimos 3 períodos",
+        "LAST_6": "Últimos 6 períodos",
+        "LAST_12": "Últimos 12 períodos"
+      },
+      "save": "Salvar visão",
+      "saved": "Visão salva.",
+      "open": "Abrir {name}",
+      "rename": "Renomear {name}",
+      "renameLabel": "Novo nome",
+      "renameDo": "Renomear",
+      "delete": "Excluir {name}",
+      "deleted": "Visão excluída.",
+      "pick": "Escolha uma visão",
+      "warning": {
+        "ARCHIVED_FILTER": "O filtro usa {kind} arquivada: {name}.",
+        "MISSING_FILTER": "O filtro aponta para {kind} que não existe mais."
+      },
+      "kinds": {
+        "CATEGORY": "uma categoria",
+        "ACCOUNT": "uma conta",
+        "TAG": "uma etiqueta",
+        "COUNTERPARTY": "uma contraparte"
+      }
     }
   },
   "ImportConnections": {

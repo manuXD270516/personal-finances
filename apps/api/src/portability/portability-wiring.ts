@@ -42,6 +42,7 @@ import {
   NOTIFICATIONS_PORTABILITY_SECTIONS,
 } from '@pf/notifications/contracts';
 import { PLANNING_CLOSE_SNAPSHOT_HASH_HOOK, PLANNING_PORTABILITY_SECTIONS } from '@pf/planning/contracts';
+import { REPORTING_PORTABILITY_SECTIONS } from '@pf/reporting/contracts';
 import { RULES_PORTABILITY_SECTIONS, RULES_SUGGESTION_FINGERPRINT_HOOK } from '@pf/rules/contracts';
 import { ruleSuggestionFingerprintHook } from '@pf/rules/interface/rules.module';
 import { closeSnapshotRestoreHook } from '@pf/planning/interface/planning.module';
@@ -77,6 +78,8 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   ...NOTIFICATIONS_PORTABILITY_SECTIONS,
   // add-document-attachments: metadatos de documentos y vínculos, sin claves ni objetos (orden 810–812).
   ...DOCUMENTS_PORTABILITY_SECTIONS,
+  // add-financial-reports-extended: vistas guardadas del usuario que exporta (orden 820).
+  ...REPORTING_PORTABILITY_SECTIONS,
   ...AUDIT_PORTABILITY_SECTIONS,
 ].sort((a, b) => a.order - b.order);
 

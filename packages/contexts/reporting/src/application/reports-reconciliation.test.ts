@@ -93,6 +93,16 @@ function build(ops: readonly Op[], rateSeed: number): InMemoryFinancialReports {
     tags: [],
   };
   mem.firstEntryDate = '2026-08-01';
+  // La tarjeta es una deuda del reporte de evolución de deudas (su pendiente es el saldo contable).
+  mem.fakes.cards = [
+    {
+      cardId: 'card-1',
+      cardName: 'Tarjeta',
+      cardAccountId: 'card-acc-1',
+      accountId: TARJETA,
+      currency: 'BOB',
+    },
+  ];
   // Una tasa USD/BOB por día (> 0) para todo el rango.
   for (let d = -10; d < 100; d += 1) {
     mem.rates.push({
@@ -264,6 +274,56 @@ describe('Reconciliación de los reportes con el ledger', () => {
       { numRuns: 40 },
     );
   }, 180_000);
+
+  it('[TC-REPORTING-REPORTS-052] [PBT] las identidades ampliadas cuadran: Σ cuentas = gasto, Σ comisiones ≤ gasto y pendiente = saldo contable', async () => {
+    let checked = 0;
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(arbOp, { minLength: 1, maxLength: 40 }),
+        fc.integer({ min: 0, max: 1_000_000 }),
+        async (ops, seed) => {
+          const mem = build(ops, seed);
+          const reports = new FinancialReportsService(mem.financialDeps());
+          expect(typeof reports.getExpensesByAccount).toBe('function');
+          const mismatches = await new ReportsReconciliation(reports, mem).verify(input);
+          checked += 1;
+          expect(mismatches, JSON.stringify(mismatches.slice(0, 3))).toEqual([]);
+        },
+      ),
+      { numRuns: 40 },
+    );
+    expect(checked).toBeGreaterThan(0);
+  }, 180_000);
+
+  it('[TC-REPORTING-REPORTS-052] un gasto de una cuenta que no figura en el reporte por cuenta rompe Σ cuentas = gasto y nombra el reporte', async () => {
+    const mem = build([{ kind: 'expense', day: 70, cents: 330_000, ccy: 'BOB', cat: 0 }], 11);
+    const reports = new FinancialReportsService(mem.financialDeps());
+    const broken: typeof reports = Object.assign(Object.create(reports) as typeof reports, {
+      getExpensesByAccount: async (p: Parameters<typeof reports.getExpensesByAccount>[0]) => {
+        const r = await reports.getExpensesByAccount(p);
+        return {
+          ...r,
+          report: {
+            ...r.report,
+            accounts: r.report.accounts.map((a) => ({
+              ...a,
+              amount: { ...a.amount, byCurrency: [{ amount: '3299.99', currency: 'BOB' }] },
+            })),
+          },
+        };
+      },
+    });
+    const found = await new ReportsReconciliation(broken, mem).verify(input);
+    expect(found).toContainEqual(
+      expect.objectContaining({
+        report: 'EXPENSES_BY_ACCOUNT',
+        currency: 'BOB',
+        identity: 'sum(accounts)=expenses',
+        expected: '3300.00',
+        actual: '3299.99',
+      }),
+    );
+  }, 60_000);
 
   it('[TC-REPORTING-REPORTS-027] una diferencia mínima (3300.01 frente a 3300.00) falla nombrando reporte, periodo y moneda', async () => {
     const mem = build([{ kind: 'expense', day: 70, cents: 330_000, ccy: 'BOB', cat: 0 }], 11);

@@ -5,17 +5,19 @@ spec: reporting/financial-reports
 related_specs: []
 requirement: "Rendimiento de los reportes ampliados"
 scenario: "Tendencias de 24 meses"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008"]
 nfr: ["NFR-PERF-006"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - apps/api/test/perf/nightly.perf.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["perf", "nightly", "large-seed"]
 error_code: null
@@ -29,7 +31,7 @@ expected_result:
   - "p95 ≤ 800 ms en los nueve reportes"
   - "Sin consumidores nuevos en el worker"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-053 — Cada reporte ampliado del Large Seed responde con p95 de 800 ms o menos en el nightly

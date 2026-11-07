@@ -621,13 +621,19 @@ describe('ReportReconciler', () => {
 });
 
 describe('REPORT_CATALOG', () => {
-  it('[TC-REPORTING-REPORTS-001] 16 reportes: 1, 2, 3, 7, 8 y 15 disponibles; 13 parcial con su vista; 16 planificado para Phase 8', () => {
+  it('[TC-REPORTING-REPORTS-001] 16 reportes numerados 1..16 con el pronóstico vs real planificado para Phase 8', () => {
     expect(REPORT_CATALOG).toHaveLength(16);
     expect(REPORT_CATALOG.map((e) => e.number)).toEqual(Array.from({ length: 16 }, (_, i) => i + 1));
-    expect(REPORT_CATALOG.filter((e) => e.status === 'AVAILABLE').map((e) => e.number)).toEqual([
-      1, 2, 3, 7, 8, 15,
-    ]);
-    expect(REPORT_CATALOG[12]).toMatchObject({ status: 'PARTIAL', viewPath: '/fx/costos' });
     expect(REPORT_CATALOG[15]).toMatchObject({ status: 'PLANNED', phase: 8, endpoint: null });
+  });
+
+  it('[TC-REPORTING-REPORTS-048] con los reportes ampliados 15 figuran disponibles con su endpoint y el 16 sigue planificado', () => {
+    const available = REPORT_CATALOG.filter((e) => e.status === 'AVAILABLE');
+    expect(available).toHaveLength(15);
+    expect(available.map((e) => e.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    expect(available.every((e) => e.endpoint !== null && e.plannedIn === null)).toBe(true);
+    expect(REPORT_CATALOG.filter((e) => e.status !== 'AVAILABLE').map((e) => e.reportId)).toEqual([
+      'FORECAST_VS_ACTUAL',
+    ]);
   });
 });

@@ -4,6 +4,7 @@ import type { FxValuationPort, ResolvedRateDto } from '@pf/fx/contracts';
 import type { AccountBalanceHistoryQuery, AccountSetFlowQuery } from '@pf/ledger/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { NominalFlowQuery, NominalPortionQuery } from '@pf/transactions/contracts';
+import type { ExtendedReportDeps } from './extended-reports.js';
 import type {
   DataVersionStore,
   FinancialPeriodsPort,
@@ -107,4 +108,6 @@ export interface FinancialReportsDeps {
   readonly audit?: ReportAuditPort;
   readonly metrics?: ReportingMetricsPort;
   readonly rateValidityWindowDays?: number;
+  /** Puertos de los reportes ampliados (add-financial-reports-extended); sin ellos responden 503. */
+  readonly extended?: ExtendedReportDeps;
 }

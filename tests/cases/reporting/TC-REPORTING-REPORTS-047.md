@@ -5,17 +5,20 @@ spec: reporting/financial-reports
 related_specs: ["fx/conversion-pricing"]
 requirement: "Reporte de conversiones de moneda y cripto"
 scenario: "Octubre con dos ventas por Binance P2P"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008", "FR-FX-011"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - apps/api/test/api/financial-reports-extended.api.test.ts
+status: automated
+regression_suite: true
 phase: 7
 tags: ["conversions"]
 error_code: null
@@ -31,7 +34,7 @@ expected_result:
   - "Costo de 2026-10 = 30.00 BOB (igual al análisis de costo)"
   - "La conversión sin referencia se lista sin punto de comparación y sin estimación"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # TC-REPORTING-REPORTS-047 — El reporte de conversiones lista la tasa efectiva frente a la de referencia y el costo mensual del análisis de costo

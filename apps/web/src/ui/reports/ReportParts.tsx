@@ -205,6 +205,12 @@ export interface FiltersBarProps {
     readonly lists?: boolean;
     readonly granularity?: readonly string[];
     readonly topN?: boolean;
+    /** Falso en los reportes sin rango (costos recurrentes). */
+    readonly range?: boolean;
+    readonly tagMatch?: boolean;
+    readonly debtKind?: boolean;
+    /** Normalizar por día sin necesidad de comparación (tendencias). */
+    readonly normalize?: boolean;
     readonly account?: readonly { id: string; name: string }[];
   };
 }
@@ -226,30 +232,37 @@ export function FiltersBar(p: FiltersBarProps) {
       }}
     >
       <div style={rowStyle}>
-        <Field label={f.t('filters.from')} error={err === 'range' ? f.t('filters.errors.range') : undefined}>
-          {(c) => (
-            <input
-              {...c}
-              type="date"
-              name="from"
-              style={inputStyle}
-              value={draft.from}
-              onChange={(e) => set({ from: e.target.value })}
-            />
-          )}
-        </Field>
-        <Field label={f.t('filters.to')}>
-          {(c) => (
-            <input
-              {...c}
-              type="date"
-              name="to"
-              style={inputStyle}
-              value={draft.to}
-              onChange={(e) => set({ to: e.target.value })}
-            />
-          )}
-        </Field>
+        {show.range !== false && (
+          <>
+            <Field
+              label={f.t('filters.from')}
+              error={err === 'range' ? f.t('filters.errors.range') : undefined}
+            >
+              {(c) => (
+                <input
+                  {...c}
+                  type="date"
+                  name="from"
+                  style={inputStyle}
+                  value={draft.from}
+                  onChange={(e) => set({ from: e.target.value })}
+                />
+              )}
+            </Field>
+            <Field label={f.t('filters.to')}>
+              {(c) => (
+                <input
+                  {...c}
+                  type="date"
+                  name="to"
+                  style={inputStyle}
+                  value={draft.to}
+                  onChange={(e) => set({ to: e.target.value })}
+                />
+              )}
+            </Field>
+          </>
+        )}
         {show.grouping && (
           <Field label={f.t('filters.grouping')}>
             {(c) => (
@@ -301,6 +314,39 @@ export function FiltersBar(p: FiltersBarProps) {
                     {a.name}
                   </option>
                 ))}
+              </select>
+            )}
+          </Field>
+        )}
+        {show.tagMatch && (
+          <Field label={f.t('filters.tagMatch')}>
+            {(c) => (
+              <select
+                {...c}
+                name="tagMatch"
+                style={inputStyle}
+                value={draft.tagMatch}
+                onChange={(e) => set({ tagMatch: e.target.value as ReportFilters['tagMatch'] })}
+              >
+                <option value="ANY">{f.t('filters.ANY')}</option>
+                <option value="ALL">{f.t('filters.ALL')}</option>
+              </select>
+            )}
+          </Field>
+        )}
+        {show.debtKind && (
+          <Field label={f.t('filters.debtKind')}>
+            {(c) => (
+              <select
+                {...c}
+                name="debtKind"
+                style={inputStyle}
+                value={draft.debtKind}
+                onChange={(e) => set({ debtKind: e.target.value as ReportFilters['debtKind'] })}
+              >
+                <option value="">{f.t('filters.debtAll')}</option>
+                <option value="LOAN">{f.t('debts.kind.LOAN')}</option>
+                <option value="CARD">{f.t('debts.kind.CARD')}</option>
               </select>
             )}
           </Field>
@@ -407,7 +453,7 @@ export function FiltersBar(p: FiltersBarProps) {
             </Field>
           </>
         )}
-        {show.compare && draft.compare !== 'NONE' && (
+        {((show.compare && draft.compare !== 'NONE') || show.normalize) && (
           <label style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
             <input
               type="checkbox"

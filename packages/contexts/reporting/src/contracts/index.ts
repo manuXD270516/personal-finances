@@ -556,3 +556,4 @@ export interface ConversionCostAnalysisDto {
 }
 
 export * from './financial-reports.js';
+export * from './portability.js';

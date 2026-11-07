@@ -228,6 +228,22 @@ export interface PaymentRepository {
     workspaceId: string,
     loanIds: readonly string[],
   ): Promise<ReadonlyMap<string, ComponentAmounts>>;
+  /** Σ por préstamo y fecha de pago de los componentes de los pagos ACTIVE en el rango (reporte de deudas). */
+  paidByDate(
+    workspaceId: string,
+    range: { from: string; to: string },
+  ): Promise<
+    readonly {
+      loanId: string;
+      date: string;
+      currency: string;
+      principal: string;
+      interest: string;
+      fees: string;
+      insurance: string;
+      taxes: string;
+    }[]
+  >;
   /** Σ interés de pagos ACTIVE con fecha en el rango, por préstamo. */
   interestPaid(
     workspaceId: string,
