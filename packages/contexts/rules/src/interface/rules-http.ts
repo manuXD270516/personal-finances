@@ -10,6 +10,7 @@ import {
 import { isDomainError } from '@pf/shared-kernel';
 import type { DryRunChange, RuleDryRunService } from '../application/dry-run.service.js';
 import type { RuleVersionRecord } from '../application/ports/index.js';
+import type { RuleProposalsService } from '../application/rule-proposals.service.js';
 import type { RulesQueries, RuleView } from '../application/rules.queries.js';
 import type { RulesService } from '../application/rules.service.js';
 import { RULE_TRIGGERS, type RuleState, type RuleTrigger } from '../domain/index.js';
@@ -17,6 +18,7 @@ import { RULE_TRIGGERS, type RuleState, type RuleTrigger } from '../domain/index
 export const RULES_SERVICE = Symbol('RULES_SERVICE');
 export const RULES_QUERIES = Symbol('RULES_QUERIES');
 export const RULES_DRY_RUN = Symbol('RULES_DRY_RUN');
+export const RULES_PROPOSALS = Symbol('RULES_PROPOSALS');
 
 type Json = Record<string, unknown>;
 const body = (b: unknown): Json => (b && typeof b === 'object' && !Array.isArray(b) ? (b as Json) : {});
@@ -46,7 +48,7 @@ function userIdOf(req: ApiRequest): string {
 
 export function ruleDto(
   rule: RuleState,
-  extra: Partial<Pick<RuleView, 'needsAttention' | 'stats' | 'status'>> = {},
+  extra: Partial<Pick<RuleView, 'needsAttention' | 'stats' | 'status' | 'fromSuggestion'>> = {},
 ) {
   return {
     id: rule.id,
@@ -66,6 +68,7 @@ export function ruleDto(
     archivedAt: rule.archivedAt,
     createdAt: rule.createdAt,
     updatedAt: rule.updatedAt,
+    fromSuggestion: extra.fromSuggestion ?? null,
     ...(extra.stats ? { stats: extra.stats } : {}),
   };
 }
@@ -109,6 +112,7 @@ export class RulesController {
     @Inject(RULES_SERVICE) private readonly rules: RulesService,
     @Inject(RULES_QUERIES) private readonly queries: RulesQueries,
     @Inject(RULES_DRY_RUN) private readonly dryRuns: RuleDryRunService,
+    @Inject(RULES_PROPOSALS) private readonly proposals: RuleProposalsService,
   ) {}
 
   @Get('workspaces/:workspaceId/rules')
@@ -138,7 +142,7 @@ export class RulesController {
     );
     res.setHeader('location', `/api/v1/workspaces/${workspaceId}/rules/${created.id}`);
     res.setHeader('etag', `"${created.rowVersion}"`);
-    return ruleDto(created);
+    return ruleDto(created, { fromSuggestion: await this.queries.suggestionOrigin(workspaceId, created.id) });
   }
 
   // Rutas literales antes de `:ruleId`.
@@ -219,6 +223,52 @@ export class RulesController {
       mode,
       items: (Array.isArray(b['items']) ? b['items'] : []) as { transactionId: string; version: number }[],
     });
+  }
+
+  // ----------------------------------------------------------- sugerencias (add-rule-suggestions)
+
+  @Get('workspaces/:workspaceId/rules/suggestions')
+  async listRuleSuggestions(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
+    const windowDays = query['windowDays'] === undefined ? undefined : Number(query['windowDays']);
+    return this.proposals.list(workspaceId, {
+      ...(windowDays !== undefined ? { windowDays } : {}),
+      includeDismissed: query['includeDismissed'] === true || query['includeDismissed'] === 'true',
+    });
+  }
+
+  @Post('workspaces/:workspaceId/rules/suggestions/preview')
+  @HttpCode(200)
+  async previewRuleSuggestion(@Param('workspaceId') workspaceId: string, @Body() raw: unknown) {
+    const b = body(raw);
+    return withDetails(() =>
+      this.proposals.preview(workspaceId, {
+        suggestionId: b['suggestionId'],
+        pattern: b['pattern'],
+        ...(b['definition'] ? { definition: body(b['definition']) } : {}),
+        ...(typeof b['windowDays'] === 'number' ? { windowDays: b['windowDays'] } : {}),
+      }),
+    );
+  }
+
+  @Post('workspaces/:workspaceId/rules/suggestions/:suggestionId/dismiss')
+  @HttpCode(204)
+  async dismissRuleSuggestion(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('suggestionId') suggestionId: string,
+    @Body() raw: unknown,
+  ): Promise<void> {
+    await this.proposals.dismiss(userIdOf(req), workspaceId, suggestionId, body(raw)['pattern']);
+  }
+
+  @Post('workspaces/:workspaceId/rules/suggestions/:suggestionId/restore')
+  @HttpCode(204)
+  async restoreRuleSuggestion(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('suggestionId') suggestionId: string,
+  ): Promise<void> {
+    await this.proposals.restore(userIdOf(req), workspaceId, suggestionId);
   }
 
   @Get('workspaces/:workspaceId/rules/coverage')

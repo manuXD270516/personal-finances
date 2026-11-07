@@ -453,6 +453,15 @@ Sección «Reglas» de la navegación principal (`/reglas`), con tres pestañas 
 
 El editor (`/reglas/nueva`, `/reglas/{id}`) agrupa nombre, prioridad, disparadores, condiciones (grupos de un nivel), acciones y «detener», con vista previa en vivo contra un ejemplo (cada condición «cumplida/no cumplida» con su valor actual) y el historial de versiones. El detalle de la transacción muestra el origen por campo («Supermercado — por la regla Supermercado (v1)», «v1, archivada»), el aviso «pendiente de revisión» con quién lo marcó y la acción de quitar la marca; el listado filtra «Pendientes de revisión»; el formulario de alta ofrece «Aplicar mis reglas de clasificación» (activado por defecto) y «Crear regla desde esta transacción» abre el editor prellenado sin guardar nada. Todo el texto está en `Rules` (es, en y pt), con formato es-BO y sin información solo por color.
 
+## Sugerencias de reglas (`add-rule-suggestions`, Phase 7)
+
+Cuarta pestaña de Reglas («Sugerencias», entre «Reglas» y «Ejecutar sobre el historial»). Se calcula al abrirla (a pedido, nunca en segundo plano) con la ventana de evidencia elegible (30, 90, 180 por omisión o 366 días) y la casilla «Ver también las descartadas».
+
+- **Tarjeta por sugerencia:** el patrón («La descripción contiene «tigo money recarga»» o «La contraparte es Farmacorp»), el tipo y la categoría, el apoyo («4 de 5 transacciones en esa categoría»), la confianza con su nivel en texto e icono (● alta, ◐ media; nunca solo color), el nombre propuesto, la evidencia reciente y los contraejemplos en `<details>` y, si hay conflictos, un aviso con cada regla, la cantidad de transacciones, la prioridad propuesta y el aviso de que no puede quedar antes.
+- **Acciones:** «Probar» (vista previa sin efectos: conteos «completaría / ya están en la categoría / tienen otra / no aplicables» y la tabla de transacciones con el resultado y los motivos del dry-run), «Aceptar…» (abre el editor de reglas prellenado con el patrón, el tipo, la categoría, el nombre y la prioridad propuestos; nada se guarda hasta «Guardar regla», que envía `fromSuggestion`), «Descartar» y, en el listado de descartadas, «Restaurar». El VIEWER ve y prueba, pero no acepta ni descarta.
+- **Aceptar → aplicar:** tras guardar, el editor vuelve a `/reglas?apply=<ruleId>` con «Ejecutar sobre el historial» abierta solo para esa regla (ventana de 180 días): el dry-run muestra qué cambiaría y se aplica como edición masiva auditada. Crear la regla no reclasifica nada.
+- Textos armados desde códigos y datos en es/en/pt, fechas y montos en es-BO, regiones con nombre accesible y sin violaciones serias de axe.
+
 ## Reportes (`add-financial-reports`, Phase 7)
 
 - **Rutas.** `/reportes` (catálogo de los 16 reportes con estado: disponible, parcial con enlace a su vista, planificado sin cifras) y `/reportes/<slug>` por reporte (`ingresos-gastos`, `presupuesto-vs-real`, `gastos-por-categoria`, `flujo-de-caja`, `patrimonio`, `historial-de-saldo`). Entrada "Reportes" en la navegación principal.

@@ -371,3 +371,16 @@ Ninguno nuevo ni modificado. Aceptar crea una regla (sin eventos de dominio de r
 - **docs/config-reference.md:** variables `RULES_SUGGEST_*` de la decisión 8.
 - **docs/03 §7:** fila del change en Phase 7 (`rules/rule-engine` + `identity/workspace-portability`), archivado después de `add-rule-engine`.
 - **docs/38:** estado del change y las preguntas 1–5.
+
+## As-built (2026-11-05)
+
+Desviaciones menores respecto de lo anterior, todas aditivas y sin cambiar el comportamiento especificado:
+
+- **`total` → `evidenceCount`.** La regla Spectral `pfos-money-via-schema` y la ESLint `pf/no-number-money` reservan `total` (y los sufijos `Total`) para montos: el denominador de la confianza se llama `evidenceCount` en `RuleSuggestion`, en el dominio y en la columna `evidence_count` de `rules.rule_suggestion_decision`.
+- **Aceptación: se reclama antes de crear.** `createRule` inserta la decisión `ACCEPTED` antes de las verificaciones de nombre, límite y catálogo, con la FK `(workspace_id, rule_id)` `DEFERRABLE INITIALLY DEFERRED`: así la segunda aceptación (también la simultánea) responde `RULE_SUGGESTION_DECIDED` y no `NAME_TAKEN`; si algo falla después, la transacción revierte la decisión.
+- **Instantánea de la decisión.** `support`, `evidence_count` y `confidence` se calculan al decidir (nulos si el patrón ya no se calcula); descartar y aceptar relanzan el cálculo de la ventana por omisión.
+- **SHA-256 puro en el dominio** (`domain/sha256.ts`): `domain-only-shared-kernel` impide importar `node:crypto`; se verifica contra `node:crypto` en `infrastructure/sha256.test.ts`.
+- **Vista previa:** compila la regla transitoria sin el caché por `(id, versión)` de `RulesQueries` (se contaminaría) y reutiliza `toSubject` y los motivos de no aplicable del dry-run; no hizo falta extraer nada de `RuleDryRunService`.
+- **Índice parcial de evidencia: no se crea.** `EXPLAIN` con 300 000 transacciones: 331 ms; el costo dominante son las búsquedas por clave primaria, que el índice no cambia (ver la tarea 4.2).
+- **Calendario:** `RulesRuntimeOptions.calendar` entrega «hoy» en la zona del workspace (`workspaceCalendar`); la ventana es `[hoy − windowDays, hoy]`.
+- **Limitación conocida de la clave de descripción:** al quitar las palabras con dígitos o asteriscos de en medio (`COMPRA TARJ ****1234 FARMACORP`), la clave no es una subcadena contigua de la glosa original y la condición `contains` de la regla propuesta podría no coincidir con su propia evidencia; la vista previa lo muestra y el usuario edita la condición. Si pasa a ser frecuente con datos reales, se reconsidera el prefijo común más largo (alternativa descartada de la decisión 3).

@@ -35,6 +35,12 @@ export function compareRules(a: EvaluableRule, b: EvaluableRule): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
+/**
+ * Qué reglas activas participan: las del disparador (por omisión) o todas, sin mirar su disparador (`ANY`; cruce de
+ * cobertura de add-rule-suggestions: una regla solo de importación también cubre un patrón para lo que se importe).
+ */
+export type TriggerFilter = 'TRIGGER' | 'ANY';
+
 /** Reglas activas del disparador, ordenadas y compiladas UNA vez. */
 export class CompiledRuleSet {
   private constructor(
@@ -50,9 +56,11 @@ export class CompiledRuleSet {
     rules: readonly EvaluableRule[],
     trigger: RuleTrigger,
     cache?: Map<string, CompiledNode>,
+    options: { readonly triggerFilter?: TriggerFilter } = {},
   ): CompiledRuleSet {
+    const anyTrigger = options.triggerFilter === 'ANY';
     const active = rules
-      .filter((r) => r.enabled && !r.archived && r.triggers.includes(trigger))
+      .filter((r) => r.enabled && !r.archived && (anyTrigger || r.triggers.includes(trigger)))
       .sort(compareRules)
       .map((rule): Compiled => {
         const key = `${rule.id}:${rule.version}`;

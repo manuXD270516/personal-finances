@@ -5,3 +5,5 @@ export * from './rule-definition.js';
 export * from './rule-evaluator.js';
 export * from './rule.js';
 export * from './types.js';
+export * from './rule-proposal.js';
+export * from './sha256.js';

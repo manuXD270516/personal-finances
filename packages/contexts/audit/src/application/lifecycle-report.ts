@@ -253,6 +253,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       SavingsGoal: 'Meta de ahorro',
       Document: 'Documento',
       ImportJob: 'Importación',
+      ImportConnection: 'Conexión con proveedor',
     },
     states: {
       Transaction: {
@@ -311,6 +312,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         PARTIALLY_ROLLED_BACK: 'Deshecha parcialmente',
         PARSE_FAILED: 'Falló la lectura',
         CANCELLED: 'Cancelada',
+      },
+      ImportConnection: {
+        PENDING_VERIFICATION: 'Pendiente de verificación',
+        ACTIVE: 'Activa',
+        NEEDS_ATTENTION: 'Requiere atención',
+        REJECTED: 'Rechazada',
+        NEEDS_CREDENTIAL: 'Requiere credencial',
+        REVOKED: 'Revocada',
       },
     },
     transitions: {
@@ -387,6 +396,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       },
       ImportJob: {
         CREATE: 'Crear',
+        CREATE_FROM_CONNECTION: 'Crear desde conexión',
         CREATE_FROM_DOCUMENT: 'Crear desde documento',
         START: 'Iniciar',
         AWAIT_MAPPING: 'Esperar mapeo',
@@ -403,6 +413,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CANCEL: 'Cancelar',
         REVERT: 'Deshacer',
         FINISH_REVERT: 'Terminar de deshacer',
+      },
+      ImportConnection: {
+        CREATE: 'Crear',
+        VERIFY_OK: 'Verificar (solo lectura)',
+        REJECT: 'Rechazar',
+        FLAG_ATTENTION: 'Pedir atención',
+        REPLACE_CREDENTIAL: 'Reemplazar credencial',
+        REVOKE: 'Revocar',
       },
     },
     element: 'Elemento',
@@ -449,6 +467,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       SavingsGoal: 'Savings goal',
       Document: 'Document',
       ImportJob: 'Import',
+      ImportConnection: 'Provider connection',
     },
     states: {
       Transaction: {
@@ -507,6 +526,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         PARTIALLY_ROLLED_BACK: 'Partially rolled back',
         PARSE_FAILED: 'Parse failed',
         CANCELLED: 'Cancelled',
+      },
+      ImportConnection: {
+        PENDING_VERIFICATION: 'Pending verification',
+        ACTIVE: 'Active',
+        NEEDS_ATTENTION: 'Needs attention',
+        REJECTED: 'Rejected',
+        NEEDS_CREDENTIAL: 'Needs credential',
+        REVOKED: 'Revoked',
       },
     },
     transitions: {
@@ -583,6 +610,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       },
       ImportJob: {
         CREATE: 'Create',
+        CREATE_FROM_CONNECTION: 'Create from connection',
         CREATE_FROM_DOCUMENT: 'Create from document',
         START: 'Start',
         AWAIT_MAPPING: 'Await mapping',
@@ -599,6 +627,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CANCEL: 'Cancel',
         REVERT: 'Revert',
         FINISH_REVERT: 'Finish revert',
+      },
+      ImportConnection: {
+        CREATE: 'Create',
+        VERIFY_OK: 'Verify (read-only)',
+        REJECT: 'Reject',
+        FLAG_ATTENTION: 'Flag for attention',
+        REPLACE_CREDENTIAL: 'Replace credential',
+        REVOKE: 'Revoke',
       },
     },
     element: 'Item',
@@ -645,6 +681,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       SavingsGoal: 'Meta de poupança',
       Document: 'Documento',
       ImportJob: 'Importação',
+      ImportConnection: 'Conexão com provedor',
     },
     states: {
       Transaction: {
@@ -703,6 +740,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         PARTIALLY_ROLLED_BACK: 'Parcialmente desfeita',
         PARSE_FAILED: 'Falha na leitura',
         CANCELLED: 'Cancelada',
+      },
+      ImportConnection: {
+        PENDING_VERIFICATION: 'Aguardando verificação',
+        ACTIVE: 'Ativa',
+        NEEDS_ATTENTION: 'Requer atenção',
+        REJECTED: 'Rejeitada',
+        NEEDS_CREDENTIAL: 'Requer credencial',
+        REVOKED: 'Revogada',
       },
     },
     transitions: {
@@ -779,6 +824,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       },
       ImportJob: {
         CREATE: 'Criar',
+        CREATE_FROM_CONNECTION: 'Criar a partir da conexão',
         CREATE_FROM_DOCUMENT: 'Criar a partir de documento',
         START: 'Iniciar',
         AWAIT_MAPPING: 'Aguardar mapeamento',
@@ -795,6 +841,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CANCEL: 'Cancelar',
         REVERT: 'Desfazer',
         FINISH_REVERT: 'Terminar de desfazer',
+      },
+      ImportConnection: {
+        CREATE: 'Criar',
+        VERIFY_OK: 'Verificar (somente leitura)',
+        REJECT: 'Rejeitar',
+        FLAG_ATTENTION: 'Pedir atenção',
+        REPLACE_CREDENTIAL: 'Substituir credencial',
+        REVOKE: 'Revogar',
       },
     },
     element: 'Item',

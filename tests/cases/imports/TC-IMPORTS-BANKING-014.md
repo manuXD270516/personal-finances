@@ -5,16 +5,17 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Credencial rechazada por el proveedor"
 scenario: "Clave borrada en el exchange"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -35,7 +36,7 @@ expected_result:
   - "Import FAILED con IMPORT_CONNECTION_EXPIRED; conexión NEEDS_ATTENTION"
   - "Tras reemplazar y verificar: ACTIVE"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-014 — Una clave rechazada deja la conexión en requiere atención

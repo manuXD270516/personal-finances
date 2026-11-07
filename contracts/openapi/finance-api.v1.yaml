@@ -10686,6 +10686,356 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/imports/providers:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Imports]
+      operationId: listBankingProviders
+      summary: Catalog of providers of external movements (banks, aggregators, exchanges)
+      description: |
+        Descriptors of the providers: kind, credential mode, capabilities and availability. A real provider is
+        `AVAILABLE` only with verified terms of use recorded in an ADR (and, for a file, a verified format); until then
+        it is `PENDING_VERIFICATION` and creating a connection with it fails with `BANKING_PROVIDER_NOT_AVAILABLE`. The
+        simulated provider `FAKE_EXCHANGE` appears only when `IMPORTS_PROVIDER_FAKE_ENABLED` is on (never in staging or
+        production).
+      x-openspec-capability: imports/banking-providers
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Providers
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/BankingProvider' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/connections:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Imports]
+      operationId: listConnections
+      summary: Connections of the workspace with its providers
+      description: |
+        Never returns credentials: only the masked fingerprint (`…a1b2`, the last 4 characters of the key identifier),
+        the master key id, the verification instant and the permissions the provider reported.
+      x-openspec-capability: imports/banking-providers
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Connections
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Connection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Imports]
+      operationId: createConnection
+      summary: Connect a provider and map its assets to accounts
+      description: |
+        OWNER only. The credential (`secret` is `writeOnly`) is encrypted with an envelope (a data key per credential
+        wrapped with an X25519 public key): the API can encrypt but never decrypt; only the worker can. The
+        `Idempotency-Key` is bound to the fingerprint of the key identifier, never to the secret. A provider with a key
+        starts `PENDING_VERIFICATION` (202) and the worker verifies it is read-only (`ACTIVE`, or `REJECTED` with
+        `CONNECTION_CREDENTIAL_NOT_READ_ONLY` and the credential destroyed); a file provider starts `ACTIVE` (201). Each
+        asset maps to an active account of the SAME currency (`CURRENCY_MISMATCH`). 422 `BANKING_PROVIDER_NOT_AVAILABLE`
+        if the provider is not available.
+      x-openspec-capability: imports/banking-providers
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateConnectionRequest' }
+            examples:
+              exchange:
+                value:
+                  providerId: FAKE_EXCHANGE
+                  name: Exchange principal
+                  assetMappings:
+                    - { asset: USDT, accountId: '01928c4e-0000-7000-8000-0000000c0001' }
+                    - { asset: BTC, accountId: '01928c4e-0000-7000-8000-0000000c0002' }
+                  credential: { keyId: AKIA-EXAMPLE-0000-a1b2, secret: example-secret-do-not-use }
+      responses:
+        '201':
+          description: A file provider connection, active
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Connection' }
+        '202':
+          description: Pending verification; the worker verifies the credential is read-only
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Connection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_CLOSED or ACCOUNT_ARCHIVED (an account of the mapping).'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BANKING_PROVIDER_NOT_AVAILABLE, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND or VALIDATION_FAILED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/connections/{connectionId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ConnectionId'
+    get:
+      tags: [Imports]
+      operationId: getConnection
+      summary: One connection (state, last error, confirmed cursor, wait)
+      description: |
+        The UI polls this resource (with `If-None-Match`) while the credential is verified. `lastError.code` is the code
+        of the last failure (`CONNECTION_CREDENTIAL_NOT_READ_ONLY`, `IMPORT_CONNECTION_EXPIRED`, …); `syncCursor` is the
+        date of the CONFIRMED cursor (it only moves when the import of a synchronization finishes) and `retryNotBefore`
+        the persisted wait the provider asked for.
+      x-openspec-capability: imports/banking-providers
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The connection
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Connection' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Imports]
+      operationId: updateConnection
+      summary: Rename a connection or change its asset mapping
+      description: OWNER only. Same rules as the creation for the mapping (same-currency accounts).
+      x-openspec-capability: imports/banking-providers
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateConnectionRequest' }
+      responses:
+        '200':
+          description: The updated connection
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Connection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_CLOSED, ACCOUNT_ARCHIVED or INVALID_STATUS_TRANSITION (revoked).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Imports]
+      operationId: deleteConnectionNotAllowed
+      summary: Not allowed (connections are revoked, never deleted)
+      description: Always 405; use `revokeConnection`.
+      x-openspec-capability: imports/banking-providers
+      x-required-role: OWNER
+      responses:
+        '405':
+          description: Connections are revoked, never deleted
+          headers:
+            Allow: { schema: { type: string } }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/connections/{connectionId}/credential:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ConnectionId'
+    put:
+      tags: [Imports]
+      operationId: replaceConnectionCredential
+      summary: Replace the credential of a connection (it is verified again)
+      description: |
+        OWNER only. Encrypts the new credential and moves the connection to `PENDING_VERIFICATION`; the worker verifies
+        it is read-only exactly as at creation. Used after `IMPORT_CONNECTION_EXPIRED` (key deleted at the exchange).
+      x-openspec-capability: imports/banking-providers
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConnectionCredentialInput' }
+      responses:
+        '202':
+          description: Pending verification
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Connection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (revoked connection).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/connections/{connectionId}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ConnectionId'
+    post:
+      tags: [Imports]
+      operationId: revokeConnection
+      summary: Revoke a connection (the credential is destroyed, what was imported stays)
+      description: |
+        OWNER only. In the same transaction as the audit entry the wrapped data key and the ciphertext are deleted
+        (cryptographic destruction: they can never be decrypted again). The connection can no longer synchronize
+        (`INVALID_STATUS_TRANSITION`); the imported transactions and their links stay. The UI reminds to delete the key at
+        the exchange too.
+      x-openspec-capability: imports/banking-providers
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: The revoked connection
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Connection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already revoked).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/connections/{connectionId}/sync:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ConnectionId'
+    post:
+      tags: [Imports]
+      operationId: syncConnection
+      summary: Synchronize a connection (creates an import that always goes through the preview)
+      description: |
+        OWNER or EDITOR. Creates an import (`source = EXCHANGE_API`, `connectionId`) in `PROCESSING` and enqueues the job
+        `imports.connection-sync`: the worker re-verifies the key is read-only, pages through the provider history from the
+        confirmed cursor (the first time `from` is required, at most `CONNECTION_SYNC_MAX_DAYS` days back), stages the
+        records and leaves the import in `AWAITING_REVIEW`. Nothing is created without the approval of the preview; the
+        confirmed cursor moves only when the import finishes. One synchronization at a time per connection
+        (409 `CONNECTION_SYNC_IN_PROGRESS`); a rejected key (409 `IMPORT_CONNECTION_EXPIRED`, as the failure of the
+        import) leaves the connection needing attention. Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: imports/banking-providers
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyncConnectionRequest' }
+            examples:
+              first: { value: { from: '2026-07-01' } }
+      responses:
+        '202':
+          description: Synchronization started; poll the import
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncConnectionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CONNECTION_SYNC_IN_PROGRESS, IMPORT_CONNECTION_EXPIRED or INVALID_STATUS_TRANSITION.'
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/import-profiles:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -12474,7 +12824,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'NAME_TAKEN, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED or CUSTOM_FIELD_ARCHIVED.'
+          description: 'NAME_TAKEN, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED, CUSTOM_FIELD_ARCHIVED or RULE_SUGGESTION_DECIDED (the suggestion in `fromSuggestion` was already accepted or dismissed).'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'VALIDATION_FAILED, RULE_INVALID_REGEX, RULE_LIMIT_EXCEEDED, REFERENCE_NOT_FOUND, CUSTOM_FIELD_VALUE_INVALID or IDEMPOTENCY_KEY_REUSED.'
@@ -12842,6 +13192,142 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Rules]
+      operationId: listRuleSuggestions
+      summary: Suggested rules from repeated manual classifications
+      description: |
+        Computed on request (nothing runs in the background and nothing is stored): the manual classifications of the last `windowDays` days (180 by default, up to 366) are grouped by normalized description or by counterparty and by transaction kind; a pattern with at least 3 transactions in the same category and a confidence (support ÷ total of the pattern, 4 decimals HALF_EVEN) of at least 0.8000 becomes a suggestion. Only categories set by the user count (manual origin, or unknown origin before the rule engine on transactions entered by hand or imported); transactions with several splits, managed by another module or in an archived category do not. Patterns already covered by the active rules are not suggested; a rule that sets another category is reported in `conflicts` with a proposed priority one unit lower. Up to 5 000 transactions are read (`truncated`) and up to 50 suggestions are returned, by support, confidence and pattern. Dismissed suggestions only appear with `includeDismissed=true`; accepted ones never. No side effects and no audit.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - name: windowDays
+          in: query
+          description: Evidence window in days up to today in the workspace time zone (default 180).
+          schema: { type: integer, minimum: 1, maximum: 366 }
+        - name: includeDismissed
+          in: query
+          description: 'Also list the dismissed suggestions (`status: DISMISSED`).'
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Suggested rules from repeated manual classifications
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleSuggestionList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: previewRuleSuggestion
+      summary: Test a suggested rule over the existing transactions
+      description: |
+        Runs the suggestion as proposed, or the `definition` the user edited, over the non-voided income, expense and refund transactions of the window with the evaluator of the dry-run and a transient rule. Reports how many transactions match, how many it would fill (today uncategorized), how many already have the suggested category and how many have another one; a match that cannot be applied carries the same reasons as the dry-run. Up to 200 items. Persists nothing and does not audit; accepting is `createRule` with `fromSuggestion` and applying to the history is `dryRunRules` + `applyRuleDryRun`.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleSuggestionPreviewInput' }
+      responses:
+        '200':
+          description: Test a suggested rule over the existing transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleSuggestionPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (also a fingerprint that does not match the pattern) or RULE_INVALID_REGEX.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions/{suggestionId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleSuggestionId'
+    post:
+      tags: [Rules]
+      operationId: dismissRuleSuggestion
+      summary: Dismiss a suggested rule
+      description: |
+        A dismissed suggestion is not listed again, even if its evidence grows, except with `includeDismissed=true`; it can be restored. The server recomputes the fingerprint from `pattern`. Audited (entity `RuleSuggestion`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleSuggestionDismissInput' }
+      responses:
+        '204':
+          description: Dismiss a suggested rule
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'RULE_SUGGESTION_DECIDED or IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (also a fingerprint that does not match the pattern) or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/rules/suggestions/{suggestionId}/restore:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RuleSuggestionId'
+    post:
+      tags: [Rules]
+      operationId: restoreRuleSuggestion
+      summary: Restore a dismissed suggested rule
+      description: |
+        Removes the dismissal, so the suggestion is listed again while its evidence holds. A suggestion that was accepted cannot be restored (`RULE_SUGGESTION_DECIDED`). Audited (entity `RuleSuggestion`).
+      x-openspec-capability: [rules/rule-engine]
+      x-required-role: EDITOR
+      responses:
+        '204':
+          description: Restore a dismissed suggested rule
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'RULE_SUGGESTION_DECIDED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED.'
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -14598,6 +15084,12 @@ components:
       required: true
       description: Import UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
+    ConnectionId:
+      name: connectionId
+      in: path
+      required: true
+      description: Connection UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     ImportRowId:
       name: rowId
       in: path
@@ -14677,6 +15169,12 @@ components:
       required: true
       description: Classification rule UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
+    RuleSuggestionId:
+      name: suggestionId
+      in: path
+      required: true
+      description: Fingerprint of a rule suggestion (SHA-256 hexadecimal of the pattern).
+      schema: { type: string, pattern: '^[0-9a-f]{64}$' }
     GoalSuggestionId:
       name: suggestionId
       in: path
@@ -15110,6 +15608,10 @@ components:
         - IMPORT_PDF_TOTALS_MISMATCH             # 422 (add-pdf-statement-parser: the balances or section totals printed in the statement do not match the rows read; fail closed)
         - IMPORT_PDF_PAGE_COUNT_MISMATCH         # 422 (add-pdf-statement-parser: fewer pages were read than the statement declares)
         - IMPORT_PDF_ACCOUNT_MISMATCH            # 422 (add-pdf-statement-parser: the last 4 digits of the statement account differ from the target account)
+        - BANKING_PROVIDER_NOT_AVAILABLE         # 422 (add-banking-providers: the provider has no verified terms (or format), is disabled, or connections are not enabled)
+        - CONNECTION_CREDENTIAL_NOT_READ_ONLY    # 422 (add-banking-providers: the key can trade, withdraw or transfer; also Connection.lastError.code and the failure of an import)
+        - CONNECTION_SYNC_IN_PROGRESS            # 409 (add-banking-providers: the connection already has a synchronization in progress)
+        - IMPORT_CONNECTION_EXPIRED              # 409 (add-banking-providers: the provider rejected the key; connection needing attention, replace the credential)
         - LOAN_METHOD_NOT_AVAILABLE              # 422 (add-loans: only the French method is available)
         - LOAN_ACCOUNT_INVALID                   # 422 (add-loans: the loan account is not an active loan account)
         - LOAN_ACCOUNT_IN_USE                    # 409 (add-loans: the account already backs another non-cancelled loan)
@@ -15155,6 +15657,7 @@ components:
         - RULE_INVALID_REGEX                     # 422 (add-rule-engine: the regular expression is invalid or uses constructs without linear-time evaluation; also rejects back-references, lookaround and patterns over 200 characters)
         - RULE_LIMIT_EXCEEDED                    # 422 (add-rule-engine: the workspace has the maximum of 500 non-archived rules)
         - RULE_DRY_RUN_STALE                     # 409 (add-rule-engine: a rule or a transaction changed after the dry-run; run it again)
+        - RULE_SUGGESTION_DECIDED                # 409 (add-rule-suggestions: the rule suggestion was already accepted or dismissed)
 
     # ── Identity ──
     WorkspaceRole:
@@ -16071,6 +16574,14 @@ components:
           type: boolean
           default: false
           description: When the rule matches, the rules of lower priority are not evaluated for that transaction.
+        fromSuggestion:
+          type: object
+          additionalProperties: false
+          required: [suggestionId, pattern]
+          description: The suggestion this rule accepts (see `listRuleSuggestions`). Registered in the same unit of work as the rule; it does not reclassify anything. A suggestion already accepted or dismissed answers `RULE_SUGGESTION_DECIDED`.
+          properties:
+            suggestionId: { type: string, pattern: '^[0-9a-f]{64}$' }
+            pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
     RuleUpdateInput:
       type: object
       additionalProperties: false
@@ -16131,6 +16642,151 @@ components:
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
         stats: { $ref: '#/components/schemas/RuleStats' }
+        fromSuggestion:
+          description: The suggestion this rule was created from, or null.
+          oneOf:
+            - type: object
+              required: [suggestionId, acceptedAt]
+              properties:
+                suggestionId: { type: string, pattern: '^[0-9a-f]{64}$' }
+                acceptedAt: { $ref: '#/components/schemas/Instant' }
+            - type: 'null'
+    RuleSuggestionPattern:
+      type: object
+      additionalProperties: false
+      required: [type, value, kind, categoryId]
+      properties:
+        type: { type: string, enum: [DESCRIPTION, COUNTERPARTY] }
+        value: { type: string, minLength: 1, maxLength: 200, description: 'Normalized description key or counterparty id.' }
+        kind: { type: string, enum: [INCOME, EXPENSE, REFUND] }
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+    RuleSuggestionEvidence:
+      type: object
+      required: [transactionId, date, description, amount, accountId, categoryId, categoryOrigin]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        date: { $ref: '#/components/schemas/LocalDate' }
+        description: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/Money' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        categoryOrigin: { $ref: '#/components/schemas/CategoryOrigin' }
+    RuleSuggestionConflict:
+      type: object
+      required: [ruleId, name, version, priority, categoryId, count]
+      properties:
+        ruleId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        version: { type: integer, minimum: 1 }
+        priority: { type: integer }
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        count: { type: integer, minimum: 1, description: Transactions of the evidence that this rule would put in another category. }
+    RuleSuggestion:
+      type: object
+      required: [suggestionId, pattern, categoryName, support, evidenceCount, confidence, confidenceLevel, proposedRule, evidence, counterExamples, conflicts, warnings, status]
+      properties:
+        suggestionId: { type: string, pattern: '^[0-9a-f]{64}$', description: Stable fingerprint of the suggestion. }
+        pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
+        patternLabel: { type: string, description: Counterparty name for `COUNTERPARTY` patterns. }
+        categoryName: { type: string }
+        support: { type: integer, minimum: 3, description: Evidence transactions of the pattern in the suggested category. }
+        evidenceCount: { type: integer, minimum: 3, description: 'Evidence transactions of the pattern and of the same kind, in any category (the denominator of the confidence).' }
+        confidence: { type: string, pattern: '^(0\.[0-9]{4}|1\.0000)$', description: support ÷ total with 4 decimals (HALF_EVEN). }
+        confidenceLevel: { type: string, x-extensible-enum: [HIGH, MEDIUM], description: '`HIGH` with a confidence of at least 0.9500 and 5 or more transactions. Presentation only.' }
+        proposedRule: { $ref: '#/components/schemas/RuleInput' }
+        evidence:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RuleSuggestionEvidence' }
+          description: The most recent transactions in favor.
+        counterExamples:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RuleSuggestionEvidence' }
+          description: The most recent transactions of the pattern classified in other categories.
+        conflicts:
+          type: array
+          items: { $ref: '#/components/schemas/RuleSuggestionConflict' }
+        warnings:
+          type: array
+          items: { type: string, x-extensible-enum: [CANNOT_OUTRANK], description: 'CANNOT_OUTRANK: a conflicting rule already has priority 0, so the new rule cannot be evaluated before it.' }
+        status: { type: string, x-extensible-enum: [OPEN, DISMISSED] }
+    RuleSuggestionList:
+      type: object
+      required: [generatedAt, from, to, scanned, truncated, items]
+      properties:
+        generatedAt: { $ref: '#/components/schemas/Instant' }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        scanned: { type: integer, minimum: 0, description: Evidence transactions read. }
+        truncated: { type: boolean, description: The window has more than 5 000 evidence transactions; only the most recent ones were used. }
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/RuleSuggestion' }
+    RuleSuggestionDismissInput:
+      type: object
+      additionalProperties: false
+      required: [pattern]
+      properties:
+        pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
+    RuleSuggestionPreviewInput:
+      type: object
+      additionalProperties: false
+      required: [suggestionId, pattern]
+      properties:
+        suggestionId: { type: string, pattern: '^[0-9a-f]{64}$' }
+        pattern: { $ref: '#/components/schemas/RuleSuggestionPattern' }
+        definition:
+          type: object
+          additionalProperties: false
+          required: [conditions, actions]
+          description: Edited candidate; absent means the proposed rule.
+          properties:
+            matchMode: { $ref: '#/components/schemas/RuleMatchMode' }
+            conditions:
+              type: array
+              items: { $ref: '#/components/schemas/RuleConditionItem' }
+            actions:
+              type: array
+              items: { $ref: '#/components/schemas/RuleAction' }
+            triggers:
+              type: array
+              items: { $ref: '#/components/schemas/RuleTrigger' }
+            stopProcessing: { type: boolean }
+        windowDays: { type: integer, minimum: 1, maximum: 366 }
+    RuleSuggestionPreviewItem:
+      type: object
+      required: [transactionId, date, description, amount, currentCategoryId, currentOrigin, proposedCategoryId, outcome, reasons]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        date: { $ref: '#/components/schemas/LocalDate' }
+        description: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/Money' }
+        currentCategoryId: { type: [string, 'null'], format: uuid }
+        currentOrigin: { $ref: '#/components/schemas/CategoryOrigin' }
+        proposedCategoryId: { $ref: '#/components/schemas/Uuid' }
+        outcome: { type: string, x-extensible-enum: [WOULD_FILL, ALREADY_IN_CATEGORY, OTHER_CATEGORY, NOT_APPLICABLE] }
+        reasons:
+          type: array
+          items: { $ref: '#/components/schemas/RuleSkipReason' }
+    RuleSuggestionPreview:
+      type: object
+      required: [from, to, scanned, truncated, matched, wouldFill, alreadyInCategory, otherCategory, notApplicable, items]
+      properties:
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        scanned: { type: integer, minimum: 0 }
+        truncated: { type: boolean, description: The window has more than 5 000 transactions; only the first ones were evaluated. }
+        matched: { type: integer, minimum: 0 }
+        wouldFill: { type: integer, minimum: 0, description: Matches with no category today that the rule would fill. }
+        alreadyInCategory: { type: integer, minimum: 0 }
+        otherCategory: { type: integer, minimum: 0 }
+        notApplicable: { type: integer, minimum: 0 }
+        items:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/RuleSuggestionPreviewItem' }
     RuleList:
       type: object
       required: [data]
@@ -22572,6 +23228,9 @@ components:
         - IMPORT_OCCURRENCE_LINK_SKIPPED
         - IMPORT_PDF_AMBIGUOUS_CELL
         - IMPORT_PDF_BOTH_DEBIT_AND_CREDIT
+        - CONNECTION_ASSET_UNMAPPED
+        - CONNECTION_RECORD_UNSUPPORTED
+        - POSSIBLE_TRANSFER
     ImportRowIssue:
       type: object
       additionalProperties: false
@@ -22797,6 +23456,11 @@ components:
         updatedAt: { $ref: '#/components/schemas/Instant' }
         version: { $ref: '#/components/schemas/Version' }
         source: { $ref: '#/components/schemas/ImportSource' }
+        connectionId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+          description: Connection the import comes from (a synchronization), or null.
         documentId:
           oneOf:
             - $ref: '#/components/schemas/Uuid'
@@ -23156,7 +23820,185 @@ components:
       description: Format of the statement, detected from the CONTENT of the file (never from its name).
     ImportSource:
       type: string
-      x-extensible-enum: [FILE_CSV, FILE_OFX, FILE_QIF, FILE_JSON, FILE_XLSX, FILE_PDF]
+      x-extensible-enum: [FILE_CSV, FILE_OFX, FILE_QIF, FILE_JSON, FILE_XLSX, FILE_PDF, EXCHANGE_API, EXCHANGE_FILE]
+    # ── Imports: conexiones con proveedores (openspec add-banking-providers) ──
+    BankingProvider:
+      type: object
+      additionalProperties: false
+      required: [id, kind, displayName, credentialMode, capabilities, availability, attribution]
+      properties:
+        id: { type: string, examples: [EXCHANGE_API_BINANCE] }
+        kind: { type: string, x-extensible-enum: [BANK_API, AGGREGATOR, EXCHANGE_API, EXCHANGE_FILE, FAKE] }
+        displayName: { type: string }
+        credentialMode:
+          type: string
+          x-extensible-enum: [NONE, API_KEY_SECRET, DELEGATED_TOKEN]
+          description: Never a username and password (NFR-COMP-008).
+        capabilities:
+          type: array
+          items: { type: string, x-extensible-enum: [TRADES, DEPOSITS, WITHDRAWALS, REWARDS, BALANCES] }
+        availability: { type: string, x-extensible-enum: [AVAILABLE, PENDING_VERIFICATION, UNAVAILABLE] }
+        attribution: { type: [string, 'null'] }
+    ConnectionStatus:
+      type: string
+      x-extensible-enum: [PENDING_VERIFICATION, ACTIVE, NEEDS_ATTENTION, REJECTED, REVOKED, NEEDS_CREDENTIAL]
+    AssetMapping:
+      type: object
+      additionalProperties: false
+      required: [asset, accountId]
+      properties:
+        asset: { type: string, pattern: '^[A-Z0-9]{1,20}$', examples: [USDT] }
+        accountId:
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+          description: Active account of the SAME currency as the asset (`CURRENCY_MISMATCH` otherwise).
+    CredentialPermissions:
+      type: object
+      additionalProperties: false
+      required: [read, trade, withdraw, transfer, ipRestricted]
+      properties:
+        read: { type: boolean }
+        trade: { type: boolean }
+        withdraw: { type: boolean }
+        transfer: { type: boolean }
+        ipRestricted: { type: [boolean, 'null'] }
+    ConnectionCredentialInput:
+      type: object
+      additionalProperties: false
+      required: [keyId, secret]
+      properties:
+        keyId:
+          type: string
+          minLength: 4
+          maxLength: 256
+          description: Identifier of the API key. Only its last 4 characters are ever shown back.
+        secret:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 1024
+          description: Secret of the key. Encrypted with an envelope; never returned, logged or audited.
+    Connection:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - providerId
+        - name
+        - status
+        - assetMappings
+        - credential
+        - lastError
+        - syncCursor
+        - cursorConfirmedAt
+        - lastSyncAt
+        - retryNotBefore
+        - syncInProgress
+        - createdAt
+        - updatedAt
+        - revokedAt
+        - version
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        providerId: { type: string }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        status: { $ref: '#/components/schemas/ConnectionStatus' }
+        assetMappings:
+          type: array
+          items: { $ref: '#/components/schemas/AssetMapping' }
+        credential:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [fingerprint, kid, verifiedAt, permissions]
+              properties:
+                fingerprint: { type: string, maxLength: 16, examples: ['…a1b2'] }
+                kid: { type: string, description: Master key id that wraps the data key. }
+                verifiedAt:
+                  oneOf:
+                    - $ref: '#/components/schemas/Instant'
+                    - type: 'null'
+                permissions:
+                  oneOf:
+                    - $ref: '#/components/schemas/CredentialPermissions'
+                    - type: 'null'
+            - type: 'null'
+        lastError:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, description: Open set (an ErrorCode or a connection code). }
+            - type: 'null'
+        syncCursor:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+          description: Date of the CONFIRMED cursor; moves only when the import of a synchronization finishes.
+        cursorConfirmedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        lastSyncAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        retryNotBefore:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+          description: Persisted wait the provider asked for (`Retry-After`).
+        syncInProgress: { type: boolean }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        revokedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        version: { $ref: '#/components/schemas/Version' }
+    CreateConnectionRequest:
+      type: object
+      additionalProperties: false
+      required: [providerId, name]
+      properties:
+        providerId: { type: string }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        assetMappings:
+          type: array
+          items: { $ref: '#/components/schemas/AssetMapping' }
+        credential: { $ref: '#/components/schemas/ConnectionCredentialInput' }
+    UpdateConnectionRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        assetMappings:
+          type: array
+          items: { $ref: '#/components/schemas/AssetMapping' }
+    SyncConnectionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        from:
+          allOf:
+            - $ref: '#/components/schemas/LocalDate'
+          description: Start of the window. Required the first time (at most `CONNECTION_SYNC_MAX_DAYS` days back).
+    SyncConnectionResponse:
+      type: object
+      additionalProperties: false
+      required: [importJobId, window]
+      properties:
+        importJobId: { $ref: '#/components/schemas/Uuid' }
+        window:
+          type: object
+          additionalProperties: false
+          required: [from, to]
+          properties:
+            from: { $ref: '#/components/schemas/LocalDate' }
+            to: { $ref: '#/components/schemas/LocalDate' }
     ImportPdfInfo:
       type: object
       additionalProperties: false
@@ -23243,13 +24085,21 @@ components:
     ImportCreateFromDocumentRequest:
       type: object
       additionalProperties: false
-      required: [accountId, documentId]
+      required: [documentId]
       description: >-
         Creates an import from an uploaded document (purpose `IMPORT_SOURCE`, status `AVAILABLE`). The format is the one
-        detected in the content of the document.
+        detected in the content of the document. `accountId` is required unless `connectionId` is given: with a
+        `connectionId` the document is the exchange history file of that file connection (openspec
+        add-banking-providers; the assets map to the accounts of the connection, the format must be a verified one or
+        the operation fails with 422 `IMPORT_UNSUPPORTED_FORMAT`).
       properties:
         accountId: { $ref: '#/components/schemas/Uuid' }
         documentId: { $ref: '#/components/schemas/Uuid' }
+        connectionId:
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+          description: File connection that receives the history file (OWNER or EDITOR).
+
         mappingProfileId:
           allOf:
             - $ref: '#/components/schemas/Uuid'

@@ -17,6 +17,7 @@ import {
   type RuleStatus,
   type RuleSubject,
   type RuleTrigger,
+  type TriggerFilter,
 } from '../domain/index.js';
 import type { RuleVersionRecord, RulesDeps } from './ports/index.js';
 
@@ -35,6 +36,8 @@ export interface RuleStats {
 
 export interface RuleView {
   readonly rule: RuleState;
+  /** Sugerencia de origen (add-rule-suggestions), o `null`. */
+  readonly fromSuggestion: { readonly suggestionId: string; readonly acceptedAt: string } | null;
   readonly status: RuleStatus;
   /** Algún destino de sus acciones está archivado o ya no existe. */
   readonly needsAttention: boolean;
@@ -169,6 +172,14 @@ export class RulesQueries {
     });
   }
 
+  /** Sugerencia que originó una regla (add-rule-suggestions), o `null`. */
+  async suggestionOrigin(workspaceId: string, ruleId: string) {
+    return this.deps.uow.run(workspaceId, async () => {
+      const found = await this.deps.decisions.acceptedByRules(workspaceId, [ruleId]);
+      return found.get(ruleId) ?? null;
+    });
+  }
+
   /** Nombre y estado de las reglas dadas (incluye archivadas: las transacciones clasificadas las siguen mostrando). */
   async names(
     workspaceId: string,
@@ -196,6 +207,10 @@ export class RulesQueries {
       actions: states.flatMap((s) => (s.archivedAt === null ? s.actions : [])),
     });
     const stats = new Map((await this.deps.coverage.ruleStats({ workspaceId })).map((s) => [s.ruleId, s]));
+    const origins = await this.deps.decisions.acceptedByRules(
+      workspaceId,
+      states.map((r) => r.id),
+    );
     const now = this.deps.clock.now().toDate().getTime();
     return states.map((rule): RuleView => {
       const s = stats.get(rule.id);
@@ -208,6 +223,7 @@ export class RulesQueries {
         (lastAppliedAt === null || now - new Date(lastAppliedAt).getTime() >= UNUSED_DAYS * DAY_MS);
       return {
         rule,
+        fromSuggestion: origins.get(rule.id) ?? null,
         status: ruleStatus(rule),
         needsAttention: rule.archivedAt === null && hasArchivedTarget(rule.actions, catalog),
         stats: { classifiedTransactions: s?.count ?? 0, lastAppliedAt, unusedFor90Days: unused },
@@ -242,12 +258,13 @@ export class RulesQueries {
     subjects: readonly RuleSubject[],
     trigger: RuleTrigger,
     mode: EvaluationMode,
+    options: { readonly triggerFilter?: TriggerFilter } = {},
   ): Promise<RuleOutcome[]> {
     if (subjects.length === 0 || rules.length === 0) {
       return subjects.map((s) => emptyOutcome(s.ref));
     }
     this.evict();
-    const set = CompiledRuleSet.compile(rules, trigger, this.compiled);
+    const set = CompiledRuleSet.compile(rules, trigger, this.compiled, options);
     if (set.size === 0) return subjects.map((s) => emptyOutcome(s.ref));
     const catalog = await this.deps.catalog.load({ workspaceId, actions: rules.flatMap((r) => r.actions) });
     return subjects.map((s) => set.evaluate(s, mode, catalog));

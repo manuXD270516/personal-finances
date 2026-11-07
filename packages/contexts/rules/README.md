@@ -23,3 +23,9 @@ puerto `RuleSuggestionPort` y la composición de `apps/api` lo adapta a `RuleEva
 |---|---|
 | `pnpm test` | Unitarios y de propiedades de dominio y aplicación (`src/**/*.test.ts`) |
 | `pnpm test:integration` | Repositorio, RLS y permisos contra PostgreSQL 18 (Testcontainers; requiere Docker) |
+
+**Sugerencias (`add-rule-suggestions`, Phase 7):** `RuleProposalMiner` (dominio puro: `descriptionKey`, `proposalFingerprint`,
+`mineProposals`, `assessCoverage`) y `RuleProposalsService` (listar, probar, descartar y restaurar) calculan a pedido, sin
+jobs ni consumidores; solo se persisten las decisiones (`rules.rule_suggestion_decision`, migración `20261106120000`).
+Aceptar es `RulesService.createRule` con `fromSuggestion`. Los nombres usan `RuleProposal*` para no confundirse con
+`RuleSuggestionPort` de Transactions. Variables `RULES_SUGGEST_*` en `docs/config-reference.md`.

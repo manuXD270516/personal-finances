@@ -100,6 +100,8 @@ export function toRowView(
     occurrenceCandidates: row.occurrenceCandidates.map(toOccurrenceCandidateView),
     occurrenceLink: row.occurrenceLink,
     transfer: row.edits.transfer ?? null,
-    conversion: row.edits.conversion ?? null,
+    // Trade de un exchange: la conversión propuesta por el proveedor se muestra hasta que el usuario la edite.
+    conversion: row.edits.conversion ?? row.external?.conversion ?? null,
+    accountId: row.accountId,
   };
 }

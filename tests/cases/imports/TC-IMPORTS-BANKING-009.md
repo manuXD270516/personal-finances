@@ -5,16 +5,18 @@ spec: imports/banking-providers
 related_specs: []
 requirement: "Credenciales cifradas y nunca expuestas"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-013"]
 nfr: ["NFR-SEC-015", "NFR-SEC-007"]
 invariants: []
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/banking.test.ts
+  - apps/api/test/api/imports-connections.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "banking-providers"]
@@ -33,7 +35,7 @@ steps:
 expected_result:
   - "0 apariciones del secreto"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-04
 ---
 
 # TC-IMPORTS-BANKING-009 — El secreto no aparece en logs, errores, auditoría, idempotencia ni export

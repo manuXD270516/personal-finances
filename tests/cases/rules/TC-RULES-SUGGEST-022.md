@@ -5,16 +5,18 @@ spec: rules/rule-engine
 related_specs: ["security/access-control"]
 requirement: "Permisos, auditoría y aislamiento de las sugerencias"
 scenario: "Evidencia de otro workspace"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-RULES-011"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: high
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/rule-suggestions.api.test.ts
+  - packages/contexts/rules/test/integration/pg-rules.int.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["rules","rule-suggestions"]

@@ -167,6 +167,7 @@
   "RULE_INVALID_REGEX": "La expresión regular no es válida o usa construcciones sin evaluación de tiempo lineal (referencias hacia atrás, lookaround o más de 200 caracteres).",
   "RULE_LIMIT_EXCEEDED": "El espacio de trabajo alcanzó el máximo de reglas. Archiva alguna para crear otra.",
   "RULE_DRY_RUN_STALE": "Una regla o una transacción cambió después de la ejecución. No se aplicó nada: vuelve a ejecutar.",
+  "RULE_SUGGESTION_DECIDED": "Esa sugerencia ya fue aceptada o descartada.",
   "IMPORT_PDF_NO_TEXT": "Este PDF no tiene texto (parece escaneado o fotografiado). Descarga el extracto digital desde tu banca por internet o registra los movimientos a mano.",
   "IMPORT_PDF_LAYOUT_UNKNOWN": "Este PDF tiene texto pero no coincide con ningún formato de extracto conocido. Descarga el extracto de cuenta (no el de tarjeta) desde la banca por internet; si el banco cambió su formato, avísanos.",
   "IMPORT_PDF_EXTRACTION_FAILED": "No pudimos leer el PDF dentro de los límites de seguridad (tiempo, memoria, páginas o archivo dañado). Descárgalo de nuevo desde la banca por internet.",
@@ -175,5 +176,9 @@
   "IMPORT_PDF_ACCOUNT_MISMATCH": "El extracto es de otra cuenta que la elegida (los últimos 4 dígitos no coinciden). Elige la cuenta correcta e inténtalo de nuevo.",
   "REPORT_EXPORT_TOO_LARGE": "El reporte tiene más de 50 000 filas para exportar. Acota el rango de fechas o agrega filtros y vuelve a intentarlo.",
   "SAVED_VIEW_NAME_TAKEN": "Ya tienes una vista de este reporte con ese nombre. Elige otro nombre.",
-  "SAVED_VIEW_LIMIT_EXCEEDED": "Llegaste al máximo de 50 vistas guardadas en este espacio. Borra alguna para guardar otra."
+  "SAVED_VIEW_LIMIT_EXCEEDED": "Llegaste al máximo de 50 vistas guardadas en este espacio. Borra alguna para guardar otra.",
+  "BANKING_PROVIDER_NOT_AVAILABLE": "Este proveedor todavía no está disponible: sus términos de uso o su formato aún no se verificaron. Elige otro o inténtalo más adelante.",
+  "CONNECTION_CREDENTIAL_NOT_READ_ONLY": "La clave de API permite operar, retirar o transferir. Crea en el exchange una clave de solo lectura y vuelve a conectarla; la clave anterior se destruyó.",
+  "CONNECTION_SYNC_IN_PROGRESS": "Esta conexión ya tiene una sincronización en curso. Espera a que termine o cancela su vista previa.",
+  "IMPORT_CONNECTION_EXPIRED": "El proveedor rechazó la clave de la conexión (fue borrada o venció). Reemplaza la credencial por una clave de solo lectura."
 }

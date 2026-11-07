@@ -28,6 +28,18 @@ Esquema de BD: `apps/api/db/migrations/20261010400000_txn_import_job_id.sql`, `2
 `20261010400200_imports_schema.sql`. Decisiones en `openspec/changes/add-basic-csv-import/design.md`; operación en
 [`docs/runbooks/importar-extracto-csv.md`](../../../docs/runbooks/importar-extracto-csv.md).
 
+## Conexiones con proveedores y exchanges (`add-banking-providers`)
+
+Puerto común `BankingProvider`/`FileHistoryProvider` (`src/application/banking/ports.ts`) con descriptor por proveedor
+(`src/domain/banking`): un proveedor real solo se ofrece con términos y formato **verificados** (los de Binance y Bybit
+siguen `PENDING` hasta la puerta del owner, ADR-0031 propuesto). Las credenciales se cifran con **sobre X25519 + HKDF +
+AES-256-GCM** (`CredentialVault`): la API cifra con la clave pública y solo el worker descifra; nunca salen en respuestas,
+logs, auditoría, clave de idempotencia ni export, y revocar las destruye. `imports.connection-verify`,
+`imports.connection-sync` e `imports.credentials-rewrap` corren en la cola existente (concurrencia 1). Los registros del
+proveedor entran al pipeline por `ExternalRecordStager` (un import de una conexión procesa **una pasada por cuenta**).
+`FAKE_EXCHANGE` (`IMPORTS_PROVIDER_FAKE_ENABLED`, prohibido en staging y producción) y `providerContractSuite` cubren el
+comportamiento sin red. Runbook: `docs/runbooks/conectar-un-exchange-y-revocar-una-clave.md`.
+
 | Script                  | Efecto                                                                                                                                                                         |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pnpm test`             | Unitarios, propiedades y aplicación con dobles en memoria (`src/**/*.test.ts`)                                                                                                 |

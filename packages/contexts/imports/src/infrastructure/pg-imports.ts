@@ -27,6 +27,7 @@ import {
   type ClassificationProposal,
   type CsvMapping,
   type Decision,
+  type ExternalRowData,
   type ImportJobState,
   type OccurrenceCandidateEntry,
   type OccurrenceLinkState,
@@ -110,6 +111,7 @@ interface JobRow {
   version: number;
   source: ImportJobState['source'];
   document_id: string | null;
+  connection_id: string | null;
   format: ImportJobState['format'];
   mapping_profile_id: string | null;
   mapping_profile_version: number | null;
@@ -138,7 +140,7 @@ const JOB_COLUMNS = sql`
   j.created_by,
   to_char(j.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
   to_char(j.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at,
-  j.version, j.source, j.document_id, j.format, j.mapping_profile_id, j.mapping_profile_version, j.profile_mapping,
+  j.version, j.source, j.document_id, j.connection_id, j.format, j.mapping_profile_id, j.mapping_profile_version, j.profile_mapping,
   j.read_options, j.mapping_help, j.statement, j.reconciliation, j.revert,
   to_char(j.reverted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS reverted_at,
   j.reverted_by, j.rules_summary, j.failure, j.pdf`;
@@ -179,6 +181,7 @@ const toJob = (r: JobRow): ImportJob =>
     version: Number(r.version),
     source: r.source,
     documentId: r.document_id,
+    connectionId: r.connection_id,
     format: r.format,
     mappingProfile:
       r.mapping_profile_id === null
@@ -210,7 +213,7 @@ export class PgImportJobRepository implements ImportJobRepository {
          row_count, column_count, header, mapping, counters, progress, errors, warnings, approved_by, approved_at,
          completed_at, cancelled_at, cancelled_by, expires_at, created_by, created_at, updated_at, version,
          source, document_id, format, mapping_profile_id, mapping_profile_version, profile_mapping, read_options, mapping_help,
-         statement, reconciliation, revert, reverted_at, reverted_by, rules_summary, failure, pdf)
+         statement, reconciliation, revert, reverted_at, reverted_by, rules_summary, failure, pdf, connection_id)
       VALUES
         (${s.id}, ${s.workspaceId}, ${s.accountId}, ${s.status}, ${s.originalName}, decode(${s.fileChecksum}, 'hex'),
          ${s.fileSizeBytes}, ${s.encoding}, ${s.delimiter}, ${s.rowCount}, ${s.columnCount}, ${json(s.header)}::jsonb,
@@ -223,7 +226,7 @@ export class PgImportJobRepository implements ImportJobRepository {
          ${s.mappingProfile?.version ?? null}, ${jsonOrNull(s.profileMapping)}::jsonb, ${jsonOrNull(s.readOptions)}::jsonb, ${jsonOrNull(s.mappingHelp)}::jsonb,
          ${jsonOrNull(s.statement)}::jsonb, ${jsonOrNull(s.reconciliation)}::jsonb, ${jsonOrNull(s.revert)}::jsonb,
          ${s.revertedAt}::timestamptz, ${s.revertedBy}, ${jsonOrNull(s.rulesSummary)}::jsonb,
-         ${jsonOrNull(s.failure)}::jsonb, ${jsonOrNull(s.pdf)}::jsonb)`.execute(db());
+         ${jsonOrNull(s.failure)}::jsonb, ${jsonOrNull(s.pdf)}::jsonb, ${s.connectionId})`.execute(db());
   }
 
   async findById(workspaceId: string, id: string, options?: { readonly lock?: 'update' }) {
@@ -354,6 +357,8 @@ interface StagedDbRow {
   decided_at: string | null;
   decided_score: string | null;
   warnings: RowIssue[] | null;
+  account_id: string | null;
+  external: ExternalRowData | null;
 }
 
 const STAGED_COLUMNS = sql`
@@ -364,7 +369,7 @@ const STAGED_COLUMNS = sql`
   s.running_balance::text AS running_balance, s.reference, s.counterparty_text, s.kind, s.proposal, s.edits,
   s.candidates, s.occurrence_candidates, s.occurrence_link, s.duplicate_of_row, s.decided_by,
   to_char(s.decided_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS decided_at,
-  s.decided_score::text AS decided_score, s.warnings`;
+  s.decided_score::text AS decided_score, s.warnings, s.account_id, s.external`;
 
 const toStaged = (r: StagedDbRow): StagedRow => ({
   id: r.id,
@@ -401,6 +406,8 @@ const toStaged = (r: StagedDbRow): StagedRow => ({
   decidedAt: r.decided_at,
   decidedScore: r.decided_score,
   warnings: r.warnings ?? [],
+  accountId: r.account_id,
+  external: r.external,
 });
 
 /** Categoría efectiva de la fila: la editada (aunque sea vacía) o, si no, la de la propuesta. */
@@ -702,6 +709,8 @@ export class PgStagingRepository implements StagingRepository {
         id: r.id,
         n: r.rowNumber,
         raw: r.raw,
+        accountId: r.accountId ?? null,
+        external: r.external ?? null,
         rec: r.record
           ? {
               date: r.record.bookingDate,
@@ -720,14 +729,15 @@ export class PgStagingRepository implements StagingRepository {
       await sql`
         INSERT INTO imports.staged_transaction
           (id, workspace_id, import_job_id, row_number, raw, booking_date, booking_time, value_date, amount, direction,
-           description, external_id, reference, counterparty_text, running_balance, issues)
+           description, external_id, reference, counterparty_text, running_balance, issues, account_id, external)
         SELECT (e->>'id')::uuid, ${workspaceId}::uuid, ${jobId}::uuid, (e->>'n')::int, e->'raw',
                (e#>>'{rec,date}')::date, (e#>>'{rec,time}')::time, (e#>>'{rec,valueDate}')::date,
                abs((e#>>'{rec,amount}')::numeric),
                CASE WHEN (e#>>'{rec,amount}')::numeric < 0 THEN 'OUT'
                     WHEN (e#>>'{rec,amount}')::numeric > 0 THEN 'IN' END,
                e#>>'{rec,description}', e#>>'{rec,externalId}', e#>>'{rec,reference}', e#>>'{rec,counterparty}',
-               (e#>>'{rec,runningBalance}')::numeric, COALESCE(e#>'{rec,issues}', '[]'::jsonb)
+               (e#>>'{rec,runningBalance}')::numeric, COALESCE(e#>'{rec,issues}', '[]'::jsonb),
+               (e->>'accountId')::uuid, e->'external'
           FROM jsonb_array_elements(${json(payload)}::jsonb) e
         ON CONFLICT (import_job_id, row_number) DO NOTHING`.execute(db());
     }

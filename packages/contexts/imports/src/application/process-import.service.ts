@@ -2,8 +2,10 @@ import type { AuditChangeInput } from '@pf/audit/contracts';
 import { DomainError, LocalDate, dec } from '@pf/shared-kernel';
 import { IMPORTS_EVENTS } from '../contracts/index.js';
 import {
+  EMPTY_PROPOSAL,
   matchProfile,
   resolveMapping,
+  type ClosedPeriodRange,
   TABULAR_FORMATS,
   type ImportFailure,
   type ImportJob,
@@ -20,9 +22,9 @@ import {
 } from '../domain/index.js';
 import { publishJobEvent, recordJob, SYSTEM_ACTOR } from './job-recorder.js';
 import type { PdfStatementReader } from './pdf/pdf-statement-reader.js';
-import type { ImportsDeps, StagedInsert, StoredProfileVersion } from './ports/index.js';
+import type { ImportsDeps, StagedInsert, StagedRow, StoredProfileVersion } from './ports/index.js';
 import { countersOf } from './row-pipeline.js';
-import { runStatementPipeline, type StageName } from './statement-pipeline.js';
+import { runStatementPipeline, type PipelineOutput, type StageName } from './statement-pipeline.js';
 
 /** Filas por bloque de lectura y de escritura (decisión 3: etapas por bloques de 1 000 con punto de control). */
 export const IMPORT_BLOCK = 1000;
@@ -103,6 +105,130 @@ export class ProcessImportService {
       if (err instanceof Stopped) return 'CANCELLED';
       throw err;
     }
+  }
+
+  /**
+   * Etapas de un import de una CONEXIÓN (add-banking-providers): los registros del proveedor ya están en el staging
+   * (los escribió `imports.connection-sync` página a página); entra en la normalización y recorre las etapas hasta
+   * `AWAITING_REVIEW`. Reanudable: las etapas recalculan todo desde el staging.
+   */
+  async processConnection(input: {
+    readonly workspaceId: string;
+    readonly importId: string;
+  }): Promise<ProcessOutcome> {
+    const { deps } = this;
+    const { workspaceId, importId } = input;
+    const started = await deps.uow.runDetached(workspaceId, async () => {
+      const job = await deps.jobs.findById(workspaceId, importId, { lock: 'update' });
+      if (!job || !job.isConnectionJob || job.state.status !== 'PROCESSING') return null;
+      return job.state;
+    });
+    if (!started) return 'SKIPPED';
+    const deadline = deps.clock.now().epochMillis + deps.settings.processingTimeoutMs;
+    try {
+      await this.moveToStage(started, 'NORMALIZE');
+      // Las etapas leen vínculos, duplicados y coincidencias bajo el contexto del workspace: dentro del consumidor lo
+      // aporta su transacción de bandeja; aquí, en el job de la cola, se abre una (las escrituras de etapa siguen en
+      // transacciones propias con `runDetached`).
+      return await this.deps.uow.run(workspaceId, () => this.enrichStage(started, deadline));
+    } catch (err) {
+      if (err instanceof Stopped) return 'CANCELLED';
+      throw err;
+    }
+  }
+
+  /** Una pasada del pipeline por cuenta de las filas (cada activo mapea a su cuenta); une las salidas. */
+  private async runConnectionPipeline(
+    state: ImportJobState,
+    staged: readonly StagedRow[],
+    env: {
+      readonly timeZone: string;
+      readonly closedPeriods: readonly ClosedPeriodRange[];
+      readonly hooks: { readonly onStage: (stage: StageName, processedRows: number) => Promise<void> };
+    },
+  ): Promise<PipelineOutput> {
+    const { deps } = this;
+    const { workspaceId } = state;
+    const groups = new Map<string, StagedRow[]>();
+    for (const row of staged) {
+      const key = row.accountId ?? state.accountId;
+      const group = groups.get(key);
+      if (group) group.push(row);
+      else groups.set(key, [row]);
+    }
+    const items: PipelineOutput['items'][number][] = [];
+    const resetIds: string[] = [];
+    const superseded: string[] = [];
+    let rulesUnavailable = false;
+    for (const [accountId, group] of groups) {
+      const account = await deps.uow.run(workspaceId, () => deps.accounts.getAccount(workspaceId, accountId));
+      if (!account) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found');
+      const scale = await deps.uow.run(workspaceId, () => deps.currencies.scaleOf(account.currency));
+      if (scale === null) throw new DomainError('VALIDATION_FAILED', 'the account currency is not active');
+      const out = await runStatementPipeline(
+        deps,
+        {
+          workspaceId,
+          accountId,
+          currencyCode: account.currency,
+          scale,
+          timeZone: env.timeZone,
+          format: 'JSON',
+          mapping: null,
+          descriptionCleanup: [],
+          closedPeriods: env.closedPeriods,
+          openingBalance: null,
+        },
+        group,
+        env.hooks,
+      );
+      items.push(...out.items);
+      resetIds.push(...out.resetIds);
+      superseded.push(...out.supersededFingerprints);
+      rulesUnavailable ||= out.rulesUnavailable;
+    }
+    return { items, resetIds, supersededFingerprints: superseded, rulesUnavailable };
+  }
+
+  /**
+   * Lo que solo conoce la conexión: las conversiones se muestran como tales, la señal «posible transferencia» viaja
+   * como advertencia y las comisiones proponen la categoría de sistema `FEES` si las reglas no clasificaron la fila.
+   */
+  private async applyConnectionHints(
+    workspaceId: string,
+    staged: readonly StagedRow[],
+    output: PipelineOutput,
+  ): Promise<PipelineOutput> {
+    const byId = new Map(staged.map((s) => [s.id, s] as const));
+    const needsFees = staged.some((s) => s.external?.categoryHint === 'FEES');
+    const lookup = this.deps.systemCategories;
+    const feesCategory =
+      needsFees && lookup
+        ? await this.deps.uow.run(workspaceId, () => lookup.feesCategoryId(workspaceId))
+        : null;
+    const items = output.items.map((item) => {
+      const ext = byId.get(item.id)?.external;
+      if (!ext) return item;
+      let next = item;
+      if (ext.kind === 'CONVERSION' && item.classification !== 'INVALID') {
+        next = { ...next, kind: 'CONVERSION' };
+      }
+      if (ext.signal !== null && !next.warnings.some((w) => w.code === ext.signal)) {
+        next = { ...next, warnings: [...next.warnings, { code: ext.signal, severity: 'WARNING' }] };
+      }
+      if (ext.categoryHint === 'FEES' && feesCategory && (next.proposal?.category ?? null) === null) {
+        next = {
+          ...next,
+          proposal: {
+            ...(next.proposal ?? EMPTY_PROPOSAL),
+            // Categoría por defecto del tipo de movimiento (comisión): `SYSTEM_DEFAULT` significa «sin categoría» en TRANSACTIONS.
+            category: { value: feesCategory, origin: { type: 'COUNTERPARTY_DEFAULT' } },
+          },
+        };
+      }
+      return next;
+    });
+    return { ...output, items };
   }
 
   // ───────────────────────────────────────────────────────────── lectura (PARSE)
@@ -466,7 +592,7 @@ export class ProcessImportService {
     const timeZone = await deps.uow.run(workspaceId, () => deps.calendar.timeZoneOf(workspaceId));
     const closedPeriods = await deps.uow.run(workspaceId, () => deps.periods.listClosed(workspaceId));
     const staged = await deps.uow.run(workspaceId, () => deps.staging.loadAll(workspaceId, state.id));
-    const format = (fresh.format ?? 'CSV') as StatementFormat;
+    const format = (fresh.format ?? (fresh.connectionId ? 'JSON' : 'CSV')) as StatementFormat;
 
     const tabular = TABULAR_FORMATS.includes(format);
     if (tabular && fresh.profileMapping === null) {
@@ -487,37 +613,44 @@ export class ProcessImportService {
     const layoutRef = fresh.pdf?.layout ?? null;
     const volatileFragments = layoutRef ? (deps.pdf?.layoutOf(layoutRef)?.volatileFragments ?? []) : [];
     const openingDifference = await this.openingDifference(fresh, account, scale);
-    const output = await runStatementPipeline(
-      deps,
-      {
-        workspaceId,
-        accountId: state.accountId,
-        currencyCode: account.currency,
-        scale,
-        timeZone,
-        format,
-        mapping: tabular ? fresh.profileMapping : null,
-        descriptionCleanup: cleanup,
-        volatileFragments,
-        closedPeriods,
-        openingBalance: fresh.statement?.openingBalance ?? null,
-      },
-      staged,
-      {
-        onStage: async (stage: StageName, processedRows: number) => {
-          if (deps.clock.now().epochMillis > deadline) throw new TimedOut();
-          await deps.uow.runDetached(workspaceId, async () => {
-            const job = await this.lockProcessing(state);
-            job.checkpoint({
-              stage,
-              processedRows,
-              totalRows: Math.max(0, staged.length),
-              now: deps.clock.now().toString(),
-            });
-            await this.save(job);
+    const hooks = {
+      onStage: async (stage: StageName, processedRows: number) => {
+        if (deps.clock.now().epochMillis > deadline) throw new TimedOut();
+        await deps.uow.runDetached(workspaceId, async () => {
+          const job = await this.lockProcessing(state);
+          job.checkpoint({
+            stage,
+            processedRows,
+            totalRows: Math.max(0, staged.length),
+            now: deps.clock.now().toString(),
           });
-        },
+          await this.save(job);
+        });
       },
+    };
+    const runOutput = fresh.connectionId
+      ? this.runConnectionPipeline(fresh, staged, { timeZone, closedPeriods, hooks })
+      : null;
+    let output = await (
+      runOutput ??
+      runStatementPipeline(
+        deps,
+        {
+          workspaceId,
+          accountId: state.accountId,
+          currencyCode: account.currency,
+          scale,
+          timeZone,
+          format,
+          mapping: tabular ? fresh.profileMapping : null,
+          descriptionCleanup: cleanup,
+          volatileFragments,
+          closedPeriods,
+          openingBalance: fresh.statement?.openingBalance ?? null,
+        },
+        staged,
+        hooks,
+      )
     ).catch(async (err: unknown) => {
       if (err instanceof TimedOut) {
         await this.fail(state, { code: 'IMPORT_PARSE_FAILED', pointer: 'timeout' }, 'NORMALIZE');
@@ -526,6 +659,7 @@ export class ProcessImportService {
       throw err;
     });
     if (output === null) return 'PARSE_FAILED';
+    if (fresh.connectionId) output = await this.applyConnectionHints(workspaceId, staged, output);
 
     const rulesSummary = this.coverageOf(
       output.items.filter((i) => i.classification !== 'INVALID'),

@@ -36,6 +36,9 @@ import {
   rulesPath,
   ruleToDraft,
   seedFromQuery,
+  suggestionFromQuery,
+  suggestionRuleBody,
+  draftFromSuggestion,
   validateDraft,
   type ActionDraft,
   type ConditionDraft,
@@ -578,9 +581,16 @@ function RuleEditor({ ctx, ruleId }: { ctx: WorkspaceContext; ruleId: string | u
   const customFields = useCustomFields(ctx);
   const search = useSearchParams();
   const seed = useMemo(() => seedFromQuery(new URLSearchParams(search?.toString() ?? '')), [search]);
+  // «Aceptar…» de una sugerencia (add-rule-suggestions): borrador prellenado; al guardar se envía `fromSuggestion`.
+  const suggestion = useMemo(
+    () => (ruleId ? undefined : suggestionFromQuery(new URLSearchParams(search?.toString() ?? ''))),
+    [search, ruleId],
+  );
   const [rule, setRule] = useState<Rule | undefined>();
   const [versions, setVersions] = useState<readonly RuleVersion[]>([]);
-  const [draft, setDraft] = useState<RuleDraft>(() => (ruleId ? emptyDraft() : draftFromSeed(seed)));
+  const [draft, setDraft] = useState<RuleDraft>(() =>
+    ruleId ? emptyDraft() : suggestion ? draftFromSuggestion(suggestion) : draftFromSeed(seed),
+  );
   const [loaded, setLoaded] = useState(ruleId === undefined);
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [errors, setErrors] = useState<readonly DraftError[]>([]);
@@ -664,8 +674,17 @@ function RuleEditor({ ctx, ruleId }: { ctx: WorkspaceContext; ruleId: string | u
         await load();
         setSaved(true);
       } else {
-        const r = await api.command<Rule>('POST', rulesPath(base), body);
-        if (r.data) window.location.assign(ctx.href(`/reglas/${r.data.id}`));
+        const r = await api.command<Rule>(
+          'POST',
+          rulesPath(base),
+          suggestion ? suggestionRuleBody(draft, suggestion) : body,
+        );
+        // Una regla creada desde una sugerencia ofrece «Aplicar a transacciones existentes» (dry-run solo de esa regla).
+        if (r.data) {
+          window.location.assign(
+            suggestion ? `${ctx.href('/reglas')}?apply=${r.data.id}` : ctx.href(`/reglas/${r.data.id}`),
+          );
+        }
       }
       setProblem(undefined);
     } catch (err) {
@@ -776,7 +795,12 @@ function RuleEditor({ ctx, ruleId }: { ctx: WorkspaceContext; ruleId: string | u
           {rule.needsAttention ? <span data-testid="rule-attention"> · {f.t('list.attention')}</span> : null}
         </p>
       ) : null}
-      {!ruleId && Object.keys(seed).length > 0 ? (
+      {!ruleId && suggestion ? (
+        <p style={warningStyle} role="status" data-testid="rule-suggestion-notice">
+          {f.t('editor.fromSuggestion')}
+        </p>
+      ) : null}
+      {!ruleId && !suggestion && Object.keys(seed).length > 0 ? (
         <p style={warningStyle} role="status" data-testid="rule-seed-notice">
           {f.t('editor.seedNotice')}
         </p>

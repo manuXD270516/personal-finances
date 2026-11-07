@@ -91,6 +91,8 @@ import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-
 import { registerDebtCardsJob } from './debt-jobs.js';
 import { registerGoalsDailyJob } from './goals-jobs.js';
 import { registerImportsJobs } from './imports-jobs.js';
+import { registerConnectionJobs } from './connection-jobs.js';
+import { bankingOptionsFrom, feesCategoryPort } from '../imports/banking-wiring.js';
 import { registerDocumentsJobs } from './documents-jobs.js';
 import { documentsRuntimeFor } from '../documents/documents-wiring.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
@@ -585,10 +587,17 @@ export async function createWorkerRuntime(
       accountCatalog: finance.accounts.catalog,
     }),
     settings: importsSettingsFrom(config),
+    // Conexiones con proveedores (add-banking-providers): SOLO el worker lee las claves privadas (D342).
+    banking: bankingOptionsFrom(config, queue, true),
+    systemCategories: feesCategoryPort(finance.classification.queries),
   });
   await registerImportsJobs(queue, imports.maintenance, activeWorkspaces, logger, {
     cron: config.IMPORT_MAINTENANCE_CRON,
     runOnStart: scheduledJobs && (options.importsOnStart ?? true),
+  });
+  // Tres jobs en la cola existente con concurrencia 1 (D249): no suman consumidores ni cambian el pool.
+  await registerConnectionJobs(queue, imports, activeWorkspaces, logger, {
+    rewrapOnStart: scheduledJobs && (options.importsOnStart ?? true),
   });
 
   // DOCUMENTS (add-document-attachments): UN job secuencial de mantenimiento (expiración, cuarentena, huérfanos, purga y

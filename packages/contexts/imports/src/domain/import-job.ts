@@ -24,6 +24,7 @@ export const IMPORT_JOB_AGGREGATE = 'ImportJob';
 export type ImportJobTransition =
   | 'CREATE'
   | 'CREATE_FROM_DOCUMENT'
+  | 'CREATE_FROM_CONNECTION'
   | 'START'
   | 'AWAIT_MAPPING'
   | 'APPLY_MAPPING'
@@ -81,6 +82,14 @@ export const IMPORT_JOB_LIFECYCLE = LifecycleMachine.define({
       to: ['UPLOADED'],
       guard: 'OWNER o EDITOR; cuenta activa; documento disponible de propósito «extracto para importar»',
       events: ['imports.ImportFileUploaded.v1'],
+    },
+    {
+      code: 'CREATE_FROM_CONNECTION',
+      from: [],
+      to: ['PROCESSING'],
+      guard:
+        'OWNER o EDITOR; conexión activa de un proveedor; sin otra sincronización en curso (add-banking-providers)',
+      events: [],
     },
     {
       code: 'START',
@@ -259,15 +268,30 @@ export const IMPORT_SOURCES = [
   'FILE_JSON',
   'FILE_XLSX',
   'FILE_PDF',
+  // add-banking-providers: movimientos de una conexión con un exchange (API o archivo de historial).
+  'EXCHANGE_API',
+  'EXCHANGE_FILE',
 ] as const;
 export type ImportSource = (typeof IMPORT_SOURCES)[number];
 
 export const sourceOfFormat = (format: StatementFormat): ImportSource => `FILE_${format}`;
 
+/** Fallas de una sincronización con un proveedor (add-banking-providers). */
+export const CONNECTION_IMPORT_FAILURE_CODES = [
+  'IMPORT_CONNECTION_EXPIRED',
+  'PROVIDER_UNAVAILABLE',
+  'CONNECTION_CREDENTIAL_NOT_READ_ONLY',
+] as const;
+export type ConnectionImportFailureCode = (typeof CONNECTION_IMPORT_FAILURE_CODES)[number];
+
 /** Falla estructural del archivo (`PARSE_FAILED`): código y ubicación, nunca texto del archivo (NFR-SEC-015). */
 export interface ImportFailure {
   readonly code:
-    'IMPORT_PARSE_FAILED' | 'IMPORT_TOO_MANY_ROWS' | 'IMPORT_UNSUPPORTED_FORMAT' | PdfImportFailureCode;
+    | 'IMPORT_PARSE_FAILED'
+    | 'IMPORT_TOO_MANY_ROWS'
+    | 'IMPORT_UNSUPPORTED_FORMAT'
+    | PdfImportFailureCode
+    | ConnectionImportFailureCode;
   readonly pointer: string | null;
   readonly detail?: string;
 }
@@ -401,6 +425,8 @@ export interface ImportJobState {
   // ── Phase 6 (add-import-pipeline): todos opcionales para los jobs de la ruta CSV básica.
   readonly source: ImportSource;
   readonly documentId: string | null;
+  /** Conexión de la que proviene el import (sincronización o archivo de historial), o `null`. */
+  readonly connectionId: string | null;
   readonly format: StatementFormat | null;
   readonly mappingProfile: ImportMappingRef | null;
   /** Mapeo tabular efectivo de un job de documento (perfil aplicado o mapeo enviado), con posiciones resueltas. */
@@ -432,6 +458,7 @@ const CANCELLABLE: readonly ImportStatus[] = [
 const NO_PHASE6 = {
   source: 'FILE_CSV',
   documentId: null,
+  connectionId: null,
   format: null,
   mappingProfile: null,
   profileMapping: null,
@@ -570,6 +597,71 @@ export class ImportJob {
     return job;
   }
 
+  /**
+   * Sincronización de una conexión (add-banking-providers decisión 6): nace `PROCESSING` sin documento; el worker trae
+   * los registros del proveedor, los entrega a la normalización y el job queda en vista previa. `accountId` es la
+   * cuenta ancla (las filas llevan su propia cuenta en el staging).
+   */
+  static createFromConnection(input: {
+    readonly id: string;
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly connectionId: string;
+    readonly createdBy: string;
+    readonly now: string;
+    readonly source: 'EXCHANGE_API' | 'EXCHANGE_FILE';
+    readonly originalName: string | null;
+    /** SHA-256 hexadecimal de lo que identifica la corrida (ventana o archivo). */
+    readonly fileChecksum: string;
+    readonly fileSizeBytes: number;
+    readonly stage: ImportStage;
+  }): ImportJob {
+    const job = new ImportJob(
+      {
+        id: input.id,
+        workspaceId: input.workspaceId,
+        accountId: input.accountId,
+        status: 'PROCESSING',
+        originalName: input.originalName,
+        fileChecksum: input.fileChecksum,
+        fileSizeBytes: input.fileSizeBytes,
+        encoding: 'utf-8',
+        delimiter: ',',
+        rowCount: 0,
+        columnCount: 1,
+        header: [],
+        mapping: null,
+        counters: EMPTY_COUNTERS,
+        progress: {
+          attempt: 0,
+          batchCount: 0,
+          batchesDone: 0,
+          stage: input.stage,
+          processedRows: 0,
+          totalRows: 0,
+        },
+        errors: [],
+        warnings: [],
+        approvedBy: null,
+        approvedAt: null,
+        completedAt: null,
+        cancelledAt: null,
+        cancelledBy: null,
+        expiresAt: null,
+        createdBy: input.createdBy,
+        createdAt: input.now,
+        updatedAt: input.now,
+        version: 1,
+        ...NO_PHASE6,
+        source: input.source,
+        connectionId: input.connectionId,
+      },
+      0,
+    );
+    job.transitionRecord = { transition: 'CREATE_FROM_CONNECTION', from: null, to: 'PROCESSING' };
+    return job;
+  }
+
   static rehydrate(state: ImportJobState): ImportJob {
     return new ImportJob(state, state.version);
   }
@@ -599,6 +691,11 @@ export class ImportJob {
   /** `true` si el job viene de un documento (se procesa en el worker). */
   get isDocumentJob(): boolean {
     return this.current.documentId !== null;
+  }
+
+  /** `true` si el job viene de una sincronización o de un archivo de historial de una conexión. */
+  get isConnectionJob(): boolean {
+    return this.current.connectionId !== null;
   }
 
   private update(patch: Partial<ImportJobState>, now: string): void {

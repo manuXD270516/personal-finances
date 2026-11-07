@@ -6,6 +6,8 @@ import type { Pool } from 'pg';
 import type {
   IdGenerator,
   RuleNameRecord,
+  RuleProposalDecisionRecord,
+  RuleProposalDecisionRepository,
   RuleRepository,
   RuleVersionRecord,
   UnitOfWork,
@@ -243,4 +245,87 @@ function translate(err: unknown, name: string): unknown {
     return new DomainError('NAME_TAKEN', `a rule named '${name}' already exists`).at('/name');
   }
   return err;
+}
+
+interface DecisionRow {
+  suggestion_id: string;
+  pattern_type: RuleProposalDecisionRecord['patternType'];
+  pattern_value: string;
+  kind: RuleProposalDecisionRecord['kind'];
+  category_id: string;
+  decision: 'ACCEPTED' | 'DISMISSED';
+  rule_id: string | null;
+  support: number | null;
+  evidence_count: number | null;
+  confidence: string | null;
+  decided_at: string;
+  decided_by: string;
+}
+
+const DECISION_COLUMNS = sql`suggestion_id, pattern_type, pattern_value, kind, category_id, decision, rule_id, support,
+  evidence_count, confidence::text AS confidence, decided_by, ${iso('decided_at')} AS decided_at`;
+
+const decisionOf = (r: DecisionRow): RuleProposalDecisionRecord => ({
+  suggestionId: r.suggestion_id,
+  patternType: r.pattern_type,
+  patternValue: r.pattern_value,
+  kind: r.kind,
+  categoryId: r.category_id,
+  decision: r.decision,
+  ruleId: r.rule_id,
+  support: r.support,
+  evidenceCount: r.evidence_count,
+  confidence: r.confidence,
+  decidedAt: r.decided_at,
+  decidedBy: r.decided_by,
+});
+
+/** Decisiones sobre sugerencias de reglas (`rules.rule_suggestion_decision`, RLS forzada por workspace). */
+export class PgRuleProposalDecisionRepository implements RuleProposalDecisionRepository {
+  async list(workspaceId: string): Promise<RuleProposalDecisionRecord[]> {
+    const { rows } = await sql<DecisionRow>`
+      SELECT ${DECISION_COLUMNS} FROM rules.rule_suggestion_decision
+       WHERE workspace_id = ${workspaceId} ORDER BY suggestion_id`.execute(db());
+    return rows.map(decisionOf);
+  }
+
+  async find(workspaceId: string, suggestionId: string): Promise<RuleProposalDecisionRecord | null> {
+    const { rows } = await sql<DecisionRow>`
+      SELECT ${DECISION_COLUMNS} FROM rules.rule_suggestion_decision
+       WHERE workspace_id = ${workspaceId} AND suggestion_id = ${suggestionId}`.execute(db());
+    return rows[0] ? decisionOf(rows[0]) : null;
+  }
+
+  /** Atómico: la clave primaria `(workspace_id, suggestion_id)` serializa las decisiones concurrentes. */
+  async insert(workspaceId: string, r: RuleProposalDecisionRecord): Promise<boolean> {
+    const result = await sql`
+      INSERT INTO rules.rule_suggestion_decision (workspace_id, suggestion_id, pattern_type, pattern_value, kind,
+                                                  category_id, decision, rule_id, support, evidence_count, confidence,
+                                                  decided_at, decided_by)
+      VALUES (${workspaceId}, ${r.suggestionId}, ${r.patternType}, ${r.patternValue}, ${r.kind}, ${r.categoryId},
+              ${r.decision}, ${r.ruleId}, ${r.support}, ${r.evidenceCount}, ${r.confidence}::numeric,
+              ${r.decidedAt}::timestamptz, ${r.decidedBy})
+      ON CONFLICT (workspace_id, suggestion_id) DO NOTHING`.execute(db());
+    return Number(result.numAffectedRows ?? 0) === 1;
+  }
+
+  async deleteDismissed(workspaceId: string, suggestionId: string): Promise<boolean> {
+    const result = await sql`
+      DELETE FROM rules.rule_suggestion_decision
+       WHERE workspace_id = ${workspaceId} AND suggestion_id = ${suggestionId} AND decision = 'DISMISSED'`.execute(
+      db(),
+    );
+    return Number(result.numAffectedRows ?? 0) === 1;
+  }
+
+  async acceptedByRules(workspaceId: string, ruleIds: readonly string[]) {
+    if (ruleIds.length === 0) return new Map<string, { suggestionId: string; acceptedAt: string }>();
+    const { rows } = await sql<{ rule_id: string; suggestion_id: string; decided_at: string }>`
+      SELECT rule_id, suggestion_id, ${iso('decided_at')} AS decided_at
+        FROM rules.rule_suggestion_decision
+       WHERE workspace_id = ${workspaceId} AND decision = 'ACCEPTED' AND rule_id = ANY (${[...ruleIds]}::uuid[])`.execute(
+      db(),
+    );
+    return new Map(rows.map((r) => [r.rule_id, { suggestionId: r.suggestion_id, acceptedAt: r.decided_at }]));
+  }
 }

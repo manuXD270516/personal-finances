@@ -61,3 +61,21 @@ Pestaña **Ejecutar sobre el historial**:
   versión («v1, archivada»). Las reglas nunca se eliminan.
 - **Pendientes de revisión:** la acción «marcar para revisión» deja la transacción con una marca (sin efecto en el saldo).
   Transacciones → filtro «Pendientes de revisión»; se quita desde el detalle y queda auditado.
+
+## 5. Sugerencias de reglas (`add-rule-suggestions`)
+
+Reglas → pestaña «Sugerencias». Se calculan al abrirla, nunca en segundo plano.
+
+1. **Qué cuenta como evidencia:** las categorías que tú fijaste a mano en los últimos 180 días (puedes ampliar hasta 366):
+   origen manual, o anterior al motor de reglas en transacciones registradas a mano o importadas. Una corrección tuya de
+   lo que puso una regla también cuenta. No cuentan las fijadas por una regla, por la contraparte o por el sistema, ni las
+   transacciones con varios splits, las administradas por Deudas o Metas ni las de categorías archivadas.
+2. **Cuándo se sugiere:** al menos 3 transacciones del mismo patrón (glosa normalizada o contraparte) y del mismo tipo en la
+   misma categoría, con confianza ≥ 80 % (apoyo ÷ total del patrón). Un empate entre categorías no sugiere nada.
+3. **Probar** no cambia nada: cuenta cuántas transacciones de la ventana coinciden, cuántas completaría, cuántas ya están en
+   la categoría y cuántas tienen otra. **Aceptar…** abre el editor prellenado; la regla se crea solo al guardar y **no
+   reclasifica nada**: después la pantalla te lleva a «Ejecutar sobre el historial» solo con esa regla.
+4. **Descartar** la oculta aunque crezca su evidencia; «Ver también las descartadas» permite **Restaurar**. Una aceptada no
+   reaparece, aunque archives la regla: para volver a tenerla, créala a mano.
+5. Si la sugerencia choca con una regla existente, el aviso indica la regla, las transacciones afectadas y la prioridad
+   propuesta (una unidad menor); con prioridad 0 en conflicto no puede quedar antes (empata la antigüedad).

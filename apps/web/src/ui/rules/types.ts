@@ -102,6 +102,8 @@ export interface Rule {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly stats?: RuleStats;
+  /** Sugerencia de la que se creó la regla (add-rule-suggestions), o `null`. */
+  readonly fromSuggestion?: { readonly suggestionId: string; readonly acceptedAt: string } | null;
 }
 
 export interface RuleList {
@@ -191,4 +193,93 @@ export interface SplitRuleRef {
   readonly ruleVersion: number;
   readonly ruleName: string | null;
   readonly ruleArchived?: boolean;
+}
+
+// ───────────────────────────────────────────────────────────────────── sugerencias (add-rule-suggestions)
+
+export type SuggestionKind = 'INCOME' | 'EXPENSE' | 'REFUND';
+
+export interface SuggestionPattern {
+  readonly type: 'DESCRIPTION' | 'COUNTERPARTY';
+  /** Clave de descripción o id de la contraparte. */
+  readonly value: string;
+  readonly kind: SuggestionKind;
+  readonly categoryId: string;
+}
+
+export interface SuggestionEvidence {
+  readonly transactionId: string;
+  readonly date: string;
+  readonly description: string | null;
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly accountId: string;
+  readonly categoryId: string;
+  readonly categoryOrigin: CategoryOrigin;
+}
+
+export interface SuggestionConflict {
+  readonly ruleId: string;
+  readonly name: string;
+  readonly version: number;
+  readonly priority: number;
+  readonly categoryId: string;
+  readonly count: number;
+}
+
+export interface RuleSuggestion {
+  readonly suggestionId: string;
+  readonly pattern: SuggestionPattern;
+  readonly patternLabel?: string;
+  readonly categoryName: string;
+  readonly support: number;
+  readonly evidenceCount: number;
+  /** `0.8333`. */
+  readonly confidence: string;
+  readonly confidenceLevel: 'HIGH' | 'MEDIUM' | string;
+  readonly proposedRule: {
+    readonly name: string;
+    readonly priority: number;
+  };
+  readonly evidence: readonly SuggestionEvidence[];
+  readonly counterExamples: readonly SuggestionEvidence[];
+  readonly conflicts: readonly SuggestionConflict[];
+  readonly warnings: readonly string[];
+  readonly status: 'OPEN' | 'DISMISSED' | string;
+}
+
+export interface SuggestionList {
+  readonly generatedAt: string;
+  readonly from: string;
+  readonly to: string;
+  readonly scanned: number;
+  readonly truncated: boolean;
+  readonly items: readonly RuleSuggestion[];
+}
+
+export type SuggestionOutcome =
+  'WOULD_FILL' | 'ALREADY_IN_CATEGORY' | 'OTHER_CATEGORY' | 'NOT_APPLICABLE' | string;
+
+export interface SuggestionPreviewItem {
+  readonly transactionId: string;
+  readonly date: string;
+  readonly description: string | null;
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly currentCategoryId: string | null;
+  readonly currentOrigin: CategoryOrigin;
+  readonly proposedCategoryId: string;
+  readonly outcome: SuggestionOutcome;
+  readonly reasons: readonly string[];
+}
+
+export interface SuggestionPreview {
+  readonly from: string;
+  readonly to: string;
+  readonly scanned: number;
+  readonly truncated: boolean;
+  readonly matched: number;
+  readonly wouldFill: number;
+  readonly alreadyInCategory: number;
+  readonly otherCategory: number;
+  readonly notApplicable: number;
+  readonly items: readonly SuggestionPreviewItem[];
 }
