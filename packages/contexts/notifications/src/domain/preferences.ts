@@ -1,4 +1,5 @@
 import { DomainError } from '@pf/shared-kernel';
+import { isDigestFrequency, type DigestFrequencyValue } from './home-digest.js';
 import { QuietHours } from './quiet-hours.js';
 import {
   NOTIFICATION_CHANNELS,
@@ -21,12 +22,14 @@ export interface PreferencesState {
   readonly byType: Readonly<Partial<Record<NotificationType, TypePreference>>>;
   readonly quietHours: { readonly start: string; readonly end: string } | null;
   readonly includeDetailsInEmail: boolean;
+  /** Frecuencia del digest del Home por email (add-cash-flow-forecast, D385): desactivado por omisión. */
+  readonly digestFrequency: DigestFrequencyValue;
   /** ETag de las preferencias; sin fila de ajustes es la versión 1 y se persiste al primer cambio. */
   readonly version: number;
 }
 
 export interface PreferencesChange {
-  /** Campo auditado (`byType.<TIPO>.<canal>`, `quietHours`, `includeDetailsInEmail`). */
+  /** Campo auditado (`byType.<TIPO>.<canal>`, `quietHours`, `includeDetailsInEmail`, `digestFrequency`). */
   readonly field: string;
   readonly before: unknown;
   readonly after: unknown;
@@ -36,6 +39,8 @@ export interface PreferencesInput {
   readonly types: readonly { readonly type: string; readonly inApp: boolean; readonly email: boolean }[];
   readonly quietHours: { readonly start: string; readonly end: string } | null;
   readonly includeDetailsInEmail: boolean;
+  /** Ausente = sin cambio; un valor fuera de `OFF | WEEKLY | MONTHLY` se rechaza (`VALIDATION_FAILED`). */
+  readonly digestFrequency?: string | undefined;
 }
 
 /**
@@ -51,7 +56,15 @@ export class NotificationPreferences {
 
   static defaults(userId: string, workspaceId: string): NotificationPreferences {
     return new NotificationPreferences(
-      { userId, workspaceId, byType: {}, quietHours: null, includeDetailsInEmail: false, version: 1 },
+      {
+        userId,
+        workspaceId,
+        byType: {},
+        quietHours: null,
+        includeDetailsInEmail: false,
+        digestFrequency: 'OFF',
+        version: 1,
+      },
       0,
     );
   }
@@ -68,6 +81,9 @@ export class NotificationPreferences {
   }
   get includeDetailsInEmail(): boolean {
     return this.state.includeDetailsInEmail;
+  }
+  get digestFrequency(): DigestFrequencyValue {
+    return this.state.digestFrequency;
   }
   get quietHours(): QuietHours | null {
     const q = this.state.quietHours;
@@ -86,6 +102,7 @@ export class NotificationPreferences {
     readonly types: readonly { type: NotificationType; inApp: boolean; email: boolean }[];
     readonly quietHours: { readonly start: string; readonly end: string } | null;
     readonly includeDetailsInEmail: boolean;
+    readonly digestFrequency: DigestFrequencyValue;
   } {
     return {
       types: NOTIFICATION_TYPES.map((type) => ({
@@ -95,6 +112,7 @@ export class NotificationPreferences {
       })),
       quietHours: this.state.quietHours,
       includeDetailsInEmail: this.state.includeDetailsInEmail,
+      digestFrequency: this.state.digestFrequency,
     };
   }
 
@@ -126,6 +144,17 @@ export class NotificationPreferences {
       byType[entry.type] = { inApp: entry.inApp, email: entry.email };
     });
 
+    // La frecuencia del digest es opcional en la entrada: ausente conserva el valor actual.
+    let nextDigest = this.state.digestFrequency;
+    if (input.digestFrequency !== undefined) {
+      if (!isDigestFrequency(input.digestFrequency)) {
+        throw new DomainError('VALIDATION_FAILED', 'digestFrequency must be OFF, WEEKLY or MONTHLY').at(
+          '/digestFrequency',
+        );
+      }
+      nextDigest = input.digestFrequency;
+    }
+
     const quiet = input.quietHours ? QuietHours.of(input.quietHours.start, input.quietHours.end) : null;
     const nextQuiet = quiet ? { start: quiet.start, end: quiet.end } : null;
     const prevQuiet = this.state.quietHours;
@@ -140,6 +169,10 @@ export class NotificationPreferences {
       });
     }
 
+    if (this.state.digestFrequency !== nextDigest) {
+      changes.push({ field: 'digestFrequency', before: this.state.digestFrequency, after: nextDigest });
+    }
+
     // Un `PUT` idéntico al estado actual no cambia nada (ni versión, ni auditoría).
     if (changes.length === 0) return changes;
     this.state = {
@@ -147,6 +180,7 @@ export class NotificationPreferences {
       byType,
       quietHours: nextQuiet,
       includeDetailsInEmail: input.includeDetailsInEmail,
+      digestFrequency: nextDigest,
       version: this.state.version + 1,
     };
     return changes;

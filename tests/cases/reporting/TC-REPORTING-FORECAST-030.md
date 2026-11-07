@@ -5,16 +5,17 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Las nueve preguntas del Home respondidas por completo"
 scenario: "Checklist de aceptación del Home"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-001","FR-REPORTING-002"]
 nfr: ["NFR-PERF-004"]
 invariants: []
 priority: critical
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/cash-flow-forecast.spec.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["home","sm-05","e2e"]
@@ -29,7 +30,7 @@ expected_result:
   - "Q1–Q9 con cifras; ninguna no disponible ni sin datos"
   - "Q8 con saldo más bajo y riesgo de 30 días; Q7 con variación por categoría"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-030 — Con el dataset demo las nueve preguntas del Home muestran su respuesta completa

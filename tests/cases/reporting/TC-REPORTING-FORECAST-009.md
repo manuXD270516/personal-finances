@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Riesgo de déficit por moneda"
 scenario: "Déficit por debajo de cero"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-015","FR-IDENTITY-005"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-risk.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","shortfall"]
@@ -33,7 +35,7 @@ expected_result:
   - "Sin reserva: umbral 0.00 BOB, HIGH, faltante 679.00 BOB"
   - "Con 3300.00: mínimo 621.00 BOB, HIGH, faltante 879.00 BOB, no negativo"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-009 — El riesgo es alto con faltante contra la reserva mínima o contra cero y se indica si el mínimo es negativo

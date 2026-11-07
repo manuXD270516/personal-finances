@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Ajustes del disponible del workspace"
 scenario: "Categoría de ingreso rechazada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024","FR-IDENTITY-006"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/cash-flow-calendar.api.test.ts
+  - apps/web/src/ui/cash-flow/forecast-home.test.tsx
+  - packages/contexts/reporting/src/application/spendable-settings.use-cases.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["spendable","settings","rbac"]
@@ -33,7 +36,7 @@ expected_result:
   - "403 INSUFFICIENT_ROLE"
   - "VIEWER: 200 con los ajustes vigentes"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-028 — Una categoría de ingreso o archivada se rechaza y un EDITOR no puede cambiar los ajustes

@@ -20,10 +20,21 @@ import {
   PeriodComparator,
   SPENDABLE_DURATION_METRIC,
   SpendableCalculator,
+  SpendableEssentials,
+  SpendableHorizon,
+  type EssentialPlanPeriod,
+  type EssentialsResult,
   type ExactRate,
+  type PlanCategoryNode,
   type SpendableCommittedItem,
+  type UpcomingIncome,
 } from '../domain/index.js';
-import type { ReportingDeps, SpendableDeps } from './ports/index.js';
+import {
+  DEFAULT_SPENDABLE_SETTINGS,
+  type BudgetAvailabilityRow,
+  type ReportingDeps,
+  type SpendableDeps,
+} from './ports/index.js';
 import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS, rateKey, toExact } from './valuation-support.js';
 
 const monotonic = () => Number(process.hrtime.bigint()) / 1e9;
@@ -49,16 +60,37 @@ export interface SpendableContext {
 
 export interface SpendableComputation {
   readonly summary: SpendableSummaryDto;
-  readonly detail: Pick<SpendableDto, 'committedItems' | 'reservedByAccount' | 'plannedByGoal'>;
+  readonly detail: Pick<
+    SpendableDto,
+    'committedItems' | 'reservedByAccount' | 'plannedByGoal' | 'essentialItems' | 'essentialWarnings'
+  >;
   /** Tasas usadas por el consolidado (el resumen las suma a `meta.ratesUsed`). */
   readonly ratesUsed: readonly ResolvedRateDto[];
 }
 
+/** Líneas del plan de un periodo en la forma que usan los esenciales; `null` si no hay plan o no trae líneas. */
+function planOf(row: BudgetAvailabilityRow | null, scaleOf: (code: string, amount?: string) => Currency) {
+  if (!row?.lines || row.currency === undefined) return null;
+  const money = (dto: MoneyDto) => Money.parse(dto.amount, scaleOf(dto.currency, dto.amount));
+  return {
+    currency: row.currency,
+    lines: row.lines
+      .filter((l) => l.target.kind === 'CATEGORY' || l.target.kind === 'GROUP' || l.target.kind === 'TAG')
+      .map((l) => ({
+        targetKind: l.target.kind as 'CATEGORY' | 'GROUP' | 'TAG',
+        targetId: l.target.id,
+        nature: l.nature as 'EXPENSE' | 'INCOME',
+        reference: money(l.reference),
+        actual: money(l.actual),
+      })),
+  };
+}
+
 /**
  * Cálculo del disponible para gastar libre de compromisos (Q5; openspec add-spendable-amount, design.md decisiones 2 a
- * 13). Lee la FUENTE DE VERDAD en la unidad de trabajo ya abierta (read-your-writes, D117) por los contratos públicos
- * de COMMITMENTS, GOALS, IDENTITY y PLANNING, una sola vez cada uno y por lote; todo lo financiero lo hace el DS puro
- * `SpendableCalculator`. Sin efectos.
+ * 13; add-cash-flow-forecast decisiones 10 a 12). Lee la FUENTE DE VERDAD en la unidad de trabajo ya abierta
+ * (read-your-writes, D117) por los contratos públicos de COMMITMENTS, GOALS, IDENTITY, CLASSIFICATION y PLANNING, una
+ * sola vez cada uno y por lote; todo lo financiero lo hace el DS puro `SpendableCalculator`. Sin efectos.
  */
 export class SpendableCalculation {
   constructor(
@@ -71,6 +103,9 @@ export class SpendableCalculation {
     const { ports } = this;
     const ws = ctx.workspaceId;
     const money = (dto: MoneyDto): Money => Money.parse(dto.amount, ctx.scaleOf(dto.currency, dto.amount));
+
+    // ---- ajustes del disponible (D377, D378): sin fila, valores por omisión
+    const settings = (await ports.settings?.read(ws)) ?? DEFAULT_SPENDABLE_SETTINGS;
 
     // ---- periodo financiero que contiene hoy (zona del workspace, día de inicio ya resuelto en los periodos)
     const periods = await ports.periods.listPeriods({ workspaceId: ws });
@@ -91,6 +126,29 @@ export class SpendableCalculation {
           end: month.to.toString(),
         };
 
+    // ---- horizonte: el periodo (por omisión) o hasta el próximo ingreso esperado (D377)
+    const today = ctx.today.toString();
+    let incomes: UpcomingIncome[] = [];
+    if (settings.horizonMode === 'NEXT_INCOME' && ports.commitments.listForCashFlow) {
+      const upcoming = await ports.commitments.listForCashFlow({
+        workspaceId: ws,
+        through: ctx.today.plusDays(90).toString(),
+      });
+      incomes = upcoming.items
+        .filter((i) => i.kind === 'INCOME')
+        .map((i) => ({ occurrenceId: i.occurrenceId, name: i.definitionName, date: i.dueDate }));
+    }
+    const horizon = SpendableHorizon.resolve({ mode: settings.horizonMode, today, period, incomes });
+    // Periodos posteriores al de hoy que alcanza el horizonte por ingreso (sus aportes y esenciales entran, D387 y D388).
+    const reached =
+      horizon.mode === 'NEXT_INCOME'
+        ? SpendableHorizon.periodsReached(
+            periods.map((p) => ({ id: p.id, label: p.label, start: p.periodStart, end: p.periodEnd })),
+            today,
+            horizon.to,
+          )
+        : [];
+
     // ---- lecturas por lote (contratos públicos, misma transacción)
     const liquid = ctx.accounts.filter(isLiquidAccount);
     const reservations = await ports.reservations.getReservedByAccount({
@@ -100,9 +158,29 @@ export class SpendableCalculation {
     const committed = await ports.commitments.listForSpendable({
       workspaceId: ws,
       periodFrom: period.start,
-      periodTo: period.end,
+      periodTo: horizon.to,
     });
-    const plans = await ports.goalPlans.getForPeriod({ workspaceId: ws, from: period.start, to: period.end });
+    const currentPlans = await ports.goalPlans.getForPeriod({
+      workspaceId: ws,
+      from: period.start,
+      to: period.end,
+    });
+    // Aportes planificados: lo pendiente del periodo en curso más lo planificado completo de cada periodo posterior (D388).
+    const mergedPlans = new Map<string, { goalId: string; goalName: string; pending: Money }>();
+    const addPlan = (p: { goalId: string; goalName: string; currency: string; pending: string }) => {
+      const amount = money({ amount: p.pending, currency: p.currency });
+      const prev = mergedPlans.get(p.goalId);
+      mergedPlans.set(p.goalId, {
+        goalId: p.goalId,
+        goalName: p.goalName,
+        pending: prev ? prev.pending.add(amount) : amount,
+      });
+    };
+    currentPlans.forEach(addPlan);
+    for (const later of reached) {
+      const rows = await ports.goalPlans.getForPeriod({ workspaceId: ws, from: later.start, to: later.end });
+      rows.forEach(addPlan);
+    }
     const reserve = await ports.minimumReserve.getMinimumLiquidityReserve({ workspaceId: ws });
     const budget = period.id
       ? await ports.budgets.getForPeriod({ workspaceId: ws, periodId: period.id })
@@ -113,8 +191,8 @@ export class SpendableCalculation {
       ...i,
       amount: i.amount === null ? null : money(i.amount),
     }));
-    const result = SpendableCalculator.calculate({
-      period: { from: period.start, to: period.end },
+    const base = SpendableCalculator.calculate({
+      period: { from: period.start, to: horizon.to },
       liquidAccounts: liquid.map((a) => ({
         accountId: a.accountId,
         name: a.name,
@@ -125,13 +203,26 @@ export class SpendableCalculation {
         reserved: money({ amount: r.reserved, currency: r.currency }),
       })),
       committed: items,
-      planned: plans.map((p) => ({
+      planned: [...mergedPlans.values()].map((p) => ({
         goalId: p.goalId,
         goalName: p.goalName,
-        pending: money({ amount: p.pending, currency: p.currency }),
+        pending: p.pending,
       })),
       minimumReserve: reserve ? money(reserve) : null,
     });
+
+    // ---- esenciales presupuestados (D378): categorías propias de REPORTING, planes del periodo en curso y los alcanzados
+    let essentials: EssentialsResult | null = null;
+    if (settings.subtractEssentials) {
+      essentials = await this.essentials(ctx, settings.essentialCategoryIds, {
+        period,
+        reached,
+        horizonEnd: horizon.to,
+        budget,
+        counted: base.committedItems,
+      });
+    }
+    const result = SpendableCalculator.applyEssentials(base, essentials?.byCurrency ?? null);
 
     // ---- consolidado: una sola resolución de tasas por petición (solo las monedas sin tasa ya resuelta)
     const rates = new Map(ctx.knownRates);
@@ -174,6 +265,13 @@ export class SpendableCalculation {
 
     const summary: SpendableSummaryDto = {
       period,
+      horizon: {
+        mode: horizon.mode,
+        from: horizon.from,
+        to: horizon.to,
+        nextIncome: horizon.nextIncome,
+        fallback: horizon.fallback,
+      },
       reportingCurrency: ctx.reporting.code,
       byCurrency: result.byCurrency.map((t) => ({
         currency: t.currency.code,
@@ -182,6 +280,7 @@ export class SpendableCalculation {
         committed: t.committed.toJSON(),
         plannedGoalContributions: t.plannedGoalContributions.toJSON(),
         minimumReserve: t.minimumReserve?.toJSON() ?? null,
+        essentials: t.essentials?.toJSON() ?? null,
         spendable: t.spendable.toJSON(),
       })),
       consolidated: {
@@ -222,9 +321,85 @@ export class SpendableCalculation {
           goalName: p.goalName,
           pending: p.pending.toJSON(),
         })),
+        essentialItems: (essentials?.items ?? []).map((i) => ({
+          categoryId: i.categoryId,
+          name: i.name,
+          periodLabel: i.periodLabel,
+          reference: i.reference.toJSON(),
+          actual: i.actual.toJSON(),
+          committed: i.committed.toJSON(),
+          counted: i.counted.toJSON(),
+          prorated: i.prorated,
+        })),
+        essentialWarnings: (essentials?.warnings ?? []).map((w) => ({
+          categoryId: w.categoryId,
+          reason: w.reason,
+          periodLabel: w.periodLabel,
+        })),
       },
       ratesUsed: [...used.values()],
     };
+  }
+
+  /**
+   * Término de esenciales (D378, D387): lee el árbol de categorías (para validar y resolver subcategorías) y los planes de
+   * los periodos posteriores que alcanza el horizonte; los del periodo en curso ya vienen leídos.
+   */
+  private async essentials(
+    ctx: SpendableContext,
+    essentialIds: readonly string[],
+    input: {
+      readonly period: {
+        readonly id: string | null;
+        readonly label: string;
+        readonly start: string;
+        readonly end: string;
+      };
+      readonly reached: readonly {
+        readonly id: string;
+        readonly label: string;
+        readonly start: string;
+        readonly end: string;
+      }[];
+      readonly horizonEnd: string;
+      readonly budget: BudgetAvailabilityRow | null;
+      readonly counted: readonly SpendableCommittedItem[];
+    },
+  ): Promise<EssentialsResult> {
+    const { ports } = this;
+    const ws = ctx.workspaceId;
+    if (essentialIds.length === 0 || !ports.categories) {
+      return { byCurrency: new Map(), items: [], warnings: [] };
+    }
+    const tree = await ports.categories.categoryTree({ userId: '', workspaceId: ws });
+    const nodes = new Map<string, PlanCategoryNode>(
+      tree.categories.map((c) => [c.categoryId, { parentId: c.parentId, groupId: c.groupId }]),
+    );
+    const info = new Map(tree.categories.map((c) => [c.categoryId, c]));
+    const current: EssentialPlanPeriod = {
+      label: input.period.label,
+      start: input.period.start,
+      end: input.period.end,
+      plan: planOf(input.budget, ctx.scaleOf),
+    };
+    const later: EssentialPlanPeriod[] = [];
+    for (const p of input.reached) {
+      const row = await ports.budgets.getForPeriod({ workspaceId: ws, periodId: p.id });
+      later.push({ label: p.label, start: p.start, end: p.end, plan: planOf(row, ctx.scaleOf) });
+    }
+    return SpendableEssentials.compute({
+      essentials: essentialIds.map((id) => ({
+        categoryId: id,
+        name: info.get(id)?.name ?? id,
+        archived: info.get(id)?.archived ?? true,
+      })),
+      current,
+      later,
+      horizonEnd: input.horizonEnd,
+      categories: nodes,
+      committed: input.counted.map((i) => ({ categoryId: i.categoryId ?? null, amount: i.amount as Money })),
+      currencyOf: (code) => ctx.scaleOf(code),
+    });
   }
 }
 

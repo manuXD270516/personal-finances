@@ -4,6 +4,8 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { cashFlowHref } from '../cash-flow/logic';
+import type { CashFlowHomeBlock } from '../cash-flow/types';
 import { problemOf, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { HOME_CSS } from '../dashboard/styles';
 import type { FormatContext, HomeQuestionStatus } from '../dashboard/types';
@@ -35,11 +37,14 @@ function useUpcomingFormat(locale: string, timeZone: string): FormatContext {
  */
 export function HomeCommitments({
   questions,
+  cashFlow,
   locale,
   timeZone,
   uiLocale,
 }: {
   questions: readonly HomeQuestionStatus[];
+  /** Bloque `cashFlow` del resumen (Q8 con saldo esperado y riesgo). */
+  cashFlow?: CashFlowHomeBlock | null | undefined;
   locale: string;
   timeZone: string;
   uiLocale: string;
@@ -88,6 +93,8 @@ export function HomeCommitments({
       createAccountHref={localized(uiLocale, '/cuentas/nueva')}
       href={(path) => localized(uiLocale, path)}
       cardOf={cards.ofDefinition}
+      cashFlow={cashFlow}
+      cashFlowHref={(currency) => cashFlowHref((path) => localized(uiLocale, path), { currency })}
     />
   );
 }

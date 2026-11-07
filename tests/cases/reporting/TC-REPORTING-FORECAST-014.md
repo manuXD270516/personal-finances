@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Consolidado informativo del calendario"
 scenario: "BOB y USD consolidados"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014","FR-FX-006"]
 nfr: ["NFR-DATA-002"]
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-risk.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","fx"]
@@ -32,7 +35,7 @@ expected_result:
   - "Mínimo consolidado 4949.12 BOB el 2026-10-28 con tasa y fuente"
   - "Sin tasa: 3821.00 BOB el 2026-10-28, incompleto, USD no convertida"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-014 — El mínimo consolidado convierte cada moneda con la tasa vigente y sin tasa queda incompleto, nunca 1:1

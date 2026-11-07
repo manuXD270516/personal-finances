@@ -456,12 +456,13 @@ interface ViewRow extends OccurrenceRow {
   v_to_account_id: string | null;
   v_mode: OccurrenceView['mode'];
   v_lead_days: number;
+  v_category_id: string | null;
 }
 
 const VIEW_SELECT = sql`
   SELECT ${OCCURRENCE_COLUMNS}, d.name AS def_name, d.kind AS def_kind, d.managed_by AS def_managed_by,
          v.account_id AS v_account_id, v.to_account_id AS v_to_account_id,
-         v.materialization_mode AS v_mode, v.lead_days AS v_lead_days
+         v.materialization_mode AS v_mode, v.lead_days AS v_lead_days, v.category_id AS v_category_id
     FROM commitments.recurring_occurrence o
     JOIN fx.currency c ON c.code = o.currency
     JOIN commitments.recurring_definition d ON d.workspace_id = o.workspace_id AND d.id = o.definition_id
@@ -477,6 +478,7 @@ const toView = (r: ViewRow): OccurrenceView => ({
   toAccountId: r.v_to_account_id,
   mode: r.v_mode,
   leadDays: Number(r.v_lead_days),
+  categoryId: r.v_category_id,
 });
 
 const INSERT_CHUNK = 200;

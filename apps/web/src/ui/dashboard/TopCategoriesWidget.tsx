@@ -6,7 +6,7 @@ import {
   type CategoryComparison,
 } from './category-comparison';
 import { TREND_ICON } from './FlowCards';
-import { formatMoney, formatSignedMoney, isNegative } from './format';
+import { formatMoney, formatSignedDecimal, formatSignedMoney, isNegative, isZero } from './format';
 import { statusOf } from './QuestionWidgets';
 import type { FormatContext, ReportSummary, TopCategory } from './types';
 
@@ -74,6 +74,70 @@ function CategoryTrendLine({
   );
 }
 
+/**
+ * Variación de la categoría que calcula la API (Q7, add-cash-flow-forecast): valor con signo, porcentaje con dos
+ * decimales (o «nuevo» si antes era cero) y el sentido favorable o desfavorable. Glifo + texto, nunca solo color.
+ */
+function CategoryVariationLine({
+  category,
+  comparison,
+  kind,
+  ctx,
+}: {
+  category: TopCategory;
+  comparison: CategoryComparison | undefined;
+  kind: TopCategoriesKind;
+  ctx: FormatContext;
+}) {
+  const { t, locale } = ctx;
+  const v = category.variation!;
+  const ns = KEYS[kind];
+  const trend = v.isNew
+    ? 'new'
+    : isZero(v.amount.amount)
+      ? 'flat'
+      : isNegative(v.amount.amount)
+        ? 'down'
+        : 'up';
+  const tone = v.direction === 'FAVORABLE' ? 'ok' : v.direction === 'UNFAVORABLE' ? 'warning' : 'neutral';
+  return (
+    <p
+      data-testid="top-category-trend"
+      data-trend={trend}
+      data-direction={v.direction}
+      className="pf-home-muted"
+    >
+      <span className="pf-home-trend" data-tone={tone}>
+        <span aria-hidden="true" className="pf-home-trend-icon">
+          {TREND_ICON[trend]}
+        </span>{' '}
+        <span data-testid="top-category-delta" className="pf-home-num">
+          {formatSignedMoney(v.amount, locale)}
+        </span>{' '}
+        {v.isNew ? (
+          <strong data-testid="top-category-new">{t(`${ns}.variation.new`)}</strong>
+        ) : v.percent !== null ? (
+          <span data-testid="top-category-percent" className="pf-home-num">
+            {formatSignedDecimal(v.percent, locale)} %
+          </span>
+        ) : null}
+        {' · '}
+        <strong data-testid="top-category-trend-label">{t(`${ns}.trend.${trend}`)}</strong>
+        {' · '}
+        <strong data-testid="top-category-direction">{t(`${ns}.variation.${v.direction}`)}</strong>
+      </span>
+      {!v.isNew && comparison?.previous ? (
+        <>
+          {' · '}
+          <span data-testid="top-category-previous">
+            {t(`${ns}.previous`, { amount: formatMoney(comparison.previous, locale) })}
+          </span>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
 function CategoryRow({
   category,
   comparison,
@@ -119,7 +183,11 @@ function CategoryRow({
           />
         ) : null}
       </div>
-      {comparison ? <CategoryTrendLine comparison={comparison} kind={kind} ctx={ctx} /> : null}
+      {category.variation ? (
+        <CategoryVariationLine category={category} comparison={comparison} kind={kind} ctx={ctx} />
+      ) : comparison ? (
+        <CategoryTrendLine comparison={comparison} kind={kind} ctx={ctx} />
+      ) : null}
     </li>
   );
 }

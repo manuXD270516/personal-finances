@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Montos conservadores según el tipo de monto"
 scenario: "Rangos y montos variables"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014","FR-COMMITMENTS-004"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","amount-type"]
@@ -31,7 +33,7 @@ expected_result:
   - "\"Freelance\" suma 1000.00 BOB"
   - "\"Agua\" sin monto; 1 movimiento sin monto en BOB"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-007 — Los egresos de rango usan el máximo, los ingresos de rango el mínimo y los variables no suman

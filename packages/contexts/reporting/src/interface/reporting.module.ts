@@ -16,7 +16,14 @@ import type {
   NominalPortionQuery,
 } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
+import { CashFlowCalendarQueries } from '../application/cash-flow-calendar.queries.js';
 import { DataVersionProjector } from '../application/data-version-projector.js';
+import { EvaluateShortfallRisk } from '../application/evaluate-shortfall-risk.js';
+import { HomeDigestComposer } from '../application/home-digest.query.js';
+import {
+  SpendableSettingsService,
+  type SpendableSettingsAuditPort,
+} from '../application/spendable-settings.use-cases.js';
 import { NetWorthAtQueries, PeriodFlowsQueries } from '../application/closing-figures.queries.js';
 import { ConversionCostQueries } from '../application/conversion-cost.queries.js';
 import { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
@@ -41,6 +48,11 @@ import type {
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
 import { SpendableQueries } from '../application/spendable.queries.js';
+import type {
+  ShortfallNotifierPort,
+  ShortfallOutboxPort,
+  ShortfallWorkspacesPort,
+} from '../application/ports/index.js';
 import { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
 import {
   DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
@@ -54,14 +66,20 @@ import {
   type NetWorthQuery,
   type PeriodFlowsQuery,
 } from '../contracts/index.js';
+import {
+  PgSpendableSettingsRepository,
+  PgShortfallEpisodeRepository,
+} from '../infrastructure/pg-cash-flow.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
 import { FINANCIAL_REPORTS, FinancialReportsController } from './financial-reports-http.js';
 import {
+  CASH_FLOW_QUERIES,
   CONVERSION_COST_QUERIES,
   NET_WORTH_HISTORY_QUERIES,
   REPORT_SUMMARY_QUERIES,
   ReportingController,
   SPENDABLE_QUERIES,
+  SPENDABLE_SETTINGS_SERVICE,
   UPCOMING_PAYMENTS_QUERIES,
 } from './reporting-http.js';
 
@@ -118,7 +136,12 @@ export interface ReportingRuntimeOptions {
    * Se componen después de REPORTING, así que la composición los entrega con resolución tardía. Los periodos y las
    * métricas son los de las demás consultas.
    */
-  readonly spendable: Omit<SpendableDeps, 'periods' | 'metrics'>;
+  readonly spendable: Omit<SpendableDeps, 'periods' | 'metrics' | 'settings' | 'categories'>;
+  /**
+   * Auditoría de los cambios de los ajustes del disponible (`reporting.spendable_settings.updated`, misma unidad de
+   * trabajo, add-cash-flow-forecast); opcional en pruebas.
+   */
+  readonly settingsAudit?: SpendableSettingsAuditPort;
   /** Histogramas de la consulta de próximos pagos (docs/35 D117); opcional. */
   readonly metrics?: ReportingMetricsPort;
   /**
@@ -150,6 +173,12 @@ export interface ReportingRuntime {
   readonly upcoming: UpcomingPaymentsQueries;
   /** Detalle del disponible para gastar (`GET /reports/spendable`, add-spendable-amount). */
   readonly spendable: SpendableQueries;
+  /** Calendario de flujo de caja y riesgo de déficit (`GET /reports/cash-flow-calendar`, add-cash-flow-forecast). */
+  readonly cashFlow: CashFlowCalendarQueries;
+  /** Ajustes del disponible (`GET`/`PUT /reports/spendable/settings`). */
+  readonly spendableSettings: SpendableSettingsService;
+  /** Resumen del Home para el digest por email (contrato público `HomeDigestQuery`; sin ruta HTTP). */
+  readonly digest: HomeDigestComposer;
   /** Flujos del periodo para el cierre de mes (contrato público `PeriodFlowsQuery`; sin ruta HTTP). */
   readonly periodFlows: PeriodFlowsQuery;
   /** Patrimonio a una fecha de corte para el cierre de mes (contrato público `NetWorthQuery`; sin ruta HTTP). */
@@ -185,6 +214,8 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     spendable: {
       ...options.spendable,
       periods: options.periods,
+      settings: new PgSpendableSettingsRepository(),
+      categories: options.categories,
       ...(options.metrics ? { metrics: options.metrics } : {}),
     },
   };
@@ -215,6 +246,14 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     history: new NetWorthHistoryQueries(deps),
     upcoming: new UpcomingPaymentsQueries(deps),
     spendable: new SpendableQueries(deps, deps.spendable as SpendableDeps),
+    cashFlow: new CashFlowCalendarQueries(deps),
+    spendableSettings: new SpendableSettingsService({
+      uow: deps.uow,
+      repository: new PgSpendableSettingsRepository(),
+      categories: options.categories,
+      audit: options.settingsAudit ?? { updated: async () => undefined },
+    }),
+    digest: new HomeDigestComposer(deps),
     periodFlows: new PeriodFlowsQueries(deps),
     netWorth: new NetWorthAtQueries(deps),
     conversionCosts: new ConversionCostQueries({
@@ -267,6 +306,8 @@ export class ReportingModule {
         { provide: NET_WORTH_HISTORY_QUERIES, useValue: options.runtime.history },
         { provide: UPCOMING_PAYMENTS_QUERIES, useValue: options.runtime.upcoming },
         { provide: SPENDABLE_QUERIES, useValue: options.runtime.spendable },
+        { provide: CASH_FLOW_QUERIES, useValue: options.runtime.cashFlow },
+        { provide: SPENDABLE_SETTINGS_SERVICE, useValue: options.runtime.spendableSettings },
         { provide: CONVERSION_COST_QUERIES, useValue: options.runtime.conversionCosts },
         { provide: FINANCIAL_REPORTS, useValue: options.runtime.reports },
       ],
@@ -274,6 +315,45 @@ export class ReportingModule {
   }
 }
 
+export interface CashFlowWatchOptions {
+  readonly pool: Pool;
+  readonly clock: Clock;
+  /** Calendario de flujo de caja del `ReportingRuntime` (`runtime.cashFlow`). */
+  readonly calendar: Pick<CashFlowCalendarQueries, 'evaluateRisk'>;
+  /** Workspaces activos con su zona y moneda base (directorio de IDENTITY). */
+  readonly workspaces: ShortfallWorkspacesPort;
+  /** Outbox transaccional (misma unidad de trabajo del episodio). */
+  readonly outbox: ShortfallOutboxPort;
+  /** Entrega directa a NOTIFY (`NotificationIntakePort`, D249). */
+  readonly notifier: ShortfallNotifierPort;
+  /** `REPORTING_SHORTFALL_ALERT_HORIZON_DAYS` (7, 30, 60 o 90; 30 por omisión). */
+  readonly horizonDays: number;
+  readonly newId: () => string;
+}
+
+/**
+ * Job `reporting.cash-flow-watch` (openspec add-cash-flow-forecast, decisión 13; D381): evalúa el riesgo de déficit de cada
+ * workspace, UNO a UNO, y abre, sostiene o cierra el episodio de cada moneda. Corre en el worker (rol `pf_worker`) y no
+ * agrega consumidores ni conexiones: usa la `JobQueue` existente.
+ */
+export function createCashFlowWatch(options: CashFlowWatchOptions): EvaluateShortfallRisk {
+  return new EvaluateShortfallRisk(
+    {
+      uow: new PgReportingUnitOfWork(options.pool),
+      workspaces: options.workspaces,
+      episodes: new PgShortfallEpisodeRepository(),
+      outbox: options.outbox,
+      notifier: options.notifier,
+      ids: { next: options.newId },
+      clock: options.clock,
+      horizonDays: options.horizonDays,
+    },
+    options.calendar,
+  );
+}
+
+export { EvaluateShortfallRisk, type ShortfallWatchSummary } from '../application/evaluate-shortfall-risk.js';
+export { CASH_FLOW_WATCH_JOB } from '../contracts/index.js';
 export { REPORTING_DATA_VERSION_CONSUMER } from '../contracts/index.js';
 export type { WorkspaceSettingsPort };
 

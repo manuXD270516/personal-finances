@@ -37,6 +37,9 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/recurring')).toBe('recurring');
     expect(activeNav('/en/recurring/0198f0aa')).toBe('recurring');
     expect(activeNav('/recurring/occurrences/0198f0bb')).toBe('recurring');
+    // Phase 7 (add-cash-flow-forecast): calendario de flujo de caja.
+    expect(activeNav('/flujo-de-caja')).toBe('cashFlow');
+    expect(activeNav('/en/flujo-de-caja')).toBe('cashFlow');
     // Phase 4 (add-loans): Deudas → préstamos.
     expect(activeNav('/debts')).toBe('debt');
     expect(activeNav('/en/debts/nuevo')).toBe('debt');

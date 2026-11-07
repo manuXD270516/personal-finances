@@ -287,6 +287,7 @@ const NAV_PATHS: Record<NavKey, string> = {
   rules: 'M4 6h16M4 12h10M4 18h6M18 14l3 3-3 3M21 17h-7',
   planning: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M8 14h3',
   recurring: 'M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5',
+  cashFlow: 'M3 17l5-6 4 3 4-7 5 5M3 21h18',
   goals: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
   debt: 'M3 6h18v12H3zM3 10h18M7 15h4M15 15h2',
   reports: 'M4 20V10M10 20V4M16 20v-7M22 20H2',

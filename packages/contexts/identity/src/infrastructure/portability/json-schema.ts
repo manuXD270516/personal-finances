@@ -72,7 +72,7 @@ export function buildSectionSchema(section: PortabilitySection, columns: readonl
     description: `Registro de la sección «${section.name}» (tabla ${section.table}, contexto ${section.context}). Montos como texto decimal exacto; instantes ISO-8601 UTC.`,
     type: 'object',
     additionalProperties: false,
-    required: cols.map((c) => c.name),
+    required: cols.filter((c) => !(c.name in (section.legacyDefaults ?? {}))).map((c) => c.name),
     properties: Object.fromEntries(cols.map((c) => [c.name, property(c)])),
     'x-pfos-table': section.table,
     'x-pfos-context': section.context,

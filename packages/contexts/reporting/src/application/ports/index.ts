@@ -64,7 +64,8 @@ export interface ReportingDeps {
    * Q4/Q8 del Home (add-upcoming-payments): ¿hay definiciones recurrentes activas o transacciones pendientes de egreso?
    * Solo estas lecturas mínimas; la lista completa usa `UpcomingPaymentsDeps`.
    */
-  readonly commitments: Pick<UpcomingCommitmentsPort, 'hasActiveDefinitions'>;
+  readonly commitments: Pick<UpcomingCommitmentsPort, 'hasActiveDefinitions'> &
+    Partial<Pick<UpcomingCommitmentsPort, 'listForCashFlow'>>;
   readonly pending: PendingTransactionsPort;
   /**
    * Q9 del Home (add-savings-goals): metas en curso (GOALS, `GoalSummaryQuery.listForHome`). Opcional: sin él, Q9 es
@@ -240,6 +241,36 @@ export interface UpcomingOccurrenceRow {
   readonly toAccountId: string | null;
 }
 
+/**
+ * Ocurrencia no resuelta de cualquier tipo para el calendario de flujo de caja (COMMITMENTS,
+ * `UpcomingPaymentsQuery.listForCashFlow`; add-cash-flow-forecast, S1).
+ */
+export interface CashFlowOccurrenceRow {
+  readonly occurrenceId: string;
+  readonly definitionId: string;
+  readonly definitionName: string;
+  readonly kind: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_PAYMENT' | 'CARD_PAYMENT';
+  readonly dueDate: string;
+  readonly status: 'SCHEDULED' | 'DUE' | 'OVERDUE';
+  readonly expected: {
+    readonly type: 'FIXED' | 'ESTIMATED' | 'MIN_MAX' | 'VARIABLE';
+    readonly amount: string | null;
+    readonly min: string | null;
+    readonly max: string | null;
+    readonly currency: string;
+  };
+  readonly accountId: string;
+  readonly toAccountId: string | null;
+  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL';
+  readonly categoryId: string | null;
+}
+
+export interface CashFlowOccurrencesRow {
+  readonly items: readonly CashFlowOccurrenceRow[];
+  /** Hasta qué fecha (inclusive) el motor de recurrencia generó ocurrencias. */
+  readonly generatedThrough: string;
+}
+
 /** Comprometido de un rango en montos NATIVOS (COMMITMENTS, `CommittedQuery.getForRange`). */
 export interface CommittedRangeRow {
   readonly fromCommitments: readonly MoneyRow[];
@@ -281,6 +312,11 @@ export interface UpcomingCommitmentsPort {
     readonly to: string;
   }): Promise<readonly ResolvedOutflowRow[]>;
   hasActiveDefinitions(input: { readonly workspaceId: string }): Promise<boolean>;
+  /** Calendario de flujo de caja (add-cash-flow-forecast, S1): ocurrencias de todos los tipos con vencimiento ≤ `through`. */
+  listForCashFlow(input: {
+    readonly workspaceId: string;
+    readonly through: string;
+  }): Promise<CashFlowOccurrencesRow>;
 }
 
 /** Transacción `PENDING` (TRANSACTIONS, `PendingFlowQuery.listPending`). */
@@ -294,6 +330,10 @@ export interface PendingTransactionRow {
   readonly amount: MoneyRow;
   readonly description: string | null;
   readonly externalRef: { readonly namespace: string; readonly id: string } | null;
+  /** Pata destino de una conversión pendiente (S3); ausente en el resto. */
+  readonly toAmount?: MoneyRow | null;
+  /** Categoría de su único split (S2); `null` con varios o ausente. */
+  readonly categoryId?: string | null;
 }
 
 export interface PendingTransactionsPort {
@@ -302,6 +342,8 @@ export interface PendingTransactionsPort {
     readonly accountIds?: readonly string[];
     readonly dateFrom?: string;
     readonly dateTo?: string;
+    /** Incluye las conversiones pendientes (calendario de flujo de caja). */
+    readonly includeConversions?: boolean;
   }): Promise<readonly PendingTransactionRow[]>;
 }
 
@@ -335,6 +377,8 @@ export interface SpendableCommittedRow {
   readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL' | null;
   readonly amount: MoneyRow | null;
   readonly overdueFromPrevious: boolean;
+  /** Categoría del ítem (S2); ausente o `null` si no la tiene. */
+  readonly categoryId?: string | null;
 }
 
 /** Reservado por metas en una cuenta (GOALS, `GoalReservationsQuery.getReservedByAccount`). */
@@ -355,10 +399,42 @@ export interface GoalPlanRow {
 /** Disponible del plan del periodo (PLANNING, `BudgetVsActualQuery.getForPeriod`); `null` si no hay plan. */
 export interface BudgetAvailabilityRow {
   readonly budgetId: string;
+  /** Moneda del plan (add-cash-flow-forecast: esenciales y gasto planificado); ausente en dobles que solo traen el total. */
+  readonly currency?: string;
+  /** Líneas del plan con planificado y gastado (`BudgetVsActualQuery`); ausente si el consumidor solo usa los totales. */
+  readonly lines?: readonly BudgetPlanLineRow[];
   readonly totals: {
     readonly availableToSpend: MoneyRow;
     readonly complete: boolean;
   };
+}
+
+/** Línea del plan (PLANNING, `BudgetVsActualLineDto`) en la forma que usa REPORTING. */
+export interface BudgetPlanLineRow {
+  readonly target: { readonly kind: string; readonly id: string };
+  readonly nature: string;
+  readonly reference: MoneyRow;
+  readonly actual: MoneyRow;
+}
+
+/** Ajustes del disponible del workspace (D377, D378); sin fila = valores por omisión. */
+export interface SpendableSettingsRow {
+  readonly horizonMode: 'FINANCIAL_PERIOD' | 'NEXT_INCOME';
+  readonly subtractEssentials: boolean;
+  readonly essentialCategoryIds: readonly string[];
+  readonly version: number;
+}
+
+export const DEFAULT_SPENDABLE_SETTINGS: SpendableSettingsRow = {
+  horizonMode: 'FINANCIAL_PERIOD',
+  subtractEssentials: false,
+  essentialCategoryIds: [],
+  version: 1,
+};
+
+/** Lectura de los ajustes del disponible (`reporting.spendable_setting`) en la unidad de trabajo en curso. */
+export interface SpendableSettingsReader {
+  read(workspaceId: string): Promise<SpendableSettingsRow | null>;
 }
 
 /**
@@ -373,6 +449,11 @@ export interface SpendableDeps {
       readonly periodFrom: string;
       readonly periodTo: string;
     }): Promise<{ readonly items: readonly SpendableCommittedRow[]; readonly withoutAmountCount: number }>;
+    /** Próximo ingreso esperado del modo "hasta el próximo ingreso" (add-cash-flow-forecast, S1); opcional. */
+    listForCashFlow?(input: {
+      readonly workspaceId: string;
+      readonly through: string;
+    }): Promise<CashFlowOccurrencesRow>;
   };
   readonly reservations: {
     getReservedByAccount(input: {
@@ -399,4 +480,10 @@ export interface SpendableDeps {
   };
   readonly periods: FinancialPeriodsPort;
   readonly metrics?: ReportingMetricsPort;
+  /** Ajustes del disponible; sin él, valores por omisión (periodo financiero, sin esenciales). */
+  readonly settings?: SpendableSettingsReader;
+  /** Árbol de categorías (CLASSIFICATION) para los esenciales y el gasto planificado; sin él no se aplican. */
+  readonly categories?: Pick<CategoryCatalogQuery, 'categoryTree'>;
 }
+
+export * from './shortfall.js';

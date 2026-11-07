@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Notificación de riesgo de déficit"
 scenario: "Hecho entregado dos veces"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-005","FR-NOTIFY-004"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/cash-flow-notifications.test.ts
+  - packages/contexts/notifications/test/integration/cash-flow-digest.int.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["notifications","shortfall","idempotency"]
@@ -29,7 +31,7 @@ expected_result:
   - "Una notificación por destinatario"
   - "Cierre sin notificación; episodio nuevo con notificación nueva"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-NOTIFICATIONS-SHORTFALL-002 — Un episodio entregado dos veces genera una sola notificación y su cierre no notifica

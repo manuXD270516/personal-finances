@@ -54,6 +54,8 @@ export interface Recorded {
 export interface FakeTransaction extends TransactionLinkDto {
   readonly occurrenceId: string | null;
   readonly description: string;
+  /** Categoría de su único split (add-cash-flow-forecast, S2); ausente = `null`. */
+  readonly categoryId?: string | null;
 }
 
 /** Dobles en memoria de los puertos de COMMITMENTS (misma semántica que las tablas: estados persistidos, no instancias). */
@@ -465,6 +467,7 @@ export class InMemoryCommitments {
           description: t.description,
           source: t.source,
           externalRef: t.externalRef,
+          categoryId: t.categoryId ?? null,
         })),
   };
 
@@ -781,6 +784,7 @@ export class InMemoryCommitments {
       toAccountId: v.toAccountId,
       mode: v.materialization.mode,
       leadDays: v.materialization.leadDays,
+      categoryId: v.categoryId,
     };
   }
 

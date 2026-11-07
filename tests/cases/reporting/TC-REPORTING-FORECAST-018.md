@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Detección periódica del riesgo de déficit"
 scenario: "Primer riesgo alto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-015","FR-NOTIFY-004"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/cash-flow-watch.int.test.ts
+  - packages/contexts/reporting/src/application/evaluate-shortfall-risk.test.ts
+  - packages/contexts/reporting/src/domain/category-variation.test.ts
+  - packages/contexts/reporting/test/integration/pg-cash-flow.int.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","shortfall","job"]
@@ -32,7 +36,7 @@ expected_result:
   - "Episodio abierto de BOB y un hecho reporting.CashFlowShortfallRiskDetected.v1 en el outbox"
   - "Sin hechos nuevos; episodio abierto"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-018 — El job abre un episodio y publica una vez el riesgo detectado aunque el riesgo siga alto

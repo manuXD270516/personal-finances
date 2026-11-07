@@ -12,6 +12,7 @@ export type NavKey =
   | 'rules'
   | 'planning'
   | 'recurring'
+  | 'cashFlow'
   | 'goals'
   | 'debt'
   | 'reports'
@@ -40,6 +41,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // Phase 3 (add-recurrence-engine): pagos recurrentes (Próximos, Por aprobar con contador, Definiciones); la lista
   // de próximos pagos con comprometido y saldo proyectado (add-upcoming-payments) cuelga de la misma sección.
   { key: 'recurring', path: '/recurring', also: ['/pagos-proximos'] },
+  // Phase 7 (add-cash-flow-forecast): calendario de flujo de caja 7/30/60/90 con el saldo esperado y el riesgo de déficit.
+  { key: 'cashFlow', path: '/flujo-de-caja' },
   // Phase 4 (add-savings-goals): Metas de ahorro (listado, alta, detalle y reservas por cuenta).
   { key: 'goals', path: '/goals' },
   // Phase 4 (add-loans): Deudas → préstamos (lista, alta, detalle y comparación con la tabla del banco).

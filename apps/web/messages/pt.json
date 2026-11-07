@@ -46,7 +46,8 @@
     "goals": "Metas",
     "documents": "Documentos",
     "rules": "Regras",
-    "reports": "Relatórios"
+    "reports": "Relatórios",
+    "cashFlow": "Fluxo de caixa"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -372,6 +373,12 @@
         "flat": "igual ao mês anterior",
         "new": "novo: sem gasto no mês anterior",
         "unknown": "sem comparação com o mês anterior"
+      },
+      "variation": {
+        "new": "novo",
+        "FAVORABLE": "favorável",
+        "UNFAVORABLE": "desfavorável",
+        "NONE": "sem mudança"
       }
     },
     "topIncomeCategories": {
@@ -386,6 +393,12 @@
         "flat": "igual ao mês anterior",
         "new": "novo: sem receita no mês anterior",
         "unknown": "sem comparação com o mês anterior"
+      },
+      "variation": {
+        "new": "novo",
+        "FAVORABLE": "favorável",
+        "UNFAVORABLE": "desfavorável",
+        "NONE": "sem mudança"
       }
     },
     "netWorth": {
@@ -471,7 +484,8 @@
         "committed": "Comprometido",
         "plannedGoalContributions": "Aportes planejados para metas",
         "minimumReserve": "Reserva mínima",
-        "spendable": "Disponível"
+        "spendable": "Disponível",
+        "essentials": "Essenciais orçados"
       },
       "breakdown": "Detalhamento por moeda",
       "currencyHeading": "Em {currency}",
@@ -505,9 +519,66 @@
         "rateLine": "{pair} {value}",
         "loading": "Carregando o disponível…",
         "noAccounts": "Você ainda não tem contas líquidas: não há disponível a calcular."
+      },
+      "settingsLink": "Ajustes do disponível",
+      "horizon": {
+        "period": "Horizonte: período financeiro {label} ({from} a {to})",
+        "nextIncome": "Horizonte: até a próxima receita, «{name}» em {date} ({from} a {to})",
+        "fallback": "Horizonte: não há receita esperada, então se usam 30 dias ({from} a {to})"
+      },
+      "essentials": {
+        "title": "Essenciais orçados",
+        "off": "Os essenciais não são descontados. Você pode ativá-los nos ajustes do disponível.",
+        "caption": "Essenciais que subtraem do disponível",
+        "category": "Categoria",
+        "period": "Período",
+        "reference": "Referência do plano",
+        "actual": "Gasto",
+        "committed": "Já comprometido",
+        "counted": "Subtrai",
+        "prorated": "proporcional",
+        "unknownCategory": "Uma categoria essencial",
+        "warning": {
+          "NO_PLAN": "{name}: não há plano para {period}, então nada é subtraído por essa categoria.",
+          "NO_LINE": "{name}: o plano de {period} não tem uma linha para essa categoria.",
+          "ARCHIVED": "{name}: a categoria está arquivada e não é descontada. Remova-a dos ajustes."
+        }
       }
     },
-    "reportsLink": "Ver o relatório de receitas e despesas"
+    "reportsLink": "Ver o relatório de receitas e despesas",
+    "settings": {
+      "title": "Ajustes do disponível",
+      "subtitle": "Escolha até quando o disponível é calculado e se os gastos essenciais do seu orçamento são descontados.",
+      "loading": "Carregando os ajustes…",
+      "readOnly": "Só o proprietário do espaço de trabalho pode alterar estes ajustes. Aqui você os vê somente para leitura.",
+      "horizon": {
+        "legend": "Horizonte do disponível",
+        "FINANCIAL_PERIOD": "Período financeiro",
+        "FINANCIAL_PERIODHelp": "Até o fim do período financeiro atual (padrão).",
+        "NEXT_INCOME": "Até a próxima receita esperada",
+        "NEXT_INCOMEHelp": "Até a data da próxima receita esperada; se não houver, se usam 30 dias."
+      },
+      "essentials": {
+        "legend": "Essenciais",
+        "subtract": "Descontar os essenciais orçados",
+        "subtractHelp": "Subtrai do disponível o que falta gastar da linha do orçamento de cada categoria essencial, sem contar duas vezes o que já está comprometido."
+      },
+      "categories": {
+        "legend": "Categorias essenciais",
+        "count": "{count} de {max} categorias selecionadas",
+        "empty": "Não há categorias de despesa para escolher.",
+        "archived": "arquivada",
+        "max": "Você atingiu o máximo de {max} categorias: desmarque alguma para escolher outra."
+      },
+      "reload": "Recarregar os ajustes",
+      "notice": {
+        "saved": "Ajustes salvos.",
+        "noChanges": "Não há alterações para salvar.",
+        "reloaded": "Ajustes recarregados com a versão vigente."
+      },
+      "save": "Salvar os ajustes",
+      "back": "Voltar ao detalhe do disponível"
+    }
   },
   "Common": {
     "noWorkspace": "Selecione ou crie um espaço de trabalho.",
@@ -2542,7 +2613,9 @@
       "openGoal": "Ver a meta",
       "openGoalReservations": "Ver as reservas da conta",
       "openFxFeedStatus": "Ver o estado das taxas automáticas",
-      "openFxRate": "Revisar a taxa retida"
+      "openFxRate": "Revisar a taxa retida",
+      "openCashFlowCalendar": "Ver o calendário de fluxo de caixa",
+      "openHome": "Ir para o início"
     },
     "prefs": {
       "title": "Notificações",
@@ -2573,11 +2646,23 @@
         "GOAL_MILESTONE": "Marco de uma meta (25 %, 50 %, 75 %)",
         "FX_RATE_FEED_STALE": "Taxa automática sem atualização",
         "FX_RATE_FEED_RECOVERED": "Taxa automática recuperada",
-        "FX_RATE_ANOMALY_RETAINED": "Taxa retida por variação anômala"
+        "FX_RATE_ANOMALY_RETAINED": "Taxa retida por variação anômala",
+        "CASH_FLOW_SHORTFALL_RISK": "Risco de déficit no fluxo de caixa",
+        "HOME_DIGEST": "Resumo periódico do início (email)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalhes (valores e nomes) nos e-mails",
       "privacy": "Os e-mails viajam por canais externos; por padrão não incluem valores nem nomes de categorias. Ative esta opção somente se aceitar ver esses dados no seu e-mail. As notificações dentro do app não mudam.",
+      "digest": {
+        "legend": "Resumo por email",
+        "label": "Frequência do resumo",
+        "hint": "O resumo é enviado apenas por email. Sem a opção de detalhes ele não inclui valores: só quantidades, percentuais, estados e datas.",
+        "options": {
+          "OFF": "Desativado",
+          "WEEKLY": "Semanal (segundas às 08:00)",
+          "MONTHLY": "Mensal (primeiro dia do período financeiro, 08:00)"
+        }
+      },
       "quiet": {
         "legend": "Horário de silêncio",
         "enable": "Ativar horário de silêncio",
@@ -3504,7 +3589,17 @@
       "more": "{count, plural, one {e mais # pagamento} other {e mais # pagamentos}}",
       "viewAll": "Ver todos os próximos pagamentos",
       "noAccounts": "Ainda não há contas, então não há compromissos nem pagamentos a antecipar.",
-      "createAccount": "Crie sua primeira conta para começar."
+      "createAccount": "Crie sua primeira conta para começar.",
+      "cashFlowLink": "Ver o fluxo de caixa",
+      "risk": {
+        "NONE": "Sem risco de déficit",
+        "LOW": "Risco baixo de déficit em {currency}",
+        "POSSIBLE": "Risco possível de déficit em {currency}",
+        "HIGH": "Risco alto de déficit em {currency}"
+      },
+      "lowestLabel": "Menor saldo esperado nos próximos {days} dias",
+      "lowestOn": "{amount} em {date}",
+      "lowestIncomplete": "incompleto: falta uma taxa"
     },
     "committed": {
       "period": "{name} ({from} a {to})",
@@ -6476,6 +6571,137 @@
       "done": "Sugestões aplicadas ao plano.",
       "close": "Fechar",
       "cancel": "Cancelar"
+    }
+  },
+  "CashFlow": {
+    "title": "Fluxo de caixa",
+    "subtitle": "Saldo esperado das suas contas líquidas de {from} a {to}, com os pagamentos, receitas e transferências conhecidos.",
+    "loading": "Carregando o fluxo de caixa…",
+    "refreshing": "Atualizando…",
+    "controls": {
+      "horizon": "Horizonte",
+      "days": "{days} dias",
+      "currency": "Moeda",
+      "account": "Conta",
+      "allAccounts": "Total em {currency}"
+    },
+    "summary": {
+      "caption": "Risco de déficit por moeda",
+      "currency": "Moeda",
+      "risk": "Risco",
+      "lowest": "Menor saldo",
+      "lowestDate": "Data"
+    },
+    "risk": {
+      "NONE": "Sem risco",
+      "LOW": "Risco baixo",
+      "POSSIBLE": "Risco possível",
+      "HIGH": "Risco alto",
+      "thresholdReserve": "Limite: reserva mínima de {amount}.",
+      "thresholdZero": "Limite: zero (não há reserva mínima nesta moeda).",
+      "noneHelp": "O saldo esperado se mantém acima do limite durante todo o horizonte.",
+      "lowHelp": "O saldo esperado fica perto do limite: convém acompanhá-lo.",
+      "possibleHelp": "O saldo esperado não cai abaixo do limite, mas o gasto planejado restante do plano o levaria abaixo.",
+      "highHelp": "O saldo esperado cai abaixo do limite com os pagamentos já conhecidos.",
+      "firstShortfall": "Primeira data abaixo do limite: {date}.",
+      "shortfall": "Falta: {amount}.",
+      "belowZero": "O menor saldo esperado é negativo: não é suficiente para cobrir todos os pagamentos."
+    },
+    "currency": {
+      "title": "Saldo esperado em {currency}",
+      "withoutAmount": "{count, plural, one {# movimento variável sem valor não é descontado} other {# movimentos variáveis sem valor não são descontados}}"
+    },
+    "kpi": {
+      "start": "Saldo inicial",
+      "lowest": "Menor saldo",
+      "end": "Saldo final",
+      "outflow": "Saídas esperadas",
+      "inflow": "Entradas esperadas"
+    },
+    "chart": {
+      "title": "Saldo esperado em {currency} em {days} dias",
+      "accountTitle": "Saldo esperado de {name} em {days} dias",
+      "accountNote": "Você está vendo apenas a conta {name}.",
+      "backToCurrency": "Ver o total em {currency}",
+      "description": "Saldo esperado dia a dia; o menor é {low} em {date}.",
+      "balance": "Saldo esperado",
+      "planned": "Com o gasto planejado restante",
+      "thresholdReserve": "Reserva mínima: {amount}",
+      "thresholdZero": "Limite: zero",
+      "lowest": "Mínimo"
+    },
+    "table": {
+      "show": "Ver a tabela de dados do gráfico",
+      "date": "Data",
+      "balance": "Saldo no fechamento",
+      "low": "Menor saldo do dia",
+      "planned": "Com gasto planejado",
+      "belowThreshold": "abaixo do limite"
+    },
+    "scenarios": {
+      "withoutIncome": "Pior caso sem receitas esperadas",
+      "withPlan": "Com o gasto planejado restante",
+      "lowestOn": "mínimo em {date}",
+      "endsAt": "termina em {amount}",
+      "noPlan": "Sem plano em: {periods}. O gasto planejado desses períodos não está incluído."
+    },
+    "accounts": {
+      "title": "Contas",
+      "caption": "Saldo esperado de cada conta líquida em {currency}",
+      "account": "Conta",
+      "start": "Saldo inicial",
+      "lowest": "Menor saldo",
+      "lowestDate": "Data do mínimo",
+      "end": "Saldo final",
+      "actions": "Ações",
+      "showing": "No gráfico",
+      "showSeries": "Ver a série de {name}"
+    },
+    "events": {
+      "title": "Movimentos esperados em {currency}",
+      "empty": "Não há pagamentos, receitas nem transferências esperados neste horizonte."
+    },
+    "event": {
+      "kind": {
+        "INCOME": "Receita",
+        "EXPENSE": "Despesa",
+        "TRANSFER": "Transferência",
+        "CONVERSION": "Conversão",
+        "LOAN_PAYMENT": "Parcela de empréstimo",
+        "CARD_PAYMENT": "Pagamento de cartão"
+      },
+      "certainty": {
+        "KNOWN": "Conhecido",
+        "ESTIMATED": "Estimado",
+        "EXPECTED": "Esperado"
+      },
+      "overdue": "Vencido há {days, plural, one {# dia} other {# dias}} (era de {date}): aplicado hoje",
+      "noAmount": "Sem valor"
+    },
+    "consolidated": {
+      "title": "Consolidado em {currency}",
+      "help": "Informativo: converte o menor saldo de cada moeda com a taxa vigente. Não define o risco.",
+      "none": "Não há um mínimo consolidado: nenhuma moeda pôde ser convertida.",
+      "incomplete": "Consolidado incompleto: faltam taxas vigentes para estas moedas, que não são somadas.",
+      "unconverted": "{amount} sem converter"
+    },
+    "suggestions": {
+      "title": "Sugestões de conversão",
+      "help": "São aproximadas e não executam nada: você decide se converte e a que taxa.",
+      "line": "Converter cerca de {amount} para {to} antes de {date} evitaria a falta."
+    },
+    "coverage": {
+      "incomplete": "Os pagamentos recorrentes só são gerados até {through}: o que cai depois não aparece neste calendário."
+    },
+    "empty": {
+      "text": "Você ainda não tem contas líquidas: não há saldo para projetar.",
+      "action": "Criar uma conta"
+    },
+    "meta": {
+      "generatedAt": "Gerado: {date}",
+      "freshness": "Dados até: {date}",
+      "reportingCurrency": "Moeda de relatório: {currency}",
+      "help": "As saídas de cada dia são aplicadas antes das entradas; um valor com faixa usa o máximo nas saídas e o mínimo nas entradas."
     }
   }
 }

@@ -1,6 +1,6 @@
 import type { Money } from '../common/fx-types';
 import { isNegative, isZero } from '../dashboard/format';
-import type { SpendableCurrencyTerms } from './types';
+import type { SpendableCurrencyTerms, SpendableSummary } from './types';
 
 /** Días del periodo a partir del cual la tarjeta enlaza a los próximos pagos del periodo siguiente (design.md decisión 11). */
 export const PERIOD_END_LINK_DAYS = 7;
@@ -8,6 +8,7 @@ export const PERIOD_END_LINK_DAYS = 7;
 export const SPENDABLE_PATH = '/disponible';
 export const UPCOMING_PATH = '/pagos-proximos';
 export const BUDGETS_PATH = '/planificacion/presupuestos';
+export const SPENDABLE_SETTINGS_PATH = '/disponible/ajustes';
 
 /** Término que resta del disponible, mostrado con signo negativo (`−5000.00`); un cero no lleva signo. */
 export function subtracted(money: Money): Money {
@@ -45,3 +46,36 @@ export const nearPeriodEnd = (end: string, generatedAt: string, timeZone: string
 
 /** El disponible de una moneda está en negativo (se muestra con signo y alerta, nunca como 0.00). */
 export const isShort = (terms: SpendableCurrencyTerms): boolean => isNegative(terms.spendable.amount);
+
+/**
+ * Horizonte usado por el disponible: el periodo financiero (por omisión), «hasta el próximo ingreso» con su ocurrencia o
+ * el respaldo de 30 días cuando no hay un ingreso esperado. `undefined` en una API anterior al horizonte.
+ */
+export type HorizonView =
+  | { readonly kind: 'PERIOD'; readonly label: string; readonly from: string; readonly to: string }
+  | {
+      readonly kind: 'NEXT_INCOME';
+      readonly name: string;
+      readonly date: string;
+      readonly from: string;
+      readonly to: string;
+    }
+  | { readonly kind: 'FALLBACK'; readonly from: string; readonly to: string };
+
+export function horizonView(summary: SpendableSummary): HorizonView | undefined {
+  const h = summary.horizon;
+  if (!h) return undefined;
+  if (h.mode === 'NEXT_INCOME') {
+    if (h.nextIncome && !h.fallback) {
+      return {
+        kind: 'NEXT_INCOME',
+        name: h.nextIncome.name,
+        date: h.nextIncome.date,
+        from: h.from,
+        to: h.to,
+      };
+    }
+    return { kind: 'FALLBACK', from: h.from, to: h.to };
+  }
+  return { kind: 'PERIOD', label: summary.period.label, from: h.from, to: h.to };
+}

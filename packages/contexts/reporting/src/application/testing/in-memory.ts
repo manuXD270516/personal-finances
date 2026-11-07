@@ -1,5 +1,5 @@
 import type { AccountSummaryDto } from '@pf/accounts/contracts';
-import type { CategorySummaryDto } from '@pf/classification/contracts';
+import type { CategoryNodeDto, CategorySummaryDto, CategoryTreeDto } from '@pf/classification/contracts';
 import type {
   FxValuationPort,
   RateAttributionDto,
@@ -13,6 +13,8 @@ import type { ConversionCostRowDto, NominalFlowRowDto } from '@pf/transactions/c
 import type {
   AccountReservationRow,
   BudgetAvailabilityRow,
+  CashFlowOccurrenceRow,
+  SpendableSettingsRow,
   ClosingSnapshotsPort,
   CommittedRangeRow,
   ConversionCostDeps,
@@ -161,11 +163,22 @@ export class InMemoryReporting {
   readonly reservations: AccountReservationRow[] = [];
   /** Aportes planificados del periodo (`GoalPlansQuery`). */
   readonly goalPlans: GoalPlanRow[] = [];
+  /** Aportes planificados de un periodo concreto (clave: inicio del periodo); sin entrada se usa `goalPlans`. */
+  readonly goalPlansByPeriodStart = new Map<string, GoalPlanRow[]>();
   /** Reserva mínima de liquidez (`WorkspaceSettingsQuery`). */
   minimumReserve: { amount: string; currency: string } | null = null;
   /** Disponible del plan por periodo (`BudgetVsActualQuery`, por `periodId`). */
   readonly budgets = new Map<string, BudgetAvailabilityRow>();
   readonly spendableRequests: { periodFrom: string; periodTo: string }[] = [];
+
+  /** add-cash-flow-forecast: ocurrencias no resueltas de todos los tipos (`UpcomingPaymentsQuery.listForCashFlow`). */
+  readonly cashFlowOccurrences: CashFlowOccurrenceRow[] = [];
+  /** Hasta qué fecha generó ocurrencias el motor de recurrencia (por omisión, muy lejos: cobertura completa). */
+  generatedThrough = '2999-12-31';
+  /** Ajustes del disponible (`reporting.spendable_setting`); `null` = valores por omisión. */
+  spendableSettings: SpendableSettingsRow | null = null;
+  /** Nodos del árbol de categorías (CLASSIFICATION, `categoryTree`). */
+  readonly categoryNodes: CategoryNodeDto[] = [];
 
   addPeriod(label: string, periodStart: string, periodEnd: string, status = 'CLOSED') {
     this.periods.push({ id: `period-${label}`, label, periodStart, periodEnd, status });
@@ -304,6 +317,7 @@ export class InMemoryReporting {
         listPending: async (input) =>
           this.pendingTransactions.filter(
             (p) =>
+              (p.kind !== 'CONVERSION' || input.includeConversions === true) &&
               (input.dateFrom === undefined || p.businessDate >= input.dateFrom) &&
               (input.dateTo === undefined || p.businessDate <= input.dateTo) &&
               (input.accountIds === undefined || input.accountIds.includes(p.accountId)),
@@ -329,6 +343,10 @@ export class InMemoryReporting {
                     }));
                   return { items, withoutAmountCount: items.filter((i) => i.amount === null).length };
                 },
+                listForCashFlow: async ({ through }: { through: string }) => ({
+                  items: this.cashFlowOccurrences.filter((o) => o.dueDate <= through),
+                  generatedThrough: this.generatedThrough,
+                }),
               },
               reservations: {
                 getReservedByAccount: async ({ accountIds }: { accountIds?: readonly string[] }) =>
@@ -336,7 +354,11 @@ export class InMemoryReporting {
                     (r) => accountIds === undefined || accountIds.includes(r.accountId),
                   ),
               },
-              goalPlans: { getForPeriod: async () => [...this.goalPlans] },
+              goalPlans: {
+                getForPeriod: async ({ from }: { from: string }) => [
+                  ...(this.goalPlansByPeriodStart.get(from) ?? this.goalPlans),
+                ],
+              },
               minimumReserve: { getMinimumLiquidityReserve: async () => this.minimumReserve },
               budgets: {
                 getForPeriod: async ({ periodId }: { periodId: string }) =>
@@ -345,6 +367,14 @@ export class InMemoryReporting {
               periods: { listPeriods: async () => [...this.periods] },
               metrics: {
                 observe: (name: string, value: number) => void this.metricSamples.push({ name, value }),
+              },
+              settings: { read: async () => this.spendableSettings },
+              categories: {
+                categoryTree: async (): Promise<CategoryTreeDto> => ({
+                  groups: [],
+                  categories: [...this.categoryNodes],
+                  tags: [],
+                }),
               },
             },
           }
@@ -419,6 +449,10 @@ export class InMemoryReporting {
         listResolvedOutflows: async ({ from, to }) =>
           this.resolvedOutflows.filter((r) => r.transactionDate >= from && r.transactionDate <= to),
         hasActiveDefinitions: async () => this.hasActiveDefinitions,
+        listForCashFlow: async ({ through }) => ({
+          items: this.cashFlowOccurrences.filter((o) => o.dueDate <= through),
+          generatedThrough: this.generatedThrough,
+        }),
       },
       metrics: { observe: (name, value) => void this.metricSamples.push({ name, value }) },
     };

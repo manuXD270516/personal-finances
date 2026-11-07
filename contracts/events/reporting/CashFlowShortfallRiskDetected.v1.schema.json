@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/reporting/CashFlowShortfallRiskDetected.v1.schema.json",
+  "title": "reporting.CashFlowShortfallRiskDetected.v1",
+  "description": "Se abrió un episodio de riesgo de déficit de flujo de caja en una moneda: el calendario del horizonte de la alerta (`REPORTING_SHORTFALL_ALERT_HORIZON_DAYS`, 30 días por omisión, D381) tiene riesgo `HIGH`, es decir, el saldo más bajo esperado de la moneda queda por debajo de su umbral (la reserva mínima de liquidez cuando está en esa moneda, 0 en otro caso). Un único hecho por episodio aunque el job se repita: mientras el riesgo siga `HIGH` no se publica otro; el cierre lo publica `reporting.CashFlowShortfallRiskCleared.v1`. Productor: REPORTING (job `reporting.cash-flow-watch`, actor SYSTEM, aggregateType CashFlowShortfallEpisode, aggregateId = episodeId, aggregateVersion 1). Sin consumidores en Phase 7 (catálogo y trazabilidad): NOTIFY recibe el aviso por su puerto síncrono `NotificationIntakePort` en la misma unidad de trabajo (D249). Idempotencia natural: episodeId. Contiene montos del owner: no se copian a emails sin opt-in.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "reporting.CashFlowShortfallRiskDetected"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "CashFlowShortfallEpisode"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episodeId",
+        "currency",
+        "horizonDays",
+        "evaluatedAt",
+        "today",
+        "lowest",
+        "lowestDate",
+        "firstShortfallDate",
+        "threshold",
+        "thresholdSource",
+        "belowZero"
+      ],
+      "properties": {
+        "episodeId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "horizonDays": {
+          "description": "Horizonte evaluado (7, 30, 60 o 90).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90
+        },
+        "evaluatedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        },
+        "today": {
+          "description": "Hoy en la zona del workspace al evaluar.",
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "lowest": {
+          "description": "Saldo más bajo esperado de la moneda en el horizonte (con signo).",
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "lowestDate": {
+          "description": "Primera fecha en que se alcanza el saldo más bajo.",
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "firstShortfallDate": {
+          "description": "Primera fecha con el saldo más bajo del día bajo el umbral.",
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "threshold": {
+          "description": "Umbral: reserva mínima de liquidez o cero.",
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "thresholdSource": {
+          "description": "Origen del umbral: `MINIMUM_RESERVE` o `ZERO` (enum abierto).",
+          "type": "string",
+          "examples": ["MINIMUM_RESERVE", "ZERO"]
+        },
+        "belowZero": {
+          "description": "El saldo más bajo esperado es negativo.",
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000701",
+      "eventType": "reporting.CashFlowShortfallRiskDetected",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-20T12:25:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CashFlowShortfallEpisode",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fc001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f2",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "reporting.cash-flow-watch"
+      },
+      "payload": {
+        "episodeId": "01928c4e-0000-7000-8000-0000000fc001",
+        "currency": "BOB",
+        "horizonDays": 30,
+        "evaluatedAt": "2026-10-20T12:25:00.000Z",
+        "today": "2026-10-20",
+        "lowest": { "amount": "-679.00", "currency": "BOB" },
+        "lowestDate": "2026-11-01",
+        "firstShortfallDate": "2026-11-01",
+        "threshold": { "amount": "1500.00", "currency": "BOB" },
+        "thresholdSource": "MINIMUM_RESERVE",
+        "belowZero": true
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000702",
+      "eventType": "reporting.CashFlowShortfallRiskDetected",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-21T12:25:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CashFlowShortfallEpisode",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fc002",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f3",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "reporting.cash-flow-watch"
+      },
+      "payload": {
+        "episodeId": "01928c4e-0000-7000-8000-0000000fc002",
+        "currency": "USD",
+        "horizonDays": 30,
+        "evaluatedAt": "2026-10-21T12:25:00.000Z",
+        "today": "2026-10-21",
+        "lowest": { "amount": "621.00", "currency": "USD" },
+        "lowestDate": "2026-11-01",
+        "firstShortfallDate": "2026-10-28",
+        "threshold": { "amount": "1500.00", "currency": "USD" },
+        "thresholdSource": "MINIMUM_RESERVE",
+        "belowZero": false
+      }
+    }
+  ]
+}

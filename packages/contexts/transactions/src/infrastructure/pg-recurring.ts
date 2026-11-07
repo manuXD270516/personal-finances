@@ -128,6 +128,9 @@ export class PgTransactionLinkQuery implements TransactionLinkQuery {
 
 interface PendingRow extends LinkRow {
   description: string | null;
+  to_amount: string | null;
+  to_currency: string | null;
+  category_id: string | null;
 }
 
 /** `PendingFlowQuery`: transacciones `PENDING` de ingreso, gasto y transferencia del workspace (sin asiento). */
@@ -142,7 +145,11 @@ export class PgPendingFlowQuery implements PendingFlowQuery {
     readonly accountIds?: readonly string[];
     readonly dateFrom?: string;
     readonly dateTo?: string;
+    readonly includeConversions?: boolean;
   }) {
+    const kinds = input.includeConversions
+      ? ['INCOME', 'EXPENSE', 'TRANSFER', 'CONVERSION']
+      : ['INCOME', 'EXPENSE', 'TRANSFER'];
     const from = input.dateFrom ? LocalDate.parse(input.dateFrom).toString() : null;
     const to = input.dateTo ? LocalDate.parse(input.dateTo).toString() : null;
     const accounts = input.accountIds ? [...input.accountIds] : null;
@@ -153,28 +160,43 @@ export class PgPendingFlowQuery implements PendingFlowQuery {
                t.external_ref_namespace, t.external_ref_id,
                (SELECT l.account_id FROM txn.transaction_leg l
                  WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
-                   AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL LIMIT 1) AS to_account_id
+                   AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL LIMIT 1) AS to_account_id,
+               (SELECT abs(l.amount)::text FROM txn.transaction_leg l
+                 WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
+                   AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL LIMIT 1) AS to_amount,
+               (SELECT l.currency FROM txn.transaction_leg l
+                 WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
+                   AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL LIMIT 1) AS to_currency,
+               (SELECT CASE WHEN count(*) = 1 THEN min(s.category_id::text) END
+                  FROM txn.transaction_split s
+                 WHERE s.workspace_id = t.workspace_id AND s.transaction_id = t.id
+                   AND s.superseded_in_revision IS NULL) AS category_id
           FROM txn.transaction t
          WHERE t.workspace_id = ${input.workspaceId}
            AND t.status = 'PENDING'
-           AND t.kind IN ('INCOME', 'EXPENSE', 'TRANSFER')
+           AND t.kind = ANY(${kinds}::text[])
            AND (${from}::date IS NULL OR t.transaction_date >= ${from}::date)
            AND (${to}::date IS NULL OR t.transaction_date <= ${to}::date)
            AND (${accounts}::uuid[] IS NULL OR t.account_id = ANY(${accounts}::uuid[]))
          ORDER BY t.transaction_date, t.id`.execute(unitOfWorkKysely());
       const out: PendingFlowRowDto[] = [];
       for (const r of rows) {
+        const isMove = r.kind === 'TRANSFER' || r.kind === 'CONVERSION';
         out.push({
           transactionId: r.id,
           kind: r.kind,
           businessDate: r.business_date,
           accountId: r.account_id,
-          toAccountId: r.kind === 'TRANSFER' ? r.to_account_id : null,
+          toAccountId: isMove ? r.to_account_id : null,
           direction: r.kind === 'INCOME' ? 'IN' : 'OUT',
           amount: await money(this.currencies, r.amount, r.currency),
           description: r.description,
           source: r.source,
           externalRef: ref(r),
+          ...(r.kind === 'CONVERSION' && r.to_amount !== null && r.to_currency !== null
+            ? { toAmount: await money(this.currencies, r.to_amount, r.to_currency) }
+            : {}),
+          categoryId: r.category_id,
         });
       }
       return out;

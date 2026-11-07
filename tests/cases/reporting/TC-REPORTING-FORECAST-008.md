@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Saldo más bajo esperado con orden conservador dentro del día"
 scenario: "Sueldo y alquiler el mismo día"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.properties.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","lowest-balance"]
@@ -31,7 +33,7 @@ expected_result:
   - "Saldo más bajo −679.00 BOB el 2026-11-01; cierre del 2026-11-01 7321.00 BOB; final 6200.50 BOB"
   - "Con los datos base: 3821.00 BOB el 2026-10-28"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-008 — El mismo día los egresos se aplican antes que los ingresos y el mínimo toma la primera fecha

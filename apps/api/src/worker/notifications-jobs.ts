@@ -1,4 +1,5 @@
 import {
+  DIGEST_QUEUE,
   EMAIL_DISPATCH_QUEUE,
   EMAIL_SWEEP_QUEUE,
   PURGE_QUEUE,
@@ -6,6 +7,7 @@ import {
   type EmailDispatchJob,
   type NotificationsMaintenanceJob,
   type PurgeExpiredNotifications,
+  type SendHomeDigests,
 } from '@pf/notifications/interface/notifications.module';
 import type { Logger } from '@pf/platform/logging';
 import type { JobQueue } from '@pf/platform/queue';
@@ -14,6 +16,8 @@ import type { JobQueue } from '@pf/platform/queue';
 export const EMAIL_SWEEP_CRON = '*/5 * * * *';
 /** Purga por retención: diaria, de madrugada en UTC (design decisión 11). */
 export const PURGE_CRON = '30 4 * * *';
+/** Digest del Home por email: cada hora a los :05 (`NOTIFICATIONS_DIGEST_CRON`, D385). */
+export const DEFAULT_DIGEST_CRON = '5 * * * *';
 
 export interface ActiveWorkspaces {
   list(): Promise<readonly { readonly workspaceId: string }[]>;
@@ -30,6 +34,17 @@ export interface NotificationsJobsOptions {
   readonly sweepOnStart?: boolean;
   /** Trabajos de despacho en paralelo (el proveedor lento no bloquea otras colas). */
   readonly dispatchConcurrency?: number;
+  /**
+   * Digest periódico del Home (add-cash-flow-forecast): job `notifications.digest` de la `JobQueue` existente, sin
+   * consumidor de eventos (presupuesto de conexiones: dentro de las reservadas para jobs periódicos).
+   */
+  readonly digest?: {
+    readonly service: SendHomeDigests;
+    /** `NOTIFICATIONS_DIGEST_CRON` (UTC, 5 campos) u `off`. */
+    readonly cron?: string;
+    /** Encola además una pasada al arrancar (recupera el digest de la semana si el worker estuvo caído). */
+    readonly runOnStart?: boolean;
+  };
 }
 
 /**
@@ -69,6 +84,39 @@ export async function registerNotificationsJobs(
     for (const { workspaceId } of await workspaces.list()) purged += await purge.purgeWorkspace(workspaceId);
     logger.info({ purged }, 'expired notifications purged');
   });
+
+  if (options.digest) {
+    const { service, cron = DEFAULT_DIGEST_CRON } = options.digest;
+    await queue.work<NotificationsMaintenanceJob>(DIGEST_QUEUE, { concurrency: 1 }, async () => {
+      let created = 0;
+      for (const { workspaceId } of await workspaces.list()) {
+        // Un workspace con error no frena a los demás: la pasada siguiente (cada hora) lo reintenta.
+        try {
+          created += (await service.run(workspaceId)).created;
+        } catch (err) {
+          logger.warn(
+            { err: { type: err instanceof Error ? err.name : typeof err }, workspaceId },
+            'home digest failed for a workspace',
+          );
+        }
+      }
+      if (created > 0) logger.info({ created }, 'home digests created');
+    });
+    if (cron === 'off') {
+      await queue.unschedule(DIGEST_QUEUE);
+      logger.info({ 'job.queue': DIGEST_QUEUE }, 'notifications digest cron disabled');
+    } else if (options.scheduleCrons ?? true) {
+      await queue.schedule<NotificationsMaintenanceJob>(
+        DIGEST_QUEUE,
+        cron,
+        { trigger: 'cron' },
+        { tz: 'UTC' },
+      );
+    }
+    if (options.digest.runOnStart ?? false) {
+      await queue.send<NotificationsMaintenanceJob>(DIGEST_QUEUE, { trigger: 'startup' });
+    }
+  }
 
   if (options.scheduleCrons ?? true) {
     await queue.schedule<NotificationsMaintenanceJob>(EMAIL_SWEEP_QUEUE, EMAIL_SWEEP_CRON, {

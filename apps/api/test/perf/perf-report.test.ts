@@ -1185,3 +1185,17 @@ describe('costo por evento de cada consumidor (optimize-consumer-throughput, D30
     expect(readFileSync(join(dir, 'perf-summary.md'), 'utf8')).toContain('OK — sin umbrales superados');
   });
 });
+
+describe('add-cash-flow-forecast: umbral del calendario de flujo de caja', () => {
+  it('[TC-REPORTING-FORECAST-021] el calendario de 90 días tiene un umbral bloqueante de p95 500 ms y un p95 de 501 ms es brecha', () => {
+    expect(PERF_THRESHOLDS['NFR-PERF-010']).toMatchObject({ metric: 'p95', limitMs: 500 });
+    const row = latencyResult({
+      id: 'cash-flow-calendar-90d',
+      nfr: 'NFR-PERF-010',
+      title: 'calendario de flujo de caja 90 días',
+      samples: Array.from({ length: 20 }, () => 501),
+      limitMs: PERF_THRESHOLDS['NFR-PERF-010'].limitMs,
+    });
+    expect([row.gate, row.passed]).toEqual([true, false]);
+  });
+});

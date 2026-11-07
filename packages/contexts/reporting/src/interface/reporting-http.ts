@@ -1,18 +1,28 @@
 import { createHash } from 'node:crypto';
-import { Controller, Get, Inject, Param, Req, Res, StreamableFile } from '@nestjs/common';
-import { ValidatedQuery, principalOf, type ApiRequest, type ApiResponse } from '@pf/platform/nest';
+import { Body, Controller, Get, Inject, Param, Put, Req, Res, StreamableFile } from '@nestjs/common';
+import {
+  ExpectedVersion,
+  ValidatedQuery,
+  principalOf,
+  type ApiRequest,
+  type ApiResponse,
+} from '@pf/platform/nest';
 import type { CompareMode } from '../domain/index.js';
+import type { CashFlowCalendarQueries } from '../application/cash-flow-calendar.queries.js';
+import type { SpendableSettingsService } from '../application/spendable-settings.use-cases.js';
 import type { ConversionCostQueries } from '../application/conversion-cost.queries.js';
 import type { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
 import type { ReportSummaryQueries } from '../application/report-summary.queries.js';
 import type { SpendableQueries } from '../application/spendable.queries.js';
 import type { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
 import type {
+  CashFlowCalendarDto,
   ConversionCostAnalysisDto,
   ConversionCostGroupingDto,
   NetWorthHistoryDto,
   ReportSummaryDto,
   SpendableDto,
+  SpendableSettingsDto,
   SurprisePaymentsDto,
   UpcomingPaymentsDto,
 } from '../contracts/index.js';
@@ -22,6 +32,8 @@ export const NET_WORTH_HISTORY_QUERIES = Symbol('NET_WORTH_HISTORY_QUERIES');
 export const UPCOMING_PAYMENTS_QUERIES = Symbol('UPCOMING_PAYMENTS_QUERIES');
 export const SPENDABLE_QUERIES = Symbol('SPENDABLE_QUERIES');
 export const CONVERSION_COST_QUERIES = Symbol('CONVERSION_COST_QUERIES');
+export const CASH_FLOW_QUERIES = Symbol('CASH_FLOW_QUERIES');
+export const SPENDABLE_SETTINGS_SERVICE = Symbol('SPENDABLE_SETTINGS_SERVICE');
 
 type Json = Record<string, unknown>;
 const str = (q: Json, k: string): string | undefined =>
@@ -93,6 +105,16 @@ export function spendableEtag(spendable: SpendableDto, dataVersion: string): str
   return `W/"${dataVersion}-${hash}"`;
 }
 
+/** ETag débil del calendario de flujo de caja: versión de datos + hash del contenido (sin `generatedAt`). */
+export function cashFlowEtag(calendar: CashFlowCalendarDto, dataVersion: string): string {
+  const { generatedAt: _generatedAt, ...meta } = calendar.meta;
+  const hash = createHash('sha256')
+    .update(JSON.stringify({ ...calendar, meta }))
+    .digest('base64url')
+    .slice(0, 22);
+  return `W/"${dataVersion}-${hash}"`;
+}
+
 /**
  * `GET /api/v1/workspaces/{workspaceId}/reports/summary` (`getReportSummary`, VIEWER). Autenticación, rol y validación
  * de contrato (incl. `topCategories` 0..20) los aplican las convenciones globales; `If-None-Match` ⇒ 304 lo resuelve
@@ -106,6 +128,8 @@ export class ReportingController {
     @Inject(UPCOMING_PAYMENTS_QUERIES) private readonly upcoming: UpcomingPaymentsQueries,
     @Inject(SPENDABLE_QUERIES) private readonly spendable: SpendableQueries,
     @Inject(CONVERSION_COST_QUERIES) private readonly conversionCosts: ConversionCostQueries,
+    @Inject(CASH_FLOW_QUERIES) private readonly cashFlow: CashFlowCalendarQueries,
+    @Inject(SPENDABLE_SETTINGS_SERVICE) private readonly spendableSettings: SpendableSettingsService,
   ) {}
 
   @Get('workspaces/:workspaceId/reports/summary')
@@ -204,6 +228,68 @@ export class ReportingController {
     res.setHeader('etag', spendableEtag(spendable, dataVersion));
     res.setHeader('cache-control', 'private, no-cache');
     return spendable;
+  }
+
+  /**
+   * `GET /api/v1/workspaces/{workspaceId}/reports/cash-flow-calendar` (`getCashFlowCalendar`, VIEWER): calendario de flujo
+   * de caja de 7, 30, 60 o 90 días con saldo esperado, riesgo de déficit y consolidado (add-cash-flow-forecast). Mismo
+   * manejo de `ETag`/`If-None-Match`; horizonte o cuenta inválidos ⇒ 400 `INVALID_FILTER`.
+   */
+  @Get('workspaces/:workspaceId/reports/cash-flow-calendar')
+  async getCashFlowCalendar(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @ValidatedQuery() query: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ): Promise<CashFlowCalendarDto> {
+    const horizon = int(query, 'horizon');
+    const { calendar, dataVersion } = await this.cashFlow.getCashFlowCalendar({
+      userId: principalOf(req)?.userId ?? null,
+      workspaceId,
+      ...(horizon !== undefined ? { horizon } : {}),
+      ...(str(query, 'accountId') ? { accountId: str(query, 'accountId') as string } : {}),
+      ...(str(query, 'reportingCurrency')
+        ? { reportingCurrency: str(query, 'reportingCurrency') as string }
+        : {}),
+    });
+    res.setHeader('etag', cashFlowEtag(calendar, dataVersion));
+    res.setHeader('cache-control', 'private, no-cache');
+    return calendar;
+  }
+
+  /** `GET …/reports/spendable/settings` (`getSpendableSettings`, VIEWER): modo de horizonte y esenciales del disponible. */
+  @Get('workspaces/:workspaceId/reports/spendable/settings')
+  getSpendableSettings(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+  ): Promise<SpendableSettingsDto> {
+    return this.spendableSettings.get({ userId: principalOf(req)?.userId ?? null, workspaceId });
+  }
+
+  /**
+   * `PUT …/reports/spendable/settings` (`updateSpendableSettings`, OWNER, `If-Match` obligatorio): auditado; categoría de
+   * ingreso ⇒ 422 `CATEGORY_KIND_MISMATCH`, archivada ⇒ 409 `CATEGORY_ARCHIVED`, versión vencida ⇒ 412.
+   */
+  @Put('workspaces/:workspaceId/reports/spendable/settings')
+  updateSpendableSettings(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @ExpectedVersion() expected: number,
+    @Body() body: Json,
+  ): Promise<SpendableSettingsDto> {
+    const ids = Array.isArray(body['essentialCategoryIds'])
+      ? (body['essentialCategoryIds'] as unknown[])
+      : [];
+    return this.spendableSettings.update({
+      userId: principalOf(req)?.userId ?? '',
+      workspaceId,
+      expectedVersion: expected,
+      settings: {
+        horizonMode: body['horizonMode'] as 'FINANCIAL_PERIOD' | 'NEXT_INCOME',
+        subtractEssentials: body['subtractEssentials'] === true,
+        essentialCategoryIds: ids.map(String),
+      },
+    });
   }
 
   /**

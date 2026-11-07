@@ -77,6 +77,7 @@ import {
   identityWorkspaceCalendarDirectory,
   identityWorkspaceSettings,
   identityWorkspaceSettingsDirectory,
+  identityWorkspaceReserveDirectory,
   identityWorkspaceSettingsQuery,
   identityUserDisplayNames,
   identityWorkspaceTimeZones,
@@ -401,6 +402,8 @@ export function financeRuntimes(input: {
   const requestSettings = identityWorkspaceSettings(input.pool);
   const directorySettings = identityWorkspaceSettingsDirectory(input.pool);
   const isUser = () => currentRequestContext()?.actor?.type === 'USER';
+  const requestReserve = identityWorkspaceSettingsQuery(input.pool);
+  const directoryReserve = identityWorkspaceReserveDirectory(input.pool);
   const actorCalendar: WorkspaceCalendarQuery = {
     calendarOf: (workspaceId) =>
       isUser() ? requestCalendar.calendarOf(workspaceId) : directoryCalendar.calendarOf(workspaceId),
@@ -530,7 +533,8 @@ export function financeRuntimes(input: {
   const reporting = createReportingRuntime({
     pool: input.pool,
     clock: input.clock,
-    workspaces: identityWorkspaceSettings(input.pool),
+    // La API lee el workspace con la membresía del usuario; el job y el digest del worker, con el directorio.
+    workspaces: actorSettings,
     accounts: accounts.catalog,
     balances: ledger.accountBalances,
     flows: transactions.flows,
@@ -566,6 +570,10 @@ export function financeRuntimes(input: {
         deferred.commitments?.resolved.listResolvedOutflows(query) ?? Promise.resolve([]),
       hasActiveDefinitions: (query) =>
         deferred.commitments?.stats.hasActiveDefinitions(query) ?? Promise.resolve(false),
+      // add-cash-flow-forecast (S1): ocurrencias de todos los tipos para el calendario de flujo de caja.
+      listForCashFlow: (query) =>
+        deferred.commitments?.upcoming.listForCashFlow(query) ??
+        Promise.resolve({ items: [], generatedThrough: '9999-12-31' }),
     },
     pending: transactions.pending,
     // add-savings-goals: Q9 y aportes netos a metas del mes (GOALS se compone después de REPORTING).
@@ -584,6 +592,10 @@ export function financeRuntimes(input: {
         listForSpendable: (query) =>
           deferred.commitments?.committed.listForSpendable(query) ??
           Promise.resolve({ items: [], withoutAmountCount: 0 }),
+        // add-cash-flow-forecast: el próximo ingreso esperado del modo "hasta el próximo ingreso" (S1).
+        listForCashFlow: (query) =>
+          deferred.commitments?.upcoming.listForCashFlow(query) ??
+          Promise.resolve({ items: [], generatedThrough: '9999-12-31' }),
       },
       reservations: {
         getReservedByAccount: (query) =>
@@ -592,7 +604,13 @@ export function financeRuntimes(input: {
       goalPlans: {
         getForPeriod: (query) => deferred.goals?.queries.getForPeriod(query) ?? Promise.resolve([]),
       },
-      minimumReserve: identityWorkspaceSettingsQuery(input.pool),
+      // La API lee la reserva con la membresía del usuario; el job y el digest del worker, con el rol de directorio.
+      minimumReserve: {
+        getMinimumLiquidityReserve: (query) =>
+          isUser()
+            ? requestReserve.getMinimumLiquidityReserve(query)
+            : directoryReserve.getMinimumLiquidityReserve(query),
+      },
       budgets: {
         getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
       },
@@ -609,6 +627,20 @@ export function financeRuntimes(input: {
       getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
     },
     reconciliationMarks: transactions.reconciliationMarks,
+    // add-cash-flow-forecast: cada cambio de los ajustes del disponible se audita con los valores anterior y nuevo.
+    settingsAudit: {
+      updated: async (entry) => {
+        await input.audit.append({
+          workspaceId: entry.workspaceId,
+          action: 'reporting.spendable_settings.updated',
+          aggregateType: 'SpendableSettings',
+          aggregateId: entry.workspaceId,
+          aggregateVersion: entry.version,
+          actor: { type: 'USER' as const, userId: entry.userId },
+          changes: entry.changes.map((c) => ({ field: c.field, before: c.before, after: c.after })),
+        });
+      },
+    },
     // La exportación de un reporte se audita sin su contenido: reporte, filtros (texto JSON) y cantidad de filas.
     reportAudit: {
       exported: async (entry) => {

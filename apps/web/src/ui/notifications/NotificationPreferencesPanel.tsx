@@ -19,11 +19,13 @@ import type { FormatContext } from '../dashboard/types';
 import { useNotificationsContext, useNotificationsFormat, type NotificationsContext } from './context';
 import { loadPreferences, savePreferences, type SavedPreferences } from './service';
 import {
+  DIGEST_FREQUENCIES,
   draftFromPreferences,
   hasQuietHoursServerError,
   preferencesChanged,
   quietHoursError,
   setChannel,
+  isDigestFrequency,
   type PreferencesDraft,
   type QuietHoursError,
 } from './logic';
@@ -251,6 +253,40 @@ export function NotificationPreferencesView({
               {f.t('prefs.privacy')}
             </p>
           </div>
+
+          <fieldset
+            style={{
+              border: 0,
+              margin: 0,
+              padding: 0,
+              minWidth: 0,
+              display: 'grid',
+              gap: 'var(--pf-space-2)',
+            }}
+          >
+            <legend style={{ fontWeight: 600 }}>{f.t('prefs.digest.legend')}</legend>
+            <label htmlFor={`${id}-digest`}>{f.t('prefs.digest.label')}</label>
+            <select
+              id={`${id}-digest`}
+              value={draft.digestFrequency}
+              disabled={busy}
+              style={inputStyle}
+              aria-describedby={`${id}-digest-hint`}
+              data-testid="pref-digest-frequency"
+              onChange={(e) =>
+                isDigestFrequency(e.target.value) && onChange?.({ ...draft, digestFrequency: e.target.value })
+              }
+            >
+              {DIGEST_FREQUENCIES.map((value) => (
+                <option key={value} value={value}>
+                  {f.t(`prefs.digest.options.${value}`)}
+                </option>
+              ))}
+            </select>
+            <small id={`${id}-digest-hint`} style={mutedStyle} data-testid="pref-digest-hint">
+              {f.t('prefs.digest.hint')}
+            </small>
+          </fieldset>
 
           <fieldset
             style={{

@@ -43,6 +43,12 @@ export interface PortabilitySection {
    * pertenecen al workspace restaurado, donde el importador es el único OWNER).
    */
   readonly importerColumn?: string;
+  /**
+   * Columnas agregadas después de publicar el formato (expand): un archivo exportado antes del cambio puede no traerlas.
+   * El esquema JSON no las exige y el importador las completa con el valor indicado (el DEFAULT de la tabla), de modo que
+   * el archivo anterior se importa con el valor por omisión (p. ej. el digest del Home desactivado, FR-NOTIFY-007).
+   */
+  readonly legacyDefaults?: Readonly<Record<string, string | number | boolean | null>>;
   /** Gancho de importación registrado por nombre en el composition root (p. ej. recalcular `content_sha256`). */
   readonly importHook?: string;
 }

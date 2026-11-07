@@ -75,6 +75,22 @@ export class InMemoryNotifications implements NotificationRepository {
     return Promise.resolve('REFRESHED');
   }
 
+  usersWithDedupeKey(
+    workspaceId: string,
+    userIds: readonly string[],
+    dedupeKey: string,
+  ): Promise<ReadonlySet<string>> {
+    return Promise.resolve(
+      new Set(
+        [...this.rows.values()]
+          .filter(
+            (r) => r.workspaceId === workspaceId && r.dedupeKey === dedupeKey && userIds.includes(r.userId),
+          )
+          .map((r) => r.userId),
+      ),
+    );
+  }
+
   findOwn(workspaceId: string, userId: string, id: string): Promise<NotificationState | null> {
     const row = this.rows.get(id);
     return Promise.resolve(row && row.workspaceId === workspaceId && row.userId === userId ? row : null);
@@ -323,6 +339,19 @@ export class InMemoryPreferences implements PreferencesRepository {
     const out = new Map<string, NotificationPreferences>();
     for (const id of userIds) out.set(id, await this.load(workspaceId, id));
     return out;
+  }
+
+  digestSubscribers(
+    workspaceId: string,
+  ): Promise<readonly { readonly userId: string; readonly frequency: 'WEEKLY' | 'MONTHLY' }[]> {
+    return Promise.resolve(
+      [...this.rows.values()]
+        .filter((p) => p.snapshot.workspaceId === workspaceId && p.snapshot.digestFrequency !== 'OFF')
+        .map((p) => ({
+          userId: p.snapshot.userId,
+          frequency: p.snapshot.digestFrequency as 'WEEKLY' | 'MONTHLY',
+        })),
+    );
   }
 
   save(prefs: NotificationPreferences): Promise<boolean> {

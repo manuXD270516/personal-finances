@@ -353,7 +353,15 @@ describe('GetSpendable: tarjetas sin pago programado y resumen del Home', () => 
       actionHint: null,
     });
     const detail = await spendable();
-    const { committedItems: _a, reservedByAccount: _b, plannedByGoal: _c, meta: _m, ...base } = detail;
+    const {
+      committedItems: _a,
+      reservedByAccount: _b,
+      plannedByGoal: _c,
+      essentialItems: _d,
+      essentialWarnings: _e,
+      meta: _m,
+      ...base
+    } = detail;
     expect(s.spendable).toEqual(base);
   });
 
@@ -413,5 +421,206 @@ describe('GetSpendable: tarjetas sin pago programado y resumen del Home', () => 
     };
     await new SpendableQueries(wrapped, wrapped.spendable).getSpendable({ userId: USER, workspaceId: WS });
     expect(seen).toEqual([WS]);
+  });
+});
+
+const SUPER = 'cat-supermercado';
+const TRANSPORTE = 'cat-transporte';
+
+function setSettings(over: Partial<NonNullable<typeof mem.spendableSettings>>) {
+  mem.spendableSettings = {
+    horizonMode: 'FINANCIAL_PERIOD',
+    subtractEssentials: false,
+    essentialCategoryIds: [],
+    version: 2,
+    ...over,
+  };
+}
+
+function income(name: string, dueDate: string, status: 'SCHEDULED' | 'OVERDUE' = 'SCHEDULED') {
+  mem.cashFlowOccurrences.push({
+    occurrenceId: `income-${name}-${dueDate}`,
+    definitionId: `def-${name}`,
+    definitionName: name,
+    kind: 'INCOME',
+    dueDate,
+    status,
+    expected: { type: 'FIXED', amount: '8000.00', min: null, max: null, currency: 'BOB' },
+    accountId: 'banco',
+    toAccountId: null,
+    managedBy: 'USER',
+    categoryId: null,
+  });
+}
+
+function plan(periodId: string, lines: { id: string; reference: string; actual: string }[]) {
+  mem.budgets.set(periodId, {
+    budgetId: `budget-${periodId}`,
+    currency: 'BOB',
+    lines: lines.map((l) => ({
+      target: { kind: 'CATEGORY', id: l.id },
+      nature: 'EXPENSE',
+      reference: bob(l.reference),
+      actual: bob(l.actual),
+    })),
+    totals: { availableToSpend: bob('0.00'), complete: true },
+  });
+}
+
+describe('GetSpendable: horizonte hasta el próximo ingreso y esenciales (add-cash-flow-forecast; D377, D378)', () => {
+  const node = (categoryId: string, name: string) =>
+    ({ categoryId, name, kind: 'EXPENSE', groupId: null, parentId: null, archived: false }) as never;
+
+  beforeEach(() => {
+    mem.categoryNodes.push(node(SUPER, 'Supermercado'), node(TRANSPORTE, 'Transporte'));
+  });
+
+  it('[TC-REPORTING-FORECAST-022] sin esenciales el disponible no cambia, no hay término e informa el horizonte usado', async () => {
+    const s = await spendable();
+    expect(s.horizon).toEqual({
+      mode: 'FINANCIAL_PERIOD',
+      from: '2026-10-01',
+      to: '2026-10-31',
+      nextIncome: null,
+      fallback: false,
+    });
+    expect(text(s.consolidated.total)).toBe('5521.00 BOB');
+    expect(s.byCurrency[0]!.essentials).toBeNull();
+    expect(s.essentialItems).toEqual([]);
+  });
+
+  it('[TC-REPORTING-FORECAST-023] hasta el próximo ingreso el horizonte termina en el sueldo y el disponible es 5701.00 BOB', async () => {
+    setSettings({ horizonMode: 'NEXT_INCOME' });
+    income('Sueldo', '2026-10-26');
+    const s = await spendable();
+    expect(s.horizon).toMatchObject({
+      mode: 'NEXT_INCOME',
+      from: '2026-10-20',
+      to: '2026-10-26',
+      fallback: false,
+    });
+    expect(s.horizon.nextIncome?.name).toBe('Sueldo');
+    expect(s.byCurrency[0]!.committed).toEqual(bob('2999.00'));
+    expect(text(s.consolidated.total)).toBe('5701.00 BOB');
+    expect(mem.spendableRequests.at(-1)).toEqual({ periodFrom: '2026-10-01', periodTo: '2026-10-26' });
+  });
+
+  it('[TC-REPORTING-FORECAST-023] un ingreso atrasado sin resolver no fija el horizonte', async () => {
+    setSettings({ horizonMode: 'NEXT_INCOME' });
+    income('Sueldo', '2026-10-18', 'OVERDUE');
+    income('Sueldo', '2026-11-18');
+    const s = await spendable();
+    expect(s.horizon.to).toBe('2026-11-18');
+  });
+
+  it('[TC-REPORTING-FORECAST-024] sin ingreso esperado usa 30 días desde hoy y lo indica', async () => {
+    setSettings({ horizonMode: 'NEXT_INCOME' });
+    const s = await spendable();
+    expect(s.horizon).toMatchObject({
+      from: '2026-10-20',
+      to: '2026-11-19',
+      fallback: true,
+      nextIncome: null,
+    });
+  });
+
+  it('[TC-REPORTING-FORECAST-024] un horizonte que cruza de periodo suma lo planificado completo del periodo siguiente', async () => {
+    mem.clock.set(Instant.parse('2026-10-27T14:00:00Z'));
+    mem.addPeriod('2026-11', '2026-11-01', '2026-11-30', 'ACTIVE');
+    mem.spendableItems.length = 0;
+    item('Luz', '2026-10-28', bob('180.00'));
+    item('Alquiler', '2026-11-01', bob('2500.00'));
+    item('Internet', '2026-11-22', bob('199.00'));
+    mem.goalPlansByPeriodStart.set('2026-11-01', [
+      { goalId: 'g1', goalName: 'Fondo de emergencia', currency: 'BOB', pending: '1500.00' },
+    ]);
+    setSettings({ horizonMode: 'NEXT_INCOME' });
+    income('Sueldo', '2026-11-05');
+    const s = await spendable();
+    expect(s.horizon).toMatchObject({ from: '2026-10-27', to: '2026-11-05' });
+    expect(s.byCurrency[0]!.committed).toEqual(bob('2680.00'));
+    expect(s.byCurrency[0]!.plannedGoalContributions).toEqual(bob('2100.00'));
+    expect(text(s.consolidated.total)).toBe('4520.00 BOB');
+    expect(s.plannedByGoal).toEqual([
+      { goalId: 'g1', goalName: 'Fondo de emergencia', pending: bob('2100.00') },
+    ]);
+  });
+
+  it('[TC-REPORTING-FORECAST-025] los esenciales restan lo planificado menos lo gastado: 450.00 y disponible 5071.00 BOB', async () => {
+    setSettings({ subtractEssentials: true, essentialCategoryIds: [SUPER] });
+    plan('period-2026-10', [{ id: SUPER, reference: '1200.00', actual: '750.00' }]);
+    const s = await spendable();
+    expect(s.byCurrency[0]!.essentials).toEqual(bob('450.00'));
+    expect(text(s.consolidated.total)).toBe('5071.00 BOB');
+    expect(s.essentialItems).toEqual([
+      {
+        categoryId: SUPER,
+        name: 'Supermercado',
+        periodLabel: '2026-10',
+        reference: bob('1200.00'),
+        actual: bob('750.00'),
+        committed: bob('0.00'),
+        counted: bob('450.00'),
+        prorated: false,
+      },
+    ]);
+  });
+
+  it('[TC-REPORTING-FORECAST-025] un compromiso de la misma categoría no se cuenta dos veces: comprometido 3379.00, esenciales 250.00', async () => {
+    setSettings({ subtractEssentials: true, essentialCategoryIds: [SUPER] });
+    plan('period-2026-10', [{ id: SUPER, reference: '1200.00', actual: '750.00' }]);
+    item('Canasta', '2026-10-25', bob('200.00'), { categoryId: SUPER });
+    const s = await spendable();
+    expect(s.byCurrency[0]!.committed).toEqual(bob('3379.00'));
+    expect(s.byCurrency[0]!.essentials).toEqual(bob('250.00'));
+    expect(text(s.consolidated.total)).toBe('5071.00 BOB');
+  });
+
+  it('[TC-REPORTING-FORECAST-026] los esenciales de un periodo posterior se prorratean por días: 650.00 y disponible 3870.00 BOB', async () => {
+    mem.clock.set(Instant.parse('2026-10-27T14:00:00Z'));
+    mem.addPeriod('2026-11', '2026-11-01', '2026-11-30', 'ACTIVE');
+    mem.spendableItems.length = 0;
+    item('Luz', '2026-10-28', bob('180.00'));
+    item('Alquiler', '2026-11-01', bob('2500.00'));
+    mem.goalPlansByPeriodStart.set('2026-11-01', [
+      { goalId: 'g1', goalName: 'Fondo de emergencia', currency: 'BOB', pending: '1500.00' },
+    ]);
+    setSettings({ horizonMode: 'NEXT_INCOME', subtractEssentials: true, essentialCategoryIds: [SUPER] });
+    income('Sueldo', '2026-11-05');
+    plan('period-2026-10', [{ id: SUPER, reference: '1200.00', actual: '750.00' }]);
+    plan('period-2026-11', [{ id: SUPER, reference: '1200.00', actual: '0.00' }]);
+    const s = await spendable();
+    expect(s.byCurrency[0]!.essentials).toEqual(bob('650.00'));
+    expect(text(s.consolidated.total)).toBe('3870.00 BOB');
+    expect(s.essentialItems.map((i) => [i.periodLabel, i.prorated, i.counted.amount])).toEqual([
+      ['2026-10', false, '450.00'],
+      ['2026-11', true, '200.00'],
+    ]);
+  });
+
+  it('[TC-REPORTING-FORECAST-026] una categoría esencial sin línea no resta y se indica', async () => {
+    setSettings({ subtractEssentials: true, essentialCategoryIds: [SUPER, TRANSPORTE] });
+    plan('period-2026-10', [{ id: SUPER, reference: '1200.00', actual: '750.00' }]);
+    const s = await spendable();
+    expect(s.byCurrency[0]!.essentials).toEqual(bob('450.00'));
+    expect(s.essentialWarnings).toEqual([
+      { categoryId: TRANSPORTE, reason: 'NO_LINE', periodLabel: '2026-10' },
+    ]);
+  });
+
+  it('[TC-REPORTING-FORECAST-026] sin plan del periodo los esenciales no restan y se indica sin plan', async () => {
+    setSettings({ subtractEssentials: true, essentialCategoryIds: [SUPER] });
+    const s = await spendable();
+    expect(s.byCurrency[0]!.essentials).toEqual(bob('0.00'));
+    expect(text(s.consolidated.total)).toBe('5521.00 BOB');
+    expect(s.essentialWarnings[0]).toMatchObject({ categoryId: SUPER, reason: 'NO_PLAN' });
+  });
+
+  it('[TC-REPORTING-FORECAST-022] el resumen del Home usa los mismos ajustes que el detalle', async () => {
+    setSettings({ subtractEssentials: true, essentialCategoryIds: [SUPER] });
+    plan('period-2026-10', [{ id: SUPER, reference: '1200.00', actual: '750.00' }]);
+    const s = await summary();
+    expect(text(s.spendable?.consolidated.total)).toBe('5071.00 BOB');
+    expect(s.spendable?.horizon.mode).toBe('FINANCIAL_PERIOD');
   });
 });

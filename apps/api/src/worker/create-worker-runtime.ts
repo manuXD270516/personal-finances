@@ -19,7 +19,7 @@ import {
   startHealthServer,
   type HealthServer,
 } from '@pf/platform/health';
-import type { Logger } from '@pf/platform/logging';
+import { uuidv7, type Logger } from '@pf/platform/logging';
 import {
   createFxMarketRateJobs,
   createUserConversionObservations,
@@ -68,9 +68,9 @@ import {
   createNotificationsWorkerRuntime,
   notificationEventConsumers,
 } from '@pf/notifications/interface/notifications.module';
-import type { EmailSender } from '@pf/notifications/interface/notifications.module';
+import type { EmailSender, HomeDigestSourcePort } from '@pf/notifications/interface/notifications.module';
 import { PinoNestLogger } from '@pf/platform/nest';
-import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
+import { createCashFlowWatch, reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
 import { otelCounters, otelHistograms, shutdownTelemetry } from '@pf/platform/otel';
 import type { JobQueue } from '@pf/platform/queue';
 import { createObjectStorageClient } from '@pf/platform/storage';
@@ -95,6 +95,7 @@ import { registerDocumentsJobs } from './documents-jobs.js';
 import { documentsRuntimeFor } from '../documents/documents-wiring.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
+import { registerCashFlowWatchJob } from './reporting-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
 import { registerPortabilityJobs } from './portability-jobs.js';
 import { portabilityOptions } from '../portability/portability-wiring.js';
@@ -259,6 +260,20 @@ export async function createWorkerRuntime(
   // del email (adaptador por EMAIL_DRIVER: smtp → Mailpit en local/CI, none → solo in-app), barrido y purga. La cola de
   // despacho se crea antes de arrancar los consumidores: estos encolan en la transacción de la notificación.
   const notificationsClock = options.clock ?? systemClock;
+  // Digest del Home (add-cash-flow-forecast): el contenido lo compone REPORTING (`HomeDigestQuery`), que se arma más
+  // abajo con el resto de los contextos financieros; el puerto lo resuelve de forma diferida.
+  const financeRef: { current?: ReturnType<typeof financeRuntimes> } = {};
+  const homeDigestSource: HomeDigestSourcePort = {
+    compose: (input) => {
+      const digest = (financeRef.current?.reporting as { digest?: HomeDigestSourcePort } | undefined)?.digest;
+      if (!digest) {
+        return Promise.reject(
+          new Error('el digest del Home aún no está disponible (REPORTING sin componer)'),
+        );
+      }
+      return digest.compose(input);
+    },
+  };
   const emailDriver = config.EMAIL_DRIVER ?? 'none';
   const notifications = createNotificationsWorkerRuntime({
     pool,
@@ -292,12 +307,22 @@ export async function createWorkerRuntime(
     retentionMonths: config.NOTIFY_RETENTION,
     ...(options.notifications?.backoffMs ? { backoffMs: options.notifications.backoffMs } : {}),
     ...(options.notifications?.leaseMs ? { leaseMs: options.notifications.leaseMs } : {}),
+    homeDigest: { source: homeDigestSource, calendar: identityWorkspaceCalendarDirectory(pool) },
   });
   await registerNotificationsJobs(queue, {
     dispatch: notifications.dispatch,
     purge: notifications.purge,
     workspaces: activeWorkspaces,
     logger,
+    ...(notifications.digest
+      ? {
+          digest: {
+            service: notifications.digest,
+            cron: config.NOTIFICATIONS_DIGEST_CRON,
+            runOnStart: scheduledJobs && (options.notifications?.sweepOnStart ?? true),
+          },
+        }
+      : {}),
     ...(options.notifications?.scheduleCrons !== undefined
       ? { scheduleCrons: options.notifications.scheduleCrons }
       : {}),
@@ -511,6 +536,7 @@ export async function createWorkerRuntime(
     outbox: fxOutbox,
     documentsRef,
   });
+  financeRef.current = finance;
   const commitments = createCommitmentsRuntime({
     pool,
     clock: options.clock ?? systemClock,
@@ -540,6 +566,50 @@ export async function createWorkerRuntime(
   });
   await registerSubscriptionsJob(queue, commitments.subscriptionDaily, activeWorkspaces, logger, {
     cron: config.COMMITMENTS_SUBSCRIPTIONS_CRON,
+    runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
+  });
+
+  // REPORTING (add-cash-flow-forecast): job `reporting.cash-flow-watch` (cada hora a los :25, después de las ocurrencias).
+  // Usa el MISMO calendario que la API, la `JobQueue` existente y la entrega directa a NOTIFY (D249): sin consumidores de
+  // eventos ni conexiones nuevas; episodio, hecho del outbox y notificación se escriben en una sola transacción.
+  const cashFlowWatch = createCashFlowWatch({
+    pool,
+    clock: options.clock ?? systemClock,
+    calendar: finance.reporting.cashFlow,
+    workspaces: activeWorkspaces,
+    outbox: {
+      append: async (event) => {
+        await fxOutbox.append(event);
+      },
+    },
+    newId: () => uuidv7(),
+    horizonDays: config.REPORTING_SHORTFALL_ALERT_HORIZON_DAYS,
+    notifier: {
+      notify: async (f) => {
+        await notifications.intake.notify({
+          workspaceId: f.workspaceId,
+          type: 'CASH_FLOW_SHORTFALL_RISK',
+          factKey: f.episodeId,
+          sourceEventId: f.sourceEventId,
+          occurredAt: f.occurredAt,
+          payload: {
+            episodeId: f.episodeId,
+            currency: f.currency,
+            horizonDays: f.horizonDays,
+            firstShortfallDate: f.firstShortfallDate,
+            lowest: f.lowest,
+            lowestDate: f.lowestDate,
+            threshold: f.threshold,
+            belowZero: f.belowZero,
+            detectedAt: f.occurredAt,
+            timeZone: f.timeZone,
+          },
+        });
+      },
+    },
+  });
+  await registerCashFlowWatchJob(queue, cashFlowWatch, logger, {
+    cron: config.REPORTING_CASH_FLOW_WATCH_CRON,
     runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
   });
 

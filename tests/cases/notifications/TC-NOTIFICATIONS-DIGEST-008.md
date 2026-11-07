@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Idioma de las notificaciones de déficit y del digest"
 scenario: "Locale no soportado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-002","FR-NOTIFY-007"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: low
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/domain/home-digest.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["notifications","digest","i18n"]
@@ -28,7 +29,7 @@ expected_result:
   - "fr-FR: español"
   - "pt-BR: portugués"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-NOTIFICATIONS-DIGEST-008 — El digest usa el idioma del destinatario con español como respaldo

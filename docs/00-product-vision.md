@@ -104,6 +104,8 @@ El dashboard (capability `reporting/dashboard`, a especificar en Phase 1) existe
 
 > **As-built de Phase 4 (`add-spendable-amount`, D209–D218):** Q5 muestra **ambas vistas**: la cifra principal "libre de compromisos" (líquido − reservado por metas − comprometido pagadero desde cuentas líquidas − aportes planificados pendientes − reserva mínima, por moneda y consolidado, sin sumar ingresos esperados) y, como segunda vista, el disponible "según tu presupuesto" del plan del periodo. El horizonte es el periodo financiero que contiene hoy; "hasta el próximo ingreso" y las categorías esenciales llegan en Phase 7.
 
+> **As-built de Phase 7 (`add-cash-flow-forecast`, D377–D389):** Q5 conserva el periodo financiero como horizonte por omisión y ofrece como **ajuste del workspace** (solo el OWNER lo cambia) el modo «hasta el próximo ingreso» —de hoy al vencimiento de la primera ocurrencia de ingreso no resuelta posterior a hoy, o 30 días sin ingreso esperado— y el término de **esenciales presupuestados** (lista propia de Reporting de hasta 50 categorías de gasto); Q7 informa la **variación por categoría** de los tops (valor, % con dos decimales, «nuevo», favorable o desfavorable); Q8 muestra el **saldo más bajo esperado y el riesgo de déficit** de los próximos 30 días con enlace al calendario `/flujo-de-caja`. SM-05 se verifica con un checklist E2E sobre el dataset Demo v2 (TC-REPORTING-FORECAST-030).
+
 Regla de UX: si una pregunta todavía no puede responderse (fase no implementada o datos insuficientes), el widget lo **dice explícitamente** y sugiere la acción para habilitarlo; nunca muestra un número inventado.
 
 ## 7. Alcance por fase (vista rápida)

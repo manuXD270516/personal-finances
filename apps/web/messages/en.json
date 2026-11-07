@@ -46,7 +46,8 @@
     "goals": "Goals",
     "documents": "Documents",
     "rules": "Rules",
-    "reports": "Reports"
+    "reports": "Reports",
+    "cashFlow": "Cash flow"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -372,6 +373,12 @@
         "flat": "same as last month",
         "new": "new: no spending last month",
         "unknown": "no comparison with last month"
+      },
+      "variation": {
+        "new": "new",
+        "FAVORABLE": "favorable",
+        "UNFAVORABLE": "unfavorable",
+        "NONE": "no change"
       }
     },
     "topIncomeCategories": {
@@ -386,6 +393,12 @@
         "flat": "same as last month",
         "new": "new: no income last month",
         "unknown": "no comparison with last month"
+      },
+      "variation": {
+        "new": "new",
+        "FAVORABLE": "favorable",
+        "UNFAVORABLE": "unfavorable",
+        "NONE": "no change"
       }
     },
     "netWorth": {
@@ -471,7 +484,8 @@
         "committed": "Committed",
         "plannedGoalContributions": "Planned goal contributions",
         "minimumReserve": "Minimum reserve",
-        "spendable": "Spendable"
+        "spendable": "Spendable",
+        "essentials": "Budgeted essentials"
       },
       "breakdown": "Breakdown by currency",
       "currencyHeading": "In {currency}",
@@ -505,9 +519,66 @@
         "rateLine": "{pair} {value}",
         "loading": "Loading the spendable amount…",
         "noAccounts": "You do not have liquid accounts yet: there is no spendable amount to calculate."
+      },
+      "settingsLink": "Spendable settings",
+      "horizon": {
+        "period": "Horizon: financial period {label} ({from} to {to})",
+        "nextIncome": "Horizon: until the next income, \"{name}\" on {date} ({from} to {to})",
+        "fallback": "Horizon: there is no expected income, so 30 days are used ({from} to {to})"
+      },
+      "essentials": {
+        "title": "Budgeted essentials",
+        "off": "Essentials are not deducted. You can turn them on in the spendable settings.",
+        "caption": "Essentials subtracted from the spendable amount",
+        "category": "Category",
+        "period": "Period",
+        "reference": "Plan reference",
+        "actual": "Spent",
+        "committed": "Already committed",
+        "counted": "Subtracts",
+        "prorated": "prorated",
+        "unknownCategory": "An essential category",
+        "warning": {
+          "NO_PLAN": "{name}: there is no plan for {period}, so nothing is subtracted for that category.",
+          "NO_LINE": "{name}: the plan of {period} has no line for that category.",
+          "ARCHIVED": "{name}: the category is archived and is not deducted. Remove it from the settings."
+        }
       }
     },
-    "reportsLink": "See the income and expenses report"
+    "reportsLink": "See the income and expenses report",
+    "settings": {
+      "title": "Spendable settings",
+      "subtitle": "Choose until when the spendable amount is calculated and whether the essential expenses of your budget are deducted.",
+      "loading": "Loading the settings…",
+      "readOnly": "Only the owner of the workspace can change these settings. Here you see them read-only.",
+      "horizon": {
+        "legend": "Spendable horizon",
+        "FINANCIAL_PERIOD": "Financial period",
+        "FINANCIAL_PERIODHelp": "Until the end of the current financial period (default).",
+        "NEXT_INCOME": "Until the next expected income",
+        "NEXT_INCOMEHelp": "Until the date of the next expected income; if there is none, 30 days are used."
+      },
+      "essentials": {
+        "legend": "Essentials",
+        "subtract": "Deduct the budgeted essentials",
+        "subtractHelp": "Subtracts from the spendable amount what is still to be spent on the budget line of each essential category, without counting twice what is already committed."
+      },
+      "categories": {
+        "legend": "Essential categories",
+        "count": "{count} of {max} categories selected",
+        "empty": "There are no expense categories to choose from.",
+        "archived": "archived",
+        "max": "You reached the maximum of {max} categories: uncheck one to choose another."
+      },
+      "reload": "Reload the settings",
+      "notice": {
+        "saved": "Settings saved.",
+        "noChanges": "There are no changes to save.",
+        "reloaded": "Settings reloaded with the current version."
+      },
+      "save": "Save the settings",
+      "back": "Back to the spendable detail"
+    }
   },
   "Common": {
     "noWorkspace": "Select or create a workspace.",
@@ -2542,7 +2613,9 @@
       "openGoal": "View the goal",
       "openGoalReservations": "View the account reservations",
       "openFxFeedStatus": "View the status of the automatic rates",
-      "openFxRate": "Review the held rate"
+      "openFxRate": "Review the held rate",
+      "openCashFlowCalendar": "View the cash flow calendar",
+      "openHome": "Go to the home page"
     },
     "prefs": {
       "title": "Notifications",
@@ -2573,11 +2646,23 @@
         "GOAL_MILESTONE": "Goal milestone (25 %, 50 %, 75 %)",
         "FX_RATE_FEED_STALE": "Automatic rate not updated",
         "FX_RATE_FEED_RECOVERED": "Automatic rate recovered",
-        "FX_RATE_ANOMALY_RETAINED": "Rate held for an abnormal change"
+        "FX_RATE_ANOMALY_RETAINED": "Rate held for an abnormal change",
+        "CASH_FLOW_SHORTFALL_RISK": "Cash flow shortfall risk",
+        "HOME_DIGEST": "Periodic home summary (email)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
       "privacy": "Emails travel through external channels; by default they do not include amounts or category names. Turn this on only if you accept seeing that data in your mailbox. In-app notifications do not change.",
+      "digest": {
+        "legend": "Email summary",
+        "label": "Summary frequency",
+        "hint": "The summary is sent by email only. Without the details option it carries no amounts: only counts, percentages, states and dates.",
+        "options": {
+          "OFF": "Off",
+          "WEEKLY": "Weekly (Mondays at 08:00)",
+          "MONTHLY": "Monthly (first day of the financial period, 08:00)"
+        }
+      },
       "quiet": {
         "legend": "Quiet hours",
         "enable": "Turn on quiet hours",
@@ -3504,7 +3589,17 @@
       "more": "{count, plural, one {and # more payment} other {and # more payments}}",
       "viewAll": "View all upcoming payments",
       "noAccounts": "There are no accounts yet, so there are no commitments or payments to anticipate.",
-      "createAccount": "Create your first account to get started."
+      "createAccount": "Create your first account to get started.",
+      "cashFlowLink": "See the cash flow",
+      "risk": {
+        "NONE": "No shortfall risk",
+        "LOW": "Low shortfall risk in {currency}",
+        "POSSIBLE": "Possible shortfall risk in {currency}",
+        "HIGH": "High shortfall risk in {currency}"
+      },
+      "lowestLabel": "Lowest expected balance in the next {days} days",
+      "lowestOn": "{amount} on {date}",
+      "lowestIncomplete": "incomplete: a rate is missing"
     },
     "committed": {
       "period": "{name} ({from} to {to})",
@@ -6476,6 +6571,137 @@
       "done": "Suggestions applied to the plan.",
       "close": "Close",
       "cancel": "Cancel"
+    }
+  },
+  "CashFlow": {
+    "title": "Cash flow",
+    "subtitle": "Expected balance of your liquid accounts from {from} to {to}, with the known payments, income and transfers.",
+    "loading": "Loading the cash flow…",
+    "refreshing": "Updating…",
+    "controls": {
+      "horizon": "Horizon",
+      "days": "{days} days",
+      "currency": "Currency",
+      "account": "Account",
+      "allAccounts": "Total in {currency}"
+    },
+    "summary": {
+      "caption": "Shortfall risk by currency",
+      "currency": "Currency",
+      "risk": "Risk",
+      "lowest": "Lowest balance",
+      "lowestDate": "Date"
+    },
+    "risk": {
+      "NONE": "No risk",
+      "LOW": "Low risk",
+      "POSSIBLE": "Possible risk",
+      "HIGH": "High risk",
+      "thresholdReserve": "Threshold: minimum reserve of {amount}.",
+      "thresholdZero": "Threshold: zero (there is no minimum reserve in this currency).",
+      "noneHelp": "The expected balance stays above the threshold for the whole horizon.",
+      "lowHelp": "The expected balance gets close to the threshold: worth keeping an eye on.",
+      "possibleHelp": "The expected balance does not fall under the threshold, but the remaining planned spending of the plan would take it under.",
+      "highHelp": "The expected balance falls under the threshold with the payments already known.",
+      "firstShortfall": "First date under the threshold: {date}.",
+      "shortfall": "Shortfall: {amount}.",
+      "belowZero": "The lowest expected balance is negative: there is not enough to cover every payment."
+    },
+    "currency": {
+      "title": "Expected balance in {currency}",
+      "withoutAmount": "{count, plural, one {# variable movement without an amount is not deducted} other {# variable movements without an amount are not deducted}}"
+    },
+    "kpi": {
+      "start": "Starting balance",
+      "lowest": "Lowest balance",
+      "end": "Ending balance",
+      "outflow": "Expected outflows",
+      "inflow": "Expected inflows"
+    },
+    "chart": {
+      "title": "Expected balance in {currency} over {days} days",
+      "accountTitle": "Expected balance of {name} over {days} days",
+      "accountNote": "You are seeing the {name} account only.",
+      "backToCurrency": "See the total in {currency}",
+      "description": "Expected balance day by day; the lowest is {low} on {date}.",
+      "balance": "Expected balance",
+      "planned": "With the remaining planned spending",
+      "thresholdReserve": "Minimum reserve: {amount}",
+      "thresholdZero": "Threshold: zero",
+      "lowest": "Lowest"
+    },
+    "table": {
+      "show": "Show the chart data table",
+      "date": "Date",
+      "balance": "Closing balance",
+      "low": "Lowest balance of the day",
+      "planned": "With planned spending",
+      "belowThreshold": "under the threshold"
+    },
+    "scenarios": {
+      "withoutIncome": "Worst case without expected income",
+      "withPlan": "With the remaining planned spending",
+      "lowestOn": "lowest on {date}",
+      "endsAt": "ends at {amount}",
+      "noPlan": "No plan for: {periods}. The planned spending of those periods is not included."
+    },
+    "accounts": {
+      "title": "Accounts",
+      "caption": "Expected balance of each liquid account in {currency}",
+      "account": "Account",
+      "start": "Starting balance",
+      "lowest": "Lowest balance",
+      "lowestDate": "Date of the lowest",
+      "end": "Ending balance",
+      "actions": "Actions",
+      "showing": "In the chart",
+      "showSeries": "See the series of {name}"
+    },
+    "events": {
+      "title": "Expected movements in {currency}",
+      "empty": "There are no expected payments, income or transfers in this horizon."
+    },
+    "event": {
+      "kind": {
+        "INCOME": "Income",
+        "EXPENSE": "Expense",
+        "TRANSFER": "Transfer",
+        "CONVERSION": "Conversion",
+        "LOAN_PAYMENT": "Loan installment",
+        "CARD_PAYMENT": "Card payment"
+      },
+      "certainty": {
+        "KNOWN": "Known",
+        "ESTIMATED": "Estimated",
+        "EXPECTED": "Expected"
+      },
+      "overdue": "Overdue by {days, plural, one {# day} other {# days}} (was due {date}): applied today",
+      "noAmount": "No amount"
+    },
+    "consolidated": {
+      "title": "Consolidated in {currency}",
+      "help": "Informative: converts the lowest balance of each currency with the rate in force. It does not define the risk.",
+      "none": "There is no consolidated lowest balance: no currency could be converted.",
+      "incomplete": "Incomplete consolidated figure: rates in force are missing for these currencies, which are not added.",
+      "unconverted": "{amount} not converted"
+    },
+    "suggestions": {
+      "title": "Conversion suggestions",
+      "help": "They are approximate and execute nothing: you decide whether to convert and at which rate.",
+      "line": "Converting about {amount} to {to} before {date} would avoid the shortfall."
+    },
+    "coverage": {
+      "incomplete": "Recurring payments are only generated until {through}: anything after that does not appear in this calendar."
+    },
+    "empty": {
+      "text": "You do not have liquid accounts yet: there is no balance to project.",
+      "action": "Create an account"
+    },
+    "meta": {
+      "generatedAt": "Generated: {date}",
+      "freshness": "Data as of: {date}",
+      "reportingCurrency": "Reporting currency: {currency}",
+      "help": "Each day expenses are applied before income; an amount with a range uses the maximum for expenses and the minimum for income."
     }
   }
 }

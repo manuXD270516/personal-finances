@@ -33,6 +33,15 @@ export interface NotificationRepository {
    * `REFRESHED` si actualizó una existente, `UNCHANGED` si la foto entrante era más vieja que la guardada.
    */
   insertOrRefresh(notification: NotificationState): Promise<'CREATED' | 'REFRESHED' | 'UNCHANGED'>;
+  /**
+   * De `userIds`, quienes ya tienen una notificación con esa clave de deduplicación (el digest consulta antes de pedir el
+   * contenido: una composición por workspace solo si falta algún destinatario).
+   */
+  usersWithDedupeKey(
+    workspaceId: string,
+    userIds: readonly string[],
+    dedupeKey: string,
+  ): Promise<ReadonlySet<string>>;
   findOwn(workspaceId: string, userId: string, id: string): Promise<NotificationState | null>;
   findById(workspaceId: string, id: string): Promise<NotificationState | null>;
   /** Más reciente primero (`created_at DESC, id DESC`); el llamador pide `limit + 1` para saber si hay más. */
@@ -127,6 +136,10 @@ export interface PreferencesRepository {
     workspaceId: string,
     userIds: readonly string[],
   ): Promise<ReadonlyMap<string, NotificationPreferences>>;
+  /** Usuarios del workspace con digest activo (`WEEKLY` o `MONTHLY`; add-cash-flow-forecast, FR-NOTIFY-007). */
+  digestSubscribers(
+    workspaceId: string,
+  ): Promise<readonly { readonly userId: string; readonly frequency: 'WEEKLY' | 'MONTHLY' }[]>;
   /** Guarda con bloqueo optimista por la versión persistida; `false` si cambió (412). */
   save(preferences: NotificationPreferences): Promise<boolean>;
 }

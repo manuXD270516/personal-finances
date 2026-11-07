@@ -16,6 +16,7 @@ import type {
 import {
   NotificationPreferences,
   NOTIFICATION_CHANNELS,
+  isDigestFrequency,
   isNotificationType,
   type NotificationLink,
   type NotificationParams,
@@ -90,16 +91,35 @@ function toNotification(row: NotificationRow): NotificationState {
  */
 export class PgNotificationRepository implements NotificationRepository {
   async insertIfAbsent(n: NotificationState): Promise<boolean> {
+    // El digest del Home (add-cash-flow-forecast) nace `ARCHIVED` (con `archived_at`): no aparece en el centro ni cuenta
+    // como no leído. El resto nace `UNREAD`.
+    const archivedAt = n.status === 'ARCHIVED' ? (n.archivedAt ?? n.createdAt) : null;
     const { rows } = await sql<{ id: string }>`
       INSERT INTO notifications.notification
         (id, workspace_id, user_id, notification_type, severity, message_key, params, link, dedupe_key,
-         source_event_id, status, created_at)
+         source_event_id, status, created_at, archived_at)
       VALUES (${n.id}, ${n.workspaceId}, ${n.userId}, ${n.type}, ${n.severity}, ${n.messageKey},
               ${JSON.stringify(n.params)}::jsonb, ${JSON.stringify(n.link)}::jsonb, ${n.dedupeKey},
-              ${n.sourceEventId}, 'UNREAD', ${n.createdAt}::timestamptz)
+              ${n.sourceEventId}, ${n.status === 'ARCHIVED' ? 'ARCHIVED' : 'UNREAD'},
+              ${n.createdAt}::timestamptz, ${archivedAt}::timestamptz)
       ON CONFLICT (workspace_id, user_id, dedupe_key) DO NOTHING
       RETURNING id`.execute(db());
     return rows.length > 0;
+  }
+
+  async usersWithDedupeKey(
+    workspaceId: string,
+    userIds: readonly string[],
+    dedupeKey: string,
+  ): Promise<ReadonlySet<string>> {
+    if (userIds.length === 0) return new Set();
+    const ids = [...userIds];
+    const { rows } = await sql<{ user_id: string }>`
+      SELECT user_id FROM notifications.notification
+       WHERE workspace_id = ${workspaceId} AND dedupe_key = ${dedupeKey} AND user_id = ANY(${ids}::uuid[])`.execute(
+      db(),
+    );
+    return new Set(rows.map((r) => r.user_id));
   }
 
   async insertOrRefresh(n: NotificationState): Promise<'CREATED' | 'REFRESHED' | 'UNCHANGED'> {
@@ -385,6 +405,7 @@ interface SettingRow {
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
   include_details_in_email: boolean;
+  digest_frequency: string;
   version: number;
 }
 
@@ -411,6 +432,7 @@ function buildPreferences(
         ? { start: settings.quiet_hours_start, end: settings.quiet_hours_end }
         : null,
     includeDetailsInEmail: settings?.include_details_in_email ?? false,
+    digestFrequency: isDigestFrequency(settings?.digest_frequency) ? settings.digest_frequency : 'OFF',
     version: Number(settings?.version ?? 1),
   });
 }
@@ -436,7 +458,8 @@ export class PgPreferencesRepository implements PreferencesRepository {
     const ids = [...userIds];
     const settings = await sql<SettingRow>`
       SELECT user_id, to_char(quiet_hours_start, 'HH24:MI') AS quiet_hours_start,
-             to_char(quiet_hours_end, 'HH24:MI') AS quiet_hours_end, include_details_in_email, version
+             to_char(quiet_hours_end, 'HH24:MI') AS quiet_hours_end, include_details_in_email, digest_frequency,
+             version
         FROM notifications.user_setting
        WHERE workspace_id = ${workspaceId} AND user_id = ANY(${ids}::uuid[])`.execute(db());
     const prefs = await sql<PreferenceRow>`
@@ -456,22 +479,34 @@ export class PgPreferencesRepository implements PreferencesRepository {
     return out;
   }
 
+  async digestSubscribers(
+    workspaceId: string,
+  ): Promise<readonly { readonly userId: string; readonly frequency: 'WEEKLY' | 'MONTHLY' }[]> {
+    const { rows } = await sql<{ user_id: string; digest_frequency: 'WEEKLY' | 'MONTHLY' }>`
+      SELECT user_id, digest_frequency FROM notifications.user_setting
+       WHERE workspace_id = ${workspaceId} AND digest_frequency <> 'OFF'
+       ORDER BY user_id`.execute(db());
+    return rows.map((r) => ({ userId: r.user_id, frequency: r.digest_frequency }));
+  }
+
   async save(preferences: NotificationPreferences): Promise<boolean> {
     const s = preferences.snapshot;
     const quiet = s.quietHours;
     if (preferences.persistedVersion === 0) {
       const inserted = await sql`
         INSERT INTO notifications.user_setting
-          (workspace_id, user_id, quiet_hours_start, quiet_hours_end, include_details_in_email, version)
+          (workspace_id, user_id, quiet_hours_start, quiet_hours_end, include_details_in_email, digest_frequency,
+           version)
         VALUES (${s.workspaceId}, ${s.userId}, ${quiet?.start ?? null}::time, ${quiet?.end ?? null}::time,
-                ${s.includeDetailsInEmail}, ${s.version})
+                ${s.includeDetailsInEmail}, ${s.digestFrequency}, ${s.version})
         ON CONFLICT (workspace_id, user_id) DO NOTHING`.execute(db());
       if ((inserted.numAffectedRows ?? 0n) === 0n) return false;
     } else {
       const updated = await sql`
         UPDATE notifications.user_setting
            SET quiet_hours_start = ${quiet?.start ?? null}::time, quiet_hours_end = ${quiet?.end ?? null}::time,
-               include_details_in_email = ${s.includeDetailsInEmail}, version = ${s.version}, updated_at = now()
+               include_details_in_email = ${s.includeDetailsInEmail}, digest_frequency = ${s.digestFrequency},
+               version = ${s.version}, updated_at = now()
          WHERE workspace_id = ${s.workspaceId} AND user_id = ${s.userId} AND version = ${preferences.persistedVersion}`.execute(
         db(),
       );

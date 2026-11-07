@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Sugerencia de conversión ante un déficit cubrible"
 scenario: "Convertir dólares antes del alquiler"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-risk.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","suggestion"]
@@ -33,7 +36,7 @@ expected_result:
   - "Sugerencia: convertir aproximadamente 181.58 USD a BOB antes del 2026-11-01"
   - "Ninguna acción ejecutada"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-016 — Un déficit en BOB cubrible con USD sugiere convertir el equivalente aproximado antes de la fecha

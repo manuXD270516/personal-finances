@@ -5,16 +5,20 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Notificación de riesgo de déficit"
 scenario: "Déficit bajo cero"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004","FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/notifications.api.test.ts
+  - apps/web/src/ui/notifications/notifications.test.tsx
+  - packages/contexts/notifications/src/application/cash-flow-notifications.test.ts
+  - packages/contexts/notifications/src/domain/cash-flow-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["notifications","shortfall"]
@@ -29,7 +33,7 @@ expected_result:
   - "OWNER y EDITOR: notificación CRITICAL con BOB, 2026-11-01 y enlace al calendario; VIEWER: ninguna"
   - "Mínimo 621.00: severidad WARNING"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-NOTIFICATIONS-SHORTFALL-001 — Al abrirse un episodio el OWNER y el EDITOR reciben el riesgo de déficit con severidad según el mínimo y el VIEWER no

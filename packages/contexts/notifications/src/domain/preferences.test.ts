@@ -24,9 +24,12 @@ describe('NotificationPreferences', () => {
         { type: 'FX_RATE_FEED_STALE', inApp: true, email: true },
         { type: 'FX_RATE_FEED_RECOVERED', inApp: true, email: true },
         { type: 'FX_RATE_ANOMALY_RETAINED', inApp: true, email: true },
+        { type: 'CASH_FLOW_SHORTFALL_RISK', inApp: true, email: true },
+        { type: 'HOME_DIGEST', inApp: true, email: true },
       ],
       quietHours: null,
       includeDetailsInEmail: false,
+      digestFrequency: 'OFF',
     });
     expect(prefs.isEnabled('BUDGET_THRESHOLD', 'EMAIL')).toBe(true);
     expect(prefs.version).toBe(1);

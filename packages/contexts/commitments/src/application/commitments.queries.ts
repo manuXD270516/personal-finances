@@ -11,6 +11,8 @@ import {
   type Currency,
 } from '@pf/shared-kernel';
 import type {
+  CashFlowOccurrenceDto,
+  CashFlowOccurrencesDto,
   CommittedForSpendableDto,
   CommittedForSpendableItemDto,
   CommittedItemDto,
@@ -316,6 +318,7 @@ export class CommitmentsQueries
           managedBy: v.managedBy,
           amount: projected === null ? null : money(projected, o.currency),
           overdueFromPrevious: o.dueDate < periodFrom,
+          categoryId: v.categoryId,
         });
       }
       for (const p of pendingRows) {
@@ -334,6 +337,7 @@ export class CommitmentsQueries
           managedBy: null,
           amount: p.amount,
           overdueFromPrevious: false,
+          categoryId: p.categoryId ?? null,
         });
       }
       items.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date < b.date ? -1 : 1));
@@ -528,6 +532,52 @@ export class CommitmentsQueries
             toAccountId: v.toAccountId,
           };
         });
+    });
+  }
+
+  /**
+   * Insumo del calendario de flujo de caja (`add-cash-flow-forecast`, S1): TODAS las ocurrencias no resueltas (ingresos,
+   * gastos, transferencias, cuotas de préstamo y pagos de tarjeta; también las administradas por una meta o una deuda) con
+   * vencimiento ≤ `through` y de cualquier antigüedad, con la liquidez de origen y destino y la categoría. Las
+   * materializadas como transacción pendiente ya no son `SCHEDULED/DUE/OVERDUE`: las informa TRANSACTIONS. Lectura
+   * directa en la unidad de trabajo del llamador (RISK-022); `listUpcoming` y Q4/Q5/Q8 no cambian.
+   */
+  listForCashFlow(input: {
+    readonly workspaceId: string;
+    readonly through: string;
+  }): Promise<CashFlowOccurrencesDto> {
+    const { workspaceId } = input;
+    return this.deps.uow.run(workspaceId, async () => {
+      const classes = await this.accountClasses(workspaceId);
+      const liquid = (id: string | null) => {
+        const c = id === null ? undefined : classes.get(id);
+        return c === undefined ? null : c.nature === 'ASSET' && c.liquidity === 'LIQUID';
+      };
+      const rows = await this.deps.occurrences.list(workspaceId, {
+        statuses: UNRESOLVED,
+        dueTo: input.through,
+        order: 'DUE_DATE',
+      });
+      const items = rows.map((v): CashFlowOccurrenceDto => {
+        const o = v.occurrence;
+        return {
+          occurrenceId: o.id,
+          definitionId: o.definitionId,
+          definitionName: nameOf(v),
+          kind: v.kind,
+          dueDate: o.dueDate,
+          status: o.status as 'SCHEDULED' | 'DUE' | 'OVERDUE',
+          expected: { ...o.expected, currency: o.currency },
+          accountId: v.accountId,
+          toAccountId: v.toAccountId,
+          sourceLiquid: liquid(v.accountId) === true,
+          targetLiquid: liquid(v.toAccountId),
+          managedBy: v.managedBy,
+          categoryId: v.categoryId,
+        };
+      });
+      const today = await this.todayOf(workspaceId);
+      return { items, generatedThrough: today.plusDays(this.deps.horizonDays).toString() };
     });
   }
 

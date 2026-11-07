@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Saldo esperado diario por moneda"
 scenario: "Saldo esperado de octubre y noviembre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014","FR-LEDGER-013"]
 nfr: ["NFR-DATA-002"]
 invariants: ["INV-001"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.properties.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","expected-balance"]
@@ -32,7 +36,7 @@ expected_result:
   - "Saldos 4200.00 (2026-10-20), 4001.00 (2026-10-22), 3821.00 (2026-10-28), 11821.00 (2026-10-31), 9321.00 (2026-11-01), 8200.50 (2026-11-15 al 2026-11-19)"
   - "Saldo final 8200.50 BOB y \"Seguro anual\" no incluido"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-003 — El saldo esperado diario parte del saldo contable y aplica pendientes y ocurrencias en su fecha

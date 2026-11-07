@@ -5,6 +5,7 @@
 
 import type { GoalContributionsNet, GoalsHomeBlock } from '../goals/types';
 import type { Money, RateAttribution, ResolvedRate } from '../common/fx-types';
+import type { CashFlowHomeBlock, CategoryVariation } from '../cash-flow/types';
 import type { SpendableSummary } from '../spendable/types';
 
 export type {
@@ -111,6 +112,11 @@ export interface TopCategory {
    * API no pudo convertirlo (FR-REPORTING-004).
    */
   readonly previousAmount?: Money | null;
+  /**
+   * Variación frente al periodo de comparación (Q7, add-cash-flow-forecast): valor, porcentaje con dos decimales, «nuevo» y
+   * sentido favorable o desfavorable; `null` si no hay monto anterior. Ausente en una API anterior.
+   */
+  readonly variation?: CategoryVariation | null;
 }
 
 export type HomeQuestion = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'Q5' | 'Q6' | 'Q7' | 'Q8' | 'Q9';
@@ -140,6 +146,8 @@ export interface ReportSummary {
   readonly goalContributions?: GoalContributionsNet | null;
   /** Q5 (add-spendable-amount): disponible para gastar libre de compromisos; `null` sin cuentas líquidas. */
   readonly spendable?: SpendableSummary | null;
+  /** Q8 (add-cash-flow-forecast): saldo más bajo esperado y riesgo de 30 días; `null` sin cuentas líquidas. */
+  readonly cashFlow?: CashFlowHomeBlock | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;

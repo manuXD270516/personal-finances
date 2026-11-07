@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Frecuencia del digest en la portabilidad del workspace"
 scenario: "Exportar e importar el digest semanal"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-007","FR-IDENTITY-010"]
 nfr: []
 invariants: []
 priority: low
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/workspace-export-digest.api.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["notifications","digest","portability"]
@@ -29,7 +30,7 @@ expected_result:
   - "Preferencias importadas con digest semanal"
   - "Archivo anterior: digest desactivado"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-NOTIFICATIONS-DIGEST-007 — La frecuencia del digest viaja en el export y un archivo anterior la importa desactivada

@@ -12,6 +12,8 @@ interface MoneyDto {
 /** Allow-list de auditoría de la exportación de un reporte: acción `reporting.report.exported`, sin contenido. */
 export const REPORTING_AUDIT_POLICY = {
   ReportExport: { reportId: 'plain', filters: 'plain', rowCount: 'plain' },
+  // add-cash-flow-forecast: ajustes del disponible (`essentialCategoryIds` viaja como texto JSON).
+  SpendableSettings: { horizonMode: 'plain', subtractEssentials: 'plain', essentialCategoryIds: 'plain' },
 } as const;
 
 /** Tope de filas de una exportación CSV síncrona (D370; `REPORT_EXPORT_TOO_LARGE` por encima). */

@@ -301,7 +301,8 @@ export class PgWorkspaceImporter implements WorkspaceImporter {
       if (s.importerColumn && row[s.importerColumn] !== userId) continue;
       const next: Row = {};
       for (const c of cols) {
-        const v = row[c.name];
+        // Archivo anterior a una columna nueva: toma el valor por omisión declarado por la sección.
+        const v = row[c.name] === undefined ? s.legacyDefaults?.[c.name] : row[c.name];
         if (c.name === wsCol) next[c.name] = newWorkspaceId;
         else if (v === null || v === undefined) next[c.name] = null;
         else if (c.kind === 'uuid') next[c.name] = typeof v === 'string' ? (remap.get(v) ?? v) : v;

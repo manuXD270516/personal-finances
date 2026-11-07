@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Digest sin montos salvo opt-in"
 scenario: "Digest sin opt-in"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-006","FR-NOTIFY-007"]
 nfr: ["NFR-COMP-001"]
 invariants: []
 priority: critical
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/send-home-digests.test.ts
+  - packages/contexts/notifications/src/domain/home-digest.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["notifications","digest","privacy"]
@@ -29,7 +31,7 @@ expected_result:
   - "3 pagos, 41.5 %, riesgo alto desde 15/11/2026, disponible positivo; ningún monto (regex con límites sobre 5521)"
   - "Con opt-in: 5521.00 BOB y montos consolidados"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-NOTIFICATIONS-DIGEST-004 — Sin opt-in el digest resume con cantidades, porcentajes, estados y fechas sin ningún monto

@@ -767,6 +767,34 @@ export const VARIABLES = {
     },
   ),
 
+  // ── REPORTING: pronóstico de flujo de caja (openspec add-cash-flow-forecast, design.md decisión 13; D381) ──
+  REPORTING_CASH_FLOW_WATCH_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `25 * * * *`) u `off`',
+      ),
+    {
+      group: 'Reporting',
+      description:
+        'Cron (5 campos, UTC) del job `reporting.cash-flow-watch`: evalúa el calendario de flujo de caja de cada workspace con cuentas líquidas y abre, sostiene o cierra un episodio de riesgo de déficit por moneda (un aviso por episodio). Por omisión a los :25, después de `commitments.generate-occurrences` (:10). También corre al arrancar el worker. `off` desactiva el cron.',
+      default: '25 * * * *',
+    },
+  ),
+  REPORTING_SHORTFALL_ALERT_HORIZON_DAYS: variable(
+    z.coerce
+      .number()
+      .int()
+      .refine((n) => [7, 30, 60, 90].includes(n), 'uno de 7, 30, 60 o 90 días'),
+    {
+      group: 'Reporting',
+      description:
+        'Horizonte (días: 7, 30, 60 o 90) del calendario que evalúa el job `reporting.cash-flow-watch` para la alerta de riesgo de déficit. Por omisión 30, el mismo de la tarjeta Q8 del Home.',
+      default: '30',
+    },
+  ),
+
   // ── Planning: periodos financieros (openspec add-financial-periods, design.md decisiones 5 y 6; docs/33 D63) ──
   PLANNING_PERIOD_LOOKAHEAD: variable(
     positiveInt.refine((n) => n <= 24, 'entre 1 y 24 periodos'),
@@ -1196,6 +1224,20 @@ export const VARIABLES = {
       default: '12mo',
     },
   ),
+  NOTIFICATIONS_DIGEST_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `5 * * * *`) u `off`',
+      ),
+    {
+      group: 'Notificaciones',
+      description:
+        'Cron (5 campos, UTC) del job `notifications.digest` (add-cash-flow-forecast, D385): cada pasada crea, para cada miembro que eligió el digest del Home, el email de su semana (lunes 08:00 en la zona del workspace) o de su periodo financiero (primer día 08:00) si todavía no lo tiene; repetir la pasada es inocuo (una sola vez por ventana). `off` desactiva el cron.',
+      default: '5 * * * *',
+    },
+  ),
 
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
@@ -1569,6 +1611,9 @@ export const APP_VARIABLES = {
     'IMPORT_PDF_MIN_PAGE_TEXT_CHARS',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',
+    // add-cash-flow-forecast: job que detecta el riesgo de déficit de cada workspace.
+    'REPORTING_CASH_FLOW_WATCH_CRON',
+    'REPORTING_SHORTFALL_ALERT_HORIZON_DAYS',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).
     'EMAIL_DRIVER',
     'SMTP_HOST',
@@ -1580,6 +1625,7 @@ export const APP_VARIABLES = {
     'APP_PUBLIC_URL',
     'NOTIFY_EMAIL_MAX_ATTEMPTS',
     'NOTIFY_RETENTION',
+    'NOTIFICATIONS_DIGEST_CRON',
     // add-workspace-export: el worker genera el export, importa y expira los archivos vencidos.
     ...EXPORT_PORTABILITY,
     // add-document-attachments: mantenimiento de documentos (expiración, cuarentena, huérfanos, purga y rotación).

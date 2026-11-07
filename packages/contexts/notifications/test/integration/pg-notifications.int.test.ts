@@ -457,9 +457,12 @@ describe('PgPreferencesRepository', () => {
         { type: 'FX_RATE_FEED_STALE', inApp: true, email: true },
         { type: 'FX_RATE_FEED_RECOVERED', inApp: true, email: true },
         { type: 'FX_RATE_ANOMALY_RETAINED', inApp: true, email: true },
+        { type: 'CASH_FLOW_SHORTFALL_RISK', inApp: true, email: true },
+        { type: 'HOME_DIGEST', inApp: true, email: true },
       ],
       quietHours: null,
       includeDetailsInEmail: false,
+      digestFrequency: 'OFF',
     });
     expect(prefs.version).toBe(1);
     expect(prefs.persistedVersion).toBe(0);
@@ -522,6 +525,7 @@ describe('PgPreferencesRepository', () => {
       byType: {},
       quietHours: null,
       includeDetailsInEmail: true,
+      digestFrequency: 'OFF',
       version: readVersion,
     });
     stale.update({ types: [], quietHours: null, includeDetailsInEmail: false });

@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Saldo esperado por cuenta"
 scenario: "Banco y efectivo con transferencia"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/cash-flow-calendar.api.test.ts
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","accounts"]
@@ -34,7 +37,7 @@ expected_result:
   - "Σ de ambas = serie BOB cada día"
   - "\"Plazo fijo\": 400 INVALID_FILTER"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-013 — La serie de cada cuenta líquida suma la de su moneda y una cuenta no líquida se rechaza

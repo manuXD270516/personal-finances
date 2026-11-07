@@ -118,6 +118,8 @@ export interface OccurrenceView {
   readonly toAccountId: string | null;
   readonly mode: 'AUTO_CREATE' | 'PENDING_APPROVAL' | 'NOTIFY_ONLY';
   readonly leadDays: number;
+  /** Categoría de la versión vigente de la definición (add-cash-flow-forecast, S2). */
+  readonly categoryId: string | null;
 }
 
 export interface OccurrenceFilter {

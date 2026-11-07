@@ -4,6 +4,7 @@
  * `{amount: "<decimal>", currency: "<código>"}` (nunca `number`, ADR-0006).
  */
 import type { ResolvedRateDto, RateAttributionDto } from '@pf/fx/contracts';
+import type { CashFlowHomeBlockDto, CategoryVariationDto } from './cash-flow.js';
 
 export const REPORTING_CONTEXT = 'reporting' as const;
 
@@ -123,6 +124,8 @@ export interface TopCategoryDto {
    * algún monto anterior quedó sin tasa.
    */
   readonly previousAmount: MoneyDto | null;
+  /** Variación frente al periodo de comparación (Q7, D389); `null` si `previousAmount` es `null`. */
+  readonly variation: CategoryVariationDto | null;
 }
 
 /** Meta del Home (Q9, add-savings-goals): mismos cálculos que `goals/savings-goals`. */
@@ -177,6 +180,11 @@ export interface SpendableCurrencyTermsDto {
   readonly plannedGoalContributions: MoneyDto;
   /** `null` si el workspace no tiene reserva mínima en esta moneda (el término no se muestra). */
   readonly minimumReserve: MoneyDto | null;
+  /**
+   * Esenciales presupuestados restantes (add-cash-flow-forecast, D378): `null` con los esenciales desactivados (el término
+   * no se muestra y el disponible no cambia).
+   */
+  readonly essentials: MoneyDto | null;
   readonly spendable: MoneyDto;
 }
 
@@ -197,6 +205,17 @@ export interface SpendableSummaryDto {
     readonly label: string;
     readonly start: string;
     readonly end: string;
+  };
+  /**
+   * Horizonte del disponible (add-cash-flow-forecast, D377): el periodo financiero (por omisión) o "hasta el próximo
+   * ingreso" con su ocurrencia; `fallback` indica que no hay ingreso esperado y se usaron 30 días.
+   */
+  readonly horizon: {
+    readonly mode: 'FINANCIAL_PERIOD' | 'NEXT_INCOME';
+    readonly from: string;
+    readonly to: string;
+    readonly nextIncome: { readonly occurrenceId: string; readonly name: string; readonly date: string } | null;
+    readonly fallback: boolean;
   };
   readonly reportingCurrency: string;
   readonly byCurrency: readonly SpendableCurrencyTermsDto[];
@@ -242,11 +261,35 @@ export interface SpendablePlannedGoalDto {
   readonly pending: MoneyDto;
 }
 
+/** Línea de esenciales que resta del disponible (add-cash-flow-forecast, D378, D387). */
+export interface SpendableEssentialItemDto {
+  readonly categoryId: string;
+  readonly name: string;
+  readonly periodLabel: string;
+  readonly reference: MoneyDto;
+  readonly actual: MoneyDto;
+  /** Comprometido de esa categoría ya descontado (sin doble conteo). */
+  readonly committed: MoneyDto;
+  /** Lo que resta del disponible por esta línea. */
+  readonly counted: MoneyDto;
+  /** Periodo posterior: proporcional a los días del periodo dentro del horizonte. */
+  readonly prorated: boolean;
+}
+
+export interface SpendableEssentialWarningDto {
+  readonly categoryId: string;
+  readonly reason: 'NO_PLAN' | 'NO_LINE' | 'ARCHIVED';
+  readonly periodLabel: string | null;
+}
+
 /** `Spendable` del contrato (`GET /workspaces/{workspaceId}/reports/spendable`). */
 export interface SpendableDto extends SpendableSummaryDto {
   readonly committedItems: readonly SpendableCommittedItemDto[];
   readonly reservedByAccount: readonly SpendableReservedAccountDto[];
   readonly plannedByGoal: readonly SpendablePlannedGoalDto[];
+  /** Detalle del término de esenciales; vacío con los esenciales desactivados. */
+  readonly essentialItems: readonly SpendableEssentialItemDto[];
+  readonly essentialWarnings: readonly SpendableEssentialWarningDto[];
   readonly meta: {
     readonly generatedAt: string;
     readonly rateWindowDays: number;
@@ -280,6 +323,8 @@ export interface ReportSummaryDto {
   readonly goalContributions: GoalContributionsDto;
   /** Disponible para gastar (Q5, add-spendable-amount); `null` si el workspace no tiene cuentas líquidas. */
   readonly spendable: SpendableSummaryDto | null;
+  /** Saldo más bajo esperado y riesgo de 30 días (Q8, add-cash-flow-forecast); `null` sin cuentas líquidas. */
+  readonly cashFlow: CashFlowHomeBlockDto | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;
@@ -556,3 +601,6 @@ export interface ConversionCostAnalysisDto {
 }
 
 export * from './financial-reports.js';
+
+export * from './cash-flow.js';
+export * from './portability.js';

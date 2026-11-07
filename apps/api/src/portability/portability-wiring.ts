@@ -42,6 +42,7 @@ import {
 } from '@pf/notifications/contracts';
 import { PLANNING_CLOSE_SNAPSHOT_HASH_HOOK, PLANNING_PORTABILITY_SECTIONS } from '@pf/planning/contracts';
 import { RULES_PORTABILITY_SECTIONS } from '@pf/rules/contracts';
+import { REPORTING_PORTABILITY_EXCLUSIONS, REPORTING_PORTABILITY_SECTIONS } from '@pf/reporting/contracts';
 import { closeSnapshotRestoreHook } from '@pf/planning/interface/planning.module';
 import { requireSqlExecutor } from '@pf/platform/api';
 import { currentCorrelation, uuidv7 } from '@pf/platform/logging';
@@ -65,6 +66,8 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   ...LEDGER_PORTABILITY_SECTIONS,
   ...TRANSACTIONS_PORTABILITY_SECTIONS,
   ...PLANNING_PORTABILITY_SECTIONS,
+  // add-cash-flow-forecast: ajustes del disponible y categorías esenciales (orden 745–746, después de PLANNING).
+  ...REPORTING_PORTABILITY_SECTIONS,
   ...COMMITMENTS_PORTABILITY_SECTIONS,
   // add-basic-csv-import: jobs y vínculos de idempotencia (orden 770–771, después de COMMITMENTS 750–765).
   ...IMPORTS_PORTABILITY_SECTIONS,
@@ -84,6 +87,7 @@ export const PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
   ...LEDGER_PORTABILITY_EXCLUSIONS,
   ...IMPORTS_PORTABILITY_EXCLUSIONS,
   ...NOTIFICATIONS_PORTABILITY_EXCLUSIONS,
+  ...REPORTING_PORTABILITY_EXCLUSIONS,
 ];
 
 /** Versión de producto que se escribe en el manifiesto (`pfosVersion`). */

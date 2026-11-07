@@ -8,3 +8,4 @@ export { presentNotifications, type EmailStatusView, type NotificationView } fro
 export { PreferencesService, type PreferencesView } from './preferences.service.js';
 export { PurgeExpiredNotifications, retentionCutoff, type PurgeDeps } from './purge-expired.js';
 export { targetNameIn } from './target-name.js';
+export { SendHomeDigests, type DigestDeps, type DigestOutcome } from './send-home-digests.js';

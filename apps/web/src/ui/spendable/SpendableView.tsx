@@ -3,8 +3,8 @@ import type { Money } from '../common/fx-types';
 import { formatMoney, formatLocalDate, formatInstant, isNegative } from '../dashboard/format';
 import { ActionHint } from '../dashboard/QuestionWidgets';
 import type { FormatContext } from '../dashboard/types';
-import { isShort, nearPeriodEnd, subtracted } from './logic';
-import type { Spendable, SpendableCurrencyTerms, SpendableSummary } from './types';
+import { horizonView, isShort, nearPeriodEnd, subtracted } from './logic';
+import type { Spendable, SpendableCurrencyTerms, SpendableEssentialWarning, SpendableSummary } from './types';
 
 export interface SpendableLinks {
   /** Vista de detalle del disponible. */
@@ -16,10 +16,18 @@ export interface SpendableLinks {
   readonly createAccountHref?: string | undefined;
   /** Inicio (vuelta desde la vista de detalle). */
   readonly homeHref?: string | undefined;
+  /** Ajustes del disponible (horizonte y esenciales; add-cash-flow-forecast). */
+  readonly settingsHref?: string | undefined;
 }
 
 type TermKey =
-  'liquid' | 'reservedForGoals' | 'committed' | 'plannedGoalContributions' | 'minimumReserve' | 'spendable';
+  | 'liquid'
+  | 'reservedForGoals'
+  | 'committed'
+  | 'plannedGoalContributions'
+  | 'essentials'
+  | 'minimumReserve'
+  | 'spendable';
 
 /** Desglose de una moneda: cada término por separado y el disponible (siempre visible, sin ocultar términos en cero). */
 function TermsList({ terms, ctx }: { terms: SpendableCurrencyTerms; ctx: FormatContext }) {
@@ -29,6 +37,8 @@ function TermsList({ terms, ctx }: { terms: SpendableCurrencyTerms; ctx: FormatC
   rows.push({ key: 'reservedForGoals', value: subtracted(terms.reservedForGoals) });
   rows.push({ key: 'committed', value: subtracted(terms.committed) });
   rows.push({ key: 'plannedGoalContributions', value: subtracted(terms.plannedGoalContributions) });
+  // Con los esenciales desactivados (`null`) el término no se muestra y el disponible no cambia.
+  if (terms.essentials) rows.push({ key: 'essentials', value: subtracted(terms.essentials) });
   // Sin reserva mínima en esta moneda el término no se muestra (no un 0.00 en el desglose).
   if (terms.minimumReserve) rows.push({ key: 'minimumReserve', value: subtracted(terms.minimumReserve) });
   rows.push({ key: 'spendable', value: terms.spendable });
@@ -48,6 +58,27 @@ function TermsList({ terms, ctx }: { terms: SpendableCurrencyTerms; ctx: FormatC
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Horizonte del disponible: periodo financiero, «hasta el próximo ingreso» o el respaldo de 30 días sin ingreso esperado. */
+function HorizonLine({ summary, ctx }: { summary: SpendableSummary; ctx: FormatContext }) {
+  const { t, locale } = ctx;
+  const view = horizonView(summary);
+  if (!view) return null;
+  const range = { from: formatLocalDate(view.from, locale), to: formatLocalDate(view.to, locale) };
+  return (
+    <p className="pf-home-muted" data-testid="spendable-horizon" data-horizon={view.kind}>
+      {view.kind === 'PERIOD'
+        ? t('spendable.horizon.period', { label: view.label, ...range })
+        : view.kind === 'NEXT_INCOME'
+          ? t('spendable.horizon.nextIncome', {
+              name: view.name,
+              date: formatLocalDate(view.date, locale),
+              ...range,
+            })
+          : t('spendable.horizon.fallback', range)}
+    </p>
   );
 }
 
@@ -228,6 +259,7 @@ export function SpendableCard({
           })}
         </p>
       </div>
+      <HorizonLine summary={summary} ctx={ctx} />
       <div className="pf-home-grid">
         <div className="pf-home-card pf-home-hero" data-testid="spendable-main">
           <MainFigure summary={summary} ctx={ctx} />
@@ -260,6 +292,13 @@ export function SpendableCard({
               </a>
             </p>
           ) : null}
+          {links.settingsHref ? (
+            <p>
+              <a href={links.settingsHref} data-testid="spendable-settings-link">
+                {t('spendable.settingsLink')}
+              </a>
+            </p>
+          ) : null}
           {near ? (
             <p>
               <a href={links.upcomingHref} data-testid="spendable-upcoming-link">
@@ -269,6 +308,114 @@ export function SpendableCard({
           ) : null}
         </div>
       </div>
+    </section>
+  );
+}
+
+const warningKey = (w: SpendableEssentialWarning): string => `spendable.essentials.warning.${w.reason}`;
+
+/**
+ * Detalle de los esenciales presupuestados (add-cash-flow-forecast): por categoría y periodo, la referencia del plan, lo
+ * gastado, lo ya comprometido (sin doble conteo) y lo que resta del disponible, con los avisos de categorías sin plan,
+ * sin línea o archivadas. Con los esenciales desactivados solo ofrece activarlos en los ajustes.
+ */
+function EssentialsSection({
+  spendable,
+  ctx,
+  categoryNames,
+  links,
+}: {
+  spendable: Spendable;
+  ctx: FormatContext;
+  categoryNames: ReadonlyMap<string, string> | undefined;
+  links: SpendableLinks;
+}) {
+  const { t, locale } = ctx;
+  const items = spendable.essentialItems ?? [];
+  const warnings = spendable.essentialWarnings ?? [];
+  const active = spendable.byCurrency.some((c) => c.essentials);
+  return (
+    <section
+      aria-labelledby="spendable-essentials-title"
+      data-testid="spendable-essentials"
+      data-active={active ? 'true' : 'false'}
+      className="pf-home-card"
+    >
+      <h2 id="spendable-essentials-title">{t('spendable.essentials.title')}</h2>
+      {!active && warnings.length === 0 ? (
+        <p className="pf-home-muted" data-testid="spendable-essentials-off">
+          {t('spendable.essentials.off')}
+        </p>
+      ) : null}
+      {items.length > 0 ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table
+            data-testid="spendable-essential-items"
+            style={{ width: '100%', borderCollapse: 'collapse' }}
+          >
+            <caption style={{ textAlign: 'left' }}>{t('spendable.essentials.caption')}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{t('spendable.essentials.category')}</th>
+                <th scope="col">{t('spendable.essentials.period')}</th>
+                <th scope="col">{t('spendable.essentials.reference')}</th>
+                <th scope="col">{t('spendable.essentials.actual')}</th>
+                <th scope="col">{t('spendable.essentials.committed')}</th>
+                <th scope="col">{t('spendable.essentials.counted')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((i) => (
+                <tr key={`${i.categoryId}-${i.periodLabel}`} data-testid="spendable-essential-item">
+                  <th scope="row">{i.name}</th>
+                  <td>
+                    {i.periodLabel}
+                    {i.prorated ? (
+                      <>
+                        {' '}
+                        <span className="pf-home-badge" data-testid="spendable-essential-prorated">
+                          {t('spendable.essentials.prorated')}
+                        </span>
+                      </>
+                    ) : null}
+                  </td>
+                  <td className="pf-home-num">{formatMoney(i.reference, locale)}</td>
+                  <td className="pf-home-num">{formatMoney(i.actual, locale)}</td>
+                  <td className="pf-home-num">{formatMoney(i.committed, locale)}</td>
+                  <td className="pf-home-num">
+                    <strong>{formatMoney(i.counted, locale)}</strong>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {warnings.length > 0 ? (
+        <ul className="pf-home-list" data-testid="spendable-essential-warnings">
+          {warnings.map((w) => (
+            <li
+              key={`${w.categoryId}-${w.reason}-${w.periodLabel ?? ''}`}
+              className="pf-home-warning"
+              data-testid="spendable-essential-warning"
+              data-reason={w.reason}
+            >
+              <span aria-hidden="true">⚠</span>{' '}
+              {t(warningKey(w), {
+                name: categoryNames?.get(w.categoryId) ?? t('spendable.essentials.unknownCategory'),
+                period: w.periodLabel ?? '',
+              })}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {links.settingsHref ? (
+        <p>
+          <a href={links.settingsHref} data-testid="spendable-settings-link-detail">
+            {t('spendable.settingsLink')}
+          </a>
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -289,10 +436,13 @@ export function SpendableDetailView({
   spendable,
   ctx,
   links = {},
+  categoryNames,
 }: {
   spendable: Spendable;
   ctx: FormatContext;
   links?: SpendableLinks;
+  /** Nombres de categoría (para los avisos de esenciales, que solo traen el id). */
+  categoryNames?: ReadonlyMap<string, string> | undefined;
 }) {
   const { t, locale, timeZone } = ctx;
   const attributions = spendable.meta.attributions;
@@ -307,6 +457,7 @@ export function SpendableDetailView({
             to: formatLocalDate(spendable.period.end, locale),
           })}
         </p>
+        <HorizonLine summary={spendable} ctx={ctx} />
         <MainFigure summary={spendable} ctx={ctx} />
         <Notices summary={spendable} ctx={ctx} />
         {spendable.byCurrency.map((terms) => (
@@ -351,6 +502,8 @@ export function SpendableDetailView({
           </ul>
         )}
       </Section>
+
+      <EssentialsSection spendable={spendable} ctx={ctx} categoryNames={categoryNames} links={links} />
 
       <Section id="spendable-reserved" title={t('spendable.detail.reserved')}>
         {spendable.reservedByAccount.length === 0 ? (

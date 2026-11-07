@@ -1,4 +1,3 @@
-import { DomainError } from '@pf/shared-kernel';
 import { decimalOf, fail, recordOf, uuidOf, type NotificationPlan } from './type-catalog.js';
 import type { NotificationType, WorkspaceRoleName } from './types.js';
 
@@ -34,12 +33,12 @@ const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SIGNED_DECIMAL = /^[+-]?\d+(\.\d+)?$/;
 
-function currencyOf(source: Record<string, unknown>, key: string): string {
+export function currencyOf(source: Record<string, unknown>, key: string): string {
   const value = source[key];
   return typeof value === 'string' && CURRENCY.test(value) ? value : fail(key);
 }
 
-function instantOf(source: Record<string, unknown>, key: string): string {
+export function instantOf(source: Record<string, unknown>, key: string): string {
   const value = source[key];
   return typeof value === 'string' && INSTANT.test(value) && !Number.isNaN(Date.parse(value))
     ? value
@@ -50,7 +49,7 @@ function nullableInstantOf(source: Record<string, unknown>, key: string): string
   return source[key] === null ? null : instantOf(source, key);
 }
 
-function zoneOf(source: Record<string, unknown>, key: string): string {
+export function zoneOf(source: Record<string, unknown>, key: string): string {
   const value = source[key];
   if (typeof value !== 'string' || value === '') return fail(key);
   try {
@@ -61,11 +60,11 @@ function zoneOf(source: Record<string, unknown>, key: string): string {
   return value;
 }
 
-function factKeyOf(factKey: string): string {
+export function factKeyOf(factKey: string): string {
   return UUID.test(factKey) ? factKey : fail('factKey');
 }
 
-function signedDecimalOf(source: Record<string, unknown>, key: string): string {
+export function signedDecimalOf(source: Record<string, unknown>, key: string): string {
   const value = source[key];
   return typeof value === 'string' && SIGNED_DECIMAL.test(value) ? value : fail(key);
 }
@@ -209,15 +208,9 @@ const FX_RATE_ANOMALY_RETAINED: IntakeTypeDefinition = {
   },
 };
 
-/** Tipos de entrega directa (sin consumidor): NO se registran colas `events.notifications.*` por ellos. */
-export const NOTIFICATION_INTAKE_CATALOG: readonly IntakeTypeDefinition[] = [
+/** Tipos de entrega directa de FX (sin consumidor): NO se registran colas `events.notifications.*` por ellos. */
+export const FX_INTAKE_CATALOG: readonly IntakeTypeDefinition[] = [
   FX_RATE_FEED_STALE,
   FX_RATE_FEED_RECOVERED,
   FX_RATE_ANOMALY_RETAINED,
 ];
-
-export function intakeDefinitionOf(type: string): IntakeTypeDefinition {
-  const definition = NOTIFICATION_INTAKE_CATALOG.find((d) => d.type === type);
-  if (!definition) throw new DomainError('VALIDATION_FAILED', `unknown intake notification type ${type}`);
-  return definition;
-}

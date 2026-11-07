@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/reporting/CashFlowShortfallRiskCleared.v1.schema.json",
+  "title": "reporting.CashFlowShortfallRiskCleared.v1",
+  "description": "Se cerró el episodio de riesgo de déficit de flujo de caja de una moneda: la evaluación siguiente del job dio riesgo `NONE` o `LOW` (o la moneda dejó de tener cuentas líquidas). Un único hecho por episodio (aggregateVersion 2, después del `reporting.CashFlowShortfallRiskDetected.v1` de versión 1). Productor: REPORTING (job `reporting.cash-flow-watch`, actor SYSTEM, aggregateType CashFlowShortfallEpisode, aggregateId = episodeId). Sin consumidores en Phase 7: el cierre NO genera notificación (D380); el calendario muestra el estado. Idempotencia natural: episodeId. Sin montos.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "reporting.CashFlowShortfallRiskCleared"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "CashFlowShortfallEpisode"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episodeId", "currency", "evaluatedAt", "risk"],
+      "properties": {
+        "episodeId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "evaluatedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        },
+        "risk": {
+          "description": "Riesgo de la evaluación que cerró el episodio: `NONE` o `LOW` (enum abierto).",
+          "type": "string",
+          "examples": ["NONE", "LOW"]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000711",
+      "eventType": "reporting.CashFlowShortfallRiskCleared",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-22T12:25:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CashFlowShortfallEpisode",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fc001",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f4",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "reporting.cash-flow-watch"
+      },
+      "payload": {
+        "episodeId": "01928c4e-0000-7000-8000-0000000fc001",
+        "currency": "BOB",
+        "evaluatedAt": "2026-10-22T12:25:00.000Z",
+        "risk": "NONE"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000712",
+      "eventType": "reporting.CashFlowShortfallRiskCleared",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-23T12:25:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CashFlowShortfallEpisode",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fc002",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f5",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "reporting.cash-flow-watch"
+      },
+      "payload": {
+        "episodeId": "01928c4e-0000-7000-8000-0000000fc002",
+        "currency": "USD",
+        "evaluatedAt": "2026-10-23T12:25:00.000Z",
+        "risk": "LOW"
+      }
+    }
+  ]
+}

@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Saldo esperado diario por moneda"
 scenario: "Ocurrencia vencida aplicada hoy"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","overdue"]
@@ -31,7 +34,7 @@ expected_result:
   - "Saldo esperado del 2026-10-20: 4151.00 BOB"
   - "\"Netflix\" en hoy, vencida, 5 días de atraso"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-004 — Una ocurrencia vencida sin resolver se aplica hoy marcada con sus días de atraso

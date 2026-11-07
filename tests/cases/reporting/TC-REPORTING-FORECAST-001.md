@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Calendario de flujo de caja por horizonte"
 scenario: "Horizonte de 30 días"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/cash-flow-calendar.api.test.ts
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","calendar"]
@@ -30,7 +33,7 @@ expected_result:
   - "Calendario del 2026-10-20 al 2026-11-19 con 31 puntos"
   - "Horizonte 45: 400 INVALID_FILTER"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-001 — El calendario de 30 días tiene un punto por día de hoy a hoy más 30 y un horizonte no admitido se rechaza

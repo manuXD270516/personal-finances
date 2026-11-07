@@ -1,6 +1,8 @@
 import {
+  HOME_DIGEST_MESSAGE_KEY,
   notificationLocaleOf,
   renderEmail,
+  renderHomeDigestEmail,
   type EmailVariant,
   type NotificationState,
   type RenderNames,
@@ -113,15 +115,27 @@ export class DispatchEmailDelivery {
 
       const variant: EmailVariant = prefs.includeDetailsInEmail ? 'detailed' : 'basic';
       const names = variant === 'detailed' ? await this.namesOf(notification) : { targetName: null };
-      const rendered = renderEmail({
-        locale: notificationLocaleOf(member.locale),
-        variant,
-        messageKey: notification.messageKey,
-        params: notification.params,
-        names,
-        notificationUrl: `${deps.config.appPublicUrl}/notificaciones/${notification.id}`,
-        preferencesUrl: `${deps.config.appPublicUrl}/preferencias`,
-      });
+      const locale = notificationLocaleOf(member.locale);
+      const preferencesUrl = `${deps.config.appPublicUrl}/preferencias`;
+      // El digest del Home (add-cash-flow-forecast) se redacta por secciones y enlaza al Home, no a una notificación.
+      const rendered =
+        notification.messageKey === HOME_DIGEST_MESSAGE_KEY
+          ? renderHomeDigestEmail({
+              locale,
+              variant,
+              params: notification.params,
+              homeUrl: `${deps.config.appPublicUrl}/`,
+              preferencesUrl,
+            })
+          : renderEmail({
+              locale,
+              variant,
+              messageKey: notification.messageKey,
+              params: notification.params,
+              names,
+              notificationUrl: `${deps.config.appPublicUrl}/notificaciones/${notification.id}`,
+              preferencesUrl,
+            });
       accepted = await deps.sender.send({
         to,
         subject: rendered.subject,

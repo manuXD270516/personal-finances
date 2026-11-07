@@ -78,6 +78,9 @@ contracts/events/
 │  ├─ RateFeedStale.v1.schema.json          # add-rate-feed-alerts: episodio de obsolescencia abierto (par sin tasa aceptada por más de N horas)
 │  ├─ RateFeedRecovered.v1.schema.json      # add-rate-feed-alerts: llegó una tasa fresca y el episodio se cerró
 │  └─ RateAnomalyRetained.v1.schema.json    # add-rate-feed-alerts: muestra de provider retenida como anómala (un hecho por muestra)
+├─ reporting/                           # add-cash-flow-forecast (pronóstico de flujo de caja)
+│  ├─ CashFlowShortfallRiskDetected.v1.schema.json  # episodio de riesgo de déficit abierto (una vez por episodio y moneda; aggregateVersion 1)
+│  └─ CashFlowShortfallRiskCleared.v1.schema.json   # episodio cerrado con riesgo NONE o LOW (aggregateVersion 2; sin notificación)
 └─ ledger/
    └─ JournalEntryPosted.v1.schema.json
 ```
@@ -172,6 +175,13 @@ Notas: el agregado de `SavingsContributionRecorded` y `GoalReached` es `SavingsG
 | `fx.RateAnomalyRetained.v1` | FX | Ninguno en Phase 5; aviso `FX_RATE_ANOMALY_RETAINED` por el puerto, agrupado por par |
 
 Un consumidor futuro tendría su propia justificación de conexiones (presupuesto de conexiones del worker, D249).
+
+## Eventos Phase 7 — Reporting (`add-cash-flow-forecast`)
+
+| Evento | Productor | Consumidores |
+|---|---|---|
+| `reporting.CashFlowShortfallRiskDetected.v1` | REPORTING (job `reporting.cash-flow-watch`, actor SYSTEM, `aggregateType` `CashFlowShortfallEpisode`, versión 1) | Ninguno en Phase 7 (catálogo y trazabilidad); NOTIFY recibe el aviso `CASH_FLOW_SHORTFALL_RISK` por su puerto síncrono `NotificationIntakePort` en la misma unidad de trabajo (D249) |
+| `reporting.CashFlowShortfallRiskCleared.v1` | REPORTING (mismo job, versión 2) | Ninguno en Phase 7; el cierre no notifica (D380) |
 
 ## Eventos Phase 6 — Documents (`add-document-attachments`)
 
