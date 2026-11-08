@@ -65,4 +65,4 @@
 
 - [x] 8.1 Aplicar design.md § "Cambios a docs compartidos" (docs/00, 01, 03, 08, 10, 11, 14, 17, 18, 26, 28, 38 y config-reference)
 - [x] 8.2 Actualizar la matriz de trazabilidad; ejecutar `pnpm spec:validate`, `pnpm traceability:check` y `pnpm format:check`
-- [ ] 8.3 Al archivar, actualizar el `## Purpose` de `reporting/cash-flow-calendar` (deja de decir que el calendario "llega en Phase 7") *(2026-11-07: pendiente del archivado; el `## Purpose` se actualiza al archivar el change)*
+- [x] 8.3 Al archivar, actualizar el `## Purpose` de `reporting/cash-flow-calendar` (deja de decir que el calendario "llega en Phase 7") *(2026-11-07: hecho al archivar)*

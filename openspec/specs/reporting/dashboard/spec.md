@@ -232,7 +232,7 @@ Trace: FR-REPORTING-002, FR-GOALS-003 · Priority: Should
 - **Y** el ahorro y la tasa de ahorro del mes no cambian
 
 ### Requirement: Disponible para gastar libre de compromisos
-El Home DEBE (MUST) responder "¿Cuánto puedo gastar?" (Q5) para el periodo financiero que contiene hoy con el disponible para gastar, calculado por moneda como el saldo de las cuentas líquidas menos lo reservado por metas en ellas, menos lo comprometido pagadero desde cuentas líquidas, menos los aportes planificados pendientes a metas del periodo y menos la reserva mínima de liquidez del workspace, mostrando cada término por separado; los ingresos esperados NO DEBEN (MUST NOT) sumarse.
+El Home DEBE (MUST) responder "¿Cuánto puedo gastar?" (Q5) para el horizonte del disponible (por omisión, el periodo financiero que contiene hoy) con el disponible para gastar, calculado por moneda como el saldo de las cuentas líquidas menos lo reservado por metas en ellas, menos lo comprometido pagadero desde cuentas líquidas dentro del horizonte, menos los aportes planificados pendientes a metas, menos los esenciales presupuestados restantes cuando el workspace los activa y menos la reserva mínima de liquidez del workspace, mostrando cada término por separado y el horizonte usado; los ingresos esperados NO DEBEN (MUST NOT) sumarse.
 Trace: FR-PLANNING-024, FR-GOALS-009, FR-COMMITMENTS-011, FR-REPORTING-002 · Priority: Must
 
 #### Scenario: Disponible de octubre
@@ -247,6 +247,10 @@ Trace: FR-PLANNING-024, FR-GOALS-009, FR-COMMITMENTS-011, FR-REPORTING-002 · Pr
 #### Scenario: Sin reserva mínima
 - **CUANDO** el workspace no tiene reserva mínima de liquidez
 - **ENTONCES** el disponible para gastar es 7021.00 BOB y no se muestra el término de reserva mínima
+
+#### Scenario: Esenciales no activados
+- **CUANDO** el workspace no activó los esenciales presupuestados
+- **ENTONCES** el disponible para gastar es 5521.00 BOB y no se muestra el término de esenciales
 
 ### Requirement: Compromisos descontados del disponible
 El término comprometido del disponible DEBE (MUST) sumar, solo cuando se pagan desde una cuenta líquida: las ocurrencias de egreso no resueltas con vencimiento en el periodo (incluidas las vencidas del periodo, `MIN_MAX` por su máximo), las transferencias recurrentes no resueltas del periodo de una cuenta líquida a una no líquida (pagos de tarjeta y cuotas de préstamo incluidas), las transacciones pendientes de egreso con fecha hasta el fin del periodo y las ocurrencias vencidas de periodos anteriores aún sin resolver. NO DEBE (MUST NOT) sumar los egresos cargados a cuentas no líquidas (una compra con tarjeta se descuenta al pagar la tarjeta), las transferencias entre cuentas líquidas, las ocurrencias de compromisos administrados por una meta (se descuentan como aportes planificados) ni las ocurrencias sin monto, cuya cantidad DEBE (MUST) informarse.
@@ -328,7 +332,7 @@ Trace: FR-PLANNING-024 · Priority: Should
 - **Y** el Home sigue mostrando 5521.00 BOB
 
 ### Requirement: Periodo del disponible en la zona del workspace
-El periodo del disponible para gastar DEBE (MUST) ser el periodo financiero que contiene la fecha de hoy en la zona horaria del workspace, según el día de inicio del mes financiero; las ocurrencias con vencimiento posterior al fin de ese periodo NO DEBEN (MUST NOT) descontarse.
+El horizonte del disponible para gastar DEBE (MUST) ser el que fija el ajuste del workspace: por omisión, el periodo financiero que contiene la fecha de hoy en la zona horaria del workspace, según el día de inicio del mes financiero; con el modo "hasta el próximo ingreso", el que define el requirement "Horizonte del disponible hasta el próximo ingreso". Las ocurrencias con vencimiento posterior al fin del horizonte NO DEBEN (MUST NOT) descontarse.
 Trace: FR-PLANNING-024, NFR-USAB-004 · Priority: Must
 
 #### Scenario: Mes financiero que empieza el día 25
@@ -363,3 +367,84 @@ Trace: NFR-PERF-004, NFR-OBS-004 · Priority: Should
 #### Scenario: Workspace grande
 - **CUANDO** el workspace tiene 40 cuentas, 300 ocurrencias no resueltas en el periodo y 20 metas
 - **ENTONCES** el p95 de `reporting_spendable_duration_seconds` es como máximo 0.30 s
+
+### Requirement: Horizonte del disponible hasta el próximo ingreso
+Con el modo "hasta el próximo ingreso" el horizonte del disponible DEBE (MUST) ir desde hoy hasta la fecha de vencimiento, inclusive, de la primera ocurrencia de ingreso no resuelta con vencimiento posterior a hoy en la zona del workspace; si no hay ninguna dentro de los próximos 90 días DEBE (MUST) usar 30 días desde hoy, indicándolo. En ese horizonte el término comprometido DEBE (MUST) sumar los ítems con vencimiento o fecha hasta su fin con las mismas reglas de exclusión, y el de aportes planificados el pendiente del periodo en curso más lo planificado completo de cada periodo financiero posterior que el horizonte alcanza. Las ocurrencias de ingreso vencidas sin resolver NO DEBEN (MUST NOT) fijar el horizonte.
+Trace: FR-PLANNING-024, FR-REPORTING-014, FR-GOALS-009 · Priority: Should
+
+#### Scenario: Sueldo antes de la luz
+- **CUANDO** con los datos del disponible de octubre ("Internet" del 2026-10-22, "Pago Tarjeta X" del 2026-10-25, "Luz" del 2026-10-28 y la pendiente "Cena") el modo es "hasta el próximo ingreso" y "Sueldo" vence el 2026-10-26
+- **ENTONCES** el horizonte es del 2026-10-20 al 2026-10-26, el término comprometido 2999.00 BOB y el disponible para gastar 5701.00 BOB
+
+#### Scenario: Horizonte que cruza al periodo siguiente
+- **CUANDO** hoy es 2026-10-27 con periodos que empiezan el día 1, el modo es "hasta el próximo ingreso", el próximo ingreso esperado es "Sueldo" del 2026-11-05, las cuentas líquidas suman 15800.00 BOB con 5000.00 BOB reservados para metas, las ocurrencias no resueltas desde cuentas líquidas son "Luz" 180.00 BOB del 2026-10-28, "Alquiler" 2500.00 BOB del 2026-11-01 e "Internet" 199.00 BOB del 2026-11-22, "Fondo de emergencia" tiene 600.00 BOB pendientes en "2026-10" y planifica 1500.00 BOB por mes, y la reserva mínima es 1500.00 BOB
+- **ENTONCES** el horizonte es del 2026-10-27 al 2026-11-05
+- **Y** los términos son 2680.00 BOB comprometidos y 2100.00 BOB de aportes planificados, y el disponible para gastar es 4520.00 BOB
+
+#### Scenario: Sin ingreso esperado
+- **CUANDO** el 2026-10-20 el modo es "hasta el próximo ingreso" y no hay ocurrencias de ingreso no resueltas en los próximos 90 días
+- **ENTONCES** el horizonte es del 2026-10-20 al 2026-11-19 y se indica que no hay ingreso esperado
+
+#### Scenario: Ingreso atrasado ignorado
+- **CUANDO** el ingreso "Sueldo" del 2026-10-18 sigue sin resolver el 2026-10-20 y el siguiente vence el 2026-11-18
+- **ENTONCES** el horizonte termina el 2026-11-18
+
+### Requirement: Esenciales presupuestados restantes descontados del disponible
+Cuando el workspace activa los esenciales presupuestados, el disponible DEBE (MUST) restar por moneda del plan, por cada línea de gasto del plan cuyo objetivo es una categoría marcada como esencial, lo planificado menos lo gastado menos lo ya descontado como comprometido de esa categoría en el horizonte, no negativo: completo para el periodo en curso y, para cada periodo posterior que el horizonte alcanza, proporcional a los días del periodo dentro del horizonte, sin redondeo intermedio. Un periodo sin plan o una categoría esencial sin línea NO DEBEN (MUST NOT) restar, y DEBEN (MUST) indicarse.
+Trace: FR-PLANNING-024, FR-REPORTING-002 · Priority: Should
+
+#### Scenario: Supermercado esencial
+- **CUANDO** con los datos del disponible de octubre los esenciales están activados con "Supermercado" y el plan de "2026-10" tiene la línea "Supermercado" con 1200.00 BOB planificados y 750.00 BOB gastados
+- **ENTONCES** el término de esenciales es 450.00 BOB y el disponible para gastar 5071.00 BOB
+
+#### Scenario: Compromiso esencial sin doble conteo
+- **CUANDO** además la ocurrencia "Canasta" de 200.00 BOB del 2026-10-25, de categoría "Supermercado", se paga desde "Banco BOB"
+- **ENTONCES** el término comprometido es 3379.00 BOB, el de esenciales 250.00 BOB y el disponible para gastar sigue siendo 5071.00 BOB
+
+#### Scenario: Esenciales del periodo siguiente proporcionales
+- **CUANDO** con los datos de "Horizonte que cruza al periodo siguiente" los esenciales están activados con "Supermercado", la línea de "2026-10" tiene 1200.00 BOB planificados y 750.00 BOB gastados, y el plan de "2026-11" (del 2026-11-01 al 2026-11-30) planifica 1200.00 BOB para "Supermercado"
+- **ENTONCES** el término de esenciales es 650.00 BOB (450.00 + 1200.00 × 5 / 30) y el disponible para gastar 3870.00 BOB
+
+#### Scenario: Categoría esencial sin línea en el plan
+- **CUANDO** "Transporte" está marcada como esencial y el plan de "2026-10" no tiene línea para ella
+- **ENTONCES** "Transporte" no resta y se indica que no tiene línea en el plan
+
+### Requirement: Ajustes del disponible del workspace
+El OWNER DEBE (MUST) poder definir el modo de horizonte del disponible (periodo financiero o hasta el próximo ingreso), activar o desactivar los esenciales presupuestados y la lista de categorías esenciales (hasta 50 categorías de gasto no archivadas), con control de versión; todo miembro DEBE (MUST) poder leerlos. Una categoría de ingreso DEBE (MUST) rechazarse con `CATEGORY_KIND_MISMATCH`, una archivada con `CATEGORY_ARCHIVED`, un rol menor que OWNER con `INSUFFICIENT_ROLE` y una versión vencida con `PRECONDITION_FAILED`, sin cambiar los ajustes; cada cambio DEBE (MUST) auditarse con los valores anterior y nuevo y los ajustes DEBEN (MUST) viajar en la exportación y la importación del workspace.
+Trace: FR-PLANNING-024, FR-IDENTITY-005, FR-AUDIT-001 · Priority: Should
+
+#### Scenario: El OWNER activa el próximo ingreso y los esenciales
+- **CUANDO** el OWNER guarda el modo "hasta el próximo ingreso", activa los esenciales y marca "Supermercado" y "Transporte"
+- **ENTONCES** los ajustes quedan guardados con la versión 2 y el cambio queda auditado con los valores anterior y nuevo
+- **Y** la siguiente consulta del disponible usa el horizonte hasta el próximo ingreso y el término de esenciales
+
+#### Scenario: Categoría de ingreso rechazada
+- **CUANDO** el OWNER marca como esencial la categoría de ingreso "Salario"
+- **ENTONCES** la respuesta es 422 con código `CATEGORY_KIND_MISMATCH` y los ajustes no cambian
+
+#### Scenario: EDITOR no puede cambiarlos
+- **CUANDO** un EDITOR intenta cambiar el modo de horizonte
+- **ENTONCES** la respuesta es 403 con código `INSUFFICIENT_ROLE`
+- **Y** un VIEWER puede leer los ajustes vigentes
+
+#### Scenario: Versión vencida
+- **CUANDO** el OWNER guarda los ajustes con la versión 1 mientras la vigente es la 2
+- **ENTONCES** la respuesta es 412 con código `PRECONDITION_FAILED` y los ajustes no cambian
+
+### Requirement: Variación por categoría frente al periodo anterior
+Para completar "¿Cómo estoy respecto al mes pasado?" (Q7), cada categoría de los tops de gasto e ingreso DEBE (MUST) informar su variación frente al periodo de comparación en valor absoluto y porcentaje con dos decimales, "nuevo" cuando el monto anterior es cero y no disponible cuando el monto anterior no lo está; en los gastos un aumento DEBE (MUST) indicarse como desfavorable y en los ingresos como favorable.
+Trace: FR-REPORTING-018, FR-REPORTING-004 · Priority: Should
+
+#### Scenario: Supermercado y Fees contra agosto
+- **CUANDO** el 2026-09-15 Supermercado suma 1305.00 BOB del 1 al 15 de septiembre y 1200.00 BOB del 1 al 15 de agosto, y Fees 5.00 BOB solo en septiembre
+- **ENTONCES** Supermercado informa +105.00 BOB y +8.75 % como aumento desfavorable
+- **Y** Fees informa +5.00 BOB y "nuevo"
+
+### Requirement: Las nueve preguntas del Home respondidas por completo
+Con al menos una cuenta líquida, una definición recurrente activa y una meta, el Home DEBE (MUST) mostrar las nueve preguntas disponibles, cada una con su respuesta completa: Q1 dinero disponible por moneda y consolidado; Q2 y Q3 ingresos y gastos del periodo con sus tops de categorías; Q4 comprometido del periodo; Q5 disponible para gastar con su horizonte y desglose; Q6 ahorro, tasa de ahorro y aportes netos a metas; Q7 variación de ingresos, gastos, ahorro y de cada categoría de los tops frente al periodo anterior; Q8 pagos de los próximos 7 días con el saldo más bajo esperado y el riesgo de déficit de los próximos 30 días; y Q9 metas en curso. Ninguna tarjeta DEBE (MUST) mostrar un número inventado ni un cero sustituto.
+Trace: FR-REPORTING-001, FR-REPORTING-002 · Priority: Must
+
+#### Scenario: Checklist de aceptación del Home
+- **CUANDO** el workspace demo con cuentas líquidas en BOB y USD, compromisos, una tarjeta, un préstamo y metas abre el Home
+- **ENTONCES** las nueve tarjetas muestran su respuesta con cifras y ninguna se declara no disponible ni sin datos
+- **Y** la tarjeta de Q8 muestra el saldo más bajo esperado de los próximos 30 días y su riesgo, y la de Q7 la variación de cada categoría de los tops
