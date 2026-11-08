@@ -5,16 +5,17 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Calendario de flujo de caja por horizonte"
 scenario: "Consulta de noche en La Paz"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014"]
 nfr: ["NFR-USAB-004"]
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","timezone"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "El calendario va del 2026-10-20 al 2026-10-27"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-002 — El hoy del calendario es la fecha local del workspace y no la fecha UTC

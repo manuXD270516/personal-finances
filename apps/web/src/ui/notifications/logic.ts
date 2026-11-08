@@ -20,6 +20,8 @@ export interface NotificationLink {
     | 'GOAL_RESERVATIONS'
     | 'FX_FEED_STATUS'
     | 'FX_RATE'
+    | 'CASH_FLOW_CALENDAR'
+    | 'HOME_DIGEST'
     | (string & {});
   readonly periodId: string;
   readonly periodLabel: string;
@@ -40,6 +42,9 @@ export interface NotificationLink {
    * confirma o se rechaza). `FX_FEED_STATUS` abre Configuración → Tasas automáticas (estado por par).
    */
   readonly fxRateId?: string;
+  /** Riesgo de déficit (solo `CASH_FLOW_CALENDAR`, add-cash-flow-forecast): moneda y horizonte del calendario. */
+  readonly currency?: string;
+  readonly horizonDays?: number;
   readonly budgetId?: string;
   readonly budgetLineId?: string;
   readonly targetKind?: string;
@@ -157,6 +162,14 @@ export function resourcePath(link: NotificationLink): string | undefined {
     const rateId = link.fxRateId ?? link.periodId;
     return rateId ? `/fx?vista=proveedores#${fxAnomalyAnchor(rateId)}` : undefined;
   }
+  if (link.kind === 'CASH_FLOW_CALENDAR') {
+    const query = new URLSearchParams();
+    if (link.horizonDays) query.set('horizonte', String(link.horizonDays));
+    if (link.currency) query.set('moneda', link.currency);
+    const qs = query.toString();
+    return qs ? `/flujo-de-caja?${qs}` : '/flujo-de-caja';
+  }
+  if (link.kind === 'HOME_DIGEST') return '/';
   return undefined;
 }
 
@@ -308,22 +321,32 @@ export interface QuietHours {
   readonly start: string;
   readonly end: string;
 }
+/** Frecuencia del digest del Home por email (add-cash-flow-forecast, D385). */
+export const DIGEST_FREQUENCIES = ['OFF', 'WEEKLY', 'MONTHLY'] as const;
+export type DigestFrequency = (typeof DIGEST_FREQUENCIES)[number];
+export const isDigestFrequency = (value: unknown): value is DigestFrequency =>
+  typeof value === 'string' && (DIGEST_FREQUENCIES as readonly string[]).includes(value);
+
 export interface NotificationPreferences {
   readonly types: readonly TypePreference[];
   readonly quietHours: QuietHours | null;
   readonly includeDetailsInEmail: boolean;
+  /** Ausente en una API anterior al digest: se trata como `OFF`. */
+  readonly digestFrequency?: DigestFrequency;
   readonly version: number;
 }
 export interface NotificationPreferencesInput {
   readonly types: readonly TypePreference[];
   readonly quietHours: QuietHours | null;
   readonly includeDetailsInEmail: boolean;
+  readonly digestFrequency: DigestFrequency;
 }
 
 /** Borrador editable: el horario conserva sus horas aunque se desactive (para reactivarlo sin reescribir). */
 export interface PreferencesDraft {
   readonly types: readonly TypePreference[];
   readonly includeDetailsInEmail: boolean;
+  readonly digestFrequency: DigestFrequency;
   readonly quietEnabled: boolean;
   readonly start: string;
   readonly end: string;
@@ -336,6 +359,7 @@ export function draftFromPreferences(prefs: NotificationPreferences): Preference
   return {
     types: prefs.types.map((t) => ({ ...t })),
     includeDetailsInEmail: prefs.includeDetailsInEmail,
+    digestFrequency: isDigestFrequency(prefs.digestFrequency) ? prefs.digestFrequency : 'OFF',
     quietEnabled: prefs.quietHours !== null,
     start: prefs.quietHours?.start ?? DEFAULT_QUIET_START,
     end: prefs.quietHours?.end ?? DEFAULT_QUIET_END,
@@ -361,6 +385,7 @@ export function preferencesInput(draft: PreferencesDraft): NotificationPreferenc
     types: draft.types.map((t) => ({ type: t.type, inApp: t.inApp, email: t.email })),
     quietHours: draft.quietEnabled ? { start: draft.start, end: draft.end } : null,
     includeDetailsInEmail: draft.includeDetailsInEmail,
+    digestFrequency: draft.digestFrequency,
   };
 }
 

@@ -5,16 +5,20 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Frecuencia del digest en las preferencias"
 scenario: "Activar el digest semanal"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-007","FR-NOTIFY-003"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/workspace-export-digest.api.test.ts
+  - apps/web/src/ui/notifications/notifications.test.tsx
+  - packages/contexts/notifications/src/application/preferences.service.test.ts
+  - packages/contexts/notifications/test/integration/cash-flow-digest.int.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["notifications","digest","preferences"]
@@ -31,7 +35,7 @@ expected_result:
   - "DAILY: 400 VALIDATION_FAILED sin cambios"
   - "Sin el campo: la frecuencia no cambia"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-NOTIFICATIONS-DIGEST-001 — El usuario elige la frecuencia del digest, el cambio se audita y un valor inválido se rechaza

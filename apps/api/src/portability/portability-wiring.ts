@@ -42,7 +42,7 @@ import {
   NOTIFICATIONS_PORTABILITY_SECTIONS,
 } from '@pf/notifications/contracts';
 import { PLANNING_CLOSE_SNAPSHOT_HASH_HOOK, PLANNING_PORTABILITY_SECTIONS } from '@pf/planning/contracts';
-import { REPORTING_PORTABILITY_SECTIONS } from '@pf/reporting/contracts';
+import { REPORTING_PORTABILITY_EXCLUSIONS, REPORTING_PORTABILITY_SECTIONS } from '@pf/reporting/contracts';
 import { RULES_PORTABILITY_SECTIONS, RULES_SUGGESTION_FINGERPRINT_HOOK } from '@pf/rules/contracts';
 import { ruleSuggestionFingerprintHook } from '@pf/rules/interface/rules.module';
 import { closeSnapshotRestoreHook } from '@pf/planning/interface/planning.module';
@@ -68,6 +68,8 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   ...LEDGER_PORTABILITY_SECTIONS,
   ...TRANSACTIONS_PORTABILITY_SECTIONS,
   ...PLANNING_PORTABILITY_SECTIONS,
+  // REPORTING: ajustes del disponible y categorías esenciales (745–746, add-cash-flow-forecast) y vistas guardadas del usuario que exporta (820, add-financial-reports-extended).
+  ...REPORTING_PORTABILITY_SECTIONS,
   ...COMMITMENTS_PORTABILITY_SECTIONS,
   // add-basic-csv-import: jobs y vínculos de idempotencia (orden 770–771, después de COMMITMENTS 750–765).
   ...IMPORTS_PORTABILITY_SECTIONS,
@@ -78,8 +80,6 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   ...NOTIFICATIONS_PORTABILITY_SECTIONS,
   // add-document-attachments: metadatos de documentos y vínculos, sin claves ni objetos (orden 810–812).
   ...DOCUMENTS_PORTABILITY_SECTIONS,
-  // add-financial-reports-extended: vistas guardadas del usuario que exporta (orden 820).
-  ...REPORTING_PORTABILITY_SECTIONS,
   ...AUDIT_PORTABILITY_SECTIONS,
 ].sort((a, b) => a.order - b.order);
 
@@ -89,6 +89,7 @@ export const PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
   ...LEDGER_PORTABILITY_EXCLUSIONS,
   ...IMPORTS_PORTABILITY_EXCLUSIONS,
   ...NOTIFICATIONS_PORTABILITY_EXCLUSIONS,
+  ...REPORTING_PORTABILITY_EXCLUSIONS,
 ];
 
 /** Versión de producto que se escribe en el manifiesto (`pfosVersion`). */

@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Gasto planificado restante del plan como estimación"
 scenario: "Supermercado restante repartido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014","FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-risk.test.ts
+  - packages/contexts/reporting/src/domain/planned-spending.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","budget"]
@@ -33,7 +37,7 @@ expected_result:
   - "50.00 BOB por día del 2026-10-20 al 2026-10-31; mínimo planificado 3221.00 BOB el 2026-10-31; riesgo POSSIBLE desde el 2026-10-28; \"2026-11\" sin plan"
   - "Con \"Canasta\": 30.00 BOB por día y \"Canasta\" resta 240.00 BOB en la serie principal"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-011 — El restante del plan se reparte por día, descuenta compromisos de la misma categoría y solo cambia la serie planificada

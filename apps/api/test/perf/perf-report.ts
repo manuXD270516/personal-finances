@@ -30,6 +30,8 @@ export const PERF_THRESHOLDS = {
     allAccountsLimitMs: 150,
     docText: 'p95 ≤ 50 ms por cuenta; ≤ 150 ms para todas las cuentas del workspace',
   },
+  /** NFR-PERF-010: calendario de flujo de caja de 90 días (add-cash-flow-forecast; 40 cuentas líquidas, 300 ocurrencias). */
+  'NFR-PERF-010': { metric: 'p95', limitMs: 500, docText: 'p95 ≤ 500 ms' },
 } as const;
 
 /**

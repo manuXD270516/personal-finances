@@ -8,7 +8,7 @@ import { localized, useSession } from '../session-context';
 import { DebtSummaryCard } from '../debt/summary/DebtSummaryCard';
 import { NetWorthEvolutionCard } from '../networth/NetWorthEvolution';
 import { BudgetProgressWidget } from '../planning/BudgetProgressWidget';
-import { BUDGETS_PATH, SPENDABLE_PATH, UPCOMING_PATH } from '../spendable/logic';
+import { BUDGETS_PATH, SPENDABLE_PATH, SPENDABLE_SETTINGS_PATH, UPCOMING_PATH } from '../spendable/logic';
 import { HomeCommitments } from '../upcoming/UpcomingPage';
 import { DashboardSkeleton, DashboardView } from './DashboardView';
 import type { ReportSummary } from './types';
@@ -82,6 +82,7 @@ export function Dashboard() {
       spendableDetailHref={localized(uiLocale, SPENDABLE_PATH)}
       createBudgetHref={localized(uiLocale, BUDGETS_PATH)}
       upcomingHref={localized(uiLocale, UPCOMING_PATH)}
+      spendableSettingsHref={localized(uiLocale, SPENDABLE_SETTINGS_PATH)}
       goalsHref={localized(uiLocale, '/goals')}
       createGoalHref={localized(uiLocale, '/goals/nuevo')}
       goalHref={(goalId) => localized(uiLocale, `/goals/${goalId}`)}
@@ -95,6 +96,7 @@ export function Dashboard() {
       commitmentsSection={
         <HomeCommitments
           questions={loaded.summary.questions}
+          cashFlow={loaded.summary.cashFlow}
           locale={loaded.formatLocale}
           timeZone={loaded.summary.meta.timeZone || DEFAULT_TIME_ZONE}
           uiLocale={uiLocale}

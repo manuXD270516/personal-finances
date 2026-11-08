@@ -134,3 +134,9 @@ quadrantChart
 4. ¿Se acepta el riesgo residual de RISK-014 (forecast poco útil) o se posterga Phase 8 indefinidamente si los datos no alcanzan?
 5. ¿Se requiere un revisor externo (segundo par de ojos) para cambios del ledger y de seguridad, mitigando RISK-026?
 6. ¿La ruta del repositorio en Windows (`D:\projects\personal-finances`) se mantiene o se recomienda clonar dentro del FS de WSL2 tras SPIKE-08?
+
+## Riesgos del pronóstico de flujo de caja (`add-cash-flow-forecast`, Phase 7)
+
+- **Fatiga de alertas (junto a RISK-022/029).** La alerta de déficit abre **un episodio por moneda** y un solo aviso por destinatario; solo el riesgo `HIGH` abre, no hay aviso de cierre (D380) y el umbral es la reserva mínima que el usuario controla. Latencia de hasta una hora aceptada (D381): la tarjeta Q8 muestra el riesgo en la siguiente lectura.
+- **Estimados en la serie principal (D379).** Un `ESTIMATED` sobreestimado puede abrir un episodio; el monto se edita por ocurrencia.
+- **Privacidad del digest (RISK-010).** Desactivado por omisión, sin montos ni nombres sin opt-in y con porcentajes y fechas (D385, D386).

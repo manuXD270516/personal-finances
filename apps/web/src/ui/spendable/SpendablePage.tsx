@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { Category } from '../common/types';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { HOME_CSS } from '../dashboard/styles';
-import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
-import { BUDGETS_PATH, UPCOMING_PATH } from './logic';
+import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { BUDGETS_PATH, SPENDABLE_SETTINGS_PATH, UPCOMING_PATH } from './logic';
 import type { Spendable } from './types';
 import { SpendableDetailView } from './SpendableView';
 
@@ -13,6 +14,19 @@ function SpendableDetail({ ctx }: { ctx: WorkspaceContext }) {
   const f = useFormat('Dashboard', ctx);
   const [spendable, setSpendable] = useState<Spendable | undefined>();
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
+  const [categories, setCategories] = useState<readonly Category[]>([]);
+
+  // Los avisos de esenciales traen solo el id de la categoría: el nombre sale del catálogo (si no carga, un texto genérico).
+  useEffect(() => {
+    let cancelled = false;
+    listAll<Category>(ctx.api, `${ctx.base}/categories`, new URLSearchParams({ includeArchived: 'true' }))
+      .then((rows) => !cancelled && setCategories(rows))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx.api, ctx.base]);
+  const categoryNames = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +61,9 @@ function SpendableDetail({ ctx }: { ctx: WorkspaceContext }) {
           <SpendableDetailView
             spendable={spendable}
             ctx={f}
+            categoryNames={categoryNames}
             links={{
+              settingsHref: ctx.href(SPENDABLE_SETTINGS_PATH),
               homeHref: ctx.href('/'),
               createBudgetHref: ctx.href(BUDGETS_PATH),
               upcomingHref: ctx.href(UPCOMING_PATH),

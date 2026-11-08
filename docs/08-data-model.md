@@ -1790,7 +1790,7 @@ Cambios respecto del diseño original (docs/33 D87–D93): `DISMISSED` → `ARCH
 | `notification` | `(workspace_id, user_id, dedupe_key)` (p. ej. `budget-threshold:<periodId>:CATEGORY:<id>:90`) | coherencia estado ↔ `read_at`/`archived_at` | `(workspace_id, user_id, status, created_at DESC, id DESC)`, `(created_at)` | WS + `user_id` (`notifications.is_row_user`): `pf_app` SELECT propias y UPDATE de estado propio; `pf_worker` INSERT, SELECT y DELETE (purga) y UPDATE solo de `params`, `message_key` y `link` (aviso agrupado de tasas retenidas, `refine-rate-anomaly-alert-grouping`; un disparador rechaza cualquier otra columna) | Retención 12 meses (D93), archivadas incluidas |
 | `notification_delivery` | `(notification_id, channel)` | `attempts >= 0`; `SUPPRESSED` ⇒ motivo; `SENT` ⇒ `sent_at` | `(status, not_before) WHERE status IN ('PENDING','RETRY')`, `(lease_until) WHERE status='SENDING'` | WS; `pf_worker` todo; `pf_app` solo `(workspace_id, notification_id, channel, status)` de las entregas de SUS notificaciones | No exportada |
 | `notification_preference` | `(workspace_id, user_id, notification_type, channel)` (PK) | — | — | WS + `user_id`; `pf_worker` SELECT | Ausencia = activado; exportada |
-| `user_setting` | `(workspace_id, user_id)` (PK) | horario: ambos nulos o ambos presentes y distintos | — | WS + `user_id`; `pf_worker` SELECT | `version` = ETag; exportada |
+| `user_setting` | `(workspace_id, user_id)` (PK) | horario: ambos nulos o ambos presentes y distintos; `digest_frequency IN ('OFF','WEEKLY','MONTHLY')` | — | WS + `user_id`; `pf_worker` SELECT | `version` = ETag; exportada. `digest_frequency` (`DEFAULT 'OFF'`, `add-cash-flow-forecast`) viaja en el export con `legacyDefaults` (un archivo anterior la importa en `OFF`) |
 
 Las cuatro tablas están registradas en `platform.workspace_scoped_table` (purga del workspace demo, órdenes 120–126).
 
@@ -2327,5 +2327,16 @@ Migración `20261004170000_identity_demo_data.sql` (expand):
 | Funciones | `platform.purge_demo_workspace(uuid)` (SECURITY DEFINER, EXECUTE solo `pf_worker`, PF006), `platform.demo_purge_target()`, `platform.workspace_is_retired(uuid)`, nueva versión de `platform.forbid_mutation()`. |
 
 
+## Pronóstico de flujo de caja (`add-cash-flow-forecast`, Phase 7)
+
+Migración expand `20261108100000_reporting_cash_flow_forecast.sql`. Las tres tablas nuevas tienen `workspace_id`, RLS `ENABLE` + `FORCE` fail-closed (`platform.current_workspace_id()` lanza `PF002` sin contexto) y están registradas en `platform.workspace_scoped_table` (purga del demo, órdenes 174–176).
+
+| Tabla | PK / unicidad | Contenido | Acceso | Notas |
+|---|---|---|---|---|
+| `reporting.cash_flow_shortfall_episode` | `id`; índice único parcial `(workspace_id, currency) WHERE closed_at IS NULL` | `currency`, `opened_at`, `closed_at`, `first_shortfall_date`, `lowest_amount`, `lowest_date`, `threshold_amount`, `below_zero`, `last_evaluated_at`, `last_lowest_amount` | `pf_app` SELECT; `pf_worker` INSERT/UPDATE/DELETE | Dato derivado (sin auditoría, sin export): un episodio abierto por moneda aunque dos réplicas evalúen a la vez; los cerrados con más de 400 días se purgan en el mismo job. |
+| `reporting.spendable_setting` | `workspace_id` | `horizon_mode IN ('FINANCIAL_PERIOD','NEXT_INCOME')`, `subtract_essentials`, `version`, `updated_at` | `pf_app` SELECT/INSERT/UPDATE (columnas) | Sin fila = valores por omisión (versión 1); exportada (`spendable-settings`). |
+| `reporting.spendable_essential_category` | `(workspace_id, category_id)` | Categorías de gasto esenciales (hasta 50) | `pf_app` SELECT/INSERT/DELETE | Sin FK a CLASSIFICATION; exportada con el remapeo de ids (`spendable-essential-categories`). |
+
+`pf_workspace_directory` gana `SELECT (min_liquidity_reserve_amount, min_liquidity_reserve_currency)` en `iam.workspace`: el worker (sin usuario) lee la reserva mínima, umbral del riesgo de déficit.
 
 **As-built Phase 6 (`add-banking-providers`, migraciones `20261104100000`–`20261104100200`).** `imports.connection` e `imports.connection_credential` (RLS forzada, registradas en `platform.workspace_scoped_table`; las credenciales con grants por columna); `import_job.connection_id` (nullable) y las fuentes `EXCHANGE_API`/`EXCHANGE_FILE`; `staged_transaction.account_id` y `external` (cuenta de la fila en un import de varias cuentas, y referencia externa, señal y conversión propuesta del registro del proveedor); índices únicos parciales `import_job_connection_active_uk` (una sincronización en curso por conexión) y `txn.transaction_provider_ref_uk` (referencia `imports.provider:<exchange>:<tipo>`, compartida entre archivo y API), ambos `CONCURRENTLY`. El export lleva la sección `import-connections` sin credenciales; al importar, las conexiones de API quedan `NEEDS_CREDENTIAL`.

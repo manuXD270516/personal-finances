@@ -1,4 +1,6 @@
-import { formatLocalDate } from '../dashboard/format';
+import { homeCashFlowSummary } from '../cash-flow/logic';
+import type { CashFlowHomeBlock } from '../cash-flow/types';
+import { formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext, HomeQuestionStatus } from '../dashboard/types';
 import { homeSlice, amountText } from './logic';
 import { UPCOMING_CSS } from './styles';
@@ -29,6 +31,86 @@ export interface CommitmentsHomeViewProps {
   readonly href: (path: string) => string;
   /** Tarjeta de un pago del plan de pago de una tarjeta (add-credit-cards). */
   readonly cardOf?: CardOf | undefined;
+  /**
+   * Bloque `cashFlow` del resumen (add-cash-flow-forecast): saldo más bajo esperado y riesgo de 30 días. `null` o ausente
+   * (sin cuentas líquidas): la tarjeta no muestra saldo esperado ni riesgo.
+   */
+  readonly cashFlow?: CashFlowHomeBlock | null | undefined;
+  /** Calendario de flujo de caja (`/flujo-de-caja`), con el horizonte y la moneda del riesgo cuando los hay. */
+  readonly cashFlowHref?: ((currency?: string) => string) | undefined;
+}
+
+/**
+ * Saldo más bajo esperado de los próximos 30 días: la moneda con riesgo, su mínimo y la fecha o, sin riesgo, el mínimo
+ * consolidado; enlaza al calendario. Sin bloque (`null`) no dice nada (nunca un saldo inventado).
+ */
+function CashFlowLine({
+  cashFlow,
+  f,
+  href,
+}: {
+  cashFlow: CashFlowHomeBlock | null | undefined;
+  f: FormatContext;
+  href: ((currency?: string) => string) | undefined;
+}) {
+  const summary = homeCashFlowSummary(cashFlow);
+  if (summary.kind === 'NONE') return null;
+  const days = cashFlow?.horizonDays ?? 30;
+  const link = href ? (
+    <a href={href(summary.kind === 'RISK' ? summary.currency : undefined)} data-testid="cash-flow-link">
+      {f.t('home.cashFlowLink')}
+    </a>
+  ) : null;
+  return (
+    <div
+      data-testid="cash-flow-q8"
+      data-kind={summary.kind}
+      data-risk={summary.kind === 'RISK' ? summary.risk : 'NONE'}
+    >
+      {summary.kind === 'RISK' ? (
+        <>
+          <p>
+            <strong data-testid="cash-flow-q8-risk">
+              <span aria-hidden="true">⚠</span>{' '}
+              {f.t(`home.risk.${summary.risk}`, { currency: summary.currency })}
+            </strong>
+          </p>
+          <p data-testid="cash-flow-q8-lowest">
+            {f.t('home.lowestOn', {
+              amount: formatMoney(summary.lowest, f.locale),
+              date: formatLocalDate(summary.date, f.locale),
+              days,
+            })}
+          </p>
+        </>
+      ) : (
+        <>
+          <p>
+            <strong data-testid="cash-flow-q8-risk">
+              <span aria-hidden="true">✓</span> {f.t('home.risk.NONE')}
+            </strong>
+          </p>
+          <p className="pf-home-muted">{f.t('home.lowestLabel', { days })}</p>
+          <p data-testid="cash-flow-q8-lowest">
+            {f.t('home.lowestOn', {
+              amount: formatMoney(summary.lowest, f.locale),
+              date: formatLocalDate(summary.date, f.locale),
+              days,
+            })}
+            {!summary.complete ? (
+              <>
+                {' '}
+                <span className="pf-home-muted" data-testid="cash-flow-q8-incomplete">
+                  · {f.t('home.lowestIncomplete')}
+                </span>
+              </>
+            ) : null}
+          </p>
+        </>
+      )}
+      {link ? <p>{link}</p> : null}
+    </div>
+  );
 }
 
 /**
@@ -113,9 +195,20 @@ function Q8Card({
   createAccountHref,
   href,
   cardOf,
+  cashFlow,
+  cashFlowHref,
 }: Pick<
   CommitmentsHomeViewProps,
-  'upcoming' | 'q8' | 'f' | 'fullHref' | 'createHref' | 'createAccountHref' | 'href' | 'cardOf'
+  | 'upcoming'
+  | 'q8'
+  | 'f'
+  | 'fullHref'
+  | 'createHref'
+  | 'createAccountHref'
+  | 'href'
+  | 'cardOf'
+  | 'cashFlow'
+  | 'cashFlowHref'
 >) {
   const noData = q8?.status === 'NO_DATA' || (upcoming && upcoming !== 'error' && !upcoming.hasCommitments);
   const body = () => {
@@ -195,6 +288,7 @@ function Q8Card({
       className="pf-home-card"
     >
       <h3 id="question-Q8-title">{f.t('home.q8Title')}</h3>
+      {noData ? null : <CashFlowLine cashFlow={cashFlow} f={f} href={cashFlowHref} />}
       {body()}
       {noData ? null : (
         <p style={{ margin: 0 }}>

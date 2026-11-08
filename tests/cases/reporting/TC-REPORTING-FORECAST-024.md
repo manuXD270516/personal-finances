@@ -5,16 +5,18 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Horizonte del disponible hasta el próximo ingreso"
 scenario: "Horizonte que cruza al periodo siguiente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024","FR-GOALS-009"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-horizon.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["spendable","q5","horizon"]
@@ -31,7 +33,7 @@ expected_result:
   - "Horizonte 2026-10-27 a 2026-11-05; comprometido 2680.00; aportes 2100.00; disponible 4520.00 BOB"
   - "Sin ingreso: horizonte 2026-10-20 a 2026-11-19, indicado"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-024 — Un horizonte que cruza de periodo suma lo planificado completo del periodo siguiente y sin ingreso usa 30 días

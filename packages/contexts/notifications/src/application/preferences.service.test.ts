@@ -28,9 +28,12 @@ describe('PreferencesService', () => {
         { type: 'FX_RATE_FEED_STALE', inApp: true, email: true },
         { type: 'FX_RATE_FEED_RECOVERED', inApp: true, email: true },
         { type: 'FX_RATE_ANOMALY_RETAINED', inApp: true, email: true },
+        { type: 'CASH_FLOW_SHORTFALL_RISK', inApp: true, email: true },
+        { type: 'HOME_DIGEST', inApp: true, email: true },
       ],
       quietHours: null,
       includeDetailsInEmail: false,
+      digestFrequency: 'OFF',
       version: 1,
     });
   });
@@ -113,5 +116,62 @@ describe('PreferencesService', () => {
       }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     expect(env.audit).toHaveLength(0);
+  });
+});
+
+describe('PreferencesService: frecuencia del digest (add-cash-flow-forecast)', () => {
+  const input = (digestFrequency?: string) => ({
+    types: [],
+    quietHours: null,
+    includeDetailsInEmail: false,
+    ...(digestFrequency === undefined ? {} : { digestFrequency }),
+  });
+
+  it('[TC-NOTIFICATIONS-DIGEST-001] guardar la frecuencia semanal queda auditado con el valor anterior OFF', async () => {
+    const { env, service } = setup();
+    expect((await service.get(WS, OWNER)).digestFrequency).toBe('OFF');
+    const saved = await service.update({
+      workspaceId: WS,
+      userId: OWNER,
+      expectedVersion: 1,
+      preferences: input('WEEKLY'),
+    });
+    expect(saved).toMatchObject({ digestFrequency: 'WEEKLY', version: 2 });
+    expect(env.audit).toHaveLength(1);
+    expect(env.audit[0]?.changes).toEqual([{ field: 'digestFrequency', before: 'OFF', after: 'WEEKLY' }]);
+    expect((await service.get(WS, OWNER)).digestFrequency).toBe('WEEKLY');
+  });
+
+  it('[TC-NOTIFICATIONS-DIGEST-001] una frecuencia inválida se rechaza con VALIDATION_FAILED sin cambiar nada', async () => {
+    const { env, service } = setup();
+    await service.update({
+      workspaceId: WS,
+      userId: OWNER,
+      expectedVersion: 1,
+      preferences: input('WEEKLY'),
+    });
+    const before = env.audit.length;
+    await expect(
+      service.update({ workspaceId: WS, userId: OWNER, expectedVersion: 2, preferences: input('DAILY') }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(env.audit).toHaveLength(before);
+    expect(await service.get(WS, OWNER)).toMatchObject({ digestFrequency: 'WEEKLY', version: 2 });
+  });
+
+  it('[TC-NOTIFICATIONS-DIGEST-001] guardar sin el campo no cambia la frecuencia', async () => {
+    const { service } = setup();
+    await service.update({
+      workspaceId: WS,
+      userId: OWNER,
+      expectedVersion: 1,
+      preferences: input('MONTHLY'),
+    });
+    const saved = await service.update({
+      workspaceId: WS,
+      userId: OWNER,
+      expectedVersion: 2,
+      preferences: { ...input(), includeDetailsInEmail: true },
+    });
+    expect(saved).toMatchObject({ digestFrequency: 'MONTHLY', includeDetailsInEmail: true, version: 3 });
   });
 });

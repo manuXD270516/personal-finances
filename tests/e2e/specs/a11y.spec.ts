@@ -67,6 +67,11 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   // plan de pago los analiza credit-cards.spec.ts).
   { path: '/debts?vista=tarjetas', name: 'Deudas: tarjetas' },
   { path: '/debts/tarjetas/nueva', name: 'Nueva tarjeta de crédito' },
+  // add-cash-flow-forecast 6.1 y 6.3: calendario de flujo de caja (con la cuenta BOB y la de USD, sin compromisos; la versión
+  // con datos del demo la analiza cash-flow-forecast.spec.ts) y ajustes del disponible (OWNER).
+  { path: '/flujo-de-caja', name: 'Flujo de caja' },
+  { path: '/flujo-de-caja?horizonte=90&moneda=USD', name: 'Flujo de caja: 90 días en USD' },
+  { path: '/disponible/ajustes', name: 'Ajustes del disponible' },
 ];
 
 async function seriousViolations(page: Page) {

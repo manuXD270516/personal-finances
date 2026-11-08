@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Detección periódica del riesgo de déficit"
 scenario: "Riesgo resuelto y nuevo episodio"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/cash-flow-watch.int.test.ts
+  - packages/contexts/reporting/src/application/evaluate-shortfall-risk.test.ts
+  - packages/contexts/reporting/src/domain/category-variation.test.ts
+  - packages/contexts/reporting/test/integration/pg-cash-flow.int.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","shortfall","job"]
@@ -34,7 +38,7 @@ expected_result:
   - "POSSIBLE: ningún episodio ni hecho"
   - "Concurrencia: un solo episodio abierto y un solo hecho"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-019 — El episodio se cierra con riesgo NONE o LOW, se reabre con un riesgo alto nuevo y POSSIBLE no abre episodios

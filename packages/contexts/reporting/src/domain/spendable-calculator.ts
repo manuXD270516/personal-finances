@@ -35,6 +35,8 @@ export interface SpendableCommittedItem {
   /** Monto que suma (máximo en `MIN_MAX`); `null` si es `VARIABLE` (D115). */
   readonly amount: Money | null;
   readonly overdueFromPrevious: boolean;
+  /** Categoría del ítem (add-cash-flow-forecast, S2): para no contar dos veces lo esencial; `null` si no tiene una. */
+  readonly categoryId?: string | null;
 }
 
 /** Aporte planificado pendiente de una meta `ACTIVE` con plan (`GoalPlansQuery.getForPeriod`), en la moneda de la meta. */
@@ -64,7 +66,12 @@ export interface SpendableTerms {
   readonly plannedGoalContributions: Money;
   /** `null` si el workspace no tiene reserva mínima en esta moneda (no se muestra el término). */
   readonly minimumReserve: Money | null;
-  /** `liquid − reservedForGoals − committed − plannedGoalContributions − minimumReserve`. */
+  /**
+   * Esenciales presupuestados restantes (add-cash-flow-forecast, D378); `null` con los esenciales desactivados (el término
+   * no se muestra y el disponible no cambia).
+   */
+  readonly essentials: Money | null;
+  /** `liquid − reservedForGoals − committed − plannedGoalContributions − essentials − minimumReserve`. */
   readonly spendable: Money;
 }
 
@@ -201,10 +208,28 @@ export const SpendableCalculator = {
         committed,
         plannedGoalContributions,
         minimumReserve,
+        essentials: null,
         spendable,
       };
     });
     return { byCurrency, committedItems: counted, withoutAmountCount, reservedByAccount, planned };
+  },
+
+  /**
+   * Resta los esenciales presupuestados restantes (D378) de cada moneda que ya tiene términos: `essentials` por moneda
+   * del plan, materializado UNA vez (HALF_EVEN) a la escala de la moneda. Una moneda del plan sin cuentas líquidas ni
+   * compromisos no tiene términos y no aplica. Con `null` los esenciales están desactivados: el resultado no cambia.
+   */
+  applyEssentials(result: SpendableResult, essentials: ReadonlyMap<string, Decimal> | null): SpendableResult {
+    if (essentials === null) return result;
+    return {
+      ...result,
+      byCurrency: result.byCurrency.map((t) => {
+        const raw = essentials.get(t.currency.code) ?? dec('0');
+        const term = Money.roundToScale(raw, t.currency, 'HALF_EVEN');
+        return { ...t, essentials: term, spendable: t.spendable.subtract(term) };
+      }),
+    };
   },
 
   /**

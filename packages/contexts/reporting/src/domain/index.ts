@@ -68,6 +68,7 @@ export {
   type SurprisePayment,
 } from './surprise-payments.js';
 export {
+  CASH_FLOW_CALENDAR_DURATION_METRIC,
   evaluateReadModelAlert,
   SPENDABLE_DURATION_METRIC,
   UPCOMING_PAYMENTS_DURATION_METRIC,
@@ -226,3 +227,68 @@ export {
   type ViewParams,
   type ViewRange,
 } from './saved-report-view.js';
+export {
+  categoriesOfTarget,
+  PlannedSpending,
+  type PlanCategoryNode,
+  type PlannedCommittedItem,
+  type PlannedLineInput,
+  type PlannedPeriodInput,
+  type PlannedSpendingPeriod,
+  type PlannedSpendingResult,
+} from './planned-spending.js';
+export {
+  CashFlowCalendar,
+  certaintyOf,
+  type CashFlowAccountBlock,
+  type CashFlowAccountInput,
+  type CashFlowAmountType,
+  type CashFlowCertainty,
+  type CashFlowCurrencyBlock,
+  type CashFlowDayPoint,
+  type CashFlowEvent,
+  type CashFlowEventKind,
+  type CashFlowInput,
+  type CashFlowLowest,
+  type CashFlowManagedBy,
+  type CashFlowMovementInput,
+  type CashFlowResult,
+} from './cash-flow-calendar.js';
+export {
+  CASH_FLOW_RISK_ORDER,
+  CashFlowConsolidator,
+  CashFlowRiskPolicy,
+  CashFlowSuggester,
+  LOW_RISK_MARGIN,
+  type CashFlowConsolidation,
+  type CashFlowRisk,
+  type CashFlowRiskAssessment,
+  type CashFlowSuggestion,
+} from './cash-flow-risk.js';
+export {
+  NEXT_INCOME_FALLBACK_DAYS,
+  NEXT_INCOME_LOOKAHEAD_DAYS,
+  SpendableEssentials,
+  SpendableHorizon,
+  type EssentialCategory,
+  type EssentialCommittedItem,
+  type EssentialItem,
+  type EssentialPlanPeriod,
+  type EssentialsResult,
+  type EssentialWarning,
+  type EssentialWarningReason,
+  type ResolvedHorizon,
+  type SpendableHorizonMode,
+  type UpcomingIncome,
+} from './spendable-horizon.js';
+export { CategoryVariation, type CategoryVariationValue } from './category-variation.js';
+export { ShortfallEpisodePolicy, type ShortfallEpisodeAction } from './shortfall-episode.js';
+export {
+  MAX_ESSENTIAL_CATEGORIES,
+  SPENDABLE_HORIZON_MODES,
+  SpendableSettingsPolicy,
+  type SettingsCategory,
+  type SettingsChange,
+  type SpendableSettingsMode,
+  type SpendableSettingsValue,
+} from './spendable-settings.js';

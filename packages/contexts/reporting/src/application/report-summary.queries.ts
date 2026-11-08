@@ -22,6 +22,7 @@ import type {
   TopCategoryDto,
 } from '../contracts/index.js';
 import {
+  CategoryVariation,
   ConsolidationService,
   countsAsOutflow,
   homeQuestions,
@@ -38,6 +39,7 @@ import {
   type NominalFlow,
   type ValuedAccount,
 } from '../domain/index.js';
+import { CashFlowCalculation, homeBlock } from './cash-flow-calendar.queries.js';
 import type { GoalHomeSummaryRow, ReportingDeps } from './ports/index.js';
 import { isLiquidAccount, SpendableCalculation } from './spendable.queries.js';
 import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS, rateKey, toExact } from './valuation-support.js';
@@ -313,6 +315,35 @@ export class ReportSummaryQueries {
       if (!used.has(key)) used.set(key, r);
     }
 
+    // ---- saldo más bajo esperado y riesgo de 30 días (Q8, add-cash-flow-forecast): mismo DS, tasas reutilizadas
+    const listForCashFlow = deps.commitments.listForCashFlow;
+    const cashFlowCalc =
+      listForCashFlow && hasLiquidAccounts && query.asOf === undefined
+        ? await new CashFlowCalculation({
+            rates: deps.rates,
+            pending: deps.pending,
+            commitments: { listForCashFlow },
+            ...(deps.spendable ? { spendable: deps.spendable } : {}),
+          }).compute(
+            {
+              workspaceId: ws,
+              now,
+              today,
+              reporting,
+              scaleOf,
+              accounts,
+              balanceOf: (accountId) => balanceByAccount.get(accountId) as Money,
+              knownRates: stockRates,
+              windowDays: deps.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
+            },
+            { horizonDays: 30, withPlan: false, withSuggestions: false },
+          )
+        : null;
+    for (const r of cashFlowCalc?.ratesUsed ?? []) {
+      const key = rateKey(r);
+      if (!used.has(key)) used.set(key, r);
+    }
+
     // ---- flujos del periodo
     const periodText = range(period);
     const inPeriod = KpiCalculator.within(flows, periodText);
@@ -454,16 +485,23 @@ export class ReportSummaryQueries {
     const show = (v: Decimal) => present(v, reporting).toJSON();
     const zero = dec('0');
     const topLine =
-      (previous: ReadonlyMap<string, CategoryAmount> | null) =>
+      (previous: ReadonlyMap<string, CategoryAmount> | null, nature: 'EXPENSE' | 'INCOME') =>
       (c: CategoryTotal): TopCategoryDto => {
         const before = previous?.get(c.categoryId);
+        const unavailable = previous === null || (before && !before.complete);
+        const v = unavailable
+          ? null
+          : CategoryVariation.of({ current: c.amount, previous: before?.amount ?? zero, nature, reporting });
         return {
           categoryId: c.categoryId,
           name: c.name,
           amount: show(c.amount),
           complete: c.complete,
-          previousAmount:
-            previous === null || (before && !before.complete) ? null : show(before?.amount ?? zero),
+          previousAmount: unavailable ? null : show(before?.amount ?? zero),
+          // Q7 (D389): variación por categoría; `null` si el monto anterior no está disponible.
+          variation: v
+            ? { amount: v.amount.toJSON(), percent: v.percent, isNew: v.isNew, direction: v.direction }
+            : null,
         };
       };
 
@@ -485,8 +523,8 @@ export class ReportSummaryQueries {
       },
       comparison: comparisonDto,
       accounts: accountLines,
-      topExpenseCategories: top.map(topLine(previousExpenseByCategory)),
-      topIncomeCategories: topIncome.map(topLine(previousIncomeByCategory)),
+      topExpenseCategories: top.map(topLine(previousExpenseByCategory, 'EXPENSE')),
+      topIncomeCategories: topIncome.map(topLine(previousIncomeByCategory, 'INCOME')),
       netWorth: {
         assets: show(nw.assets),
         liabilities: show(nw.liabilities),
@@ -511,6 +549,7 @@ export class ReportSummaryQueries {
       goals: goalsBlock(goalSummary),
       goalContributions,
       spendable: spendableCalc?.summary ?? null,
+      cashFlow: cashFlowCalc ? homeBlock(cashFlowCalc) : null,
       meta: {
         generatedAt: nowText,
         reportingCurrency: reporting.code,

@@ -1,4 +1,6 @@
 import { dec, DomainError, MoneyDecimal } from '@pf/shared-kernel';
+import { CASH_FLOW_SHORTFALL_RISK_MESSAGE_KEY } from './cash-flow-notifications.js';
+import { HOME_DIGEST_MESSAGE_KEY } from './home-digest.js';
 import {
   FX_RATE_ANOMALY_GROUP_MESSAGE_KEY,
   FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY,
@@ -118,10 +120,10 @@ function strings(params: NotificationParams, key: string): string[] {
 
 // ──────────────────────────────────────────────────────────────────────────── plantillas
 
-const fill = (template: string, values: Readonly<Record<string, string>>): string =>
+export const fill = (template: string, values: Readonly<Record<string, string>>): string =>
   template.replace(/\{(\w+)\}/g, (_m, key: string) => values[key] ?? '');
 
-const message = (locale: NotificationLocale, key: string): string => {
+export const message = (locale: NotificationLocale, key: string): string => {
   const text = MESSAGE_CATALOGS[locale][key] ?? MESSAGE_CATALOGS.es[key];
   if (text === undefined) throw new DomainError('VALIDATION_FAILED', `unknown message ${key}`);
   return text;
@@ -143,7 +145,9 @@ type MessageKind =
   | 'fx_rate_feed_stale'
   | 'fx_rate_feed_recovered'
   | 'fx_rate_anomaly_retained'
-  | 'fx_rate_anomaly_group';
+  | 'fx_rate_anomaly_group'
+  | 'cash_flow_shortfall_risk'
+  | 'home_digest';
 
 const moneyText = (value: { amount: string; currency: string }, locale: NotificationLocale): string =>
   `${formatDecimal(value.amount, locale)} ${value.currency}`;
@@ -191,6 +195,8 @@ function kindOf(messageKey: string): MessageKind {
   if (messageKey === FX_RATE_FEED_RECOVERED_MESSAGE_KEY) return 'fx_rate_feed_recovered';
   if (messageKey === FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY) return 'fx_rate_anomaly_retained';
   if (messageKey === FX_RATE_ANOMALY_GROUP_MESSAGE_KEY) return 'fx_rate_anomaly_group';
+  if (messageKey === CASH_FLOW_SHORTFALL_RISK_MESSAGE_KEY) return 'cash_flow_shortfall_risk';
+  if (messageKey === HOME_DIGEST_MESSAGE_KEY) return 'home_digest';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
 }
 
@@ -412,6 +418,18 @@ function valuesOf(
       variation: signedVariation(str(peak, 'variationPct'), locale),
     };
   }
+  if (kind === 'cash_flow_shortfall_risk') {
+    return {
+      currency: str(params, 'currency'),
+      // Código de la moneda (no un monto): el email `basic` lo muestra, a diferencia de los marcadores de monto.
+      code: str(params, 'currency'),
+      firstDate: formatDate(str(params, 'firstShortfallDate'), locale),
+      lowest: moneyText(money(params, 'lowest'), locale),
+      lowestDate: formatDate(str(params, 'lowestDate'), locale),
+      threshold: moneyText(money(params, 'threshold'), locale),
+    };
+  }
+  if (kind === 'home_digest') return { date: formatDate(str(params, 'generatedOn'), locale) };
   return {
     period: str(params, 'periodLabel'),
     periodEnd: formatDate(str(params, 'periodEnd'), locale),
@@ -471,13 +489,16 @@ export function renderInApp(
       body += ` ${fill(message(locale, 'inapp.budget_threshold.partial'), values)}`;
     }
   }
+  if (kind === 'cash_flow_shortfall_risk' && params['belowZero'] === true) {
+    body += ` ${message(locale, 'inapp.cash_flow_shortfall_risk.negative')}`;
+  }
   if (kind === 'goal_milestone' && strings(params, 'alsoCrossed').length > 0) {
     body += ` ${fill(message(locale, 'inapp.goal_milestone.also'), values)}`;
   }
   return { title, body };
 }
 
-const escapeHtml = (value: string): string =>
+export const escapeHtml = (value: string): string =>
   value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')

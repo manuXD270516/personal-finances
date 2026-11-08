@@ -13,6 +13,11 @@ export interface SpendableCurrencyTerms {
   readonly plannedGoalContributions: Money;
   /** `null` si el workspace no tiene reserva mínima en esta moneda: el término no se muestra. */
   readonly minimumReserve: Money | null;
+  /**
+   * Esenciales presupuestados restantes (add-cash-flow-forecast): `null` con los esenciales desactivados, que no muestran
+   * ese término ni cambian el disponible. Ausente en una API anterior.
+   */
+  readonly essentials?: Money | null;
   readonly spendable: Money;
 }
 
@@ -24,6 +29,15 @@ export interface SpendableBudgetView {
   readonly complete: boolean | null;
 }
 
+/** Horizonte del disponible: el periodo financiero o «hasta el próximo ingreso» (con respaldo de 30 días sin ingreso). */
+export interface SpendableHorizon {
+  readonly mode: 'FINANCIAL_PERIOD' | 'NEXT_INCOME';
+  readonly from: string;
+  readonly to: string;
+  readonly nextIncome: { readonly occurrenceId: string; readonly name: string; readonly date: string } | null;
+  readonly fallback: boolean;
+}
+
 export interface SpendableSummary {
   readonly period: {
     readonly id: string | null;
@@ -31,6 +45,8 @@ export interface SpendableSummary {
     readonly start: string;
     readonly end: string;
   };
+  /** Ausente en una API anterior (el horizonte era siempre el periodo). */
+  readonly horizon?: SpendableHorizon;
   readonly reportingCurrency: string;
   readonly byCurrency: readonly SpendableCurrencyTerms[];
   readonly consolidated: {
@@ -72,8 +88,31 @@ export interface SpendablePlannedGoal {
   readonly pending: Money;
 }
 
+/** Línea de esenciales que resta del disponible (add-cash-flow-forecast). */
+export interface SpendableEssentialItem {
+  readonly categoryId: string;
+  readonly name: string;
+  readonly periodLabel: string;
+  readonly reference: Money;
+  readonly actual: Money;
+  /** Comprometido de esa categoría ya descontado (sin doble conteo). */
+  readonly committed: Money;
+  /** Lo que resta del disponible por esta línea. */
+  readonly counted: Money;
+  /** Periodo posterior: proporcional a los días del periodo dentro del horizonte. */
+  readonly prorated: boolean;
+}
+
+export interface SpendableEssentialWarning {
+  readonly categoryId: string;
+  readonly reason: 'NO_PLAN' | 'NO_LINE' | 'ARCHIVED';
+  readonly periodLabel: string | null;
+}
+
 export interface Spendable extends SpendableSummary {
   readonly committedItems: readonly SpendableCommittedItem[];
+  readonly essentialItems?: readonly SpendableEssentialItem[];
+  readonly essentialWarnings?: readonly SpendableEssentialWarning[];
   readonly reservedByAccount: readonly SpendableReservedAccount[];
   readonly plannedByGoal: readonly SpendablePlannedGoal[];
   readonly meta: {

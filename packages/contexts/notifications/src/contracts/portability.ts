@@ -23,6 +23,9 @@ export const NOTIFICATIONS_PORTABILITY_SECTIONS: readonly PortabilitySection[] =
     orderBy: ['user_id'],
     idColumns: [],
     importerColumn: 'user_id',
+    // add-cash-flow-forecast (FR-NOTIFY-007): un archivo exportado antes del cambio no trae la frecuencia del digest y
+    // se importa con el digest desactivado.
+    legacyDefaults: { digest_frequency: 'OFF' },
   },
 ];
 

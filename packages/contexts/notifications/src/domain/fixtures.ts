@@ -313,3 +313,24 @@ export const usdtBobGroupPayload = (overrides: Record<string, unknown> = {}): Re
       ...overrides,
     },
   );
+
+export const SHORTFALL_EPISODE_ID = '01928c4e-0000-7000-8000-0000000e0101';
+export const SHORTFALL_EPISODE_2_ID = '01928c4e-0000-7000-8000-0000000e0102';
+
+/**
+ * Episodio de riesgo de déficit en BOB (add-cash-flow-forecast, TC-NOTIFICATIONS-SHORTFALL-001): saldo más bajo
+ * -679.00 BOB el 2026-11-01 (primera fecha bajo el umbral 2026-11-01) con umbral 1500.00 BOB, calendario de 30 días.
+ */
+export const shortfallPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  episodeId: SHORTFALL_EPISODE_ID,
+  currency: 'BOB',
+  horizonDays: 30,
+  firstShortfallDate: '2026-11-01',
+  lowest: { amount: '-679.00', currency: 'BOB' },
+  lowestDate: '2026-11-01',
+  threshold: { amount: '1500.00', currency: 'BOB' },
+  belowZero: true,
+  detectedAt: '2026-10-20T12:25:00.000Z',
+  timeZone: 'America/La_Paz',
+  ...overrides,
+});

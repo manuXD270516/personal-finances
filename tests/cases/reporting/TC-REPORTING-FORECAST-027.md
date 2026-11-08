@@ -5,16 +5,21 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Ajustes del disponible del workspace"
 scenario: "El OWNER activa el próximo ingreso y los esenciales"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024","FR-AUDIT-001","FR-IDENTITY-010"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/cash-flow-calendar.api.test.ts
+  - apps/api/test/api/spendable-settings-portability.api.test.ts
+  - apps/web/src/ui/cash-flow/forecast-home.test.tsx
+  - packages/contexts/reporting/src/application/spendable-settings.use-cases.test.ts
+  - packages/contexts/reporting/test/integration/pg-cash-flow.int.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["spendable","settings","audit"]
@@ -32,7 +37,7 @@ expected_result:
   - "Segundo PUT: 412 PRECONDITION_FAILED sin cambios"
   - "Ajustes importados con las categorías remapeadas"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-027 — El OWNER guarda los ajustes con versión y auditoría, viajan en el export y una versión vencida se rechaza

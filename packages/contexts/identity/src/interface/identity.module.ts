@@ -279,6 +279,40 @@ export function identityWorkspaceSettingsQuery(pool: Pool): WorkspaceSettingsQue
 }
 
 /**
+ * Reserva mínima de liquidez para el worker (openspec add-cash-flow-forecast: umbral del riesgo de déficit del job
+ * `reporting.cash-flow-watch` y del digest). Igual que `identityWorkspaceSettingsDirectory`: conexión PROPIA con el rol de
+ * directorio (`SET LOCAL ROLE pf_workspace_directory`, columnas `min_liquidity_reserve_*`); el monto vuelve tal como lo
+ * guarda la base (`NUMERIC(38,18)`, `Money.parse` tolera los ceros finales).
+ */
+export function identityWorkspaceReserveDirectory(pool: Pool): WorkspaceSettingsQuery {
+  return {
+    async getMinimumLiquidityReserve({ workspaceId }) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN READ ONLY');
+        await client.query('SET LOCAL ROLE pf_workspace_directory');
+        const { rows } = await client.query<{ amount: string | null; currency: string | null }>(
+          `SELECT min_liquidity_reserve_amount::text AS amount, min_liquidity_reserve_currency AS currency
+             FROM iam.workspace WHERE id = $1`,
+          [workspaceId],
+        );
+        await client.query('COMMIT');
+        const row = rows[0];
+        if (!row) throw new DomainError('RESOURCE_NOT_FOUND', `workspace ${workspaceId} not found`);
+        return row.amount !== null && row.currency !== null
+          ? { amount: row.amount, currency: row.currency }
+          : null;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
+
+/**
  * Moneda base y zona horaria del workspace para el worker (openspec add-budget-templates: el job de creación de periodos
  * crea el plan del template predeterminado en la moneda base). Igual que `identityWorkspaceCalendarDirectory`: lee en
  * una conexión PROPIA con el rol de directorio (`SET LOCAL ROLE pf_workspace_directory`, columnas `base_currency` y

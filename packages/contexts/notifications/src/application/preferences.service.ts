@@ -7,6 +7,8 @@ export interface PreferencesView {
   readonly types: readonly { readonly type: string; readonly inApp: boolean; readonly email: boolean }[];
   readonly quietHours: { readonly start: string; readonly end: string } | null;
   readonly includeDetailsInEmail: boolean;
+  /** Frecuencia del digest del Home por email (`OFF | WEEKLY | MONTHLY`). */
+  readonly digestFrequency: string;
   /** ETag de las preferencias (`If-Match` del `PUT`). */
   readonly version: number;
 }

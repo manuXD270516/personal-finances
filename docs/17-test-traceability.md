@@ -278,3 +278,13 @@ Todo change declara su impacto en tests (ver [16-testing-strategy.md §11](./16-
 3. **Prioridad Must en specs:** ¿el formato de la línea `Trace: … · Priority: …` bajo cada Requirement lo fija [03-openspec-strategy.md](./03-openspec-strategy.md)? Sin él, R2 depende de docs/01.
 4. **Capabilities anidadas** (`openspec/specs/<context>/<capability>/spec.md`): confirmar en SPIKE-01 que `openspec validate --strict` las soporta; si no, el generador debe mapear `ledger/journal-posting` ↔ `ledger-journal-posting`.
 5. ¿Se publica la matriz como artefacto de CI únicamente o también como página (GitHub Pages) por release?
+
+## `add-cash-flow-forecast` (Phase 7)
+
+| Requisito | TC | Nivel |
+|---|---|---|
+| Calendario 7/30/60/90, hoy local, saldo esperado, vencidos, transferencias, certeza, orden dentro del día, riesgo, plan, peor caso, consolidado, cobertura, sugerencia | TC-REPORTING-FORECAST-001..016 | domain / application / api |
+| Tarjeta Q8, detección periódica (episodios), frescura y acceso, rendimiento | TC-REPORTING-FORECAST-017..021 | api / integration / platform |
+| Q5 hasta el próximo ingreso, esenciales, ajustes del disponible, Q7 y checklist SM-05 | TC-REPORTING-FORECAST-022..030 | domain / application / api / e2e |
+| Notificación de riesgo de déficit y sus emails | TC-NOTIFICATIONS-SHORTFALL-001..004 | application / integration |
+| Frecuencia, composición, privacidad, silencio y recuperación del digest | TC-NOTIFICATIONS-DIGEST-001..008 | api / integration / unit |

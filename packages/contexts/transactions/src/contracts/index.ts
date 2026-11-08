@@ -394,6 +394,13 @@ export interface PendingFlowRowDto {
   readonly description: string | null;
   readonly source: string;
   readonly externalRef: { readonly namespace: string; readonly id: string } | null;
+  /**
+   * Monto de la pata destino de una CONVERSIÓN pendiente (add-cash-flow-forecast, S3; aditivo); `null` o ausente en el
+   * resto. La fila de una conversión lleva en `amount` el monto de origen y en `toAmount` el de destino.
+   */
+  readonly toAmount?: { readonly amount: string; readonly currency: string } | null;
+  /** Categoría de su único split; `null` con varios splits (add-cash-flow-forecast, S2; aditivo). */
+  readonly categoryId?: string | null;
 }
 
 /** Solo transacciones `PENDING` (sin asiento); sin efectos; en la unidad de trabajo del llamador si existe. */
@@ -403,6 +410,11 @@ export interface PendingFlowQuery {
     readonly accountIds?: readonly string[];
     readonly dateFrom?: string;
     readonly dateTo?: string;
+    /**
+     * Incluye también las conversiones pendientes (`kind = 'CONVERSION'`, con `toAmount`); por omisión no (los totales
+     * de Q4/Q5/Q8 no cambian). Lo usa el calendario de flujo de caja.
+     */
+    readonly includeConversions?: boolean;
   }): Promise<readonly PendingFlowRowDto[]>;
 }
 

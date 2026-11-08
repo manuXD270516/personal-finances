@@ -5,6 +5,8 @@ import {
   createNotificationsWorkerRuntime,
   notificationEventConsumers,
   type EmailSender,
+  type NotificationIntakeFact,
+  type NotificationsWorkerRuntime,
 } from '@pf/notifications/interface/notifications.module';
 import { ApiContract } from '@pf/platform/api';
 import {
@@ -51,6 +53,7 @@ let baseUrl: string;
 let workerPool: Pool;
 let consumers: EventConsumerRuntime;
 let definitions: readonly EventConsumerDefinition[];
+let notifyRuntime: NotificationsWorkerRuntime;
 const apiLog = capturingLogger('finance-api', 'api');
 const workerLog = capturingLogger('finance-worker', 'worker', 'warn');
 
@@ -297,6 +300,7 @@ beforeAll(async () => {
     maxAttempts: 5,
     retentionMonths: 12,
   });
+  notifyRuntime = notifications;
   definitions = notificationEventConsumers(notifications);
   consumers = new EventConsumerRuntime({
     pool: workerPool,
@@ -334,9 +338,12 @@ describe('Preferencias de notificaciones', () => {
           { type: 'FX_RATE_FEED_STALE', inApp: true, email: true },
           { type: 'FX_RATE_FEED_RECOVERED', inApp: true, email: true },
           { type: 'FX_RATE_ANOMALY_RETAINED', inApp: true, email: true },
+          { type: 'CASH_FLOW_SHORTFALL_RISK', inApp: true, email: true },
+          { type: 'HOME_DIGEST', inApp: true, email: true },
         ],
         quietHours: null,
         includeDetailsInEmail: false,
+        digestFrequency: 'OFF',
         version: 1,
       });
       expect(r.headers.get('etag')).toBe('"1"');
@@ -473,6 +480,50 @@ describe('Preferencias de notificaciones', () => {
       3,
     );
     problem(unknown, 400, 'VALIDATION_FAILED');
+  });
+});
+
+describe('Riesgo de déficit y digest en la API (add-cash-flow-forecast)', () => {
+  const shortfallFact = (ws: string, episodeId: string, belowZero: boolean): NotificationIntakeFact =>
+    ({
+      workspaceId: ws,
+      type: 'CASH_FLOW_SHORTFALL_RISK',
+      factKey: episodeId,
+      sourceEventId: uuidv7(),
+      occurredAt: clock.now().toString(),
+      payload: {
+        episodeId,
+        currency: 'BOB',
+        horizonDays: 30,
+        firstShortfallDate: '2026-11-01',
+        lowest: { amount: belowZero ? '-679.00' : '621.00', currency: 'BOB' },
+        lowestDate: '2026-11-01',
+        threshold: { amount: '1500.00', currency: 'BOB' },
+        belowZero,
+        detectedAt: clock.now().toString(),
+        timeZone: 'America/La_Paz',
+      },
+    }) as unknown as NotificationIntakeFact;
+
+  it('[TC-NOTIFICATIONS-SHORTFALL-001] la API lista el riesgo de déficit crítico con el enlace al calendario a OWNER y EDITOR y no al VIEWER, conforme al contrato', async () => {
+    const s = await scenario('shortfall');
+    const episodeId = randomUUID();
+    await notifyRuntime.intake.notify(shortfallFact(s.owner.ws, episodeId, true));
+    for (const u of [s.owner, s.editor]) {
+      const page = await list(u);
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]).toMatchObject({
+        type: 'CASH_FLOW_SHORTFALL_RISK',
+        severity: 'CRITICAL',
+        status: 'UNREAD',
+        title: 'Riesgo de déficit en BOB desde el 01/11/2026',
+        link: { kind: 'CASH_FLOW_CALENDAR', currency: 'BOB', horizonDays: 30, periodId: episodeId },
+      });
+    }
+    expect((await list(s.viewer)).data).toHaveLength(0);
+    await notifyRuntime.intake.notify(shortfallFact(s.owner.ws, randomUUID(), false));
+    const warnings = (await list(s.owner)).data.filter((n) => n['severity'] === 'WARNING');
+    expect(warnings).toHaveLength(1);
   });
 });
 

@@ -8,7 +8,7 @@ import {
   feedStalePayload,
   FX_RATE_ID,
 } from './fixtures.js';
-import { intakeDefinitionOf, NOTIFICATION_INTAKE_CATALOG } from './fx-rate-notifications.js';
+import { intakeDefinitionOf, NOTIFICATION_INTAKE_CATALOG } from './intake-catalog.js';
 import { renderEmail, renderInApp } from './render.js';
 import { NOTIFICATION_TYPES } from './types.js';
 
@@ -35,7 +35,8 @@ describe('Catálogo de alertas de tasas (sin consumidor de eventos)', () => {
       expect(NOTIFICATION_TYPES).toContain(type);
       expect(intakeDefinitionOf(type).recipients).toEqual(['OWNER', 'EDITOR']);
     }
-    expect(NOTIFICATION_INTAKE_CATALOG.map((d) => d.type)).toHaveLength(3);
+    // 3 de FX + el riesgo de déficit de REPORTING (add-cash-flow-forecast).
+    expect(NOTIFICATION_INTAKE_CATALOG.map((d) => d.type)).toHaveLength(4);
     // Ningún tipo de entrega directa tiene consumidor ni evento: NOTIFY no suscribe colas nuevas (D249).
     for (const d of NOTIFICATION_INTAKE_CATALOG) {
       expect(d).not.toHaveProperty('consumer');

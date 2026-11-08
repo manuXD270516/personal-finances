@@ -297,6 +297,16 @@ Burn-rate alerts (multi-window 1 h/6 h) cuando haya volumen suficiente (Phase 7+
 5. ¿El worker expone un puerto HTTP de admin para health/metrics o se usa solo el comando `healthcheck` del contenedor?
 
 
+## Jobs de NOTIFY del pronóstico de flujo de caja (`add-cash-flow-forecast`, Phase 7)
+
+- **`notifications.digest`** (cola de la `JobQueue`, concurrencia 1, cron `NOTIFICATIONS_DIGEST_CRON`; sin consumidor de eventos ni conexiones nuevas): crea el digest del Home de la ventana vigente (semana ISO o periodo financiero) por destinatario. Reutiliza `notifications.created{type=HOME_DIGEST}` (una por digest nuevo), la métrica de entregas por email (`notifications.email_deliveries{status}`) y las métricas genéricas de jobs (`pf.queue.job.duration`, `pf.queue.job.failures.total`, `pf.scheduler.last_run{job=notifications.digest}`). Sin etiqueta de workspace, usuario ni contenido (NFR-SEC-015). Un workspace con error se registra con `warn` (sin montos) y la pasada siguiente lo reintenta.
+- **Riesgo de déficit** (`NotificationIntakePort`, tipo `CASH_FLOW_SHORTFALL_RISK`): `notifications.created{type=CASH_FLOW_SHORTFALL_RISK}` y `notifications.event_lag`; las métricas del job `reporting.cash-flow-watch` y del calendario las documenta el change en REPORTING.
+
 ## Métricas de DOCUMENTS (add-document-attachments, Phase 6)
 
 Sin etiqueta de workspace ni de nombre de archivo (NFR-SEC-015): `documents_uploads_total{result,reason,format}`, `documents_verification_duration_seconds{format}`, `documents_verify_inflight`, `documents_downloads_total`, `documents_storage_used_bytes` (agregado global), `documents_quarantine_objects`, `documents_orphan_links_total` y `documents_storage_usage_drift_bytes`. Los logs llevan solo `documentId`, `workspaceId`, códigos y tamaños; un test canario con un nombre con datos personales verifica que ninguno llega a logs, métricas ni trazas (TC-SECURITY-UPLOAD-014). El mantenimiento (`documents.maintenance`) registra solo conteos por paso.
+
+## Pronóstico de flujo de caja de REPORTING (`add-cash-flow-forecast`, Phase 7)
+
+- **`reporting_cash_flow_calendar_duration_seconds`** (histograma, segundos; sin etiquetas de alta cardinalidad): duración de `GET W/reports/cash-flow-calendar`. Se agrega a las métricas de la alerta `UpcomingPaymentsReadModelRecommended` (p95 > 300 ms durante 15 minutos o > 5 000 filas por consulta), **sin alerta nueva**; si el p95 del calendario de 90 días supera los 500 ms del NFR-PERF-010 la respuesta es la de esa alerta (read model por eventos, docs/35 D117).
+- **`reporting.cash-flow-watch`** (cola de la `JobQueue`, concurrencia 1, cron `REPORTING_CASH_FLOW_WATCH_CRON`, por omisión `25 * * * *`; corre también al arrancar el worker): evalúa los workspaces de a uno; registra `cash flow shortfall episodes changed` (abiertos y cerrados) y un `warn` con la cantidad de workspaces fallidos (se reintentan en la corrida siguiente). Sin consumidores de eventos ni conexiones nuevas: usa una conexión del pool del worker (más la transitoria del directorio) dentro de las 4 reservadas para jobs periódicos (28 + 4 = 32 de 34, TC-PLATFORM-THROUGHPUT-009).

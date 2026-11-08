@@ -43,6 +43,7 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
       paths[8]!,
       paths[4]!,
       paths[10]!,
+      paths[11]!,
     ];
     expect(orderPerfSuites(shuffled, (p) => p)).toEqual(paths);
     expect(orderPerfSuites([...paths].reverse(), (p) => p)).toEqual(paths);

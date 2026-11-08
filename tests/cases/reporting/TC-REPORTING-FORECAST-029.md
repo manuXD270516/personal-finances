@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Variación por categoría frente al periodo anterior"
 scenario: "Supermercado y Fees contra agosto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-018","FR-REPORTING-004"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/cash-flow/forecast-home.test.tsx
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/category-variation.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["q7","comparison"]
@@ -30,7 +33,7 @@ expected_result:
   - "Supermercado +105.00 BOB, +8.75 %, desfavorable"
   - "Fees +5.00 BOB, \"nuevo\""
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-029 — Cada categoría de los tops informa su variación en valor y porcentaje, nuevo si antes era cero

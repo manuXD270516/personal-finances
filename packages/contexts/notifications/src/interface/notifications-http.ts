@@ -174,6 +174,10 @@ export class NotificationsController {
             ? { start: String((quiet as Json)['start']), end: String((quiet as Json)['end']) }
             : null,
         includeDetailsInEmail: body['includeDetailsInEmail'] === true,
+        // Opcional (add-cash-flow-forecast): ausente = sin cambio; un valor no soportado => 400 `VALIDATION_FAILED`.
+        ...(body['digestFrequency'] !== undefined
+          ? { digestFrequency: String(body['digestFrequency']) }
+          : {}),
       },
     });
   }

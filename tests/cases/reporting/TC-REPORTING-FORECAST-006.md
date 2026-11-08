@@ -5,16 +5,17 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Movimientos esperados del calendario y su certeza"
 scenario: "Aporte a una meta hacia una cuenta no líquida y cuota de préstamo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014","FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","goals","loans"]
@@ -33,7 +34,7 @@ expected_result:
   - "Saldo final 5620.50 BOB"
   - "Aporte con origen meta; cuota con certeza conocida"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-006 — El aporte programado de una meta hacia una cuenta no líquida y la cuota del préstamo restan con su origen y certeza

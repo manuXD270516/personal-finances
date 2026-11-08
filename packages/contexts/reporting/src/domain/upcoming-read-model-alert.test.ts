@@ -44,6 +44,8 @@ describe('UpcomingPaymentsReadModelRecommended cubre Q5 (add-spendable-amount)',
     expect(UPCOMING_READ_MODEL_ALERT.durationMetrics).toEqual([
       'reporting_upcoming_payments_duration_seconds',
       'reporting_spendable_duration_seconds',
+      // add-cash-flow-forecast: el calendario de flujo de caja comparte la regla, sin alerta nueva.
+      'reporting_cash_flow_calendar_duration_seconds',
     ]);
     expect(SPENDABLE_DURATION_METRIC).toBe('reporting_spendable_duration_seconds');
   });

@@ -2,7 +2,7 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import type { AuditPort } from '@pf/audit/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { WorkspaceRecipientsQuery } from '@pf/identity/contracts';
-import type { NotificationIntakePort } from '../contracts/index.js';
+import type { HomeDigestSourcePort, NotificationIntakePort } from '../contracts/index.js';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -26,7 +26,8 @@ import {
 } from '../application/ports/index.js';
 import { PreferencesService } from '../application/preferences.service.js';
 import { PurgeExpiredNotifications } from '../application/purge-expired.js';
-import { NOTIFICATION_TYPE_CATALOG } from '../domain/index.js';
+import { SendHomeDigests } from '../application/send-home-digests.js';
+import { NOTIFICATION_TYPE_CATALOG, type DigestCalendar } from '../domain/index.js';
 import { NoneEmailSender } from '../infrastructure/none-email-sender.js';
 import { OtelNotificationMetrics } from '../infrastructure/otel-metrics.js';
 import {
@@ -47,6 +48,8 @@ import {
 
 export { NOTIFICATIONS_AUDIT_POLICY } from '../contracts/index.js';
 export {
+  DIGEST_FREQUENCIES,
+  DIGEST_QUEUE,
   EMAIL_DISPATCH_QUEUE,
   EMAIL_SWEEP_QUEUE,
   PURGE_QUEUE,
@@ -54,7 +57,16 @@ export {
   type EmailDispatchJob,
   type NotificationsMaintenanceJob,
 } from '../contracts/index.js';
-export { DispatchEmailDelivery, PurgeExpiredNotifications };
+export type {
+  CashFlowShortfallRiskFact,
+  DigestFrequency,
+  HomeDigestQuestionSnapshot,
+  HomeDigestSnapshot,
+  HomeDigestSourcePort,
+  NotificationIntakeFact,
+  NotificationIntakePort,
+} from '../contracts/index.js';
+export { DispatchEmailDelivery, PurgeExpiredNotifications, SendHomeDigests };
 export type { EmailMessage, EmailSender } from '../application/ports/index.js';
 export { PermanentEmailError, RetryableEmailError } from '../application/ports/index.js';
 
@@ -168,6 +180,14 @@ export interface NotificationsWorkerRuntimeOptions {
   /** Tests: backoff y lease acotados. */
   readonly backoffMs?: readonly number[];
   readonly leaseMs?: number;
+  /**
+   * Digest del Home por email (add-cash-flow-forecast): el contenido (REPORTING, `HomeDigestQuery`; puerto estructural) y
+   * el calendario del workspace (IDENTITY, rol de directorio). Sin él no hay `digest` y el job no se registra.
+   */
+  readonly homeDigest?: {
+    readonly source: HomeDigestSourcePort;
+    readonly calendar: { calendarOf(workspaceId: string): Promise<DigestCalendar> };
+  };
 }
 
 export interface NotificationsWorkerRuntime {
@@ -179,6 +199,8 @@ export interface NotificationsWorkerRuntime {
   readonly intake: NotificationIntakePort;
   readonly dispatch: DispatchEmailDelivery;
   readonly purge: PurgeExpiredNotifications;
+  /** Digest periódico del Home (job `notifications.digest`); ausente si no se configuró `homeDigest`. */
+  readonly digest?: SendHomeDigests;
 }
 
 /** Composición de NOTIFY para el worker: consumidores de eventos, despacho del email y purga. */
@@ -233,6 +255,15 @@ export function createNotificationsWorkerRuntime(
       clock: options.clock,
       retentionMonths: options.retentionMonths,
     }),
+    ...(options.homeDigest
+      ? {
+          digest: new SendHomeDigests({
+            ...notifyDeps,
+            calendar: options.homeDigest.calendar,
+            source: options.homeDigest.source,
+          }),
+        }
+      : {}),
   };
 }
 

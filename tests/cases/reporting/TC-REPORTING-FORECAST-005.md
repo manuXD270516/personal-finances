@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Movimientos esperados del calendario y su certeza"
 scenario: "Transferencia entre cuentas líquidas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-014","FR-COMMITMENTS-011"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.properties.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","transfers","cards"]
@@ -32,7 +34,7 @@ expected_result:
   - "Saldos diarios en BOB iguales a los de TC-REPORTING-FORECAST-003"
   - "Saldo final 8200.50 BOB"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-005 — Una transferencia entre cuentas líquidas no cambia el saldo de la moneda y una compra con tarjeta no resta hasta el pago

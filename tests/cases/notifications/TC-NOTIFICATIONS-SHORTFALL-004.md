@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Idioma de las notificaciones de déficit y del digest"
 scenario: "Riesgo de déficit en inglés"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-002"]
 nfr: ["NFR-USAB-001","NFR-USAB-002"]
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/domain/cash-flow-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["notifications","shortfall","i18n"]
@@ -27,7 +28,7 @@ steps:
 expected_result:
   - "Textos en inglés con la fecha 11/01/2026"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-NOTIFICATIONS-SHORTFALL-004 — El riesgo de déficit se presenta en el idioma y el formato de fecha del locale del destinatario

@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Frescura, lectura inmediata y acceso al calendario"
 scenario: "Ocurrencia omitida y consulta inmediata"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-007","FR-REPORTING-014","FR-IDENTITY-006"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/cash-flow-calendar.api.test.ts
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/reporting/src/application/cash-flow-calendar.queries.test.ts
+  - tests/e2e/specs/cash-flow-forecast.spec.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","freshness","rls"]
@@ -32,7 +36,7 @@ expected_result:
   - "Saldo del 2026-10-28 4001.00 BOB y final 8380.50 BOB; horizonte, moneda, generatedAt y frescura"
   - "VIEWER: mismo calendario, sin \"Hosting\""
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-020 — El calendario refleja de inmediato una ocurrencia omitida, declara su frescura y es igual para el VIEWER y aislado por workspace

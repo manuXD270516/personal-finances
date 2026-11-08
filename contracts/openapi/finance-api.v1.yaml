@@ -4404,6 +4404,145 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/reports/spendable/settings:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getSpendableSettings
+      summary: Spendable amount settings of the workspace (horizon mode and essential categories)
+      description: |
+        The horizon mode of the spendable amount (Home Q5: `FINANCIAL_PERIOD`, the default, or `NEXT_INCOME`, until the
+        due date of the next expected income), whether the budgeted essentials are subtracted and the list of essential
+        categories (up to 50 expense categories). Without a saved row the defaults apply, in version 1. Any member can
+        read them; the version is the `ETag`.
+      x-openspec-capability: [reporting/dashboard]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Settings
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpendableSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [Reporting]
+      operationId: updateSpendableSettings
+      summary: Replace the spendable amount settings (OWNER)
+      description: |
+        Only the OWNER (EDITOR and VIEWER get 403 `INSUFFICIENT_ROLE`) with optimistic concurrency (`If-Match` with the
+        version; a stale version is 412 `PRECONDITION_FAILED`). An income category is rejected with 422
+        `CATEGORY_KIND_MISMATCH` and an archived one with 409 `CATEGORY_ARCHIVED`; more than 50 categories, repeated or
+        unknown ones are 400 `VALIDATION_FAILED`. Saving the same content is idempotent (no new version, no audit).
+        Every change is audited with the previous and the new values (`essentialCategoryIds` as JSON text) in the same
+        unit of work, and the settings travel in the workspace export and import.
+      x-openspec-capability: [reporting/dashboard]
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SpendableSettingsInput' }
+      responses:
+        '200':
+          description: Saved settings
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpendableSettings' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CATEGORY_ARCHIVED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CATEGORY_KIND_MISMATCH (an income category).'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/cash-flow-calendar:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getCashFlowCalendar
+      summary: Cash-flow calendar of the liquid accounts with the lowest expected balance and the shortfall risk
+      description: |
+        The expected balance of the liquid accounts (`ASSET` + `LIQUID`, not archived) day by day from today to today plus
+        `horizon` (7, 30, 60 or 90 days, default 30, both ends included; today in the workspace time zone), from the
+        source of truth without read models (read-your-writes). The starting balance of each currency is the sum of the
+        booked balances; the pending transactions and the unresolved occurrences of every kind (income, expense,
+        transfer, card payment and loan installment, also those managed by a goal or a debt) are applied on their date;
+        the ones dated before today are applied today, marked `overdue` with `daysOverdue`. Within a day the expenses are
+        applied BEFORE the income (conservative): `low` is the balance of the previous day plus the expenses of the day
+        and `lowest` is the minimum of those values with the first date it is reached. Range amounts use the maximum in
+        expenses and the minimum in income; `VARIABLE` amounts are listed without amount, never applied and counted in
+        `withoutAmountCount`. A transfer between two liquid accounts is an expense in the source and an income in the
+        destination (neutral for the currency); one to a non-liquid account subtracts from the source; movements on
+        non-liquid accounts (a purchase charged to a card) do not affect the balance. Risk per currency against a threshold
+        equal to the minimum liquidity reserve when it is in that currency, or 0 otherwise: `HIGH` when `lowest` is below
+        the threshold, `POSSIBLE` when only the remaining planned spending of the plan takes it below, `LOW` when it is
+        below the threshold plus 10 % of the total expenses of the horizon and `NONE` otherwise; with `HIGH` or `POSSIBLE`
+        the first date under the threshold and the shortfall are reported. `planned` is the second series that also
+        subtracts the remaining planned spending of the plans of the horizon (category and group lines, minus what was
+        spent and the commitments of the same categories, split in equal exact parts per day) and `withoutExpectedIncome`
+        the worst case without expected income. `accounts` lists each account with its start, end and lowest balance; the
+        daily `series` of an account only comes when it is requested with `accountId`. `consolidated.lowest` converts the
+        lowest balance of each currency with the valuation rate in force (a currency without a rate is excluded and
+        `complete=false`, never 1:1) and is informative: it does not define the risk. `coverage` tells until which date
+        the recurrence engine generated occurrences (`complete=false` when the horizon goes further). HALF_EVEN only when
+        presenting.
+      x-openspec-capability: [reporting/cash-flow-calendar]
+      x-required-role: VIEWER
+      parameters:
+        - name: horizon
+          in: query
+          description: Horizon in days (7, 30, 60 or 90; any other value is `INVALID_FILTER`). Defaults to 30.
+          schema: { type: integer, default: 30 }
+        - name: accountId
+          in: query
+          description: Liquid account whose daily series is wanted; a non-liquid, archived or unknown account is `INVALID_FILTER`.
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: reportingCurrency
+          in: query
+          description: Defaults to the workspace base currency
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Cash-flow calendar
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashFlowCalendar' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED, INVALID_FILTER (horizon not in 7, 30, 60, 90; accountId not a liquid account).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/reports/conversion-costs:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -21325,9 +21464,19 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Money'
             - type: 'null'
+        essentials:
+          description: |
+            Budgeted essentials still to spend (add-cash-flow-forecast): for each expense line of the plan whose target is
+            an essential category, planned minus spent minus the commitments of that category already discounted in the
+            horizon, not negative; for each later period the horizon reaches, the planned amount times the days inside
+            the horizon over the days of the period. Null when the essentials are off (the term is not shown and the
+            spendable amount does not change).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
         spendable:
           $ref: '#/components/schemas/Money'
-          description: '`liquid − reservedForGoals − committed − plannedGoalContributions − minimumReserve`; may be negative'
+          description: '`liquid − reservedForGoals − committed − plannedGoalContributions − essentials − minimumReserve`; may be negative'
     SpendableBudgetView:
       type: object
       description: Second view "according to your budget" (available-to-spend of the period plan, FR-PLANNING-024).
@@ -21353,6 +21502,7 @@ components:
       description: Spendable amount block of `ReportSummary` (Home Q5) and base of `Spendable`, without the item detail.
       required:
         - period
+        - horizon
         - reportingCurrency
         - byCurrency
         - consolidated
@@ -21374,6 +21524,29 @@ components:
             label: { type: string, examples: ['2026-10'] }
             start: { $ref: '#/components/schemas/LocalDate' }
             end: { $ref: '#/components/schemas/LocalDate' }
+        horizon:
+          type: object
+          description: |
+            Horizon of the spendable amount (add-cash-flow-forecast): the financial period that contains today (default)
+            or, in `NEXT_INCOME` mode, from today to the due date (inclusive) of the first unresolved income occurrence
+            after today within 90 days (overdue income never sets it); with none, 30 days from today and `fallback=true`.
+          additionalProperties: false
+          required: [mode, from, to, nextIncome, fallback]
+          properties:
+            mode: { type: string, enum: [FINANCIAL_PERIOD, NEXT_INCOME] }
+            from: { $ref: '#/components/schemas/LocalDate' }
+            to: { $ref: '#/components/schemas/LocalDate' }
+            nextIncome:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [occurrenceId, name, date]
+                  properties:
+                    occurrenceId: { $ref: '#/components/schemas/Uuid' }
+                    name: { type: string }
+                    date: { $ref: '#/components/schemas/LocalDate' }
+                - type: 'null'
+            fallback: { type: boolean }
         reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
         byCurrency:
           type: array
@@ -21413,8 +21586,41 @@ components:
       allOf:
         - $ref: '#/components/schemas/SpendableSummary'
         - type: object
-          required: [committedItems, reservedByAccount, plannedByGoal, meta]
+          required: [committedItems, reservedByAccount, plannedByGoal, essentialItems, essentialWarnings, meta]
           properties:
+            essentialItems:
+              type: array
+              description: Lines that make up the essentials term (empty when the essentials are off).
+              items:
+                type: object
+                additionalProperties: false
+                required: [categoryId, name, periodLabel, reference, actual, committed, counted, prorated]
+                properties:
+                  categoryId: { $ref: '#/components/schemas/Uuid' }
+                  name: { type: string }
+                  periodLabel: { type: string, examples: ['2026-10'] }
+                  reference: { $ref: '#/components/schemas/Money' }
+                  actual: { $ref: '#/components/schemas/Money' }
+                  committed:
+                    $ref: '#/components/schemas/Money'
+                    description: Commitments of the same category already discounted (no double counting)
+                  counted:
+                    $ref: '#/components/schemas/Money'
+                    description: What this line subtracts from the spendable amount
+                  prorated:
+                    type: boolean
+                    description: A later period of the horizon, prorated by days
+            essentialWarnings:
+              type: array
+              description: Essential categories that do not subtract and why (no plan, no line in the plan or archived).
+              items:
+                type: object
+                additionalProperties: false
+                required: [categoryId, reason, periodLabel]
+                properties:
+                  categoryId: { $ref: '#/components/schemas/Uuid' }
+                  reason: { type: string, enum: [NO_PLAN, NO_LINE, ARCHIVED] }
+                  periodLabel: { type: [string, 'null'] }
             committedItems:
               type: array
               description: Items that subtract from the committed term (with an amount), by date and id
@@ -21517,6 +21723,11 @@ components:
                 oneOf:
                   - $ref: '#/components/schemas/Money'
                   - type: 'null'
+              variation:
+                description: Variation of the category against the comparison period (Home Q7); null when `previousAmount` is null.
+                oneOf:
+                  - $ref: '#/components/schemas/CategoryVariation'
+                  - type: 'null'
         topIncomeCategories:
           type: array
           description: |
@@ -21539,6 +21750,11 @@ components:
                 oneOf:
                   - $ref: '#/components/schemas/Money'
                   - type: 'null'
+              variation:
+                description: Variation of the category against the comparison period (Home Q7); null when `previousAmount` is null.
+                oneOf:
+                  - $ref: '#/components/schemas/CategoryVariation'
+                  - type: 'null'
         netWorth: { $ref: '#/components/schemas/NetWorthBreakdown' }
         goals:
           description: Savings goals block (Home Q9, add-savings-goals).
@@ -21552,6 +21768,13 @@ components:
             today; null when the workspace has no liquid accounts (Q5 is then `NO_DATA` with action `CREATE_ACCOUNT`).
           oneOf:
             - $ref: '#/components/schemas/SpendableSummary'
+            - type: 'null'
+        cashFlow:
+          description: |
+            Lowest expected balance and shortfall risk of the next 30 days (Home Q8, add-cash-flow-forecast), from the same
+            calculation as `getCashFlowCalendar` without the plan series; null when the workspace has no liquid accounts.
+          oneOf:
+            - $ref: '#/components/schemas/CashFlowHomeBlock'
             - type: 'null'
         questions:
           type: array
@@ -21575,6 +21798,407 @@ components:
             attributions:
               type: array
               description: 'Distinct attributions of the provider rates used (e.g. "Fuente: paralelo.bo", CC BY 4.0); clients must display them'
+              items: { $ref: '#/components/schemas/RateAttribution' }
+
+    CategoryVariation:
+      type: object
+      description: Variation of a category against the comparison period (Home Q7, add-cash-flow-forecast).
+      additionalProperties: false
+      required: [amount, percent, isNew, direction]
+      properties:
+        amount:
+          $ref: '#/components/schemas/Money'
+          description: Current minus previous amount, in the reporting currency
+        percent:
+          type: [string, 'null']
+          description: Percentage with two decimals (HALF_EVEN, `"8.75"`); null when the previous amount is zero
+          examples: ['8.75']
+        isNew: { type: boolean, description: Nothing in the previous period and something in the current one }
+        direction:
+          type: string
+          enum: [FAVORABLE, UNFAVORABLE, NONE]
+          description: In expenses an increase is unfavorable; in income it is favorable
+    SpendableSettings:
+      type: object
+      description: Settings of the spendable amount of the workspace (Home Q5).
+      additionalProperties: false
+      required: [horizonMode, subtractEssentials, essentialCategoryIds, version]
+      properties:
+        horizonMode:
+          type: string
+          enum: [FINANCIAL_PERIOD, NEXT_INCOME]
+          description: The financial period that contains today (default) or until the next expected income
+        subtractEssentials: { type: boolean }
+        essentialCategoryIds:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+        version:
+          type: integer
+          minimum: 1
+          description: Also the `ETag`; 1 while nothing was saved
+    SpendableSettingsInput:
+      type: object
+      additionalProperties: false
+      required: [horizonMode, subtractEssentials, essentialCategoryIds]
+      properties:
+        horizonMode:
+          type: string
+          enum: [FINANCIAL_PERIOD, NEXT_INCOME]
+        subtractEssentials: { type: boolean }
+        essentialCategoryIds:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          description: Active expense categories (an income one is `CATEGORY_KIND_MISMATCH`, an archived one `CATEGORY_ARCHIVED`)
+          items: { $ref: '#/components/schemas/Uuid' }
+    CashFlowHomeBlock:
+      type: object
+      description: Q8 card block of the Home (30 days).
+      additionalProperties: false
+      required: [horizonDays, worst, consolidatedLowest, complete]
+      properties:
+        horizonDays: { type: integer, enum: [30] }
+        worst:
+          description: Currency with the highest risk; null when no currency has risk.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [currency, risk, lowest, lowestDate, firstShortfallDate]
+              properties:
+                currency: { $ref: '#/components/schemas/CurrencyCode' }
+                risk: { type: string, enum: [NONE, LOW, POSSIBLE, HIGH] }
+                lowest: { $ref: '#/components/schemas/Money' }
+                lowestDate: { $ref: '#/components/schemas/LocalDate' }
+                firstShortfallDate:
+                  oneOf:
+                    - $ref: '#/components/schemas/LocalDate'
+                    - type: 'null'
+            - type: 'null'
+        consolidatedLowest:
+          description: Lowest consolidated balance with its date (informative); null when no currency could be converted.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [amount, date]
+              properties:
+                amount: { $ref: '#/components/schemas/Money' }
+                date: { $ref: '#/components/schemas/LocalDate' }
+            - type: 'null'
+        complete: { type: boolean }
+    CashFlowDayPoint:
+      type: object
+      additionalProperties: false
+      required: [date, balance, low]
+      properties:
+        date: { $ref: '#/components/schemas/LocalDate' }
+        balance:
+          $ref: '#/components/schemas/Money'
+          description: Expected balance at the close of the day
+        low:
+          $ref: '#/components/schemas/Money'
+          description: Lowest balance of the day (previous balance plus the expenses of the day, expenses before income)
+    CashFlowLowest:
+      type: object
+      additionalProperties: false
+      required: [amount, date]
+      properties:
+        amount: { $ref: '#/components/schemas/Money' }
+        date:
+          $ref: '#/components/schemas/LocalDate'
+          description: First date the lowest balance is reached
+    CashFlowCurrency:
+      type: object
+      description: Expected balance and shortfall risk of one currency of the liquid accounts.
+      additionalProperties: false
+      required:
+        - currency
+        - threshold
+        - startBalance
+        - endBalance
+        - lowest
+        - risk
+        - firstShortfallDate
+        - shortfallAmount
+        - belowZero
+        - outflowTotal
+        - inflowTotal
+        - withoutAmountCount
+        - series
+        - planned
+        - withoutExpectedIncome
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        threshold:
+          type: object
+          additionalProperties: false
+          required: [amount, source]
+          properties:
+            amount: { $ref: '#/components/schemas/Money' }
+            source:
+              type: string
+              enum: [MINIMUM_RESERVE, ZERO]
+              description: The minimum liquidity reserve when it is in this currency, otherwise zero
+        startBalance: { $ref: '#/components/schemas/Money' }
+        endBalance: { $ref: '#/components/schemas/Money' }
+        lowest: { $ref: '#/components/schemas/CashFlowLowest' }
+        risk:
+          type: string
+          description: Shortfall risk. Open set - clients must handle unknown values.
+          x-extensible-enum: [NONE, LOW, POSSIBLE, HIGH]
+        firstShortfallDate:
+          description: First date under the threshold (only with `HIGH` or `POSSIBLE`)
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        shortfallAmount:
+          description: Threshold minus the lowest balance of the series that sets the risk (only with `HIGH` or `POSSIBLE`)
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        belowZero: { type: boolean, description: The lowest balance is negative }
+        outflowTotal:
+          $ref: '#/components/schemas/Money'
+          description: Total expenses of the main series in the horizon (transfers between liquid accounts excluded)
+        inflowTotal: { $ref: '#/components/schemas/Money' }
+        withoutAmountCount:
+          type: integer
+          minimum: 0
+          description: '`VARIABLE` movements listed without amount (never 0)'
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/CashFlowDayPoint' }
+        planned:
+          description: Series that also subtracts the remaining planned spending of the plan; null without a plan.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [lowest, endBalance, series]
+              properties:
+                lowest: { $ref: '#/components/schemas/CashFlowLowest' }
+                endBalance: { $ref: '#/components/schemas/Money' }
+                series:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [date, balance]
+                    properties:
+                      date: { $ref: '#/components/schemas/LocalDate' }
+                      balance: { $ref: '#/components/schemas/Money' }
+            - type: 'null'
+        withoutExpectedIncome:
+          type: object
+          description: Worst case without expected income (no income occurrences nor pending income).
+          additionalProperties: false
+          required: [lowest, endBalance]
+          properties:
+            lowest: { $ref: '#/components/schemas/CashFlowLowest' }
+            endBalance: { $ref: '#/components/schemas/Money' }
+    CashFlowAccount:
+      type: object
+      additionalProperties: false
+      required: [accountId, name, currency, startBalance, endBalance, lowest, series]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        startBalance: { $ref: '#/components/schemas/Money' }
+        endBalance: { $ref: '#/components/schemas/Money' }
+        lowest: { $ref: '#/components/schemas/CashFlowLowest' }
+        series:
+          description: Daily series, only for the account requested with `accountId`; null for the others.
+          oneOf:
+            - type: array
+              items: { $ref: '#/components/schemas/CashFlowDayPoint' }
+            - type: 'null'
+    CashFlowEvent:
+      type: object
+      description: A movement applied to the expected balance (an unresolved occurrence or a pending transaction).
+      additionalProperties: false
+      required:
+        - id
+        - date
+        - originalDate
+        - source
+        - kind
+        - certainty
+        - amountType
+        - name
+        - accountId
+        - toAccountId
+        - amount
+        - toAmount
+        - overdue
+        - daysOverdue
+        - managedBy
+        - sourceRef
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        date:
+          $ref: '#/components/schemas/LocalDate'
+          description: Date it is applied to the balance (today for the overdue ones)
+        originalDate: { $ref: '#/components/schemas/LocalDate' }
+        source: { type: string, enum: [OCCURRENCE, PENDING] }
+        kind:
+          type: string
+          description: Open set - clients must handle unknown values.
+          x-extensible-enum: [INCOME, EXPENSE, TRANSFER, CONVERSION, LOAN_PAYMENT, CARD_PAYMENT]
+        certainty:
+          type: string
+          description: |
+            Known (pending transaction, fixed expense), estimated (estimated or range expense) or expected (income).
+            Open set - clients must handle unknown values.
+          x-extensible-enum: [KNOWN, ESTIMATED, EXPECTED]
+        amountType:
+          oneOf:
+            - type: string
+              enum: [FIXED, ESTIMATED, MIN_MAX, VARIABLE]
+            - type: 'null'
+        name: { type: [string, 'null'] }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        amount:
+          description: Amount applied (maximum in range expenses, minimum in range income); null if `VARIABLE`
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        toAmount:
+          description: Amount received in the destination account (conversions)
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        overdue: { type: boolean }
+        daysOverdue: { type: [integer, 'null'], minimum: 1 }
+        managedBy:
+          oneOf:
+            - type: string
+              enum: [USER, SUBSCRIPTION, DEBT, GOAL]
+            - type: 'null'
+        sourceRef:
+          type: object
+          additionalProperties: false
+          required: [context, id]
+          properties:
+            context: { type: string, enum: [COMMITMENTS, TRANSACTIONS] }
+            id: { $ref: '#/components/schemas/Uuid' }
+    CashFlowSuggestion:
+      type: object
+      description: Approximate conversion that would cover a shortfall; it never executes anything.
+      additionalProperties: false
+      required: [fromCurrency, toCurrency, approxAmount, rate, before]
+      properties:
+        fromCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        toCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        approxAmount:
+          $ref: '#/components/schemas/Money'
+          description: Approximate amount in `fromCurrency` (HALF_EVEN)
+        rate: { $ref: '#/components/schemas/ResolvedRate' }
+        before:
+          $ref: '#/components/schemas/LocalDate'
+          description: Convert before this date (the first date under the threshold)
+    CashFlowCalendar:
+      type: object
+      description: Cash-flow calendar of the liquid accounts (reporting/cash-flow-calendar).
+      additionalProperties: false
+      required:
+        - horizonDays
+        - today
+        - from
+        - to
+        - reportingCurrency
+        - coverage
+        - currencies
+        - accounts
+        - events
+        - plannedSpending
+        - suggestions
+        - consolidated
+        - meta
+      properties:
+        horizonDays: { type: integer, enum: [7, 30, 60, 90] }
+        today: { $ref: '#/components/schemas/LocalDate' }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        coverage:
+          type: object
+          additionalProperties: false
+          required: [through, complete]
+          properties:
+            through:
+              $ref: '#/components/schemas/LocalDate'
+              description: Last date covered by the generated occurrences within the horizon
+            complete:
+              type: boolean
+              description: False when the horizon goes beyond the date the recurrence engine generated occurrences
+        currencies:
+          type: array
+          items: { $ref: '#/components/schemas/CashFlowCurrency' }
+        accounts:
+          type: array
+          items: { $ref: '#/components/schemas/CashFlowAccount' }
+        events:
+          type: array
+          description: By applied date, expenses before income
+          items: { $ref: '#/components/schemas/CashFlowEvent' }
+        plannedSpending:
+          type: object
+          additionalProperties: false
+          required: [periods]
+          properties:
+            periods:
+              type: array
+              description: Financial periods of the horizon and whether they have a plan (a period without a plan assumes no spending)
+              items:
+                type: object
+                additionalProperties: false
+                required: [periodId, label, status]
+                properties:
+                  periodId:
+                    oneOf:
+                      - $ref: '#/components/schemas/Uuid'
+                      - type: 'null'
+                  label: { type: string, examples: ['2026-10'] }
+                  status: { type: string, enum: [PLAN, NO_PLAN] }
+        suggestions:
+          type: array
+          items: { $ref: '#/components/schemas/CashFlowSuggestion' }
+        consolidated:
+          type: object
+          description: Informative lowest consolidated balance in the reporting currency; it does not define the risk.
+          additionalProperties: false
+          required: [lowest, complete, unconverted]
+          properties:
+            lowest:
+              oneOf:
+                - $ref: '#/components/schemas/CashFlowLowest'
+                - type: 'null'
+            complete: { type: boolean }
+            unconverted:
+              type: array
+              description: Lowest balance of the currencies without a rate in force (never converted 1:1)
+              items: { $ref: '#/components/schemas/Money' }
+        meta:
+          type: object
+          additionalProperties: false
+          required: [generatedAt, rateWindowDays, ratesUsed, attributions]
+          properties:
+            generatedAt: { $ref: '#/components/schemas/Instant' }
+            dataFreshness:
+              $ref: '#/components/schemas/Instant'
+              description: Instant of the latest ledger data included
+            rateWindowDays: { type: integer, minimum: 0 }
+            ratesUsed:
+              type: array
+              items: { $ref: '#/components/schemas/ResolvedRate' }
+            attributions:
+              type: array
+              description: 'Distinct attributions of the provider rates used; clients must display them'
               items: { $ref: '#/components/schemas/RateAttribution' }
 
     # ── Platform ──
@@ -22524,7 +23148,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED, CASH_FLOW_SHORTFALL_RISK, HOME_DIGEST]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -22549,7 +23173,19 @@ components:
       properties:
         kind:
           type: string
-          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS, FX_FEED_STATUS, FX_RATE]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS, FX_FEED_STATUS, FX_RATE, CASH_FLOW_CALENDAR, HOME_DIGEST]
+        currency:
+          description: >-
+            Currency of the shortfall (only `CASH_FLOW_CALENDAR`, add-cash-flow-forecast): the app opens the cash flow
+            calendar (`/flujo-de-caja`) for that currency and `horizonDays`. In that kind `periodId` is the id of the risk
+            episode and `periodLabel` the month of the fact in the workspace time zone. `HOME_DIGEST` (the periodic email
+            digest, which is never listed in the notification center) opens the Home; there `periodId` is the workspace id.
+          type: string
+          pattern: '^[A-Z0-9]{2,16}$'
+        horizonDays:
+          description: Horizon of the cash flow calendar that raised the notice (only `CASH_FLOW_CALENDAR`).
+          type: integer
+          enum: [7, 30, 60, 90]
         fxRateId:
           description: >-
             Held exchange rate (only `FX_RATE`, add-rate-feed-alerts): the app opens the review of that rate (Rates →
@@ -22666,7 +23302,7 @@ components:
     NotificationPreferences:
       type: object
       additionalProperties: false
-      required: [types, quietHours, includeDetailsInEmail, version]
+      required: [types, quietHours, includeDetailsInEmail, digestFrequency, version]
       properties:
         types:
           type: array
@@ -22679,7 +23315,15 @@ components:
         includeDetailsInEmail:
           type: boolean
           description: Opt-in to amounts and names in the email body. The in-app content never changes with this option.
+        digestFrequency: { $ref: '#/components/schemas/NotificationDigestFrequency' }
         version: { type: integer, minimum: 1 }
+    NotificationDigestFrequency:
+      type: string
+      description: >-
+        Frequency of the Home digest email (add-cash-flow-forecast): `OFF` (default), `WEEKLY` (Mondays 08:00 in the
+        workspace time zone) or `MONTHLY` (first day of the financial period, 08:00). Without the details opt-in the
+        digest carries only counts, percentages, states and dates, never amounts.
+      enum: [OFF, WEEKLY, MONTHLY]
     NotificationPreferencesInput:
       type: object
       additionalProperties: false
@@ -22694,6 +23338,9 @@ components:
             - $ref: '#/components/schemas/QuietHours'
             - type: 'null'
         includeDetailsInEmail: { type: boolean }
+        digestFrequency:
+          description: Optional; absent keeps the current frequency. Any value other than OFF, WEEKLY or MONTHLY is rejected with 400 `VALIDATION_FAILED`.
+          $ref: '#/components/schemas/NotificationDigestFrequency'
 
     # ── Commitments: motor de recurrencia (Phase 3, add-recurrence-engine) ──
     RecurringKind:

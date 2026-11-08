@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Riesgo de déficit por moneda"
 scenario: "Sin riesgo y riesgo bajo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/cash-flow-calendar.test.ts
+  - packages/contexts/reporting/src/domain/cash-flow-risk.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["cash-flow","shortfall"]
@@ -33,7 +35,7 @@ expected_result:
   - "Reserva 3500.00: BOB LOW (3821.00 < 3929.95)"
   - "USD: umbral 0.00 USD, mínimo 94.01 USD el 2026-10-25, NONE"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-010 — Sin déficit el riesgo es NONE o LOW según el margen del 10 % de los egresos y otra moneda usa umbral cero

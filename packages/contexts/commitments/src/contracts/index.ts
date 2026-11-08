@@ -323,6 +323,11 @@ export interface CommittedForSpendableItemDto {
   readonly amount: MoneyDto | null;
   /** Ocurrencia no resuelta con vencimiento anterior al inicio del periodo. */
   readonly overdueFromPrevious: boolean;
+  /**
+   * Categoría del ítem (add-cash-flow-forecast, S2; aditivo): la de la definición en una ocurrencia; en una pendiente, la
+   * de su único split o `null` si tiene varios. Permite descontar los esenciales sin doble conteo.
+   */
+  readonly categoryId: string | null;
 }
 
 export interface CommittedForSpendableDto {
@@ -369,12 +374,46 @@ export interface UpcomingPaymentDto {
   readonly toAccountId: string | null;
 }
 
+/**
+ * Ocurrencia no resuelta de CUALQUIER tipo para el calendario de flujo de caja (add-cash-flow-forecast, S1; aditivo).
+ * A diferencia de `UpcomingPaymentDto` incluye ingresos y la liquidez de origen y destino; las materializadas como
+ * transacción pendiente no aparecen (las informa TRANSACTIONS, mismo criterio de no doble conteo).
+ */
+export interface CashFlowOccurrenceDto {
+  readonly occurrenceId: string;
+  readonly definitionId: string;
+  readonly definitionName: string;
+  readonly kind: RecurringKindDto;
+  readonly dueDate: string;
+  readonly status: 'SCHEDULED' | 'DUE' | 'OVERDUE';
+  readonly expected: ExpectedAmountDto;
+  readonly accountId: string;
+  readonly toAccountId: string | null;
+  /** La cuenta de origen es `ASSET` + `LIQUID` (D35). */
+  readonly sourceLiquid: boolean;
+  /** La cuenta de destino es líquida; `null` si no tiene destino. */
+  readonly targetLiquid: boolean | null;
+  readonly managedBy: ManagedByDto;
+  readonly categoryId: string | null;
+}
+
+export interface CashFlowOccurrencesDto {
+  readonly items: readonly CashFlowOccurrenceDto[];
+  /** Hasta qué fecha (inclusive) el motor de recurrencia generó ocurrencias: hoy + `COMMITMENTS_HORIZON_DAYS`. */
+  readonly generatedThrough: string;
+}
+
 export interface UpcomingPaymentsQuery {
   listUpcoming(input: {
     readonly workspaceId: string;
     /** Fecha límite inclusiva (`YYYY-MM-DD`). */
     readonly through: string;
   }): Promise<readonly UpcomingPaymentDto[]>;
+  /** Insumo del calendario de flujo de caja (add-cash-flow-forecast, S1): todos los tipos, vencimiento ≤ `through`. */
+  listForCashFlow(input: {
+    readonly workspaceId: string;
+    readonly through: string;
+  }): Promise<CashFlowOccurrencesDto>;
 }
 
 /** Egreso resuelto por una transacción no anulada (insumo de SM-07 de Reporting). */

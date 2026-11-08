@@ -162,7 +162,11 @@ export function NotificationDetailView({
                           ? f.t('detail.openFxFeedStatus')
                           : n.link.kind === 'FX_RATE'
                             ? f.t('detail.openFxRate')
-                            : f.t('detail.openBudgetLine', { period })}
+                            : n.link.kind === 'CASH_FLOW_CALENDAR'
+                              ? f.t('detail.openCashFlowCalendar')
+                              : n.link.kind === 'HOME_DIGEST'
+                                ? f.t('detail.openHome')
+                                : f.t('detail.openBudgetLine', { period })}
           </a>
         </p>
       ) : null}

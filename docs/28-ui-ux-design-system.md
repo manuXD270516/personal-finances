@@ -453,6 +453,12 @@ Sección «Reglas» de la navegación principal (`/reglas`), con tres pestañas 
 
 El editor (`/reglas/nueva`, `/reglas/{id}`) agrupa nombre, prioridad, disparadores, condiciones (grupos de un nivel), acciones y «detener», con vista previa en vivo contra un ejemplo (cada condición «cumplida/no cumplida» con su valor actual) y el historial de versiones. El detalle de la transacción muestra el origen por campo («Supermercado — por la regla Supermercado (v1)», «v1, archivada»), el aviso «pendiente de revisión» con quién lo marcó y la acción de quitar la marca; el listado filtra «Pendientes de revisión»; el formulario de alta ofrece «Aplicar mis reglas de clasificación» (activado por defecto) y «Crear regla desde esta transacción» abre el editor prellenado sin guardar nada. Todo el texto está en `Rules` (es, en y pt), con formato es-BO y sin información solo por color.
 
+## Notificaciones del pronóstico de flujo de caja (`add-cash-flow-forecast`, Phase 7)
+
+- **Preferencia del digest.** En Preferencias → Notificaciones, un selector con etiqueta **Frecuencia del resumen** (Desactivado por omisión, Semanal —lunes 08:00— y Mensual —primer día del periodo financiero, 08:00—) y una nota de que, sin la opción de detalles, el resumen no lleva montos. Se guarda con el resto de las preferencias (`If-Match`, auditoría) y no depende del color.
+- **Tipos nuevos en la tabla de canales.** "Riesgo de déficit en el flujo de caja" y "Resumen periódico del inicio (email)", con los mismos canales y el mismo horario de silencio.
+- **Riesgo de déficit.** La notificación (crítica si el saldo más bajo es negativo, advertencia si solo queda bajo la reserva) enlaza al calendario `/flujo-de-caja?horizonte=<días>&moneda=<código>`; el detalle ofrece "Ver el calendario de flujo de caja". El email sin opt-in dice solo la moneda y la primera fecha bajo el umbral y enlaza a la notificación en la app autenticada.
+- **Plantilla del digest.** Email con una sección por pregunta Q1–Q9 (título y viñetas): cantidades ("3 pagos en los próximos 7 días"), porcentajes ("Tasa de ahorro: 41,5 %"), estados ("Disponible para gastar: positivo") y fechas ("Riesgo de déficit alto en BOB desde el 15/11/2026"); una pregunta sin datos lo dice ("Aún no tienes metas.", sin 0 %); con opt-in suma los montos. Idioma y formato del locale del destinatario (es/en/pt, respaldo en español), enlace al Home y a las preferencias.
 ## Sugerencias de reglas (`add-rule-suggestions`, Phase 7)
 
 Cuarta pestaña de Reglas («Sugerencias», entre «Reglas» y «Ejecutar sobre el historial»). Se calcula al abrirla (a pedido, nunca en segundo plano) con la ventana de evidencia elegible (30, 90, 180 por omisión o 366 días) y la casilla «Ver también las descartadas».
@@ -471,3 +477,10 @@ Cuarta pestaña de Reglas («Sugerencias», entre «Reglas» y «Ejecutar sobre 
 - **Bloque "Cómo se convirtió".** Política, moneda de reporte, ventana de vigencia de tasas y cada tasa usada con tipo, fuente y fecha.
 - **Panel de drill-down.** Al tocar una cifra se abre un panel lateral (columna aparte en escritorio, bajo el reporte en móvil) con las filas paginadas, los totales de toda la celda, el enlace a la transacción (o al historial de saldo de la cuenta) y "Exportar CSV". En móvil el reporte es de una columna y las tablas se desplazan en una región enfocable con nombre.
 - **Home.** El gasto del mes enlaza al reporte de ingresos y gastos con la misma comparación a la fecha, el mismo rango y la misma moneda de reporte (Q7).
+
+## Flujo de caja y Home (`add-cash-flow-forecast`, Phase 7)
+
+- **Vista `/flujo-de-caja`.** Selector 7/30/60/90 días; por moneda, el gráfico de línea del saldo esperado con la reserva mínima como umbral, la serie con el gasto planificado y el peor caso sin ingresos; cada serie tiene una **tabla accesible equivalente**. Eventos por día con su certeza (conocido, estimado, esperado) y los vencidos marcados; cuentas con su saldo más bajo; cobertura incompleta, consolidado con tasas y atribuciones, y sugerencias de conversión (aproximadas, nunca ejecutan nada). Los montos usan el formato es-BO y las fechas la zona America/La_Paz.
+- **Tarjeta Q8.** Además de los pagos de 7 días, el saldo más bajo esperado con su fecha o el riesgo más alto, con enlace al calendario; sin cuentas líquidas no muestra saldo ni riesgo.
+- **Tarjeta Q5.** Muestra el horizonte usado, el término de esenciales cuando está activo y los avisos de categorías sin plan o sin línea. **Q7** muestra la variación por categoría (valor, % y sentido favorable o desfavorable).
+- **Ajustes del disponible.** El OWNER edita el modo de horizonte, los esenciales y sus categorías; los demás miembros los leen.

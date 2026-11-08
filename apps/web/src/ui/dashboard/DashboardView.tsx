@@ -33,6 +33,8 @@ export interface DashboardViewProps extends FormatContext {
   readonly spendableDetailHref?: string | undefined;
   readonly createBudgetHref?: string | undefined;
   readonly upcomingHref?: string | undefined;
+  /** Ajustes del disponible (horizonte y esenciales; add-cash-flow-forecast). */
+  readonly spendableSettingsHref?: string | undefined;
   /** Tarjeta "Deudas" (add-debt-summary), junto a la de metas en "Metas y deudas". */
   readonly debtWidget?: ReactNode;
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
@@ -64,6 +66,7 @@ export function DashboardView({
   spendableDetailHref,
   createBudgetHref,
   upcomingHref,
+  spendableSettingsHref,
   debtWidget,
   evolutionCard,
   commitmentsSection,
@@ -109,6 +112,7 @@ export function DashboardView({
             detailHref: spendableDetailHref,
             createBudgetHref,
             upcomingHref,
+            settingsHref: spendableSettingsHref,
             createAccountHref,
           }}
         />

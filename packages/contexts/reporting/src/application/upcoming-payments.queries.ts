@@ -81,6 +81,11 @@ export class UpcomingPaymentsQueries {
     );
   }
 
+  /** Próximos pagos dentro de la unidad de trabajo YA abierta por el llamador (digest del Home, add-cash-flow-forecast). */
+  getUpcomingPaymentsInCurrentUnit(query: GetUpcomingPaymentsQuery): Promise<UpcomingPaymentsResult> {
+    return this.computeUpcoming(query);
+  }
+
   getSurprisePayments(query: GetSurprisePaymentsQuery): Promise<SurprisePaymentsDto> {
     return this.deps.uow.run({ userId: query.userId, workspaceId: query.workspaceId }, () =>
       this.computeSurprise(query),

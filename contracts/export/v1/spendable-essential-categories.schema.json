@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/spendable-essential-categories.schema.json",
+  "title": "pfos-export v1 — spendable-essential-categories",
+  "description": "Registro de la sección «spendable-essential-categories» (tabla reporting.spendable_essential_category, contexto reporting). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "category_id"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "category_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "reporting.spendable_essential_category",
+  "x-pfos-context": "reporting"
+}

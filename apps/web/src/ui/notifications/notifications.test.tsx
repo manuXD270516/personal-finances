@@ -130,6 +130,19 @@ describe('Notificaciones: lógica pura', () => {
     ).toBeUndefined();
   });
 
+  it('[TC-NOTIFICATIONS-SHORTFALL-001] el enlace del riesgo de déficit abre el calendario de flujo de caja en su horizonte y moneda; el digest abre el Home', () => {
+    expect(
+      resourcePath({
+        kind: 'CASH_FLOW_CALENDAR',
+        currency: 'BOB',
+        horizonDays: 30,
+        periodId: PERIOD_ID,
+        periodLabel: '2026-10',
+      }),
+    ).toBe('/flujo-de-caja?horizonte=30&moneda=BOB');
+    expect(resourcePath({ kind: 'HOME_DIGEST', periodId: PERIOD_ID, periodLabel: '2026-11' })).toBe('/');
+  });
+
   it('[TC-COMMITMENTS-RECUR-043] el enlace RECURRING_OCCURRENCE abre el detalle de la ocurrencia', () => {
     const occurrenceId = '0198f0aa-0000-7000-8000-00000000c0de';
     expect(
@@ -223,7 +236,9 @@ describe('Notificaciones: lógica pura', () => {
       types: DEFAULT_PREFS.types,
       quietHours: null,
       includeDetailsInEmail: false,
+      digestFrequency: 'OFF',
     });
+    expect(draft.digestFrequency).toBe('OFF');
     expect(preferencesChanged(DEFAULT_PREFS, draft)).toBe(false);
   });
 
@@ -566,7 +581,7 @@ describe('Servicio de notificaciones (API)', () => {
     expect(command).toHaveBeenCalledWith(
       'PUT',
       `${base}/notification-preferences`,
-      { types: DEFAULT_PREFS.types, quietHours: null, includeDetailsInEmail: true },
+      { types: DEFAULT_PREFS.types, quietHours: null, includeDetailsInEmail: true, digestFrequency: 'OFF' },
       { ifMatch: '"1"', idempotent: false },
     );
     expect(result).toEqual({ prefs: saved, etag: '"2"' });
@@ -728,6 +743,19 @@ describe('Preferencias', () => {
     );
     expect(html).toContain('data-testid="notification-preferences"');
     expect(html).toContain('<caption');
+  });
+
+  it('[TC-NOTIFICATIONS-DIGEST-001] la frecuencia del digest es un selector con etiqueta que parte desactivado y ofrece semanal y mensual', () => {
+    const html = view();
+    const select = tagOf(html, 'pref-digest-frequency');
+    expect(select).toContain('<select');
+    expect(select).toContain('aria-describedby=');
+    expect(html).toMatch(/<label for="[^"]+-digest">Frecuencia del resumen<\/label>/);
+    expect(html).toMatch(/<option value="OFF" selected="">Desactivado<\/option>/);
+    expect(html).toContain('<option value="WEEKLY">Semanal (lunes a las 08:00)</option>');
+    expect(html).toContain('<option value="MONTHLY">');
+    const weekly = view({ draft: { ...draftFromPreferences(DEFAULT_PREFS), digestFrequency: 'WEEKLY' } });
+    expect(weekly).toMatch(/<option value="WEEKLY" selected="">/);
   });
 
   it('muestra la advertencia de privacidad de los emails con detalles', () => {

@@ -23,6 +23,10 @@ export const NOTIFICATION_TYPES = [
   'FX_RATE_FEED_STALE',
   'FX_RATE_FEED_RECOVERED',
   'FX_RATE_ANOMALY_RETAINED',
+  // Phase 7 (add-cash-flow-forecast, FR-NOTIFY-004/007): riesgo de déficit del calendario de flujo de caja (entrega directa
+  // de REPORTING, D381) y digest periódico del Home por email (fila archivada desde su creación, no aparece en el centro).
+  'CASH_FLOW_SHORTFALL_RISK',
+  'HOME_DIGEST',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -33,7 +37,7 @@ export const isNotificationType = (value: unknown): value is NotificationType =>
 export const NOTIFICATION_CHANNELS = ['IN_APP', 'EMAIL'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
-export type NotificationSeverity = 'INFO' | 'WARNING';
+export type NotificationSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 export type NotificationStatus = 'UNREAD' | 'READ' | 'ARCHIVED';
 export const NOTIFICATION_STATUSES: readonly NotificationStatus[] = ['UNREAD', 'READ', 'ARCHIVED'];
 
@@ -131,7 +135,23 @@ export type NotificationLink =
       readonly periodId: string;
       readonly periodLabel: string;
     }
-  | FxNotificationLink;
+  | FxNotificationLink
+  | CashFlowNotificationLink;
+
+/**
+ * Riesgo de déficit (add-cash-flow-forecast): `CASH_FLOW_CALENDAR` abre el calendario de flujo de caja en la moneda y el
+ * horizonte del aviso; `HOME_DIGEST` abre el Home (digest). `periodId` es el id del episodio (el del workspace en el
+ * digest) y `periodLabel` el mes del hecho en la zona del workspace: el contrato HTTP del enlace los exige en todos sus tipos.
+ */
+export type CashFlowNotificationLink =
+  | {
+      readonly kind: 'CASH_FLOW_CALENDAR';
+      readonly currency: string;
+      readonly horizonDays: number;
+      readonly periodId: string;
+      readonly periodLabel: string;
+    }
+  | { readonly kind: 'HOME_DIGEST'; readonly periodId: string; readonly periodLabel: string };
 
 /**
  * Alertas de tasas (add-rate-feed-alerts): `FX_FEED_STATUS` abre el estado de las tasas automáticas (Configuración →

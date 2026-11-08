@@ -25,6 +25,8 @@ export const NOTIFICATION_CONSUMERS = {
 export const EMAIL_DISPATCH_QUEUE = 'notifications.email-dispatch' as const;
 export const EMAIL_SWEEP_QUEUE = 'notifications.email-sweep' as const;
 export const PURGE_QUEUE = 'notifications.purge' as const;
+/** Digest periódico del Home (add-cash-flow-forecast, D385): un job de la `JobQueue`, sin consumidor de eventos. */
+export const DIGEST_QUEUE = 'notifications.digest' as const;
 
 /** Carga del trabajo `notifications.email-dispatch`: solo ids opacos (nunca la dirección ni el contenido). */
 export interface EmailDispatchJob {
@@ -56,6 +58,8 @@ export const NOTIFICATIONS_AUDIT_POLICY = {
     'byType.*': 'plain',
     quietHours: 'plain',
     includeDetailsInEmail: 'plain',
+    // add-cash-flow-forecast (FR-NOTIFY-007): frecuencia del digest por email (OFF | WEEKLY | MONTHLY).
+    digestFrequency: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
 
@@ -66,7 +70,31 @@ export const NOTIFICATIONS_AUDIT_POLICY = {
  * (FR-NOTIFY-005); el aviso de anomalías, además, se actualiza con cada foto nueva del grupo. Sin consumidor de eventos: no crea colas `events.notifications.*` ni conexiones nuevas.
  */
 export type NotificationIntakeType =
-  'FX_RATE_FEED_STALE' | 'FX_RATE_FEED_RECOVERED' | 'FX_RATE_ANOMALY_RETAINED';
+  | 'FX_RATE_FEED_STALE'
+  | 'FX_RATE_FEED_RECOVERED'
+  | 'FX_RATE_ANOMALY_RETAINED'
+  | 'CASH_FLOW_SHORTFALL_RISK';
+
+/**
+ * `CASH_FLOW_SHORTFALL_RISK` (add-cash-flow-forecast, D381/D382): se abrió un episodio de riesgo de déficit (`HIGH`) en una
+ * moneda del calendario de flujo de caja. `factKey` = `episodeId`: un aviso por episodio y destinatario (OWNER y EDITOR);
+ * el cierre del episodio no notifica (D380). Severidad `CRITICAL` si `belowZero`, si no `WARNING`.
+ */
+export interface CashFlowShortfallRiskFact {
+  readonly episodeId: string;
+  readonly currency: string;
+  readonly horizonDays: number;
+  /** Primera fecha (`YYYY-MM-DD`, zona del workspace) con el saldo esperado bajo el umbral. */
+  readonly firstShortfallDate: string;
+  /** Saldo más bajo esperado (con signo) y su fecha. */
+  readonly lowest: { readonly amount: string; readonly currency: string };
+  readonly lowestDate: string;
+  /** Reserva mínima (o cero) de esa moneda. */
+  readonly threshold: { readonly amount: string; readonly currency: string };
+  readonly belowZero: boolean;
+  readonly detectedAt: string;
+  readonly timeZone: string;
+}
 
 /** `FX_RATE_FEED_STALE`: un par configurado lleva más de N horas sin tasa aceptada de ningún provider. */
 export interface RateFeedStaleFact {
@@ -151,6 +179,10 @@ export type NotificationIntakeFact =
   | (IntakeFactBase & {
       readonly type: 'FX_RATE_ANOMALY_RETAINED';
       readonly payload: RateAnomalyGroupFact;
+    })
+  | (IntakeFactBase & {
+      readonly type: 'CASH_FLOW_SHORTFALL_RISK';
+      readonly payload: CashFlowShortfallRiskFact;
     });
 
 export interface NotificationIntakeOutcome {
@@ -169,6 +201,44 @@ export interface NotificationIntakeOutcome {
  */
 export interface NotificationIntakePort {
   notify(fact: NotificationIntakeFact): Promise<NotificationIntakeOutcome>;
+}
+
+// ───────────────────────────────────────────── digest del Home (add-cash-flow-forecast)
+
+/** Frecuencia del digest por email que elige cada usuario (D385: desactivado por omisión). */
+export const DIGEST_FREQUENCIES = ['OFF', 'WEEKLY', 'MONTHLY'] as const;
+export type DigestFrequency = (typeof DIGEST_FREQUENCIES)[number];
+
+/**
+ * Una pregunta del digest (copia estructural de `HomeDigestQuestionDto` de `@pf/reporting/contracts`: NOTIFY no importa
+ * REPORTING). REPORTING entrega todo, incluidos los montos en `amounts`; NOTIFY descarta `amounts` si el destinatario no
+ * activó los detalles (FR-NOTIFY-006, D386).
+ */
+export interface HomeDigestQuestionSnapshot {
+  readonly question: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'Q5' | 'Q6' | 'Q7' | 'Q8' | 'Q9';
+  readonly status: 'AVAILABLE' | 'NO_DATA';
+  readonly counts: Readonly<Record<string, number>>;
+  readonly percents: Readonly<Record<string, string>>;
+  readonly dates: Readonly<Record<string, string>>;
+  readonly states: Readonly<Record<string, string>>;
+  readonly amounts: Readonly<Record<string, { readonly amount: string; readonly currency: string }>>;
+}
+
+export interface HomeDigestSnapshot {
+  readonly workspaceId: string;
+  readonly generatedAt: string;
+  readonly timeZone: string;
+  readonly today: string;
+  readonly reportingCurrency: string;
+  readonly questions: readonly HomeDigestQuestionSnapshot[];
+}
+
+/**
+ * Puerto estructural de NOTIFY hacia el contenido del digest: la composición de `apps/api` lo cablea a `HomeDigestQuery`
+ * de `@pf/reporting/contracts` (mismo patrón que `SpendableDeps`; sin dependencia de paquete NOTIFY → REPORTING).
+ */
+export interface HomeDigestSourcePort {
+  compose(input: { readonly workspaceId: string }): Promise<HomeDigestSnapshot>;
 }
 
 export const NOTIFICATION_INTAKE_PORT = Symbol.for('pf.notifications.NotificationIntakePort');

@@ -321,6 +321,36 @@ describe('GetReportSummary — flujos del mes (reporting/dashboard)', () => {
     );
   });
 
+  it('[TC-REPORTING-FORECAST-029] cada categoría de los tops informa su variación en valor y porcentaje, y "nuevo" si antes era cero', async () => {
+    mem.clock.set(Instant.parse('2026-09-15T16:00:00Z'));
+    mem.flow('2026-08-03', 'EXPENSE', 'sup', '1000.00');
+    mem.flow('2026-08-14', 'EXPENSE', 'sup', '200.00');
+    mem.flow('2026-08-05', 'INCOME', 'sal', '7500.00');
+    mem.flow('2026-09-05', 'INCOME', 'sal', '8000.00');
+    mem.flow('2026-09-10', 'EXPENSE', 'sup', '1305.00');
+    mem.flow('2026-09-12', 'EXPENSE', 'fee', '5.00');
+    const s = await summary();
+    const sup = s.topExpenseCategories.find((c) => c.name === 'Supermercado')!;
+    expect(sup.variation).toEqual({
+      amount: { amount: '105.00', currency: 'BOB' },
+      percent: '8.75',
+      isNew: false,
+      direction: 'UNFAVORABLE',
+    });
+    const fee = s.topExpenseCategories.find((c) => c.name === 'Fees')!;
+    expect(fee.variation).toEqual({
+      amount: { amount: '5.00', currency: 'BOB' },
+      percent: null,
+      isNew: true,
+      direction: 'UNFAVORABLE',
+    });
+    // En los ingresos un aumento es favorable.
+    expect(s.topIncomeCategories[0]!.variation).toMatchObject({ percent: '6.67', direction: 'FAVORABLE' });
+    // Sin comparación no hay variación.
+    const none = await summary({ compare: 'NONE' });
+    expect(none.topExpenseCategories.every((c) => c.variation === null)).toBe(true);
+  });
+
   it('[TC-REPORTING-KPI-006] topCategories fuera de 0..20 se rechaza con VALIDATION_FAILED', async () => {
     await expect(summary({ topCategories: 21 })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     const s = await summary({ topCategories: 0 });

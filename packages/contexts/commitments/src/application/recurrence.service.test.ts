@@ -1231,3 +1231,92 @@ describe('Insumo del disponible para gastar (CommittedQuery.listForSpendable; ad
     expect(after.fromCommitments).toEqual([bob('199.00')]);
   });
 });
+
+describe('Insumo del calendario de flujo de caja (UpcomingPaymentsQuery.listForCashFlow; add-cash-flow-forecast, S1 y S2)', () => {
+  const common = {
+    amount: { type: 'FIXED' as const, amount: bob('500.00') },
+    schedule: { cadence: 'MONTHLY', startDate: '2026-10-20' },
+  };
+
+  it('[TC-REPORTING-FORECAST-003] informa ingresos, egresos, transferencias y cuotas con liquidez, administrador y categoría; fecha de cobertura = hoy + horizonte', async () => {
+    const s = setup();
+    await create(s, 'Internet', {
+      ...common,
+      amount: { type: 'FIXED', amount: bob('199.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-10-22' },
+    });
+    await create(
+      s,
+      'Sueldo',
+      {
+        ...common,
+        categoryId: null,
+        amount: { type: 'FIXED', amount: bob('8000.00') },
+        schedule: { cadence: 'MONTHLY', startDate: '2026-10-31' },
+      },
+      'INCOME',
+    );
+    await create(s, 'A ahorro', { ...common, categoryId: null, toAccountId: SAVINGS }, 'TRANSFER');
+    await create(s, 'A efectivo', { ...common, categoryId: null, toAccountId: CASH }, 'TRANSFER');
+    const r = await s.queries.listForCashFlow({ workspaceId: WS, through: '2026-10-31' });
+    const byName = new Map<string, (typeof r.items)[number]>();
+    for (const i of r.items) if (!byName.has(i.definitionName)) byName.set(i.definitionName, i);
+    expect([...byName.keys()].sort()).toEqual(['A ahorro', 'A efectivo', 'Internet', 'Sueldo']);
+    expect(byName.get('Internet')).toMatchObject({
+      kind: 'EXPENSE',
+      dueDate: '2026-10-22',
+      status: 'SCHEDULED',
+      sourceLiquid: true,
+      targetLiquid: null,
+      managedBy: 'USER',
+      categoryId: CATEGORY,
+      expected: { type: 'FIXED', amount: '199.00', currency: 'BOB' },
+    });
+    expect(byName.get('Sueldo')).toMatchObject({ kind: 'INCOME', categoryId: null });
+    expect(byName.get('A ahorro')).toMatchObject({ sourceLiquid: true, targetLiquid: false });
+    expect(byName.get('A efectivo')).toMatchObject({ sourceLiquid: true, targetLiquid: true });
+    // Hoy 2026-10-09 en La Paz + 90 días (COMMITMENTS_HORIZON_DAYS por omisión).
+    expect(r.generatedThrough).toBe('2027-01-07');
+    expect(r.items.every((i) => i.dueDate <= '2026-10-31')).toBe(true);
+  });
+
+  it('[TC-REPORTING-FORECAST-004] incluye las vencidas sin resolver de cualquier antigüedad y no repite lo materializado como pendiente', async () => {
+    const s = setup();
+    s.mem.setNow(noon('2026-09-10'));
+    await create(s, 'Netflix', {
+      ...common,
+      amount: { type: 'FIXED', amount: bob('49.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-09-15' },
+    });
+    s.mem.setNow(noon('2026-10-09'));
+    await s.job.runWorkspace(WS);
+    const r = await s.queries.listForCashFlow({ workspaceId: WS, through: '2026-10-31' });
+    expect(r.items.filter((i) => i.definitionName === 'Netflix').map((i) => i.dueDate)).toContain(
+      '2026-09-15',
+    );
+  });
+
+  it('[TC-REPORTING-FORECAST-003] listForSpendable informa la categoría de la definición y la de la pendiente con un solo split', async () => {
+    const s = setup();
+    await create(s, 'Canasta', {
+      ...common,
+      amount: { type: 'FIXED', amount: bob('200.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-10-25' },
+    });
+    s.mem.addTransaction({
+      kind: 'EXPENSE',
+      accountId: BANK,
+      amount: bob('300.00'),
+      status: 'PENDING',
+      businessDate: '2026-10-18',
+      categoryId: CATEGORY,
+    });
+    const r = await s.queries.listForSpendable({
+      workspaceId: WS,
+      periodFrom: '2026-10-01',
+      periodTo: '2026-10-31',
+    });
+    expect(r.items.find((i) => i.name === 'Canasta')?.categoryId).toBe(CATEGORY);
+    expect(r.items.find((i) => i.source === 'PENDING')?.categoryId).toBe(CATEGORY);
+  });
+});

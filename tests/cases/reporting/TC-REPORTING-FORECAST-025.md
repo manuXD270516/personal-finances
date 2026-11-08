@@ -5,16 +5,18 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Esenciales presupuestados restantes descontados del disponible"
 scenario: "Supermercado esencial"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024","FR-REPORTING-002"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-horizon.test.ts
+status: automated
 regression_suite: false
 phase: 7
 tags: ["spendable","q5","essentials"]
@@ -32,7 +34,7 @@ expected_result:
   - "Esenciales 450.00 BOB; disponible 5071.00 BOB"
   - "Comprometido 3379.00 BOB; esenciales 250.00 BOB; disponible 5071.00 BOB"
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-07
 ---
 
 # TC-REPORTING-FORECAST-025 — Los esenciales restan lo restante del plan sin contar dos veces lo comprometido de la misma categoría
