@@ -328,7 +328,7 @@ describe('tests con NIGHTLY y timeout explícito (seguimiento de TC-PLATFORM-PIP
 });
 
 // investigate-perf-under-load, decisión 5 (TC-PLATFORM-PIPELINE-028): los umbrales de los benchmarks son los de docs/02
-// §PERF (NFR-PERF-001..009). Un rojo de `perf` no se cierra subiendo el umbral ni volviendo informativa una fila bloqueante:
+// §PERF (NFR-PERF-001..010). Un rojo de `perf` no se cierra subiendo el umbral ni volviendo informativa una fila bloqueante:
 // cambiarlos exige editar esta tabla (EXPECTED_THRESHOLDS / BLOCKING_RESULT_IDS) con la decisión del owner (D-id) que lo
 // aprueba, y la revisión del PR lo comprueba. D43 (docs/31): qué filas son bloqueantes. D112 (docs/33): ≥ 42 ev/s.
 // D152 (docs/33): la persistencia del import ≤ 20 s se exige por omisión desde add-bulk-imported-transactions (sin techo de
@@ -358,6 +358,8 @@ const EXPECTED_THRESHOLDS: readonly ExpectedThreshold[] = [
   { key: 'NFR-PERF-008', unit: 'ev/s', value: 42, doc: '≥ 42 eventos/s por consumidor' },
   { key: 'NFR-PERF-008:drain', unit: 'ms', value: 120_000, doc: '≤ 120 s' },
   { key: 'NFR-PERF-009', unit: 'ms', value: 10_000, doc: '≤ 10 s por workspace' },
+  // add-cash-flow-forecast 5.2 (TC-REPORTING-FORECAST-021): calendario de flujo de caja de 90 días, umbral de docs/02.
+  { key: 'NFR-PERF-010', unit: 'ms', value: 500, doc: 'p95 ≤ 500 ms' },
 ];
 
 /** Umbral que declara el código del benchmark (en `perf-report.ts` o como constante local de una suite). */
