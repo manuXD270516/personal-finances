@@ -79,4 +79,4 @@
 
 - [x] 8.1 Aplicar "Cambios a docs compartidos" de design.md (docs/01, 08, 10, 11, 14, 25, 28, config-reference, 03 §7, 38) (2026-11-05: docs/01, 08, 10, 11, 14, 25, 28, config-reference, 38; la fila de 03 §7 ya existía)
 - [x] 8.2 Matriz de trazabilidad (`pnpm traceability:check` sin errores ni advertencias), `pnpm spec:validate` y `pnpm format:check` (2026-11-05: traceability, spec:validate y format:check en verde)
-- [ ] 8.3 Al archivar, verificar que `planning/budgets` e `identity/workspace-portability` conservan su `## Purpose`
+- [x] 8.3 Al archivar, verificar que `planning/budgets` e `identity/workspace-portability` conservan su `## Purpose` *(2026-11-09: verificado al archivar)*
