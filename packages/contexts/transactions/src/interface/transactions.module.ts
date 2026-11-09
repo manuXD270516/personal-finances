@@ -47,7 +47,10 @@ import { RecurringTransactionAdapter } from '../application/recurring-transactio
 import { GoalTransferAdapter } from '../application/goal-transfer.port.js';
 import { LoanTransactionsAdapter } from '../application/loan-transactions.port.js';
 import { RecordImportedConversions } from '../application/record-imported-conversions.js';
-import { RecordImportedTransactions } from '../application/record-imported-transactions.js';
+import {
+  RecordImportedTransactions,
+  type BatchStepTimer,
+} from '../application/record-imported-transactions.js';
 import {
   PgDuplicateCandidatesQuery,
   PgImportedRefReader,
@@ -83,7 +86,11 @@ import { CONVERSIONS_SERVICE, ConversionsController } from './conversions-http.j
 import { RECONCILIATIONS_SERVICE, ReconciliationsController } from './reconciliations-http.js';
 import { RULE_NAME_LOOKUP, TRANSACTIONS_SERVICE, TransactionsController } from './transactions-http.js';
 
+export type { BatchStep, BatchStepTimer } from '../application/record-imported-transactions.js';
+
 export interface TransactionsRuntimeOptions {
+  /** Solo el benchmark del import (stabilize-import-persist-perf): mide los pasos de `recordBatch`. */
+  readonly batchTimer?: BatchStepTimer;
   readonly pool: Pool;
   readonly clock: Clock;
   readonly audit: AuditPort;
@@ -230,10 +237,12 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
       deps.currencies,
       systemCategoryCodesFrom(deps.categories),
     ),
-    imported: new RecordImportedTransactions(deps, importedRefs, {
-      transfers: service,
-      conversions: conversionsService,
-    }),
+    imported: new RecordImportedTransactions(
+      deps,
+      importedRefs,
+      { transfers: service, conversions: conversionsService },
+      options.batchTimer,
+    ),
     importedConversions: new RecordImportedConversions(deps, importedRefs, conversionsService),
     duplicateCandidates: new PgDuplicateCandidatesQuery(deps.uow, deps.currencies),
     statuses: new PgTransactionStatusQuery(deps.uow),

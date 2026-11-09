@@ -31,6 +31,7 @@ import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS } from '@pf/reporting/interface/repor
 import {
   createConversionDetailQuery,
   createNominalFlowQuery,
+  type BatchStepTimer,
 } from '@pf/transactions/interface/transactions.module';
 import { createAuditRuntime, createLifecycleBackfill } from '@pf/audit/interface/audit.module';
 import { createCategoryCatalogQuery } from '@pf/classification/interface/classification.module';
@@ -40,7 +41,11 @@ import {
 } from '@pf/commitments/interface/commitments.module';
 import { debtEventConsumers } from '@pf/debt/interface/debt.module';
 import { goalsEventConsumers } from '@pf/goals/interface/goals.module';
-import { createImportsRuntime, importsEventConsumers } from '@pf/imports/interface/imports.module';
+import {
+  createImportsRuntime,
+  importsEventConsumers,
+  type PersistTimings,
+} from '@pf/imports/interface/imports.module';
 import { importsPortsFor } from '../imports/imports-wiring.js';
 import {
   createDemoDataRuntime,
@@ -148,6 +153,11 @@ export interface WorkerRuntimeOptions {
    * demás conservan su cola, que el relay sigue llenando, sin consumirla). Por omisión, todos.
    */
   readonly startConsumers?: (def: EventConsumerDefinition) => boolean;
+  /**
+   * Solo el benchmark del import (stabilize-import-persist-perf): recolector de tiempos de la persistencia por etapa y
+   * paso. En producción no se pasa y el servicio de persistencia no mide nada.
+   */
+  readonly persistTimings?: PersistTimings & BatchStepTimer;
   /** Ajustes del relay (tests: lote, polling, inyección de fallos). */
   readonly relay?: Partial<Pick<OutboxRelayOptions, 'batchSize' | 'pollIntervalMs' | 'afterEnqueue'>>;
   readonly metrics?: EventDeliveryMetrics;
@@ -172,6 +182,8 @@ export interface WorkerRuntimeOptions {
   };
   /** Encola `planning.ensure-periods` al arrancar (por defecto sí; add-financial-periods). */
   readonly planningPeriodsOnStart?: boolean;
+  /** Programa el cron horario de `reporting.cash-flow-watch` (por defecto sí; el benchmark del import lo desactiva). */
+  readonly reporting?: { readonly scheduleCrons?: boolean };
   /** Encola `commitments.generate-occurrences` al arrancar (por defecto sí; add-recurrence-engine). */
   readonly commitmentsOnStart?: boolean;
   /** Encola `imports.expire-reviews` e `imports.purge-staging` al arrancar (por defecto sí; add-basic-csv-import). */
@@ -527,6 +539,7 @@ export async function createWorkerRuntime(
   // La creación automática usa los MISMOS casos de uso de TRANSACTIONS que la API (puertos públicos), compuestos con el
   // pool del worker (`pf_worker`, miembro de `pf_app`).
   const finance = financeRuntimes({
+    ...(options.persistTimings ? { batchTimer: options.persistTimings } : {}),
     pool,
     clock: options.clock ?? systemClock,
     audit: demoAudit.port,
@@ -613,6 +626,7 @@ export async function createWorkerRuntime(
   await registerCashFlowWatchJob(queue, cashFlowWatch, logger, {
     cron: config.REPORTING_CASH_FLOW_WATCH_CRON,
     runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
+    scheduleCrons: options.reporting?.scheduleCrons ?? true,
   });
 
   // DEBT (add-credit-cards): job `debt.card-daily` (estados de cuenta, recordatorios y red de seguridad) y consumidor
@@ -633,6 +647,7 @@ export async function createWorkerRuntime(
   // IMPORTS (add-basic-csv-import): consumidor `imports.persist` (crea las transacciones por lotes con los MISMOS casos
   // de uso de TRANSACTIONS que la API, vía su contrato público) y jobs diarios de expiración y purga del staging.
   const imports = createImportsRuntime({
+    ...(options.persistTimings ? { timings: options.persistTimings } : {}),
     pool,
     clock: options.clock ?? systemClock,
     audit: demoAudit.port,

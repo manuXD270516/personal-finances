@@ -7,6 +7,11 @@ export interface ReportingJobsOptions {
   readonly cron: string;
   /** Encola además una pasada al arrancar (detecta un déficit sin esperar al cron). */
   readonly runOnStart: boolean;
+  /**
+   * Programa el cron (por defecto sí, como en producción). Los benchmarks y los tests lo desactivan para que ninguna
+   * pasada horaria caiga dentro de una ventana medida (como `notifications.scheduleCrons`).
+   */
+  readonly scheduleCrons?: boolean;
 }
 
 export interface CashFlowWatchPayload {
@@ -44,7 +49,7 @@ export async function registerCashFlowWatchJob(
   if (options.cron === 'off') {
     await queue.unschedule(CASH_FLOW_WATCH_JOB);
     logger.info({ 'job.queue': CASH_FLOW_WATCH_JOB }, 'cash flow watch cron disabled');
-  } else {
+  } else if (options.scheduleCrons ?? true) {
     await queue.schedule<CashFlowWatchPayload>(
       CASH_FLOW_WATCH_JOB,
       options.cron,

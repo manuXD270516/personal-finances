@@ -7,6 +7,7 @@ import { ImportsMaintenanceService } from './imports-maintenance.service.js';
 import { ImportsQueries } from './imports.queries.js';
 import { ImportsService, sanitizeFileName } from './imports.service.js';
 import { PersistImportService } from './persist-import.service.js';
+import type { PersistTimings } from './ports/index.js';
 import { MemoryWorld, createMemoryDeps } from './testing/in-memory.js';
 
 const WS = 'ws-1';
@@ -805,5 +806,74 @@ describe('CancelImport y retención', () => {
     // Reimportar el mismo archivo sigue dando 0 nuevas.
     const again = await mapped(ctx);
     expect(again.view.previewSummary.counts).toMatchObject({ alreadyImported: 4, new: 0 });
+  });
+});
+
+describe('Medición de la persistencia (stabilize-import-persist-perf)', () => {
+  /** Recolector mínimo del puerto opcional: registra el orden de las marcas. */
+  function recorder() {
+    const marks: string[] = [];
+    const timings: PersistTimings = {
+      persistStarted: (id) => void marks.push(`start:${id}`),
+      persistFinished: (id) => void marks.push(`finish:${id}`),
+      batch: async (n, fn) => {
+        marks.push(`batch-open:${n}`);
+        try {
+          return await fn();
+        } finally {
+          marks.push(`batch-close:${n}`);
+        }
+      },
+      measure: async (step, fn) => {
+        marks.push(`step:${step}`);
+        return fn();
+      },
+    };
+    return { marks, timings };
+  }
+
+  it('[TC-PLATFORM-PIPELINE-033] el puerto se invoca por etapa y por paso en orden, y sin él el resultado es el mismo', async () => {
+    const withTimings = setup({ batchSize: 2 });
+    const { marks, timings } = recorder();
+    const instrumented = new PersistImportService({ ...withTimings.deps, timings });
+    const a = await mapped(withTimings, EXTRACTO);
+    const current = await withTimings.queries.get(WS, a.created.id);
+    await withTimings.service.approve({
+      workspaceId: WS,
+      userId: USER,
+      importId: a.created.id,
+      expectedVersion: current.version,
+    });
+    const outcome = await instrumented.persist({ workspaceId: WS, importId: a.created.id });
+    expect(outcome).toEqual({ status: 'DONE', batches: 2, failedBatches: 0 });
+
+    const perBatch = (n: number) => [
+      `batch-open:${n}`,
+      'step:load-batch',
+      'step:record-batch',
+      'step:mark-persisted',
+      'step:links',
+      'step:job-save',
+      `batch-close:${n}`,
+      'step:link-occurrences',
+    ];
+    expect(marks).toEqual([
+      `start:${a.created.id}`,
+      'step:begin',
+      'step:timezone',
+      'step:pending-batches',
+      ...perBatch(1),
+      ...perBatch(2),
+      'step:close',
+      `finish:${a.created.id}`,
+    ]);
+
+    // Sin el puerto: mismos resultados y mismas transacciones creadas.
+    const plain = setup({ batchSize: 2 });
+    const b = await approveAndPersist(plain, (await mapped(plain, EXTRACTO)).created.id);
+    expect(b.outcome).toEqual(outcome);
+    expect(plain.world.transactions.map((t) => t.signed)).toEqual(
+      withTimings.world.transactions.map((t) => t.signed),
+    );
   });
 });

@@ -98,4 +98,4 @@ El owner decidió el 2026-11-09 tratar en un change aparte el fallo recurrente d
 
 ## Respuestas
 
-Pendientes. Se registrarán en el siguiente doc `…-decisions.md` (o en docs/38 si son pocas), con su número D.
+Respondidas el 2026-11-09 en [docs/64](64-import-persist-perf-decisions.md) (pregunta N → D(402+N)): el owner aceptó la recomendación de las 7 preguntas, D403 a D409.

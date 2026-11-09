@@ -30,12 +30,25 @@ import {
   type PoolBudget,
   type ServerConnectionLimits,
 } from './connection-budget.js';
-import { IMPORTS_API_POOL_MAX, PERF_RATE_LIMITS } from './perf-env.js';
+import { IMPORTS_API_POOL_MAX, PERF_RATE_LIMITS, PERF_WORKER_ISOLATION } from './perf-env.js';
+import {
+  PersistCollector,
+  PersistSampler,
+  SerialClient,
+  queueJobsSince,
+  takeFingerprint,
+} from './persist-instrumentation.js';
 import {
   classifyRetryReason,
   importsVerdict,
+  scheduledJobsInWindow,
+  summarizeMaintenance,
+  summarizePersistBreakdown,
+  summarizeWaits,
   writeImportsReport,
+  type RunnerFingerprint,
   type ConsumerDrain,
+  type DbSample,
   type ImportsReport,
   type JobFailure,
   type RetriedJobs,
@@ -60,6 +73,10 @@ let h: Harness;
 let owner: User;
 let accountId = '';
 let sampler: Client | undefined;
+/** El mismo cliente, serializado: lo comparten el muestreador de conexiones, el de la persistencia y la huella. */
+let serial: SerialClient | undefined;
+let runner: RunnerFingerprint | undefined;
+const collector = new PersistCollector();
 let server: ServerConnectionLimits;
 let budget: ConnectionBudgetCheck;
 let acquisitions = new AcquisitionRecorder();
@@ -219,7 +236,11 @@ beforeAll(async () => {
     application_name: 'pf-perf-conn-sampler',
   });
   await sampler.connect();
+  serial = new SerialClient(sampler);
   server = await readServerLimits(sampler);
+  // Huella del runner (informativa) antes del benchmark del import: nunca repite ni invalida una medición.
+  runner = await takeFingerprint(serial);
+  console.log(JSON.stringify({ test: 'runner-fingerprint', ...runner }));
 }, 300_000);
 
 /**
@@ -231,7 +252,12 @@ async function prepare(cfg: ImportConfig): Promise<void> {
   for (const restore of restorers.splice(0)) restore();
   await h.stopWorker();
   acquisitions = new AcquisitionRecorder();
-  await h.startWorker({}, { env: cfg.workerEnv });
+  // Sin pasadas de arranque ni cron horario de los trabajos programados ajenos (H2); con el recolector de tiempos.
+  await h.startWorker({ ...PERF_WORKER_ISOLATION, persistTimings: collector }, { env: cfg.workerEnv });
+  // Un cron de la vigilancia del flujo de caja programado por un worker anterior de la misma base seguiría disparando.
+  await asAdmin(h, (c) =>
+    c.query(`DELETE FROM pgboss.schedule WHERE name = 'reporting.cash-flow-watch'`),
+  ).catch(() => undefined);
   budget = checkConnectionBudget(poolBudgets(), server);
   assertConnectionBudget(poolBudgets(), server);
   restorers.push(instrumentPool('api', h.api.resources.pool, acquisitions));
@@ -263,16 +289,21 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
   {
     const connections = new ConnectionSampler(
       { api: h.api.resources.pool, worker: h.worker!.pool },
-      sampler!,
+      serial!,
       acquisitions,
     );
     connections.start();
+    const persistSampler = new PersistSampler(serial!);
+    let approvedAtMs = 0;
+    let persistSamples: readonly DbSample[] = [];
     const tracker = new DrainTracker();
     let uploadedMs = 0;
     let previewMs = 0;
     let persistMs = 0;
     let drainAfterPersistMs = 0;
     let events: string[] = [];
+    let observedAtMs = 0;
+    let drainEndMs = 0;
     let failure: unknown;
     const startedAt = new Date(Date.now() - 1000);
     try {
@@ -310,11 +341,14 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
       expect(counts).toMatchObject({ rows: ROWS, new: ROWS });
 
       const t1 = performance.now();
+      collector.reset();
+      persistSampler.start();
       const approved = await h.call('POST', `${W()}/imports/${upload.body['id'] as string}/approve`, {
         token: owner.token,
         headers: { 'idempotency-key': randomUUID(), 'if-match': `"${String(mapped.body['version'])}"` },
       });
       expect(approved.status, JSON.stringify(approved.body)).toBe(202);
+      approvedAtMs = Date.now();
       const done = await until(
         async () => {
           const r = await h.call('GET', `${W()}/imports/${upload.body['id'] as string}`, {
@@ -326,6 +360,8 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
         500,
       );
       persistMs = performance.now() - t1;
+      observedAtMs = Date.now();
+      persistSamples = await persistSampler.stop();
       const persistEnd = t1 + persistMs;
       expect(done['status']).toBe('COMPLETED');
       expect((done['counters'] as Json)['created']).toBe(ROWS);
@@ -347,6 +383,7 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
         500,
       );
       drainAfterPersistMs = performance.now() - persistEnd;
+      drainEndMs = Date.now();
       events = await asAdmin(h, async (c) => {
         const { rows } = await c.query<{ event_type: string }>(
           `SELECT event_type FROM platform.outbox WHERE workspace_id = $1 AND event_type LIKE 'imports.%'`,
@@ -357,6 +394,7 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
     } catch (err) {
       failure = err;
     } finally {
+      persistSamples = persistSamples.length > 0 ? persistSamples : await persistSampler.stop();
       await connections.stop();
     }
 
@@ -367,6 +405,20 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
       // El drenado no terminó (tiempo de espera agotado): se mide hasta ahora para el veredicto.
       drainAfterPersistMs = DRAIN_BUDGET_MS + 60_000;
     }
+    // Desglose, esperas, mantenimiento y trabajos programados: informativos, no deciden el veredicto de la fila.
+    const raw = collector.raw(approvedAtMs, observedAtMs);
+    const breakdown =
+      approvedAtMs > 0 && raw.batches.length > 0
+        ? summarizePersistBreakdown(raw, persistMs, persistSamples)
+        : undefined;
+    const scheduledJobs =
+      approvedAtMs > 0
+        ? scheduledJobsInWindow(
+            await queueJobsSince(h, approvedAtMs).catch(() => []),
+            approvedAtMs,
+            drainEndMs > 0 ? drainEndMs : Date.now(),
+          )
+        : undefined;
     const verdict = importsVerdict({
       drainAfterPersistMs,
       drainBudgetMs: DRAIN_BUDGET_MS,
@@ -384,6 +436,16 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
       retries,
       jobFailures: jobFailures(),
       verdict,
+      persistBudgetMs: PERSIST_BUDGET_MS,
+      ...(breakdown ? { persistBreakdown: breakdown } : {}),
+      ...(persistSamples.length > 0
+        ? {
+            waits: summarizeWaits(persistSamples),
+            maintenance: summarizeMaintenance(persistSamples, approvedAtMs),
+          }
+        : {}),
+      ...(scheduledJobs ? { scheduledJobs } : {}),
+      ...(runner ? { runner } : {}),
       configuration: {
         label: cfg.label,
         eventConsumerConcurrency: cfg.concurrency,
@@ -454,7 +516,7 @@ describe('import CSV de 5 000 filas', () => {
     await runImportBenchmark(CODE_CONFIG);
   }, 1_800_000);
 
-  it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-008][TC-PLATFORM-THROUGHPUT-014] ${HOST_CONFIG.title}: vista previa ≤ 30 s, persistencia ≤ 20 s y cada consumidor drena en ≤ 120 s`, async () => {
+  it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-008][TC-PLATFORM-THROUGHPUT-014][TC-PLATFORM-PIPELINE-033][TC-PLATFORM-PIPELINE-034][TC-PLATFORM-PIPELINE-035][TC-PLATFORM-PIPELINE-036][TC-PLATFORM-PIPELINE-037][TC-PLATFORM-PIPELINE-040][TC-PLATFORM-PIPELINE-041] ${HOST_CONFIG.title}: vista previa ≤ 30 s, persistencia ≤ 20 s y cada consumidor drena en ≤ 120 s`, async () => {
     await runImportBenchmark(HOST_CONFIG);
   }, 1_800_000);
 });

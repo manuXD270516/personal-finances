@@ -512,6 +512,37 @@ export interface ImportsDeps {
   readonly systemCategories?: SystemCategoriesPort;
   /** Gancho de las conexiones: el cursor confirmado se mueve solo al completar el import (add-banking-providers). */
   readonly connectionHooks?: ConnectionHooksPort;
+  /**
+   * Medición de la persistencia por etapa y paso (stabilize-import-persist-perf): solo la inyecta el worker del
+   * benchmark; en producción no existe y `PersistImportService` se comporta igual.
+   */
+  readonly timings?: PersistTimings;
+}
+
+/** Pasos que mide `PersistImportService.persist` (los de TRANSACTIONS entran como `tx.*` desde su propio recolector). */
+export type PersistStep =
+  | 'begin'
+  | 'timezone'
+  | 'pending-batches'
+  | 'load-batch'
+  | 'record-batch'
+  | 'mark-persisted'
+  | 'links'
+  | 'job-save'
+  | 'link-occurrences'
+  | 'close';
+
+/**
+ * Puerto opcional de medición de la persistencia (design decisión 2 de stabilize-import-persist-perf). No se exporta por
+ * `@pf/imports/contracts`: es interno del contexto y de su composición en el worker del benchmark.
+ */
+export interface PersistTimings {
+  persistStarted(importId: string): void;
+  persistFinished(importId: string): void;
+  /** Envuelve la transacción de BD completa de un lote (incluida la confirmación). */
+  batch<T>(batchNo: number, fn: () => Promise<T>): Promise<T>;
+  /** Mide `fn` como el paso `step` del lote en curso (o de la etapa, fuera de los lotes). */
+  measure<T>(step: PersistStep, fn: () => Promise<T>): Promise<T>;
 }
 
 export interface SystemCategoriesPort {

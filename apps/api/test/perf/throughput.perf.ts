@@ -17,11 +17,15 @@ import {
   retriedJobs,
 } from './burst-support.js';
 import { DrainTracker } from './connection-budget.js';
-import { IMPORTS_API_POOL_MAX, PERF_RATE_LIMITS } from './perf-env.js';
+import { IMPORTS_API_POOL_MAX, PERF_RATE_LIMITS, PERF_WORKER_ISOLATION } from './perf-env.js';
+import { diagnoseOutbox } from './persist-instrumentation.js';
 import {
+  incompleteSuite,
   writeConsumerCostReport,
+  writeIncompleteReport,
   type ConsumerCost,
   type ConsumerDrain,
+  type IncompleteSuite,
   type JobFailure,
   type RetriedJobs,
 } from './perf-report.js';
@@ -47,6 +51,11 @@ const DRAIN_BUDGET_MS = 120_000;
 /** Tope de espera por consumidor: más allá se publica «sin llegar a 0» con lo procesado hasta entonces. */
 const SOLO_CAP_MS = 20 * 60_000;
 const HOST_ENV = { EVENT_CONSUMER_CONCURRENCY: '1', DATABASE_POOL_MAX: '34' } as const;
+/** Tope de la espera del outbox en 0 tras la persistencia (preparación de la ráfaga). */
+const PREPARATION_CAP_MS = 600_000;
+/** Tope de la espera de la persistencia de la importación en la preparación. */
+const PERSIST_CAP_MS = 900_000;
+const incompleteSuites: IncompleteSuite[] = [];
 
 let h: Harness;
 let sampler: Client;
@@ -76,14 +85,24 @@ afterAll(async () => {
 async function startWorker(filter?: (def: EventConsumerDefinition) => boolean): Promise<void> {
   await h.stopWorker();
   await h.startWorker(
-    { metrics, ...(filter ? { startConsumers: filter } : {}) },
+    { metrics, ...PERF_WORKER_ISOLATION, ...(filter ? { startConsumers: filter } : {}) },
     { env: HOST_ENV, discardBacklog: first },
   );
   first = false;
+  // Las definiciones de la ráfaga no dependen de que la fase A termine (D300, D359): se toman del primer worker.
+  if (burstDefs.length === 0) burstDefs = h.worker!.subscriptions.definitions().filter(isBurst);
+}
+
+/** Publica la suite «sin completar» con el diagnóstico del outbox; no decide el veredicto del job (D300, D359). */
+async function publishIncomplete(suite: string, step: string, capMs: number): Promise<void> {
+  const diagnosis = await diagnoseOutbox(h);
+  incompleteSuites.push(incompleteSuite({ suite, step, capMs, diagnosis }));
+  writeIncompleteReport(incompleteSuites, perfOutDir());
+  console.log(JSON.stringify({ test: 'sin-completar', suite, step, pending: diagnosis.pending }));
 }
 
 /** Persiste ROWS transacciones con el worker sin los consumidores de la ráfaga; deja sus colas llenas. */
-async function persistBacklog(label: string): Promise<{ persistMs: number; user: User }> {
+async function persistBacklog(label: string): Promise<{ persistMs: number; user: User; completed: boolean }> {
   await startWorker((def) => !isBurst(def));
   const user = await h.user(`kc-burst-${label}-${randomUUID()}`);
   const W = `/api/v1/workspaces/${user.ws}`;
@@ -129,18 +148,29 @@ async function persistBacklog(label: string): Promise<{ persistMs: number; user:
     headers: { 'idempotency-key': randomUUID(), 'if-match': `"${String(mapped.body['version'])}"` },
   });
   expect(approved.status, JSON.stringify(approved.body)).toBe(202);
-  await until(
-    async () => {
-      const r = await h.call('GET', `${W}/imports/${upload.body['id'] as string}`, { token: user.token });
-      return ['COMPLETED', 'PARTIALLY_FAILED'].includes(r.body['status'] as string) ? r.body : undefined;
-    },
-    900_000,
-    500,
-  );
+  const suite = `ráfaga del import (fase ${label.toUpperCase()})`;
+  try {
+    await until(
+      async () => {
+        const r = await h.call('GET', `${W}/imports/${upload.body['id'] as string}`, { token: user.token });
+        return ['COMPLETED', 'PARTIALLY_FAILED'].includes(r.body['status'] as string) ? r.body : undefined;
+      },
+      PERSIST_CAP_MS,
+      500,
+    );
+  } catch {
+    await publishIncomplete(suite, 'persistencia de la importación', PERSIST_CAP_MS);
+    return { persistMs: performance.now() - t0, user, completed: false };
+  }
   const persistMs = performance.now() - t0;
   // El relay publica el resto del outbox en las colas (los consumidores de la ráfaga siguen detenidos).
-  await until(async () => ((await outboxPending(h)) === 0 ? true : undefined), 600_000, 500);
-  return { persistMs, user };
+  try {
+    await until(async () => ((await outboxPending(h)) === 0 ? true : undefined), PREPARATION_CAP_MS, 500);
+  } catch {
+    await publishIncomplete(suite, 'publicación del outbox', PREPARATION_CAP_MS);
+    return { persistMs, user, completed: false };
+  }
+  return { persistMs, user, completed: true };
 }
 
 const artifacts: Record<string, unknown> = {};
@@ -154,8 +184,14 @@ function writeArtifacts(): void {
 describe('ráfaga del import y costo por consumidor', () => {
   const cost: ConsumerCost[] = [];
 
-  it('[TC-PLATFORM-THROUGHPUT-008] fase A: la ráfaga con la configuración del host, drenado por consumidor, duración por evento, bloqueos y reintentos', async () => {
-    const { persistMs } = await persistBacklog('a');
+  it('[TC-PLATFORM-THROUGHPUT-008][TC-PLATFORM-PIPELINE-038][TC-PLATFORM-PIPELINE-039] fase A: la ráfaga con la configuración del host, drenado por consumidor, duración por evento, bloqueos y reintentos', async () => {
+    const { persistMs, completed } = await persistBacklog('a');
+    if (completed === false) {
+      // Informativa «sin completar»: se publicó con su diagnóstico y no decide el veredicto (D300, D359).
+      artifacts['burstHost'] = { rows: ROWS, persistMs: Math.round(persistMs), incomplete: true };
+      writeArtifacts();
+      return;
+    }
     const startedAt = new Date(Date.now() - 1000);
     await h.stopWorker();
     const before = await consumerBacklogWithZeros(h);
@@ -166,7 +202,6 @@ describe('ráfaga del import y costo por consumidor', () => {
     const tracker = new DrainTracker();
     const t0 = performance.now();
     await startWorker();
-    burstDefs = h.worker!.subscriptions.definitions().filter(isBurst);
     try {
       await until(
         async () => {
@@ -210,7 +245,12 @@ describe('ráfaga del import y costo por consumidor', () => {
   }, 3_600_000);
 
   it('[TC-PLATFORM-THROUGHPUT-012] fase B: cada consumidor de la ráfaga drena solo; ritmo aislado, p50/p95 y esperas por bloqueos', async () => {
-    await persistBacklog('b');
+    const prepared = await persistBacklog('b');
+    if (!prepared.completed) {
+      artifacts['solo'] = { incomplete: true };
+      writeArtifacts();
+      return;
+    }
     await h.stopWorker();
     const { backlog } = await consumerBacklogWithZeros(h);
     const defs = burstDefs;
