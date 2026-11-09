@@ -46,3 +46,10 @@ El owner pidió avanzar sin interrupciones adoptando las recomendaciones («avan
 | D398 | Q38 Acciones diferidas por D335 | Se acepta la recomendación: se retira «vincular a meta» de FR-RULES-005 (solo se vinculan transferencias y las reglas no actúan sobre ellas, D336; las sugerencias de aporte ya cubren el caso) y «split por porcentajes» pasa al backlog hasta que haya un caso real. Phase 7 no suma un change por esto. |
 | D399 | Q39 Prioridad | Se acepta (a): subir a Should para Phase 7 — . No bloquea el diseño, sí el orden de implementación. |
 | D400 | Q40 D221: `add-commodity-prices` (42) y `add-asset-valuations` (43) | Se acepta (a): Pasarlos al backlog y reactivarlos solo si el owner adquiere esos activos — la descomposición del patrimonio (D242) sigue en `reporting/financial-reports` sin necesitarlos. |
+
+## Decisiones posteriores
+
+| ID | Tema | Decisión |
+|---|---|---|
+| D401 | Exportador PDF de `add-financial-reports-extended` (3.5, Could; D376) | 2026-11-09: el owner confirma el diferimiento. El change se archiva sin PDF; TC-REPORTING-REPORTS-051 queda `ready` sin automatizar hasta que un change futuro lo retome. |
+| D402 | Persistencia del import de 5 000 filas por encima de 20 s en el nightly (NFR-PERF-007, D152) | 2026-11-09: se investiga y corrige en un change aparte; el umbral no cambia. El change 52 se archiva cuando el nightly quede estable. |
