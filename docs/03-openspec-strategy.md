@@ -200,6 +200,12 @@ Dependencias que fijan el orden: `add-financial-periods` es la base del plan men
 
 Dependencias que fijan el orden: el núcleo de reportes fija contratos y esquemas que usa el ampliado; el forecast y los reportes coordinan `PERF_THRESHOLDS` y el delta de `reporting/dashboard`; las sugerencias de reglas se archivan después de `add-rule-engine`.
 
+**Estabilización del nightly (2026-11-09).** El owner decidió tratar en un change aparte el fallo recurrente de la persistencia del import de 5 000 filas, sin tocar el umbral (NFR-PERF-007, D152); preguntas en [63-import-persist-perf-questions.md](63-import-persist-perf-questions.md).
+
+| Orden | Change | Capabilities | Fase |
+|---|---|---|---|
+| 63 | `stabilize-import-persist-perf` | `platform/delivery-pipeline` (4 ADDED: desglose de la persistencia del benchmark del import, huella del runner, suite informativa que no decide el veredicto aunque su preparación no termine, benchmark del import sin trabajos programados ajenos); experimentos P1–P8 y arreglos según el resultado (tamaño de lote, relay, trabajos programados, estado de la base), con `throughput.perf.ts` en el alcance | 6 |
+
 
 Dependencias que fijan el orden: el throughput va primero porque cambia el perfil de eventos de los imports; la escritura por lote antes del pipeline (NFR-PERF-007); los documentos antes de la etapa de subida del pipeline (sus parsers pueden avanzar con fixtures); el motor de reglas (55, `add-rule-engine`: contexto `@pf/rules` sin consumidores de eventos nuevos) expone `RuleEvaluationQuery` a la etapa de clasificación y puede implementarse antes o en paralelo del pipeline, pero la medición del 70 % de Phase 6 requiere ambos (D334); los proveedores bancarios entran por la normalización del pipeline. El parser de PDF (57, D324) entra por la etapa de lectura del pipeline: requiere aplicados `add-document-attachments` y `add-import-pipeline` y se archiva después de este (su delta modifica un requirement que agrega el 54).
 
