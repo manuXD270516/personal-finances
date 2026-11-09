@@ -17,6 +17,7 @@ import {
   isCardPayment,
   isLoanInstallment,
   LIST_LIMIT,
+  notifyRecurringChanged,
   trayQuery,
   UPCOMING_DAYS,
   upcomingQuery,
@@ -82,6 +83,9 @@ export function OccurrencesPanel({
         setHasMore(r.data?.page.hasMore ?? false);
         setProblem(undefined);
         countRef.current?.(data.length);
+        // La bandeja recién leída manda: el contador de la sidebar se vuelve a consultar para no quedar atrasado
+        // hasta su próximo sondeo (60 s) cuando el worker genera ocurrencias después de montar la pantalla.
+        if (variant === 'tray') notifyRecurringChanged();
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -91,7 +95,7 @@ export function OccurrencesPanel({
     return () => {
       cancelled = true;
     };
-  }, [ctx.api, url, refreshKey]);
+  }, [ctx.api, url, refreshKey, variant]);
 
   const close = useCallback((trigger?: { action: OccurrenceAction; id: string }) => {
     setActive(undefined);
