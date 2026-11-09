@@ -1,0 +1,67 @@
+# Tareas
+
+> Change de diagnóstico y estabilización. El umbral de 20 s de NFR-PERF-007 no cambia (decisión del owner del 2026-11-09). Sin Docker, `pnpm perf:bench` no corre en la sesión: la instrumentación se prueba con tests unitarios del reporte y del harness, y la medición real la hace el job `perf` (programado o por `workflow_dispatch` desde la rama de experimentos).
+>
+> **Orden de implementación.** (1) Grupo 1. (2) Grupos 2, 3 y 4 en un PR que se fusiona (instrumentación, aislamiento y `throughput.perf.ts` sin decidir el veredicto). (3) Grupo 5 (P1) con los nightlies programados que siguen. (4) Grupo 6 (P2–P8) en la rama de experimentos, que no se fusiona. (5) Grupo 7 (arreglos según el resultado; los que dependen de la pregunta 2 de docs/63 esperan su respuesta). (6) Grupos 8 y 9.
+
+## 1. SPEC y TEST CASES
+
+- [ ] 1.1 Revisar el delta de `platform/delivery-pipeline` contra los 4 requirements y sus 9 scenarios; `pnpm exec openspec validate stabilize-import-persist-perf --strict`
+- [ ] 1.2 Revisar TC-PLATFORM-PIPELINE-033..041 contra los scenarios (cifras: 19 949 ms ± 5 % = 18 952–20 946 ms; 3 × 610 = 1 830 ms; 123 / 54 = 2,28); pasarlos a `ready` al empezar la implementación
+
+## 2. INSTRUMENTACIÓN de la persistencia (design decisión 2; se fusiona)
+
+- [ ] 2.1 Tests primero en `apps/api/test/perf/perf-report.test.ts`: agregación del desglose (espera inicial, lotes por paso, cierre, observación), tolerancia de ±5 % de la suma frente a la persistencia (TC-PLATFORM-PIPELINE-033), lote atípico > 3 × mediana con sus esperas (TC-PLATFORM-PIPELINE-034), mantenimiento concurrente en la ventana (TC-PLATFORM-PIPELINE-035); campo aditivo `persistBreakdown` en `perf-results.json` y tabla en `perf-summary.md`; el veredicto sigue decidiéndose con la persistencia total
+- [ ] 2.2 Test unitario primero (junto a los de la persistencia en `packages/contexts/imports/src/application/imports.service.test.ts`): `PersistImportService` invoca el puerto opcional `PersistTimings` por etapa y por paso, en orden, y sin el puerto se comporta igual que hoy (mismos resultados y llamadas)
+- [ ] 2.3 Puerto `PersistTimings` en `ImportsDeps` (application/ports, no-op por omisión) y marcas en `PersistImportService` y en `RecordImportedTransactions` (transacciones, asientos, auditoría, recorrido, outbox); opción del runtime del worker para inyectar el recolector; ninguna dependencia nueva ni cambio de contrato público
+- [ ] 2.4 Muestreador de la persistencia en `apps/api/test/perf/` (conexión aparte, 250 ms): esperas de `pg_stat_activity` por tipo, autovacuum y checkpointer, `pg_stat_progress_vacuum`, deltas de `pg_stat_checkpointer`, `pg_stat_wal` y `pg_stat_io`, trabajos `events.*` encolados y carga del host; integrarlo en `imports.perf.ts` para las dos configuraciones
+
+## 3. HUELLA del runner (design decisión 2; se fusiona)
+
+- [ ] 3.1 Tests primero en `perf-report.test.ts`: factor 123 / 54 = 2,28 con la fila del host fallida sin repetirse ni invalidarse (TC-PLATFORM-PIPELINE-036) y factor 1,00 sin efecto en ningún veredicto (TC-PLATFORM-PIPELINE-037)
+- [ ] 3.2 Calibración de CPU (5 000 filas × 200 reglas, mediana de 5, sin base) y de confirmaciones (500 `INSERT` + `COMMIT` en tabla temporal) con modelo de CPU, cantidad y memoria; tomarla al empezar el job y antes de `imports.perf.ts`; referencia inicial de CPU 54 ms en una constante citada por docs/23 §5.5; la de confirmaciones se fija con las 3 primeras corridas (tarea 5.2)
+
+## 4. AISLAMIENTO y suite informativa (design decisión 2; se fusiona)
+
+- [ ] 4.1 Tests primero: el worker del benchmark arranca sin pasada de arranque de `reporting.cash-flow-watch` ni de `notifications.digest` y el reporte publica 0 trabajos programados en la ventana (TC-PLATFORM-PIPELINE-040); un trabajo horario de 4 200 ms dentro de la ventana se publica con inicio y duración sin repetir la medición (TC-PLATFORM-PIPELINE-041)
+- [ ] 4.2 Harness (`apps/api/test/support/portability.ts`): `commitmentsOnStart: false` y digest desactivado en el arranque del worker del benchmark; `registerCashFlowWatchJob` respeta `scheduleCrons` como los jobs de NOTIFY (test nuevo junto a `apps/api/src/worker/reporting-jobs.ts`); listado de trabajos de colas no `events.*` iniciados en la ventana
+- [ ] 4.3 Tests primero: con el outbox en 37 pendientes al vencer los 600 s, `throughput.perf.ts` publica la fila «sin completar» con el diagnóstico (pendientes por tipo, intentos, último error, antigüedad, transacción abierta más larga) y el veredicto del job no cambia (TC-PLATFORM-PIPELINE-038); con la ráfaga sin completar y la fila del host en 21 300 ms el job falla por la fila del host (TC-PLATFORM-PIPELINE-039)
+- [ ] 4.4 `throughput.perf.ts`: `persistBacklog` atrapa el vencimiento de sus esperas y publica el diagnóstico (incluido `EXPLAIN` de la consulta del relay); la fase B toma las definiciones de la ráfaga aunque la fase A no termine; verificar con el test de política que ninguna fila bloqueante ni umbral cambia (`scripts/delivery-policy/test/nightly-policy.test.ts`)
+
+## 5. P1: observación en los nightlies programados
+
+- [ ] 5.1 Gates del PR de los grupos 2–4 (`pnpm format:check`, `pnpm turbo typecheck lint test build`, `pnpm arch:check`, `pnpm traceability:check`, `pnpm spec:validate`, `pnpm config:docs:check`, `pnpm contract:breaking`, `pnpm test:integration` dos veces seguidas en verde)
+- [ ] 5.2 Tras fusionar: registrar en el informe el desglose, las esperas, el mantenimiento concurrente y la huella de 3 nightlies programados; fijar la referencia de confirmaciones; ordenar H3–H6 y H8 por peso y aceptar o descartar H1 (persistencia normalizada en ± 15 %)
+
+## 6. EXPERIMENTOS P2–P8 (design decisión 3; rama `claude/import-persist-perf-experiments`, no se fusiona)
+
+- [ ] 6.1 Preparar la rama: `PF_PERF_SUITES`, repeticiones dentro del mismo job, grupo de concurrencia propio por corrida, aviso por issue desactivado, variantes por variable (sin pasada ni cron de `reporting.cash-flow-watch`, sin el refresco de #205, relay pausado durante la persistencia, consumidores de la ráfaga detenidos, `IMPORT_PERSIST_BATCH_SIZE`, `track_functions = 'pl'`, `synchronous_commit = off`, `VACUUM (ANALYZE)` tras la purga)
+- [ ] 6.2 P2 (mismo runner, suite `imports` ×3 y completa ×1): ruido intra-runner frente a entre runners; costo del recolector ≤ 3 % (H1)
+- [ ] 6.3 P3 (pares ABAB: `7d825710` + instrumentación, `main`, `main` sin la pasada ni el cron, `main` sin #205) ×3: H2
+- [ ] 6.4 P8 (`throughput.perf.ts` ×3 en `main` y ×3 sin la pasada ni el cron), junto con P3: H7 y si comparte causa con H2
+- [ ] 6.5 P4 (host, consumidores detenidos, relay pausado, código) ×3, solo si P1 da a H3 un peso ≥ 10 %: costo de consumidores y relay
+- [ ] 6.6 P5 (lotes de 200, 500 y 1 000; `track_functions`) ×3, solo si P1 da a H4 un peso ≥ 10 %: costo fijo por lote y peso de los disparadores
+- [ ] 6.7 P6 (base nueva, orden completo, orden completo con `VACUUM (ANALYZE)`) ×3, solo si P1 da a H5 un peso ≥ 10 %
+- [ ] 6.8 P7 (`synchronous_commit = off` solo en la rama, para acotar) ×3, solo si P1 da a H6 un peso ≥ 10 %
+
+## 7. ARREGLOS según el resultado (design decisión 4)
+
+- [ ] 7.1 Si H2 se acepta por `reporting.cash-flow-watch`: medir el costo de una pasada con el Large Seed y, si es ≥ 2 s de base, proponer en docs/38 el change de seguimiento que la acota; si se acepta por #205, refresco de estadísticas en una sola instancia por proceso y solo con trabajos pendientes (TDD en `apps/api/test/events/event-throughput.int.test.ts`, donde #205 probó el refresco, manteniendo D360)
+- [ ] 7.2 Si H4 se acepta por costo fijo: tests primero (TC-TRANSACTIONS-BULKIMPORT-005 de equivalencia y TC-IMPORTS-CSV-023/024 de fallo parcial y reintento en verde sin cambios) y luego unir sentencias por lote en `PersistImportService` y subir `IMPORT_PERSIST_BATCH_SIZE` con la evidencia de P5 (decisión 4 del change 52; `docs/config-reference.md` y `pnpm config:docs:check`)
+- [ ] 7.3 Si H3 se acepta por el relay: lote del relay mayor con TC-PLATFORM-EVENTS-013 (orden por agregado) y la publicación al menos una vez en verde; la regulación del relay o de los consumidores solo si la pregunta 2 (iv) la aprueba
+- [ ] 7.4 Si H5 se acepta: `VACUUM (ANALYZE)` tras la purga del harness (extiende D291) y, si P6 lo justifica, parámetros de limpieza automática de `platform.outbox` en una migración expand con timestamp posterior a la última de `main`
+- [ ] 7.5 Si H7 se acepta: corregir la causa del estancamiento del relay con un test de integración que la reproduzca (ráfaga de 15 000 eventos con los consumidores detenidos llega a 0 pendientes); si cambia una conducta de `platform/event-delivery`, delta con `/opsx:update` antes de implementar
+- [ ] 7.6 Palancas de la pregunta 2 (ii) disparadores por sentencia y (iii) `synchronous_commit` local: solo si el owner las aprueba y P5/P7 las justifican; con la equivalencia del change 52 y los tests de integridad del ledger (un asiento descuadrado inyectado revierte el lote) en verde
+- [ ] 7.7 Para cada arreglo: gates de la tarea 5.1 y nightly por `workflow_dispatch` de la rama del arreglo con la huella del runner publicada
+
+## 8. VERIFICACIÓN del criterio de salida
+
+- [ ] 8.1 Fila del host de TC-IMPORTS-CSV-029 con persistencia ≤ 20 s en los nightlies programados seguidos que fije la pregunta 1, con desglose y huella en cada uno; drenado ≤ 120 s y vista previa ≤ 30 s sin cambios
+- [ ] 8.2 `throughput.perf.ts` completa sus dos fases en esos nightlies o publica el diagnóstico sin decidir el veredicto con H7 resuelta
+- [ ] 8.3 Regresión: NFR-PERF-003 (registro manual) y los demás benchmarks sin cambios de aserciones ni de umbrales (`git diff` de `apps/api/test/perf/*.perf.ts` y del test de política)
+
+## 9. DOCS y cierre
+
+- [ ] 9.1 `docs/NN-import-persist-perf-findings.md` (siguiente número libre): H1–H8 aceptadas o descartadas con medianas, rangos y runs; causa y camino de cada rojo (requirement «Causa de los rojos de rendimiento documentada antes de cambiar un umbral»)
+- [ ] 9.2 docs/23 §5.5 (desglose, huella con su referencia, aislamiento de trabajos programados, resumen del informe); notas con causa y evidencia en TC-IMPORTS-CSV-029, TC-PLATFORM-THROUGHPUT-008 y TC-PLATFORM-THROUGHPUT-012; docs/38 (fila del change 63 y cierre de la tarea 5.2 del change 52 según la pregunta 5)
+- [ ] 9.3 TC-PLATFORM-PIPELINE-033..041 a `automated`; `pnpm traceability:check` y `pnpm exec openspec validate stabilize-import-persist-perf --strict`
