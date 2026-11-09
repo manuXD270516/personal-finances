@@ -200,7 +200,7 @@ Dependencias que fijan el orden: `add-financial-periods` es la base del plan men
 
 Dependencias que fijan el orden: el núcleo de reportes fija contratos y esquemas que usa el ampliado; el forecast y los reportes coordinan `PERF_THRESHOLDS` y el delta de `reporting/dashboard`; las sugerencias de reglas se archivan después de `add-rule-engine`.
 
-**Estabilización del nightly (2026-11-09).** El owner decidió tratar en un change aparte el fallo recurrente de la persistencia del import de 5 000 filas, sin tocar el umbral (NFR-PERF-007, D152); preguntas en [63-import-persist-perf-questions.md](63-import-persist-perf-questions.md).
+**Estabilización del nightly (2026-11-09).** El owner decidió tratar en un change aparte el fallo recurrente de la persistencia del import de 5 000 filas, sin tocar el umbral (NFR-PERF-007, D152); preguntas en [63-import-persist-perf-questions.md](63-import-persist-perf-questions.md) y decisiones D403–D409 en [64-import-persist-perf-decisions.md](64-import-persist-perf-decisions.md).
 
 | Orden | Change | Capabilities | Fase |
 |---|---|---|---|

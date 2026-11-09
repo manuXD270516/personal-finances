@@ -38,7 +38,7 @@ Otros datos de las corridas:
 
 1. Medir dónde se va la persistencia (desglose por etapa y por paso) y cómo era el runner, en cada nightly.
 2. Separar con experimentos la varianza del runner, la regresión del código y la contención, y aceptar o descartar cada hipótesis con números.
-3. Implementar en este change el arreglo del benchmark que corresponda y las optimizaciones del producto que no requieren decisión del owner, hasta cumplir el criterio de salida (docs/63, pregunta 1) con el umbral de 20 s intacto.
+3. Implementar en este change el arreglo del benchmark que corresponda y las optimizaciones del producto que no requieren decisión del owner, hasta cumplir el criterio de salida (D403, [docs/64](../../../docs/64-import-persist-perf-decisions.md)) con el umbral de 20 s intacto.
 4. Que `throughput.perf.ts` vuelva a completar sus dos fases o, si su preparación no termina, que publique un diagnóstico sin decidir el veredicto (D300, D359).
 
 **No objetivos:** cambiar umbrales (20 s, 30 s, 120 s) ni volver informativa la fila del host; cambiar el runner (D302) sin decisión del owner; cambiar contratos, eventos, auditoría o invariantes; desactivar disparadores de integridad; optimizar el pipeline por documentos (OFX y PDF tienen margen); el throughput sobre el backlog del Large Seed (informativo, D312).
@@ -63,7 +63,7 @@ Otros datos de las corridas:
 - **Desglose de la persistencia** (requirement «El benchmark del import publica el desglose de la persistencia»): un puerto opcional `PersistTimings` en IMPORTS (`ImportsDeps`, application) que `PersistImportService` invoca con marcas de tiempo por etapa y por paso del lote (`performance.now()` alrededor de cada llamada ya existente: `loadBatch`, `recordBatch` desglosado por `RecordImportedTransactions` en transacciones, asientos, auditoría, recorrido y outbox, `markPersisted`, `links.insertMany`, guardado del job, `COMMIT`). En producción el puerto es un no-op (sin costo ni dependencia nueva); el worker del harness inyecta un recolector. Sin cambios de contrato ni de esquema: el recolector entra por una opción de `createWorkerRuntime` análoga a la de `metrics` que el harness ya usa para los consumidores.
 - **Espera inicial y observación:** se derivan de la aprobación (respuesta 202), el inicio de `persist` y el cierre, más el instante en que la prueba observa `COMPLETED`.
 - **Muestreo durante la persistencia** (conexión aparte del superusuario, cada 250 ms, como `LockWaitSampler`): `pg_stat_activity` (`wait_event_type`, `wait_event`, `backend_type` para autovacuum y checkpointer), `pg_stat_progress_vacuum`, deltas de `pg_stat_checkpointer`, `pg_stat_wal` y `pg_stat_io`, trabajos `events.*` encolados y `os.loadavg()`. Se publica por lote (lote atípico > 3 × mediana) y en total.
-- **Huella del runner** (requirement «Huella del runner publicada en el reporte de rendimiento»): `os.cpus()` (modelo, cantidad), `os.totalmem()`, una calibración de CPU de carga fija y determinista (la evaluación de 5 000 filas × 200 reglas de `rules.perf.ts`, mediana de 5, sin la base) y una calibración de confirmaciones (`INSERT` + `COMMIT` de 500 filas en una tabla temporal, mediana de confirmaciones por segundo). La referencia inicial es 54 ms (mediana de las corridas rápidas de la tabla) y se registra en docs/23 §5.5; la de confirmaciones se fija con las tres primeras corridas. Informativa: nunca repite ni invalida (docs/63, pregunta 3).
+- **Huella del runner** (requirement «Huella del runner publicada en el reporte de rendimiento»): `os.cpus()` (modelo, cantidad), `os.totalmem()`, una calibración de CPU de carga fija y determinista (la evaluación de 5 000 filas × 200 reglas de `rules.perf.ts`, mediana de 5, sin la base) y una calibración de confirmaciones (`INSERT` + `COMMIT` de 500 filas en una tabla temporal, mediana de confirmaciones por segundo). La referencia inicial es 54 ms (mediana de las corridas rápidas de la tabla) y se registra en docs/23 §5.5; la de confirmaciones se fija con las tres primeras corridas. Informativa: nunca repite ni invalida (D407).
 - **Trabajos programados en la ventana** (requirement «El benchmark del import mide sin trabajos programados ajenos»): el harness arranca el worker con `commitmentsOnStart: false` (la opción que hoy gobierna la pasada de arranque de `reporting.cash-flow-watch`) y sin el digest, como ya hace con `ledgerMaintenanceOnStart`, `fxGapFillOnStart` y los demás; `registerCashFlowWatchJob` pasa a respetar `scheduleCrons` como los jobs de NOTIFY (corrección del worker, sin efecto en producción, donde los crons siguen activos). El reporte lista los trabajos de colas no `events.*` que empezaron dentro de la ventana, con su duración (`pgboss.job` por `started_on`).
 - **`throughput.perf.ts` sin decidir el veredicto** (requirement «Una suite informativa no decide el veredicto aunque su preparación no termine»): `persistBacklog` atrapa el vencimiento de sus dos esperas, publica la fila «sin completar» con el diagnóstico del outbox (pendientes por `event_type`, `publish_attempts`, `last_error`, antigüedad del más viejo, `EXPLAIN` de la consulta del relay y la transacción abierta más larga de `pg_stat_activity`) y la fase B usa las definiciones de la ráfaga aunque la fase A no termine. Aplica D300 y D359; no toca ninguna fila bloqueante.
 
@@ -77,9 +77,9 @@ Rama `claude/import-persist-perf-experiments` (no se fusiona), `workflow_dispatc
 | P2 | Mismo job, mismo runner: suite `imports` sola ×3 y suite completa ×1, en `main` | Ruido dentro de un mismo runner frente al ruido entre runners | H1: dispersión intra-runner ≤ 10 % y entre runners ≥ 40 % |
 | P3 | Pares alternados ABAB en el mismo runner: `7d825710` + instrumentación, `main`, `main` sin la pasada de arranque ni el cron de `reporting.cash-flow-watch`, `main` sin el refresco de estadísticas de #205 | Regresión atribuible a cada cambio | H2: diferencia ≥ 2 s con el mismo signo en las 3 repeticiones |
 | P4 | Suite `imports` en cuatro variantes en el mismo runner: host; consumidores de la ráfaga detenidos (como la fase A); relay pausado durante la persistencia (el outbox se publica después); código | Costo de los consumidores y del relay sobre la persistencia | H3: el componente es significativo si supera 2 s o el 15 % |
-| P5 | `IMPORT_PERSIST_BATCH_SIZE` = 200, 500 y 1 000 en el mismo runner; `track_functions = 'pl'` en el contenedor de la rama | Costo fijo por lote y peso de los disparadores por fila | H4: costo fijo = pendiente de la recta tiempo vs. cantidad de lotes; disparadores ≥ 25 % del lote abre la pregunta 2 |
+| P5 | `IMPORT_PERSIST_BATCH_SIZE` = 200, 500 y 1 000 en el mismo runner; `track_functions = 'pl'` en el contenedor de la rama | Costo fijo por lote y peso de los disparadores por fila | H4: costo fijo = pendiente de la recta tiempo vs. cantidad de lotes; disparadores ≥ 25 % del lote habilitan la tarea 7.6 con un ADR (D404) |
 | P6 | Suite `imports` en base nueva (sin Large Seed ni suites previas), en el orden completo, y en el orden completo con `VACUUM (ANALYZE)` de `pgboss.job_common` y `platform.outbox` tras la purga | Efecto del estado de la base | H5: base nueva ≥ 20 % más rápida o el `VACUUM` recupera ≥ 2 s |
-| P7 | Variante de la rama con `synchronous_commit = off` en el contenedor (solo para acotar; no se adopta sin el owner, pregunta 2) | Peso de la espera del WAL | H6: si baja ≥ 20 %, la confirmación es el cuello y se priorizan menos confirmaciones (lotes más grandes) |
+| P7 | Variante de la rama con `synchronous_commit = off` en el contenedor (solo para acotar; no se adopta: D405) | Peso de la espera del WAL | H6: si baja ≥ 20 %, la confirmación es el cuello y se priorizan menos confirmaciones (lotes más grandes) |
 | P8 | `throughput.perf.ts` ×3 en `main` con el diagnóstico del vencimiento, y ×3 sin la pasada ni el cron de `reporting.cash-flow-watch` | Causa del estancamiento del relay | H7 por la causa que muestre el diagnóstico; comparte causa con H2 si desaparece sin el trabajo programado |
 
 P1 va primero porque no cuesta corridas y ordena el resto; P2 y P3 deciden si hay regresión antes de optimizar; P4–P7 se corren solo para las hipótesis que P1 deje con peso ≥ 10 %; P8 corre junto con P3 (comparte las variantes).
@@ -90,21 +90,21 @@ P1 va primero porque no cuesta corridas y ordena el resto; P2 y P3 deciden si ha
 |---|---|---|
 | H2 aceptada (trabajo programado) | Benchmark: arranque sin la pasada (ya en la decisión 2). Producto: el cron respeta `scheduleCrons`; si una pasada cuesta ≥ 2 s de base con el Large Seed, change de seguimiento para acotarla (solo workspaces con cambios desde la pasada anterior) | No (el seguimiento se propone en docs/38) |
 | H2 aceptada (#205) | El refresco de estadísticas pasa a una sola instancia por proceso y solo con trabajos pendientes en la cola, manteniendo D360 | No |
-| H3 aceptada (relay) | Lote del relay mayor (menos transacciones; sin cambio de orden por agregado) | Regular el relay mientras corre un import cambia la latencia de NFR-PERF-008: pregunta 2 (iv) |
-| H3 aceptada (consumidores) | Ninguno sin el owner: con la configuración del host los consumidores deben drenar en ≤ 120 s (D312), y frenarlos durante el import es una regulación | Pregunta 2 (iv) |
+| H3 aceptada (relay) | Lote del relay mayor (menos transacciones; sin cambio de orden por agregado) | Regular el relay mientras corre un import cambia la latencia de NFR-PERF-008: D406 la permite solo si el drenado sigue ≤ 120 s y el retraso de los demás eventos no empeora |
+| H3 aceptada (consumidores) | Ninguno salvo D406: con la configuración del host los consumidores deben drenar en ≤ 120 s (D312), y frenarlos durante el import es una regulación | Solo con la condición de D406 |
 | H4 aceptada (costo fijo por lote) | Subir `IMPORT_PERSIST_BATCH_SIZE` hasta 1 000 con la evidencia de P5 (decisión 4 del change 52, sin tocar los scenarios de fallo parcial) y unir sentencias por lote (staging y vínculos en una sola sentencia; un guardado del job por lote) | No |
-| H4 aceptada (disparadores por fila ≥ 25 %) | Ninguno sin el owner | Pregunta 2 (ii) |
+| H4 aceptada (disparadores por fila ≥ 25 %) | Ninguno salvo D404 | Solo con la evidencia y el ADR de D404 |
 | H5 aceptada | Benchmark: `VACUUM (ANALYZE)` de las tablas que la propia purga del harness deja con tuplas muertas (extiende D291). Producto: parámetros de limpieza automática por tabla en `platform.outbox` (migración expand) si P6 lo justifica | No |
-| H6 aceptada | Menos confirmaciones por lote (lotes más grandes, H4) | `synchronous_commit` local: pregunta 2 (iii) |
+| H6 aceptada | Menos confirmaciones por lote (lotes más grandes, H4) | No: D405 descarta `synchronous_commit` local |
 | H7 aceptada | Corregir la causa que muestre el diagnóstico (estadísticas o índice de `platform.outbox`, transacción larga, evento que falla siempre), con su test de integración | No, salvo que cambie una conducta de `platform/event-delivery` (entonces delta con `/opsx:update`) |
-| Solo H1 (sin margen alcanzable) | Ninguno en el producto | Pregunta 4 (runner, D302) |
+| Solo H1 (sin margen alcanzable) | Ninguno en el producto | D408: se decide solo si queda únicamente H1 |
 
-**Objetivo de diseño (no es un umbral):** que la persistencia del host en un runner de factor 1,0 quede por debajo del objetivo que fije la pregunta 1 (recomendado: ≤ 12 s, que soporta un runner 1,65× más lento como los del 11-05 al 11-07). La fila sigue decidiéndose solo frente a 20 s.
+**Objetivo de diseño (no es un umbral):** que la persistencia del host en un runner de factor 1,0 quede por debajo del objetivo de D403 (≤ 12 s, que soporta un runner 1,65× más lento como los del 11-05 al 11-07). La fila sigue decidiéndose solo frente a 20 s.
 
 ### 5. Criterio de salida
 
 1. Cada hipótesis H1–H8 aceptada o descartada con su experimento, registrada en `docs/NN-import-persist-perf-findings.md` (siguiente número libre) y resumida en docs/23 §5.5.
-2. La fila del host de TC-IMPORTS-CSV-029 con persistencia ≤ 20 s en los nightlies programados seguidos que fije la pregunta 1 (recomendado: 5), con la huella del runner publicada en cada uno.
+2. La fila del host de TC-IMPORTS-CSV-029 con persistencia ≤ 20 s en 5 nightlies programados seguidos (D403), con la huella del runner publicada en cada uno.
 3. `throughput.perf.ts` completa sus dos fases en esos nightlies o, si no, publica el diagnóstico sin decidir el veredicto y H7 tiene causa medida.
 4. TC-IMPORTS-CSV-029, TC-PLATFORM-THROUGHPUT-008 y TC-PLATFORM-THROUGHPUT-012 enlazan el informe.
 
@@ -119,7 +119,7 @@ P1 va primero porque no cuesta corridas y ordena el resto; P2 y P3 deciden si ha
 ## Riesgos / Trade-offs
 
 - **La medición altera lo medido:** marcas de tiempo en memoria y muestreo cada 250 ms en una conexión aparte; P2 compara la persistencia con y sin el recolector en el mismo runner (diferencia aceptable ≤ 3 %).
-- **Normalizar por la huella podría esconder un problema:** la huella es informativa y no corrige ninguna medición (pregunta 3).
+- **Normalizar por la huella podría esconder un problema:** la huella es informativa y no corrige ninguna medición (D407).
 - **Aislar los trabajos programados podría esconder un costo real de producción:** P3 y P8 miden el trabajo con y sin él, y el costo se publica; si pesa, va a un change de seguimiento.
 - **Lotes más grandes:** transacciones más largas sobre el ledger (hasta ≈ 3 s con 1 000 filas en el runner lento) y un registro manual concurrente que espera un lote; un error de dominio revierte más filas (el reintento por lote no cambia). Se acepta solo con la evidencia de P5.
 - **Experimentos caros y ruidosos:** pares en el mismo runner y ≥ 3 repeticiones; grupo de concurrencia propio para no cancelar los programados.
@@ -130,9 +130,9 @@ Sin migraciones previstas. Si P6 justifica parámetros de limpieza automática e
 
 ## Dependencias entre changes
 
-- **Change 52 (`add-bulk-imported-transactions`):** su tarea 5.2 (dos nightlies programados seguidos ≤ 20 s) es la misma evidencia que el criterio de salida de este change; cómo cerrarla es la pregunta 5 de docs/63.
+- **Change 52 (`add-bulk-imported-transactions`):** su tarea 5.2 (dos nightlies programados seguidos ≤ 20 s) es la misma evidencia que el criterio de salida de este change; D409 la cierra con una nota que traslada la evidencia a este change y el change 52 se archiva en un PR aparte.
 - **Independiente de** los changes de Phase 7 pendientes de archivar; si se fusiona otro trabajo programado con pasada de arranque, el harness lo desactiva igual (requirement «El benchmark del import mide sin trabajos programados ajenos»).
 
 ## Preguntas abiertas
 
-En [docs/63](../../../docs/63-import-persist-perf-questions.md): 1 (criterio de salida y margen; bloquea el cierre, no el arranque), 2 (palancas del producto que requieren decisión; bloquea solo las optimizaciones que dependan de ellas), 3 (huella informativa o corrección por runner degradado; no bloquea), 4 (runner, D302; condicional a que solo H1 quede en pie) y 5 (tarea 5.2 del change 52; no bloquea).
+Resueltas el 2026-11-09 en [docs/64](../../../docs/64-import-persist-perf-decisions.md) (pregunta N de [docs/63](../../../docs/63-import-persist-perf-questions.md) → D(402+N)), todas con la recomendación: D403 (criterio de salida: 5 nightlies programados seguidos ≤ 20 s y objetivo interno ≤ 12 s), D404 (disparadores por sentencia solo con ≥ 25 % de peso en P5 y un ADR), D405 (sin `synchronous_commit` asíncrono), D406 (regular el relay o los consumidores solo si el drenado sigue ≤ 120 s y los demás eventos no se retrasan más), D407 (huella solo informativa), D408 (el runner de D302 no se decide ahora) y D409 (la tarea 5.2 del change 52 se cierra trasladando la evidencia a este change). No queda ninguna pregunta abierta.

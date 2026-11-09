@@ -350,6 +350,8 @@ type FinanceLifecycleQuery = ReturnType<typeof createAuditRuntime>['lifecycleQue
  * MISMOS casos de uso que la operación real).
  */
 export function financeRuntimes(input: {
+  /** Solo el benchmark del import: mide los pasos de `recordBatch` de TRANSACTIONS. */
+  readonly batchTimer?: Parameters<typeof createTransactionsRuntime>[0]['batchTimer'];
   readonly pool: Pool;
   readonly clock: Clock;
   readonly audit: AuditPort;
@@ -501,6 +503,7 @@ export function financeRuntimes(input: {
   deferred.accounts = accounts;
   // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
   const transactions = createTransactionsRuntime({
+    ...(input.batchTimer ? { batchTimer: input.batchTimer } : {}),
     pool: input.pool,
     clock: input.clock,
     audit: input.audit,

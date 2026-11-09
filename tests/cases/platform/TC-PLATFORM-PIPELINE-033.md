@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - "packages/contexts/imports/src/application/imports.service.test.ts"
+  - "apps/api/test/perf/persist-breakdown.test.ts"
+  - "apps/api/test/perf/imports.perf.ts"
+status: automated
 regression_suite: false
 phase: 6
 tags: ["nightly", "perf", "imports", "stabilize-import-persist-perf"]

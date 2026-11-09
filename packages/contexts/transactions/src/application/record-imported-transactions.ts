@@ -45,6 +45,14 @@ const MAX_BATCH_ROWS = 1000;
  * índice único parcial `transaction_import_ref_uk` sigue como barrera.
  */
 /** Servicios que crean transferencias y conversiones dentro del lote (add-import-pipeline decisión 12). */
+/** Pasos del lote que mide el benchmark (stabilize-import-persist-perf); `tx.build` incluye la validación. */
+export type BatchStep = 'tx.build' | 'tx.ledger' | 'tx.transactions' | 'tx.outbox' | 'tx.lifecycle';
+
+/** Medición opcional por paso del lote: la inyecta solo el worker del benchmark; en producción no existe. */
+export interface BatchStepTimer {
+  measure<T>(step: BatchStep, fn: () => Promise<T>): Promise<T>;
+}
+
 export interface ImportedMovementServices {
   readonly transfers?: Pick<TransactionsService, 'recordTransfer'>;
   readonly conversions?: Pick<ConversionsService, 'recordConversion'>;
@@ -57,7 +65,13 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
     private readonly deps: TransactionsDeps,
     private readonly refs: ImportedRefReader,
     private readonly services: ImportedMovementServices = {},
+    /** Solo el benchmark (stabilize-import-persist-perf): mide los pasos del lote; en producción no existe. */
+    private readonly timer?: BatchStepTimer,
   ) {}
+
+  private time<T>(step: BatchStep, fn: () => Promise<T>): Promise<T> {
+    return this.timer ? this.timer.measure(step, fn) : fn();
+  }
 
   async recordBatch(input: Parameters<ImportedTransactionsCommand['recordBatch']>[0]) {
     if (input.rows.length > MAX_BATCH_ROWS) {
@@ -98,7 +112,7 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
       if (fresh.length === 0) return { created: [], alreadyExisting };
 
       const simple = fresh.filter((r) => r.kind !== 'TRANSFER' && r.kind !== 'CONVERSION');
-      const txs = simple.length > 0 ? await this.build(input, simple) : [];
+      const txs = simple.length > 0 ? await this.time('tx.build', () => this.build(input, simple)) : [];
       if (txs.length > 0) await this.persist(txs);
       const createdOf = new Map(simple.map((row, i) => [row.rowRef, (txs[i] as Transaction).id] as const));
       // Transferencias y conversiones: por los servicios existentes, dentro de la misma unidad de trabajo.
@@ -529,7 +543,9 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
   private async persist(txs: readonly Transaction[]): Promise<void> {
     const { ledger, transactions, lifecycle, outbox } = this.deps;
     // Asientos de todo el lote en una llamada: el ledger valida cuadre, escala, moneda y periodos cerrados.
-    const posted = await ledger.postJournalEntries(txs.map((tx) => journalCommandOf(tx)));
+    const posted = await this.time('tx.ledger', () =>
+      ledger.postJournalEntries(txs.map((tx) => journalCommandOf(tx))),
+    );
     const links = txs.map((tx, i) => {
       const entryId = (posted[i] as { journalEntryId: string }).journalEntryId;
       tx.attachEntry(entryId);
@@ -540,7 +556,7 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
         linkType: 'POSTED' as const,
       };
     });
-    await transactions.insertMany(txs, links);
+    await this.time('tx.transactions', () => transactions.insertMany(txs, links));
 
     // Eventos: se reúnen con los mismos constructores del camino individual y se escriben en una sola operación.
     const collected: OutboxEvent[] = [];
@@ -566,9 +582,14 @@ export class RecordImportedTransactions implements ImportedTransactionsCommand {
         steps: transactionSteps(tx, { events, journalEntries: { posted: entryId } }),
       });
     }
-    if (outbox.appendMany) await outbox.appendMany(collected);
-    else for (const e of collected) await outbox.append(e);
-    if (lifecycle.recordMany) await lifecycle.recordMany(items);
-    else for (const item of items) await lifecycle.record(item.entry, item.steps);
+    await this.time('tx.outbox', async () => {
+      if (outbox.appendMany) await outbox.appendMany(collected);
+      else for (const e of collected) await outbox.append(e);
+    });
+    // Auditoría y recorrido se escriben juntos (`lifecycle.recordMany` guarda la entrada de auditoría y sus pasos).
+    await this.time('tx.lifecycle', async () => {
+      if (lifecycle.recordMany) await lifecycle.recordMany(items);
+      else for (const item of items) await lifecycle.record(item.entry, item.steps);
+    });
   }
 }

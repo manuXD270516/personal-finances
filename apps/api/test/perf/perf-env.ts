@@ -35,3 +35,14 @@ export function perfApiEnv(
  * por omisión de 4; el host fija 1 y 34).
  */
 export const IMPORTS_API_POOL_MAX = 22;
+
+/**
+ * Opciones del worker de los benchmarks del import (stabilize-import-persist-perf, hipótesis H2): sin la pasada de
+ * arranque de los trabajos programados ajenos (ocurrencias, suscripciones, tarjetas, metas y la vigilancia del flujo de
+ * caja, que comparten `commitmentsOnStart`) y sin el cron horario de la vigilancia. El digest del Home ya arranca sin
+ * pasada ni cron (`notifications.scheduleCrons: false` del harness). Solo benchmarks: producción no pasa estas opciones.
+ */
+export const PERF_WORKER_ISOLATION = {
+  commitmentsOnStart: false,
+  reporting: { scheduleCrons: false },
+} as const;

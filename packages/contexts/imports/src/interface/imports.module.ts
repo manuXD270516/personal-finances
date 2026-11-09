@@ -46,6 +46,7 @@ import type {
   InstitutionOfAccountPort,
   OccurrenceLinkingPort,
   OccurrenceMatchingPort,
+  PersistTimings,
   OutboxPort,
   ReferenceCatalogPort,
   RulesEvaluationPort,
@@ -127,7 +128,12 @@ export const DEFAULT_IMPORTS_SETTINGS: ImportsSettings = {
   pdfMinPageTextChars: 20,
 };
 
+/** Solo el benchmark: puerto de medición de la persistencia (stabilize-import-persist-perf). */
+export type { PersistStep, PersistTimings } from '../application/ports/index.js';
+
 export interface ImportsRuntimeOptions {
+  /** Solo el benchmark: mide la persistencia por etapa y paso. */
+  readonly timings?: PersistTimings;
   readonly pool: Pool;
   readonly clock: Clock;
   readonly audit: AuditPort;
@@ -301,6 +307,7 @@ export function createImportsRuntime(options: ImportsRuntimeOptions): ImportsRun
     institutions: options.institutions,
     conversions: options.transactions.importedConversions,
     connectionHooks: hooks,
+    ...(options.timings ? { timings: options.timings } : {}),
     ...(options.systemCategories ? { systemCategories: options.systemCategories } : {}),
     readers: new DefaultStatementReader(),
     refs: options.refs,

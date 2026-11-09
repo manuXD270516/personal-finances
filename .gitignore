@@ -52,4 +52,4 @@ infra/**/backend.hcl
 *.PDF
 
 # Caché temporal de tsx cuando TMPDIR no está definido
-apps/*/undefined/
+**/undefined/temp/

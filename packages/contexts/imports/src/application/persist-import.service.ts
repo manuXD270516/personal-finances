@@ -18,7 +18,7 @@ import {
 import { recordJob, SYSTEM_ACTOR } from './job-recorder.js';
 import { publishCompleted } from './imports.service.js';
 import { ratio } from './process-import.service.js';
-import type { ImportsDeps, StagedRow } from './ports/index.js';
+import type { ImportsDeps, PersistStep, StagedRow } from './ports/index.js';
 
 export interface PersistOutcome {
   readonly status: 'SKIPPED' | 'DONE';
@@ -49,39 +49,58 @@ export class PersistImportService {
 
   async persist(input: { readonly workspaceId: string; readonly importId: string }): Promise<PersistOutcome> {
     const { deps } = this;
+    deps.timings?.persistStarted(input.importId);
+    try {
+      return await this.persistTimed(input);
+    } finally {
+      deps.timings?.persistFinished(input.importId);
+    }
+  }
+
+  private async persistTimed(input: {
+    readonly workspaceId: string;
+    readonly importId: string;
+  }): Promise<PersistOutcome> {
+    const { deps } = this;
     const { workspaceId } = input;
 
-    const started = await deps.uow.runDetached(workspaceId, async () => {
-      const job = await deps.jobs.findById(workspaceId, input.importId, { lock: 'update' });
-      if (!job) return null;
-      const status = job.state.status;
-      // Re-entrega de un evento viejo (el job ya terminó, se canceló o está en otro estado): no-op idempotente.
-      if (status !== 'APPROVED' && status !== 'PERSISTING') return null;
-      const before = status;
-      job.beginPersisting(deps.clock.now().toString());
-      await this.save(job);
-      if (before === 'APPROVED') {
-        await recordJob(deps, job, 'persisting', {
-          actor: SYSTEM_ACTOR,
-          changes: [{ field: 'status', before: 'APPROVED', after: 'PERSISTING' }],
-        });
-      }
-      return job.state;
-    });
+    const started = await this.time('begin', () =>
+      deps.uow.runDetached(workspaceId, async () => {
+        const job = await deps.jobs.findById(workspaceId, input.importId, { lock: 'update' });
+        if (!job) return null;
+        const status = job.state.status;
+        // Re-entrega de un evento viejo (el job ya terminó, se canceló o está en otro estado): no-op idempotente.
+        if (status !== 'APPROVED' && status !== 'PERSISTING') return null;
+        const before = status;
+        job.beginPersisting(deps.clock.now().toString());
+        await this.save(job);
+        if (before === 'APPROVED') {
+          await recordJob(deps, job, 'persisting', {
+            actor: SYSTEM_ACTOR,
+            changes: [{ field: 'status', before: 'APPROVED', after: 'PERSISTING' }],
+          });
+        }
+        return job.state;
+      }),
+    );
     if (!started) return { status: 'SKIPPED', batches: 0, failedBatches: 0 };
 
     const approvedBy = started.approvedBy as string;
-    const timeZone = await deps.uow.run(workspaceId, () => deps.calendar.timeZoneOf(workspaceId));
-    const batchNos = await deps.uow.runDetached(workspaceId, () =>
-      deps.staging.pendingBatchNumbers(workspaceId, input.importId),
+    const timeZone = await this.time('timezone', () =>
+      deps.uow.run(workspaceId, () => deps.calendar.timeZoneOf(workspaceId)),
+    );
+    const batchNos = await this.time('pending-batches', () =>
+      deps.uow.runDetached(workspaceId, () => deps.staging.pendingBatchNumbers(workspaceId, input.importId)),
     );
     let failedBatches = 0;
     for (const batchNo of batchNos) {
       try {
-        const linkable = await deps.uow.runDetached(workspaceId, () =>
-          this.persistBatch(started, input, batchNo, approvedBy, timeZone),
+        const linkable = await this.inBatch(batchNo, () =>
+          deps.uow.runDetached(workspaceId, () =>
+            this.persistBatch(started, input, batchNo, approvedBy, timeZone),
+          ),
         );
-        await this.linkOccurrences(workspaceId, linkable, approvedBy);
+        await this.time('link-occurrences', () => this.linkOccurrences(workspaceId, linkable, approvedBy));
       } catch (err) {
         if (!isDomainError(err)) throw err;
         failedBatches += 1;
@@ -95,46 +114,57 @@ export class PersistImportService {
       }
     }
 
-    await deps.uow.runDetached(workspaceId, async () => {
-      const job = await this.lock(workspaceId, input.importId);
-      const failures = await deps.staging.failures(workspaceId, input.importId, ERROR_LINES_LIMIT);
-      const failed = failures.reduce((sum, f) => sum + f.count, 0);
-      const before = job.state.status;
-      const reconciliation =
-        failed === 0 ? await this.reconcile(workspaceId, job) : (job.state.reconciliation ?? null);
-      const coverage = await deps.staging.rulesCoverage(workspaceId, input.importId);
-      const status = job.finish({
-        failed,
-        errors: failures.map((f) => ({ code: f.code, count: f.count, lines: f.lines })),
-        now: deps.clock.now().toString(),
-        reconciliation,
-        rulesSummary: {
-          rows: coverage.created,
-          classifiedByRule: coverage.byRule,
-          withoutCategory: coverage.withoutCategory,
-          ratio: ratio(coverage.byRule, coverage.created),
-          rulesUnavailable: job.state.rulesSummary?.rulesUnavailable ?? false,
-        },
-      });
-      await this.save(job);
-      // El cursor confirmado de una conexión avanza SOLO al terminar el import (misma unidad de trabajo).
-      if (job.state.connectionId && deps.connectionHooks && status !== 'PARTIALLY_FAILED') {
-        await deps.connectionHooks.onImportCompleted(workspaceId, job.state.connectionId, job.state.id);
-      }
-      const refs = [
-        await publishCompleted(deps, job.state, await deps.staging.dateRange(workspaceId, input.importId)),
-      ];
-      const changes: AuditChangeInput[] = [
-        { field: 'status', before, after: status },
-        { field: 'counters', before: null, after: JSON.stringify(job.state.counters) },
-        ...(reconciliation
-          ? [{ field: 'reconciliation', before: null, after: JSON.stringify(reconciliation) }]
-          : []),
-        { field: 'ruleCoverage', before: null, after: JSON.stringify(job.state.rulesSummary) },
-      ];
-      await recordJob(deps, job, 'completed', { actor: SYSTEM_ACTOR, events: refs, changes });
-    });
+    await this.time('close', () =>
+      deps.uow.runDetached(workspaceId, async () => {
+        const job = await this.lock(workspaceId, input.importId);
+        const failures = await deps.staging.failures(workspaceId, input.importId, ERROR_LINES_LIMIT);
+        const failed = failures.reduce((sum, f) => sum + f.count, 0);
+        const before = job.state.status;
+        const reconciliation =
+          failed === 0 ? await this.reconcile(workspaceId, job) : (job.state.reconciliation ?? null);
+        const coverage = await deps.staging.rulesCoverage(workspaceId, input.importId);
+        const status = job.finish({
+          failed,
+          errors: failures.map((f) => ({ code: f.code, count: f.count, lines: f.lines })),
+          now: deps.clock.now().toString(),
+          reconciliation,
+          rulesSummary: {
+            rows: coverage.created,
+            classifiedByRule: coverage.byRule,
+            withoutCategory: coverage.withoutCategory,
+            ratio: ratio(coverage.byRule, coverage.created),
+            rulesUnavailable: job.state.rulesSummary?.rulesUnavailable ?? false,
+          },
+        });
+        await this.save(job);
+        // El cursor confirmado de una conexión avanza SOLO al terminar el import (misma unidad de trabajo).
+        if (job.state.connectionId && deps.connectionHooks && status !== 'PARTIALLY_FAILED') {
+          await deps.connectionHooks.onImportCompleted(workspaceId, job.state.connectionId, job.state.id);
+        }
+        const refs = [
+          await publishCompleted(deps, job.state, await deps.staging.dateRange(workspaceId, input.importId)),
+        ];
+        const changes: AuditChangeInput[] = [
+          { field: 'status', before, after: status },
+          { field: 'counters', before: null, after: JSON.stringify(job.state.counters) },
+          ...(reconciliation
+            ? [{ field: 'reconciliation', before: null, after: JSON.stringify(reconciliation) }]
+            : []),
+          { field: 'ruleCoverage', before: null, after: JSON.stringify(job.state.rulesSummary) },
+        ];
+        await recordJob(deps, job, 'completed', { actor: SYSTEM_ACTOR, events: refs, changes });
+      }),
+    );
     return { status: 'DONE', batches: batchNos.length, failedBatches };
+  }
+
+  /** Mide un paso con el puerto opcional; sin puerto, ejecuta `fn` tal cual. */
+  private time<T>(step: PersistStep, fn: () => Promise<T>): Promise<T> {
+    return this.deps.timings ? this.deps.timings.measure(step, fn) : fn();
+  }
+
+  private inBatch<T>(batchNo: number, fn: () => Promise<T>): Promise<T> {
+    return this.deps.timings ? this.deps.timings.batch(batchNo, fn) : fn();
   }
 
   /**
@@ -171,7 +201,9 @@ export class PersistImportService {
   ): Promise<readonly { rowId: string; transactionId: string; occurrenceId: string }[]> {
     const { deps } = this;
     const { workspaceId } = input;
-    const rows = await deps.staging.loadBatch(workspaceId, input.importId, batchNo);
+    const rows = await this.time('load-batch', () =>
+      deps.staging.loadBatch(workspaceId, input.importId, batchNo),
+    );
     if (rows.length === 0) return [];
     // Un import de una conexión mezcla cuentas (cada activo mapea a la suya): un lote por cuenta, en el mismo lote de BD.
     const groups = new Map<string, StagedRow[]>();
@@ -187,52 +219,56 @@ export class PersistImportService {
       alreadyExisting: [] as { rowRef: string; transactionId: string }[],
     };
     for (const [accountId, groupRows] of groups) {
-      const part = await deps.imported.recordBatch({
-        workspaceId,
-        accountId,
-        importJobId: input.importId,
-        actorUserId: approvedBy,
-        rows: groupRows.map((r) => this.toRecordRow(r, state.format, timeZone)),
-      });
+      const part = await this.time('record-batch', () =>
+        deps.imported.recordBatch({
+          workspaceId,
+          accountId,
+          importJobId: input.importId,
+          actorUserId: approvedBy,
+          rows: groupRows.map((r) => this.toRecordRow(r, state.format, timeZone)),
+        }),
+      );
       result.created.push(...part.created);
       result.alreadyExisting.push(...part.alreadyExisting);
       const persisted = [...part.created, ...part.alreadyExisting];
-      await deps.staging.markPersisted(
-        workspaceId,
-        persisted.map((p) => ({ rowId: p.rowRef, transactionId: p.transactionId })),
+      await this.time('mark-persisted', () =>
+        deps.staging.markPersisted(
+          workspaceId,
+          persisted.map((p) => ({ rowId: p.rowRef, transactionId: p.transactionId })),
+        ),
       );
-      await deps.links.insertMany(
-        workspaceId,
-        persisted.map((p) => {
-          const row = byId.get(p.rowRef) as StagedRow;
-          return {
-            id: deps.ids.next(),
-            accountId,
-            fingerprint: row.fingerprint as string,
-            transactionId: p.transactionId,
-            stagedTransactionId: p.rowRef,
-            kind: 'CREATED' as const,
-            importJobId: input.importId,
-            externalRef: row.externalId
-              ? {
-                  // Filas de una conexión: el namespace del proveedor (archivo y API comparten referencia).
-                  namespace: row.external
-                    ? row.external.ref.namespace
-                    : `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${state.format ?? 'CSV'}`,
-                  id: row.externalId,
-                }
-              : null,
-          };
-        }),
-      );
+      const linkRows = persisted.map((p) => {
+        const row = byId.get(p.rowRef) as StagedRow;
+        return {
+          id: deps.ids.next(),
+          accountId,
+          fingerprint: row.fingerprint as string,
+          transactionId: p.transactionId,
+          stagedTransactionId: p.rowRef,
+          kind: 'CREATED' as const,
+          importJobId: input.importId,
+          externalRef: row.externalId
+            ? {
+                // Filas de una conexión: el namespace del proveedor (archivo y API comparten referencia).
+                namespace: row.external
+                  ? row.external.ref.namespace
+                  : `${IMPORT_EXTERNAL_NAMESPACE_PREFIX}${state.format ?? 'CSV'}`,
+                id: row.externalId,
+              }
+            : null,
+        };
+      });
+      await this.time('links', () => deps.links.insertMany(workspaceId, linkRows));
     }
-    const job = await this.lock(workspaceId, input.importId);
-    job.recordBatch({
-      created: result.created.length,
-      alreadyExisting: result.alreadyExisting.length,
-      now: deps.clock.now().toString(),
+    await this.time('job-save', async () => {
+      const job = await this.lock(workspaceId, input.importId);
+      job.recordBatch({
+        created: result.created.length,
+        alreadyExisting: result.alreadyExisting.length,
+        now: deps.clock.now().toString(),
+      });
+      await this.save(job);
     });
-    await this.save(job);
     // Solo las filas efectivamente creadas se vinculan; las que ya existían no (otro import las creó).
     return result.created.flatMap((c) => {
       const link = (byId.get(c.rowRef) as StagedRow).occurrenceLink;

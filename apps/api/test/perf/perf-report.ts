@@ -1,5 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type {
+  IncompleteSuite,
+  MaintenanceEntry,
+  PersistBreakdown,
+  RunnerFingerprint,
+  ScheduledJobEntry,
+  WaitSummary,
+} from './persist-breakdown.js';
+import { persistRowStatus } from './persist-breakdown.js';
+
+export * from './persist-breakdown.js';
 
 /**
  * Umbrales de rendimiento de Phase 1 tomados de docs/02-non-functional-requirements.md (§PERF) y de add-ledger-core
@@ -410,6 +421,8 @@ export interface PerfReport {
   readonly imports?: ImportsReport;
   /** Costo por evento de cada consumidor con handler real (optimize-consumer-throughput). Informativo, aditivo. */
   readonly consumerCost?: readonly ConsumerCost[];
+  /** Suites informativas que no completaron su preparación (stabilize-import-persist-perf). Aditivo. */
+  readonly incompleteSuites?: readonly IncompleteSuite[];
 }
 
 export function latencyResult(input: {
@@ -907,6 +920,18 @@ export interface ImportsReport {
   readonly configuration?: ImportsConfiguration;
   /** Fila con la configuración de la plantilla del host (misma forma que la raíz): bloqueante desde D311. */
   readonly hostConfig?: ImportsReport;
+  /** Presupuesto de la persistencia (NFR-PERF-007); con él la fila publica su estado frente a 20 s. */
+  readonly persistBudgetMs?: number;
+  /** Desglose de la persistencia (stabilize-import-persist-perf); aditivo, no decide el veredicto. */
+  readonly persistBreakdown?: PersistBreakdown;
+  /** Esperas de la base muestreadas durante la persistencia. */
+  readonly waits?: WaitSummary;
+  /** Limpiezas automáticas y puntos de control dentro de la ventana. */
+  readonly maintenance?: readonly MaintenanceEntry[];
+  /** Trabajos programados ajenos que empezaron dentro de la ventana (persistencia y drenado). */
+  readonly scheduledJobs?: readonly ScheduledJobEntry[];
+  /** Huella del runner (informativa: nunca repite ni invalida la medición). */
+  readonly runner?: RunnerFingerprint;
 }
 
 /** Costo por evento de un consumidor con su handler real (optimize-consumer-throughput, E6–E8). Siempre informativo. */
@@ -976,6 +1001,82 @@ export function renderImportsSection(r: ImportsReport): string[] {
   return out;
 }
 
+const ms = (v: number): string => String(Math.round(v));
+const factorText = (v: number): string => v.toFixed(2).replace('.', ',');
+
+/** Huella del runner, desglose, esperas, mantenimiento y trabajos programados de una fila (todo informativo). */
+export function renderPersistDetail(r: ImportsReport): string[] {
+  const out: string[] = [];
+  const f = r.runner;
+  if (f) {
+    out.push(
+      `**Huella del runner (informativa):** ${f.cpuModel}, ${String(f.cpuCount)} CPU, ${String(f.totalMemoryMb)} MB; calibración de CPU ${ms(f.cpuCalibrationMs)} ms frente a ${ms(f.cpuReferenceMs)} ms de referencia (factor ${factorText(f.cpuFactor)}); confirmaciones ${f.commitsPerSecond === null ? 'sin medir' : `${String(f.commitsPerSecond)} por segundo`}${f.commitFactor === null ? ' (sin referencia todavía)' : ` (factor ${factorText(f.commitFactor)})`}.`,
+      '',
+    );
+  }
+  const b = r.persistBreakdown;
+  if (b) {
+    out.push(
+      `**Desglose de la persistencia:** espera inicial ${ms(b.initialWaitMs)} ms, inicio ${ms(b.beginMs)} ms, preparación ${ms(b.setupMs)} ms, ${String(b.batchCount)} lotes ${ms(b.batchesMs)} ms (mediana ${ms(b.medianBatchMs)} ms), entre lotes ${ms(b.betweenBatchesMs)} ms, cierre ${ms(b.closeMs)} ms, observación ${ms(b.observationMs)} ms. Suma ${ms(b.partsSumMs)} ms frente a ${ms(b.persistMs)} ms medidos (${b.withinTolerance ? 'dentro' : 'FUERA'} de ±5 %).`,
+      '',
+      '| Paso | Total (ms) |',
+      '|---|---|',
+      ...Object.entries(b.stepTotalsMs)
+        .sort((x, y) => y[1] - x[1])
+        .map(([step, total]) => `| ${step} | ${ms(total)} |`),
+      '',
+    );
+    const outliers = b.batches.filter((x) => x.outlier);
+    if (outliers.length > 0) {
+      out.push(
+        `Lotes atípicos (más de ${ms(b.outlierThresholdMs)} ms):`,
+        '',
+        '| Lote | Duración (ms) | Pasos | Esperas muestreadas |',
+        '|---|---|---|---|',
+        ...outliers.map(
+          (x) =>
+            `| ${String(x.batch)} | ${ms(x.durationMs)} | ${Object.entries(x.steps)
+              .map(([k, v]) => `${k} ${ms(v)}`)
+              .join(
+                ', ',
+              )} | ${(x.waits ?? []).map((w) => `${w.wait} ×${String(w.samples)}`).join(', ') || '—'} |`,
+        ),
+        '',
+      );
+    }
+  }
+  if (r.waits && r.waits.samples > 0) {
+    out.push(
+      `Esperas de la base (${String(r.waits.samples)} muestras; pico de carga ${String(r.waits.peakLoad1m)}; pico de trabajos de eventos encolados ${String(r.waits.peakQueuedEventJobs)}): ${r.waits.byWait.map((w) => `${w.wait} ${String(Math.round(w.share * 100))} %`).join(', ') || 'sin esperas'}.`,
+      '',
+    );
+  }
+  if (r.maintenance) {
+    out.push(
+      r.maintenance.length === 0
+        ? 'Mantenimiento concurrente de la base: ninguno dentro de la ventana.'
+        : `Mantenimiento concurrente de la base (la medición sigue siendo válida): ${r.maintenance
+            .map(
+              (m) =>
+                `${m.kind === 'autovacuum' ? `limpieza automática de ${m.target ?? '?'}` : 'punto de control'} a +${ms(m.startOffsetMs)} ms durante ${ms(m.durationMs)} ms`,
+            )
+            .join('; ')}.`,
+      '',
+    );
+  }
+  if (r.scheduledJobs) {
+    out.push(
+      r.scheduledJobs.length === 0
+        ? 'Trabajos programados ajenos dentro de la ventana: 0.'
+        : `Trabajos programados ajenos dentro de la ventana (la fila decide con la persistencia medida, sin repetirse): ${r.scheduledJobs
+            .map((j) => `${j.name} a +${ms(j.startOffsetMs)} ms durante ${ms(j.durationMs)} ms`)
+            .join('; ')}.`,
+      '',
+    );
+  }
+  return out;
+}
+
 /** Estado de una fila del benchmark del import: bloqueante (decide el veredicto) o informativa (se publica sin decidir). */
 export function importsRowStatus(r: ImportsReport): string {
   const gate = r.configuration?.gate ?? true;
@@ -1005,6 +1106,13 @@ function renderImportsRow(r: ImportsReport, heading: string): string[] {
     '',
     `Vista previa ${seconds(r.previewMs)}, persistencia ${seconds(r.persistMs)}, drenado ${seconds(r.drainAfterPersistMs)} después de la persistencia (presupuesto ${budgetSeconds(r.drainBudgetMs)}).`,
     '',
+    ...(r.persistBudgetMs === undefined
+      ? []
+      : [
+          `**Persistencia:** ${seconds(r.persistMs)} frente a ${budgetSeconds(r.persistBudgetMs)}: ${persistRowStatus(r.persistMs, r.persistBudgetMs)}.`,
+          '',
+        ]),
+    ...renderPersistDetail(r),
   ];
   const c = r.connections;
   if (c) {
@@ -1089,6 +1197,61 @@ export function writeImportsReport(report: ImportsReport, outDir: string): void 
 }
 
 // ── Costo por evento de cada consumidor con handler real (optimize-consumer-throughput, TC-PLATFORM-THROUGHPUT-012/013) ──
+
+export const INCOMPLETE_SECTION_START = '<!-- suites-incomplete:start -->';
+export const INCOMPLETE_SECTION_END = '<!-- suites-incomplete:end -->';
+
+/** Sección de las suites informativas que no completaron su preparación (D300, D359): no decide el veredicto. */
+export function renderIncompleteSection(rows: readonly IncompleteSuite[]): string[] {
+  const out: string[] = [
+    '## Suites informativas sin completar',
+    '',
+    'Estas suites no terminaron su preparación dentro de su tope y NO deciden el veredicto del job (D300, D359).',
+    '',
+  ];
+  for (const r of rows) {
+    const d = r.diagnosis;
+    out.push(
+      `### ${r.suite}: ${r.status}`,
+      '',
+      `Paso que no terminó: ${r.step} (tope ${seconds(r.capMs)}). Eventos pendientes en el outbox: ${String(d.pending)}; el más viejo tiene ${d.oldestPendingAgeMs === null ? 'sin dato' : seconds(d.oldestPendingAgeMs)}; transacción abierta más larga: ${d.longestTransactionMs === null ? 'ninguna' : `${seconds(d.longestTransactionMs)} (${d.longestTransactionQuery ?? 'sin consulta'})`}.`,
+      '',
+      '| Tipo de evento | Pendientes | Intentos máx. | Último error |',
+      '|---|---|---|---|',
+      ...d.byType.map(
+        (t) =>
+          `| ${t.eventType} | ${String(t.pending)} | ${String(t.maxAttempts)} | ${(t.lastError ?? '—').replace(/\|/gu, '/')} |`,
+      ),
+      '',
+      ...(d.relayPlan ? ['Plan de la consulta del relay:', '', '```', d.relayPlan, '```', ''] : []),
+    );
+  }
+  return out;
+}
+
+/** Publica las suites sin completar: `incomplete-suites-perf.json` y, si existen, `perf-results.json` y `perf-summary.md` (aditivo). */
+export function writeIncompleteReport(rows: readonly IncompleteSuite[], outDir: string): void {
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, 'incomplete-suites-perf.json'), `${JSON.stringify(rows, null, 2)}\n`, 'utf8');
+  const jsonPath = join(outDir, 'perf-results.json');
+  const mdPath = join(outDir, 'perf-summary.md');
+  if (!existsSync(jsonPath) || !existsSync(mdPath)) return;
+  const current = JSON.parse(readFileSync(jsonPath, 'utf8')) as PerfReport;
+  writeFileSync(jsonPath, `${JSON.stringify({ ...current, incompleteSuites: rows }, null, 2)}\n`, 'utf8');
+  const section = [INCOMPLETE_SECTION_START, ...renderIncompleteSection(rows), INCOMPLETE_SECTION_END].join(
+    '\n',
+  );
+  const md = readFileSync(mdPath, 'utf8');
+  const start = md.indexOf(INCOMPLETE_SECTION_START);
+  const end = md.indexOf(INCOMPLETE_SECTION_END);
+  writeFileSync(
+    mdPath,
+    start === -1 || end === -1 || end < start
+      ? `${md.replace(/\n*$/u, '')}\n\n${section}\n`
+      : `${md.slice(0, start)}${section}${md.slice(end + INCOMPLETE_SECTION_END.length)}`,
+    'utf8',
+  );
+}
 
 export const CONSUMER_COST_SECTION_START = '<!-- consumer-cost:start -->';
 export const CONSUMER_COST_SECTION_END = '<!-- consumer-cost:end -->';
