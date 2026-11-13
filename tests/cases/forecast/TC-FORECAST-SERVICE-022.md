@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Datos mínimos enviados al servicio de pronósticos"
 scenario: "Referencias distintas en cada corrida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-COMP-001","NFR-COMP-002"]
 invariants: []
 priority: high
 type: security
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/forecast-request.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["privacy"]

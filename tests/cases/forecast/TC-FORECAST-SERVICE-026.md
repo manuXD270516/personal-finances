@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Horizonte de las series"
 scenario: "Horizonte del gasto total y de una categoría"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - packages/contexts/forecasting/src/domain/readiness-gate.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["horizon"]

@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Horizonte de las series"
 scenario: "Horizonte no admitido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["horizon"]

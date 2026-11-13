@@ -77,7 +77,7 @@ tags:
   - name: Rules
     description: "Phase 6: WHEN/THEN classification rules with deterministic priority, versions, preview, retroactive dry-run and its audited application, and the classification coverage that measures the 70 % exit criterion (add-rule-engine)."
   - name: Forecasts
-    description: "LATER (Phase 8): statistical forecasts (async)."
+    description: "Phase 8: forecast runs (asynchronous, executed by the worker through the internal finance-ml service) and the current forecast by series and horizon, with the data readiness of each series (add-ml-forecasting-service)."
   - name: Assistant
     description: "LATER (Phase 10): read-only AI assistant."
 
@@ -14866,6 +14866,185 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Forecasting: corridas y pronóstico vigente (openspec add-ml-forecasting-service, forecast/expense-forecasting) ──
+  /workspaces/{workspaceId}/forecasts:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Forecasts]
+      operationId: requestForecastRun
+      summary: Request a forecast run of the workspace (OWNER or EDITOR, asynchronous)
+      description: |
+        Creates a `MANUAL` forecast run and its `FORECAST` operation (same id) and answers at once; the worker executes the run
+        (the forecasting service is never on the critical path). One run requested or running per workspace
+        (409 `FORECAST_RUN_IN_PROGRESS`); with the feature disabled in the installation, 409 `FORECASTING_DISABLED`. A VIEWER
+        gets 403 `INSUFFICIENT_ROLE`. The request is audited (`forecasting.forecast_run.requested`). The `Location` header points
+        to the run (`getForecastRun`), which reports the same state as the operation.
+      x-openspec-capability: [forecast/expense-forecasting]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '202':
+          description: Run accepted; poll the run.
+          headers:
+            Location:
+              description: URL of the forecast run (`/api/v1/workspaces/{workspaceId}/forecasts/{runId}`).
+              schema: { type: string }
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Operation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: 'FORECAST_RUN_IN_PROGRESS, FORECASTING_DISABLED or IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    get:
+      tags: [Forecasts]
+      operationId: listForecastRuns
+      summary: List the forecast runs of the workspace
+      description: Most recent first. `status` may be repeated to filter by run status.
+      x-openspec-capability: [forecast/expense-forecasting]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: status
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/ForecastRunStatus' }
+      responses:
+        '200':
+          description: Page of forecast runs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForecastRunPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/forecasts/latest:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Forecasts]
+      operationId: getLatestForecast
+      summary: Current forecast (the latest completed run) by series and horizon
+      description: |
+        Series with their data readiness and the forecast points up to `horizon` periods (1, 3, 6 or 12; any other value ⇒ 400
+        `INVALID_FILTER`). `status` is `AVAILABLE`, `NONE` (no completed run) or `DISABLED` (feature off in the installation).
+        `stale` is true when the forecast is more than 35 days old or the latest run after it failed (`lastAttempt`).
+      x-openspec-capability: [forecast/expense-forecasting]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - name: scope
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/ForecastScope' }
+        - name: scopeRef
+          in: query
+          description: Category group, category or group of "other categories" (with the matching `scope`).
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: horizon
+          in: query
+          description: Periods ahead to return (1, 3, 6 or 12).
+          schema: { type: integer, default: 12 }
+      responses:
+        '200':
+          description: Current forecast
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LatestForecast' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/forecasts/{runId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ForecastRunId'
+    get:
+      tags: [Forecasts]
+      operationId: getForecastRun
+      summary: Get a forecast run with the readiness of each series
+      x-openspec-capability: [forecast/expense-forecasting]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Forecast run
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForecastRun' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/forecasts/{runId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ForecastRunId'
+    get:
+      tags: [Forecasts]
+      operationId: getForecastRunLifecycle
+      summary: Lifecycle of a forecast run
+      description: |
+        Machine `ForecastRun` (docs/31 D37): request, start, retry (with the failure reason), completion, no-data end,
+        failure and supersession by a newer completed run.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Lifecycle of a forecast run
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -15289,6 +15468,12 @@ components:
       in: path
       required: true
       description: Savings goal UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    ForecastRunId:
+      name: runId
+      in: path
+      required: true
+      description: Forecast run UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
     DocumentId:
       name: documentId
@@ -15797,6 +15982,8 @@ components:
         - RULE_LIMIT_EXCEEDED                    # 422 (add-rule-engine: the workspace has the maximum of 500 non-archived rules)
         - RULE_DRY_RUN_STALE                     # 409 (add-rule-engine: a rule or a transaction changed after the dry-run; run it again)
         - RULE_SUGGESTION_DECIDED                # 409 (add-rule-suggestions: the rule suggestion was already accepted or dismissed)
+        - FORECAST_RUN_IN_PROGRESS               # 409 (add-ml-forecasting-service: the workspace already has a forecast run requested or running)
+        - FORECASTING_DISABLED                   # 409 (add-ml-forecasting-service: forecasting is not enabled in this installation)
 
     # ── Identity ──
     WorkspaceRole:
@@ -19953,11 +20140,11 @@ components:
       pattern: '^[A-Z][A-Za-z]{0,63}$'
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
       # aditiva (Category y Counterparty, decisión del owner D52; FinancialPeriod, add-financial-periods).
-      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal, Document]
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal, Document, ForecastRun]
     LifecycleAggregateTypeInput:
       type: string
       description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
-      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal, Document]
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal, Document, ForecastRun]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).
@@ -28189,3 +28376,161 @@ components:
               rate:
                 oneOf: [{ $ref: '#/components/schemas/ResolvedRate' }, { type: 'null' }]
         nextCursor: { type: [string, 'null'] }
+
+    # ── Forecasting (openspec add-ml-forecasting-service) ──
+    ForecastRunStatus:
+      type: string
+      description: Open set. State of a forecast run (machine `ForecastRun`).
+      x-extensible-enum: [REQUESTED, RUNNING, COMPLETED, INSUFFICIENT_DATA, FAILED, SUPERSEDED]
+    ForecastFailureReason:
+      type: string
+      description: Open set. Why the run failed or was retried.
+      x-extensible-enum: [SERVICE_UNAVAILABLE, SERVICE_REJECTED, TIMEOUT, INVALID_OUTPUT]
+    ForecastScope:
+      type: string
+      description: Open set. What a series forecasts.
+      x-extensible-enum: [TOTAL_EXPENSE, CATEGORY_GROUP, CATEGORY, OTHER_CATEGORIES, TOTAL_INCOME]
+    ForecastReadiness:
+      type: string
+      description: Open set. `MODEL` (6 or more finished periods), `SIMPLE` (3 to 5, a simple estimate only) or `INSUFFICIENT`.
+      x-extensible-enum: [MODEL, SIMPLE, INSUFFICIENT]
+    ForecastRunSummary:
+      type: object
+      required: [id, trigger, status, requestedAt, requestedBy, completedAt, asOfPeriod, attempts, failureReason, seriesCount]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        trigger: { type: string, enum: [MANUAL, SCHEDULED] }
+        status: { $ref: '#/components/schemas/ForecastRunStatus' }
+        requestedAt: { $ref: '#/components/schemas/Instant' }
+        requestedBy:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        completedAt:
+          oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }]
+        asOfPeriod:
+          description: Last finished period used as history.
+          type: [string, 'null']
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        attempts: { type: integer, minimum: 0 }
+        failureReason:
+          oneOf: [{ $ref: '#/components/schemas/ForecastFailureReason' }, { type: 'null' }]
+        seriesCount:
+          type: object
+          required: [published, insufficient, invalid]
+          properties:
+            published: { type: integer, minimum: 0 }
+            insufficient: { type: integer, minimum: 0 }
+            invalid: { type: integer, minimum: 0 }
+    ForecastRunPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ForecastRunSummary' }
+        nextCursor: { type: [string, 'null'] }
+    ForecastReadinessReason:
+      type: object
+      required: [code, missingForSimple, missingForModel]
+      properties:
+        code:
+          type: string
+          description: Open set (TOO_FEW_PERIODS, LOW_CATEGORIZATION, GAP_TRUNCATED, INVALID_OUTPUT).
+        missingForSimple: { type: [integer, 'null'] }
+        missingForModel: { type: [integer, 'null'] }
+    ForecastSeriesSummary:
+      type: object
+      required: [scope, scopeRef, name, readiness, readinessReasons, historyFrom, historyTo, historyPeriods, groupedCategoryIds]
+      properties:
+        scope: { $ref: '#/components/schemas/ForecastScope' }
+        scopeRef:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        name: { type: string, description: 'Group or category name; `TOTAL_EXPENSE` and `TOTAL_INCOME` for the totals.' }
+        readiness: { $ref: '#/components/schemas/ForecastReadiness' }
+        readinessReasons:
+          type: array
+          items: { $ref: '#/components/schemas/ForecastReadinessReason' }
+        historyFrom: { type: [string, 'null'] }
+        historyTo: { type: [string, 'null'] }
+        historyPeriods: { type: integer, minimum: 0 }
+        groupedCategoryIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+    ForecastRun:
+      allOf:
+        - $ref: '#/components/schemas/ForecastRunSummary'
+        - type: object
+          required: [datasetSnapshotId, serviceVersion, reportingCurrency, series]
+          properties:
+            datasetSnapshotId: { type: [string, 'null'] }
+            serviceVersion: { type: [string, 'null'] }
+            reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+            series:
+              type: array
+              items: { $ref: '#/components/schemas/ForecastSeriesSummary' }
+    ForecastInterval:
+      type: object
+      required: [lower, upper]
+      properties:
+        lower: { $ref: '#/components/schemas/Money' }
+        upper: { $ref: '#/components/schemas/Money' }
+    ForecastPoint:
+      type: object
+      required: [period, periodStart, periodEnd, monthsAhead, prediction, interval80, interval95, baseline]
+      properties:
+        period: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        periodStart: { $ref: '#/components/schemas/LocalDate' }
+        periodEnd: { $ref: '#/components/schemas/LocalDate' }
+        monthsAhead: { type: integer, minimum: 1, maximum: 12 }
+        prediction: { $ref: '#/components/schemas/Money' }
+        interval80: { $ref: '#/components/schemas/ForecastInterval' }
+        interval95: { $ref: '#/components/schemas/ForecastInterval' }
+        baseline:
+          type: object
+          required: [method, n, value]
+          properties:
+            method: { type: string, description: 'Open set (NAIVE, SEASONAL_NAIVE, MEAN_LAST_N).' }
+            n: { type: [integer, 'null'] }
+            value: { $ref: '#/components/schemas/Money' }
+    ForecastSeries:
+      allOf:
+        - $ref: '#/components/schemas/ForecastSeriesSummary'
+        - type: object
+          required: [currency, model, points]
+          properties:
+            currency: { $ref: '#/components/schemas/CurrencyCode' }
+            model:
+              oneOf:
+                - type: object
+                  required: [name, version]
+                  properties:
+                    name: { type: string }
+                    version: { type: string }
+                - type: 'null'
+            points:
+              type: array
+              items: { $ref: '#/components/schemas/ForecastPoint' }
+    LatestForecast:
+      type: object
+      required: [status, stale, lastAttempt, run, reportingCurrency, generatedAt, series, disclaimerKey]
+      properties:
+        status: { type: string, enum: [AVAILABLE, NONE, DISABLED] }
+        stale: { type: boolean }
+        lastAttempt:
+          oneOf:
+            - type: object
+              required: [status, at, failureReason]
+              properties:
+                status: { $ref: '#/components/schemas/ForecastRunStatus' }
+                at: { $ref: '#/components/schemas/Instant' }
+                failureReason:
+                  oneOf: [{ $ref: '#/components/schemas/ForecastFailureReason' }, { type: 'null' }]
+            - type: 'null'
+        run:
+          oneOf: [{ $ref: '#/components/schemas/ForecastRunSummary' }, { type: 'null' }]
+        reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        generatedAt:
+          oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }]
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/ForecastSeries' }
+        disclaimerKey: { type: string }

@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Solicitud manual de una corrida"
 scenario: "VIEWER no solicita corridas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001","FR-FORECAST-006"]
 nfr: []
 invariants: []
 priority: medium
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["rbac"]

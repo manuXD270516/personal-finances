@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Corridas programadas sin consumidores nuevos"
 scenario: "Pronóstico reciente sin periodo nuevo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001"]
 nfr: ["NFR-PERF-012"]
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["scheduler"]

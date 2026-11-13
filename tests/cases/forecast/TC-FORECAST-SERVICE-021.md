@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Datos mínimos enviados al servicio de pronósticos"
 scenario: "Petición sin datos identificables"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-COMP-001","NFR-COMP-002"]
 invariants: []
 priority: critical
 type: security
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - packages/contexts/forecasting/src/domain/forecast-request.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["privacy"]

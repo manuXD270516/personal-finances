@@ -5,16 +5,17 @@ spec: platform/local-environment
 related_specs: []
 requirement: "Servicio de pronósticos en el perfil ml"
 scenario: "Stack con el perfil ml"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-PORT-001","NFR-REL-010"]
 invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - services/ml-forecasting/tests/test_api.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["compose","ml"]

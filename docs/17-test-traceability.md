@@ -288,3 +288,7 @@ Todo change declara su impacto en tests (ver [16-testing-strategy.md §11](./16-
 | Q5 hasta el próximo ingreso, esenciales, ajustes del disponible, Q7 y checklist SM-05 | TC-REPORTING-FORECAST-022..030 | domain / application / api / e2e |
 | Notificación de riesgo de déficit y sus emails | TC-NOTIFICATIONS-SHORTFALL-001..004 | application / integration |
 | Frecuencia, composición, privacidad, silencio y recuperación del digest | TC-NOTIFICATIONS-DIGEST-001..008 | api / integration / unit |
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Matriz: `TC-FORECAST-SERVICE-001..040` y `TC-PLATFORM-MLSERVICE-001..009`. Los tests de Python citan el TC-id entre corchetes en el docstring (`"""[TC-FORECAST-SERVICE-034] …"""`) y `scripts/traceability` los escanea (`services/**/test_*.py`). Sin test todavía: `TC-FORECAST-SERVICE-001` (E2E de degradación), `-028` (nightly con el servicio real) y `TC-PLATFORM-MLSERVICE-001/-005/-006/-007` (humo de Compose/CI/despliegue, validados por los workflows).

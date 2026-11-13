@@ -500,3 +500,9 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 8. ¿Las tarjetas bimoneda (FR-DEBT-016) son un caso real del owner? Si sí, subir a Must. — _Resuelta (D171, 2026-10-10): sí; FR-DEBT-016 es Must._
 9. ¿Se requiere soporte de **cuentas conjuntas** (una cuenta compartida entre workspaces) o basta con el workspace compartido del track de Colaboración?
 10. ~~**Ubicación de FR-REPORTING-004**~~: resuelta por el owner el 2026-10-05 ([docs/31 D50](./31-phase-1-consolidation-decisions.md)): pasa a `reporting/dashboard` en Phase 1, servido por `GET /reports/summary` en el Home.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- FR-FORECAST-001/002: corridas por periodo financiero (`forecast_run`, series y puntos), valor esperado = promedio móvil de 6 periodos (o los disponibles), intervalos empíricos del 80 % y 95 % y referencia (`NAIVE`/`SEASONAL_NAIVE`/`MEAN_LAST_N`); ETS y selección por backtesting son del change 65.
+- FR-FORECAST-005: `ReadinessGate` puro con umbrales por entorno (`FORECASTING_MIN_PERIODS_MODEL` 6, `FORECASTING_MIN_PERIODS_SIMPLE` 3), «Otras categorías», huecos y calidad de la clasificación.
+- FR-FORECAST-006: el servicio nunca está en el camino crítico; apagado o deshabilitado el núcleo responde igual y la consulta devuelve el último pronóstico con `stale`/`lastAttempt`.

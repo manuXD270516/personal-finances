@@ -140,3 +140,7 @@ quadrantChart
 - **Fatiga de alertas (junto a RISK-022/029).** La alerta de déficit abre **un episodio por moneda** y un solo aviso por destinatario; solo el riesgo `HIGH` abre, no hay aviso de cierre (D380) y el umbral es la reserva mínima que el usuario controla. Latencia de hasta una hora aceptada (D381): la tarjeta Q8 muestra el riesgo en la siguiente lectura.
 - **Estimados en la serie principal (D379).** Un `ESTIMATED` sobreestimado puede abrir un episodio; el monto se edita por ocurrencia.
 - **Privacidad del digest (RISK-010).** Desactivado por omisión, sin montos ni nombres sin opt-in y con porcentajes y fechas (D385, D386).
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Riesgo nuevo: memoria del host N1 con el servicio de pronósticos habilitado (techo 320 MiB; medido 56 MiB con 400 series × 60 periodos y baselines; se vuelve a medir con ETS en el change 65). Mitigación: opt-in por perfil, un proceso, hilos BLAS en 1 y disparador N2. RISK-005 (segundo runtime): un solo servicio sin estado, `uv.lock`, Renovate y el job `ml`.

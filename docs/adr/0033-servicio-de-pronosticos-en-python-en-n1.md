@@ -90,3 +90,7 @@ ADR-0017 propuso un servicio Python separado para el pronóstico, con un ACL en 
 
 - Versiones de Python, numpy, scipy, pandas y statsmodels: a verificar al implementar (no se consultaron fuentes externas en esta propuesta).
 - Si se acepta, ADR-0017 pasa a «Aceptado» con esta concreción.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Medición (tarea 4.8, 2026-11-12, imagen `finance-ml` construida del Dockerfile, contenedor `read_only`, `-m 320m --cpus 1`): reposo 48 MiB; tras una petición de 400 series × 60 periodos × horizonte 12 (197 KB) responde en 0,14 s y el contenedor queda en 56 MiB. Con los baselines de este change `statsmodels` no se importa; el límite de 320 MiB deja margen para ETS (change 65, que vuelve a medir).

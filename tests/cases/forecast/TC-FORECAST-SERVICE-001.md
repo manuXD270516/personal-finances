@@ -5,7 +5,7 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronóstico opcional y aislado del núcleo"
 scenario: "Servicio de pronósticos apagado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-REL-010"]
 invariants: []
@@ -14,7 +14,7 @@ type: e2e
 level: container-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 8
 tags: ["degradation"]

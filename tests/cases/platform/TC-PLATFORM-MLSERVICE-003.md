@@ -5,16 +5,19 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Gate del servicio de pronósticos en el pull request"
 scenario: "Contrato desalineado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-MAINT-001","NFR-SEC-013"]
 invariants: []
 priority: high
 type: platform
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/infrastructure/ml-service-client.test.ts
+  - services/ml-forecasting/tests/test_api.py
+  - services/ml-forecasting/tests/test_contract.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["ci","contract"]

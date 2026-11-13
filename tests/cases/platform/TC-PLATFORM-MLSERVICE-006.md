@@ -5,7 +5,7 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Imagen del servicio de pronósticos promovida por digest"
 scenario: "Despliegue por digest"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PORT-006","NFR-SEC-013","NFR-SEC-014"]
 invariants: []
@@ -14,7 +14,7 @@ type: platform
 level: smoke
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 8
 tags: ["deploy"]

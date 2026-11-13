@@ -495,3 +495,7 @@ Los puertos de host ya no son los canónicos: defaults "2 + puerto canónico" (2
 ## Documentos adjuntos en local (add-document-attachments)
 
 `migrate` crea, con `OBJECT_STORAGE_ENSURE_BUCKET=true`, el bucket de **cuarentena** `OBJECT_STORAGE_QUARANTINE_BUCKET` (sin versioning y con CORS solo `PUT`/`HEAD` de `OBJECT_STORAGE_CORS_ORIGINS`) además del bucket de documentos y el de exports. La URL de subida se firma con `OBJECT_STORAGE_PUBLIC_ENDPOINT` (en modo A y en el stack, el S3 publicado en el host: debe ser alcanzable por el navegador). `pnpm env:init`/`setup:env` genera `PF_DEV_DOCUMENT_MASTER_KEY` para el llavero propio de documentos (`DOCUMENT_ENCRYPTION_KEYS=dev1:…`). El antimalware está apagado (`DOCUMENT_MALWARE_SCANNER=none`); el perfil opcional `clamav` de Compose (imagen `clamav/clamav`, no incluida en `core`) lo habilita junto con `CLAMAV_HOST`.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Perfil `ml` (as-built): `docker compose --profile core --profile ml` (siempre con `PF_E2E_PROJECT` en pruebas) levanta `ml-forecasting` (puerto solo en `127.0.0.1:${PF_ML_PORT}`, 28090 por omisión, credencial `PF_DEV_ML_SERVICE_TOKEN` generada por `pnpm setup:env`). Ningún servicio de `core` depende de él.

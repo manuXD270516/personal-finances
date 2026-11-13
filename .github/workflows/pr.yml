@@ -23,6 +23,9 @@ env:
   TRIVY_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
   GITLEAKS_VERSION: 8.30.1
   GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  OSV_SCANNER_VERSION: 2.7.0
+  OSV_SCANNER_SHA256: 160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b
+  UV_VERSION: 0.12.20
 
 jobs:
   format:
@@ -148,6 +151,63 @@ jobs:
       - name: Cobertura del shared-kernel (≥ 95 % líneas, ≥ 90 % ramas)
         run: pnpm --filter @pf/shared-kernel run test:coverage
 
+  # Gate del servicio de pronósticos Python (platform/delivery-pipeline, openspec add-ml-forecasting-service, D419). UN solo
+  # check llamado `ml`, siempre presente: cuando la PR no toca el servicio ni su contrato los pasos se omiten y el job queda
+  # en verde, así puede ser obligatorio en `main` sin bloquear las PR ajenas. Agregarlo a los checks obligatorios es una
+  # decisión de seguridad del repositorio y la aplica el owner (CLAUDE.md).
+  ml:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/ml-forecasting
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: ¿Cambia el servicio o su contrato?
+        id: changes
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -Eq '^(services/ml-forecasting/|contracts/ml/|contracts/openapi/ml-forecasting.v1.yaml$|docker/finance-ml.Dockerfile$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Sin cambios en el servicio de pronósticos ni en su contrato: el gate pasa sin ejecutar pasos."
+          fi
+      - name: Instalar uv (versión fijada) y las dependencias del lockfile
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          python3 -m pip install --user "uv==${UV_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/uv" sync --frozen
+      - name: ruff (lint y formato)
+        if: steps.changes.outputs.run == 'true'
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: mypy --strict
+        if: steps.changes.outputs.run == 'true'
+        run: uv run mypy --strict .
+      # Incluye las propiedades de los intervalos (hypothesis), el determinismo y la verificación de que el OpenAPI que genera
+      # el servicio coincide con contracts/openapi/ml-forecasting.v1.yaml (y los ejemplos compartidos con el lado TypeScript).
+      - name: pytest (propiedades, contrato y ejemplos compartidos)
+        if: steps.changes.outputs.run == 'true'
+        run: uv run pytest
+      - name: Instalar osv-scanner (versión fijada + SHA-256)
+        if: steps.changes.outputs.run == 'true'
+        working-directory: .
+        run: |
+          curl -fsSLo osv-scanner "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  osv-scanner" | sha256sum --check --strict
+          chmod +x osv-scanner && mv osv-scanner "$RUNNER_TEMP/osv-scanner"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: osv-scanner (uv.lock)
+        if: steps.changes.outputs.run == 'true'
+        run: osv-scanner scan source --lockfile uv.lock
+
   integration:
     runs-on: ubuntu-latest # Docker disponible en los runners Linux hospedados
     # La suite tarda ~22 min; con 25 el margen era de ~2,5 min y un archivo nuevo o un runner lento la cancelaba (2026-10-20, #154).
@@ -173,6 +233,9 @@ jobs:
           # Imagen de producción N1 (ADR-0027): se construye y escanea en el PR para no descubrir fallas recién en main.
           - image: pfos-postgres
             dockerfile: docker/postgres.Dockerfile
+          # Servicio interno de pronósticos (ADR-0033): imagen opcional en N1, escaneada con el mismo criterio.
+          - image: finance-ml
+            dockerfile: docker/finance-ml.Dockerfile
     env:
       IMAGE_REF: pfos/${{ matrix.image }}:ci
     steps:

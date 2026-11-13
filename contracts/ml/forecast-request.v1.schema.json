@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/ml/forecast-request.v1.schema.json",
+  "title": "ForecastRequestV1",
+  "description": "Petición interna al servicio de pronósticos (POST /v1/forecasts). Solo montos por periodo con referencias opacas por corrida: sin identificador del workspace, nombres, descripciones ni ids de transacciones.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestId", "seed", "policy", "series"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "seed": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modelSet", "horizonMax", "intervalLevels"],
+      "properties": {
+        "modelSet": { "const": "baseline-v1" },
+        "horizonMax": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "intervalLevels": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 }
+        }
+      }
+    },
+    "series": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 400,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "kind", "currency", "scale", "readiness", "horizon", "points"],
+        "properties": {
+          "ref": { "type": "string", "pattern": "^s[1-9][0-9]{0,3}$" },
+          "kind": { "enum": ["EXPENSE", "INCOME"] },
+          "currency": { "type": "string", "pattern": "^[A-Z0-9]{2,16}$" },
+          "scale": { "type": "integer", "minimum": 0, "maximum": 8 },
+          "readiness": { "enum": ["MODEL", "SIMPLE"] },
+          "horizon": { "type": "integer", "minimum": 1, "maximum": 12 },
+          "points": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 120,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["period", "value", "txCount"],
+              "properties": {
+                "period": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                "value": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "maxLength": 40 },
+                "txCount": { "type": "integer", "minimum": 0, "maximum": 1000000 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

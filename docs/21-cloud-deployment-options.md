@@ -332,3 +332,7 @@ flowchart LR
 ## Nota: subida directa de documentos (add-document-attachments, D316)
 
 En el VPS N1 la subida de documentos entra por un hostname propio (`PF_DOMAIN_FILES`) de Caddy limitado a `PUT`/`OPTIONS` firmados sobre el bucket de cuarentena; un registro DNS más y certificado automático. En cloud gestionado equivale a una URL presignada de S3 con CORS acotado a la app.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- El servicio de pronósticos es opcional en N1: deshabilitado no consume memoria; habilitado (`COMPOSE_PROFILES=ml`, `FORECASTING_ENABLED=true`) tiene un techo de 320 MiB medido (ADR-0033). Disparador: memoria del host > 85 % sostenida con el servicio habilitado ⇒ N2 (ADR-0027).
