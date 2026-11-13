@@ -28,14 +28,15 @@ async function prepareHistory(page: Page, W: string): Promise<void> {
   for (let i = 8; i >= 1; i -= 1) {
     const idx = y * 12 + (m - 1) - i;
     const date = `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}-10`;
-    const amount = (900 + (8 - i) * 25).toFixed(2);
+    // Tercio del gasto mensual de la serie sintética (900, 925, … BOB), como string decimal con dos cifras.
+    const third = ((900 + (8 - i) * 25) / 3).toFixed(2);
     for (const day of ['10', '17', '24']) {
       await api(page, 'POST', `${W}/transactions`, {
         kind: 'EXPENSE',
         transactionDate: `${date.slice(0, 8)}${day}`,
         accountId: account,
-        amount: bob((Number(amount) / 3).toFixed(2)),
-        splits: [{ amount: bob((Number(amount) / 3).toFixed(2)), categoryId: category }],
+        amount: bob(third),
+        splits: [{ amount: bob(third), categoryId: category }],
       });
     }
   }
