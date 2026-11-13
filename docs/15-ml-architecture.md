@@ -4,6 +4,8 @@
 >
 > **Contexto:** `FORECAST` · schema `forecasting` · `services/ml-forecasting` (Python/FastAPI) + `@pf/forecasting` (ACL TypeScript) · **Phase 8** (forecasting), **Phase 9** (anomalías, auto-clasificación, insights).
 > **Capability OpenSpec:** `forecast/expense-forecasting`.
+>
+> **Consolidación de Phase 8 (2026-11-12):** el diseño vigente está en los changes 64–67 (docs/03 §7) y en [ADR-0033](adr/0033-servicio-de-pronosticos-en-python-en-n1.md) (propuesto), con preguntas en [docs/65](65-phase-8-consolidation-questions.md). Cambios propuestos frente a este documento: petición síncrona con el conjunto de datos en el cuerpo y sin Object Storage (§2–§3), referencias opacas por corrida en vez de `HMAC(workspaceId)` (§11), FORECAST lee TRANSACTIONS/CLASSIFICATION/FX/PLANNING y no REPORTING (§2), sin consumir `planning.MonthClosed` (trabajo diario, D249), costos conocidos calculados en el ACL, sin Prophet ni boosting en Phase 8 (§7), evaluación frente al real en FORECAST y no en una proyección de REPORTING (§10), anomalías propuestas para Phase 9. Las secciones de abajo se actualizan como as-built al implementar.
 
 ---
 

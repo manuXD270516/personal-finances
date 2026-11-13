@@ -968,6 +968,8 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 
 ## EPIC-22 — Forecasting (Phase 8)
 
+> Consolidado el 2026-11-12 (docs/03 §7, preguntas en [docs/65](65-phase-8-consolidation-questions.md)): FEAT-22.1 → `add-ml-forecasting-service` (64); FEAT-22.2 y el backtesting de FEAT-22.3 → `add-expense-forecasts` (65); FEAT-22.4 (US-245) → `add-predicted-cash-flow-band` (66); US-244 → `add-forecast-accuracy` (67).
+
 | Feature | Prioridad | Capability | Historias |
 |---------|-----------|------------|-----------|
 | FEAT-22.1 Servicio ML y ACL | Must | forecast/expense-forecasting | TS: servicio `ml-forecasting`, contrato ACL, degradación sin ML. |
