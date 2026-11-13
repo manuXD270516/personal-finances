@@ -137,6 +137,8 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'ImportJob',
   // add-banking-providers (Phase 6): conexión con un proveedor de movimientos externos.
   'ImportConnection',
+  // add-ml-forecasting-service (Phase 8): corrida de pronóstico de FORECAST.
+  'ForecastRun',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

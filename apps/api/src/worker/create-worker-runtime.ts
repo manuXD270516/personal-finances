@@ -95,6 +95,7 @@ import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-jobs.js';
 import { registerDebtCardsJob } from './debt-jobs.js';
 import { registerGoalsDailyJob } from './goals-jobs.js';
+import { registerForecastingJobs } from './forecasting-jobs.js';
 import { registerImportsJobs } from './imports-jobs.js';
 import { registerConnectionJobs } from './connection-jobs.js';
 import { bankingOptionsFrom, feesCategoryPort } from '../imports/banking-wiring.js';
@@ -641,6 +642,15 @@ export async function createWorkerRuntime(
   // aportes recurrentes y sugerencias); usan los MISMOS contratos públicos que la API, con el pool del worker.
   await registerGoalsDailyJob(queue, finance.goals, activeWorkspaces, logger, {
     cron: config.GOALS_DAILY_CRON,
+    runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
+  });
+
+  // FORECAST (add-ml-forecasting-service): jobs `forecasting.schedule` y `forecasting.runner`. Sin consumidores de eventos ni
+  // conexiones nuevas (D249): comparten la reserva de trabajos periódicos y la llamada al servicio no retiene conexión.
+  await registerForecastingJobs(queue, finance.forecasting, logger, {
+    enabled: config.FORECASTING_ENABLED,
+    scheduleCron: config.FORECASTING_SCHEDULE_CRON,
+    runnerCron: config.FORECASTING_RUNNER_CRON,
     runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
   });
 

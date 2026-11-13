@@ -5,16 +5,17 @@ spec: quality/test-traceability
 related_specs: []
 requirement: "Tests del servicio de pronósticos en la trazabilidad"
 scenario: "Test de Python que cita un TC"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-MAINT-004","NFR-MAINT-005"]
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/traceability/test/python-tests.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["traceability","python"]

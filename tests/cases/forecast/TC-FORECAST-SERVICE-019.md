@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Huecos en la historia"
 scenario: "Categoría sin gasto en un periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-005"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/period-series-builder.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["readiness"]

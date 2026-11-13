@@ -183,3 +183,7 @@ Traduce `ExternalTransaction` → `StagedTransaction` (monto string + moneda, fe
 1. Formalizar en ARCHITECTURE §7 las relaciones SYNC-TX adicionales: `Planning → Ledger` (period lock) e `Imports → Transactions` (batch).
 2. ¿Rules debe aplicarse **sincrónicamente** durante el commit de un import (clasificación visible al terminar) en lugar de async? Propuesto: async con UI que muestra "aplicando reglas…".
 3. Proveedores concretos de tasas para BOB/USDT (BCB oficial, referenciales de mercado) — decisión en Phase 5.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Relaciones de FORECAST (§4.3): upstream TRANSACTIONS, CLASSIFICATION, FX e IDENTITY (cliente de sus `contracts`); ACL hacia `finance-ml` (`MlForecastingServiceClient`, `POST /v1/forecasts`); sin dependencia de PLANNING ni de REPORTING. Publica `forecast.ForecastGenerated.v1` sin consumidores.

@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Series mensuales por periodo financiero"
 scenario: "Periodo con gastos en dos monedas y un reembolso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001"]
 nfr: ["NFR-DATA-002"]
 invariants: ["INV-001","INV-002","INV-020"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/period-series-builder.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["money","multi-currency","periods"]

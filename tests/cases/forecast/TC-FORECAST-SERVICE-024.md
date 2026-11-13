@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Resultado validado antes de publicarse"
 scenario: "Escala de la moneda excedida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-002","FR-FORECAST-006"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/forecast-request.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["validation","money"]

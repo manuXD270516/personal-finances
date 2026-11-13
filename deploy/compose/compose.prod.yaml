@@ -188,6 +188,7 @@ services:
     image: ${FINANCE_API_IMAGE:?digest de finance-api (main.yml)}
     build: !reset null
     pull_policy: missing
+    read_only: true # la credencial del servicio de pronósticos es un `file` del host (en desarrollo es `content`)
     environment:
       <<: *prod-app-env
       # Sin proveedor de email elegido (docs/33 D87, add-alerts): solo notificaciones in-app. Sin mailpit en producción.
@@ -214,6 +215,27 @@ services:
       resources:
         limits: { cpus: '1', memory: 288m }
 
+  # ─────────────────────────── ml (opcional) ───────────────────────────
+  # Servicio interno de pronósticos (ADR-0033, openspec add-ml-forecasting-service). Opcional: el host lo habilita con
+  # `COMPOSE_PROFILES=ml` y `FORECASTING_ENABLED=true` en /etc/pfos/pfos.env y el digest FINANCE_ML_IMAGE del despliegue;
+  # deshabilitado no arranca ni consume memoria. Sin puertos (ni siquiera de loopback); red `ml-internal` sin salida a Internet.
+  # Techo 320m medido en la tarea 4.8 (400 series x 60 periodos: 56 MiB; con ETS del change 65 se vuelve a medir).
+  ml-forecasting:
+    image: ${FINANCE_ML_IMAGE:-pfos/finance-ml:unset}
+    build: !reset null
+    pull_policy: missing
+    ports: !reset []
+    read_only: true # con la credencial como `file` del host sí es posible (en desarrollo es `content`)
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 320m }
+
 volumes:
   caddy-data:
   caddy-config:
+
+# Credencial de servicio del servicio de pronósticos: secreto de archivo del host (el reemplazo `!override` evita mezclar
+# `file` con el `content` de desarrollo del archivo base). `pfos-deploy.sh` crea el archivo vacío si no existe.
+configs:
+  ml-service-token: !override
+    file: /etc/pfos/ml-service-token

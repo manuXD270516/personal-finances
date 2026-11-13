@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Hecho de pronóstico generado"
 scenario: "Corrida completada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-002"]
 nfr: ["NFR-REL-008"]
 invariants: []
 priority: medium
 type: integration
 level: event-contract
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["outbox"]

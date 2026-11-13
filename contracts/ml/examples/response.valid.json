@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1",
+  "requestId": "6f1b7c3e-2d54-4b7a-9a52-0d1c3e5a7b90",
+  "serviceVersion": "0.1.0",
+  "durationMs": 12,
+  "results": [
+    {
+      "ref": "s1",
+      "status": "OK",
+      "error": null,
+      "model": { "name": "mean_last_n", "version": "1", "selectedBy": "fixed" },
+      "baseline": { "method": "MEAN_LAST_N", "n": 6 },
+      "points": [
+        {
+          "period": "2026-11",
+          "monthsAhead": 1,
+          "prediction": "4350.00",
+          "lower80": "3980.00",
+          "upper80": "4790.00",
+          "lower95": "3810.00",
+          "upper95": "5050.00",
+          "baselineValue": "4350.00"
+        }
+      ]
+    },
+    { "ref": "s2", "status": "ERROR", "error": "NON_FINITE_INPUT", "model": null, "baseline": null, "points": [] }
+  ]
+}

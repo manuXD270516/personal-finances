@@ -78,3 +78,7 @@ Hay que decidir dónde vive el cómputo de ML y cómo se integra.
 
 - Amazon Forecast cerrado a nuevos clientes desde 2024 (conocimiento previo; a verificar si se reconsidera ML gestionado).
 - Versiones de librerías Python (Prophet, statsmodels, Polars): a verificar al inicio de Phase 8.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Estado: reemplazado en su parte operativa por [ADR-0033](0033-servicio-de-pronosticos-en-python-en-n1.md) (aceptado, D410): servicio Python separado, ACL `@pf/forecasting` y degradación sin el servicio se mantienen; el snapshot en Object Storage y el job asíncrono interno se sustituyen por el contrato síncrono de `POST /v1/forecasts`.

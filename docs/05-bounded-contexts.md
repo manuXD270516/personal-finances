@@ -261,3 +261,7 @@ Flechas = dependencia de código (`A` usa `contracts` de `B`). Prohibidos ciclos
 2. ¿Credit cards necesitan un contexto propio si crecen (rewards, cuotas sin interés tipo "diferidos")? Por ahora en Debt.
 3. ¿Planning debería consumir `ledger.JournalEntryPosted` en lugar de eventos de Transactions para los actuals? Propuesto: eventos de Transactions (llevan splits/categorías).
 4. La orquestación "abrir cuenta + saldo inicial" en una misma unidad de trabajo vive en la capa de composición (`apps/api`), no en un contexto; validar con SPIKE-04.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- FORECAST (§2.15) lee TRANSACTIONS (`NominalFlowQuery`), CLASSIFICATION (`CategoryCatalogQuery`), FX (`FxValuationPort`) e IDENTITY (calendario y moneda base) solo por `contracts`; NO lee REPORTING (REPORTING leerá FORECAST en el change 66) y NO consume `planning.MonthClosed`: el trabajo diario `forecasting.schedule` detecta el periodo nuevo con el calendario del workspace (D249, sin consumidores nuevos). Contrato con el servicio: síncrono (cuerpo de `POST /v1/forecasts`), sin Object Storage.

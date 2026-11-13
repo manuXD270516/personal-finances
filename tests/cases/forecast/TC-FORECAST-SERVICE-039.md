@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronósticos fuera de la portabilidad del workspace"
 scenario: "Workspace importado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-010"]
 nfr: ["NFR-COMP-002"]
 invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/src/portability/portability-coverage.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["portability"]

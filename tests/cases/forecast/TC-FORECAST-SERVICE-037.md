@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Métricas de las corridas"
 scenario: "Tres corridas fallidas seguidas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-OBS-009","NFR-OBS-004"]
 invariants: []
 priority: medium
 type: platform
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["observability"]

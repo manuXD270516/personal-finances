@@ -254,6 +254,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Document: 'Documento',
       ImportJob: 'Importación',
       ImportConnection: 'Conexión con proveedor',
+      ForecastRun: 'Corrida de pronóstico',
     },
     states: {
       Transaction: {
@@ -320,6 +321,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REJECTED: 'Rechazada',
         NEEDS_CREDENTIAL: 'Requiere credencial',
         REVOKED: 'Revocada',
+      },
+      ForecastRun: {
+        REQUESTED: 'Solicitada',
+        RUNNING: 'En curso',
+        COMPLETED: 'Completada',
+        INSUFFICIENT_DATA: 'Sin datos suficientes',
+        FAILED: 'Fallida',
+        SUPERSEDED: 'Reemplazada',
       },
     },
     transitions: {
@@ -422,6 +431,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REPLACE_CREDENTIAL: 'Reemplazar credencial',
         REVOKE: 'Revocar',
       },
+      ForecastRun: {
+        REQUEST: 'Solicitar',
+        START: 'Iniciar',
+        RETRY: 'Reintentar',
+        COMPLETE: 'Completar',
+        NO_DATA: 'Terminar sin datos suficientes',
+        FAIL: 'Fallar',
+        SUPERSEDE: 'Reemplazar',
+      },
     },
     element: 'Elemento',
     currentState: 'Estado actual',
@@ -468,6 +486,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Document: 'Document',
       ImportJob: 'Import',
       ImportConnection: 'Provider connection',
+      ForecastRun: 'Forecast run',
     },
     states: {
       Transaction: {
@@ -534,6 +553,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REJECTED: 'Rejected',
         NEEDS_CREDENTIAL: 'Needs credential',
         REVOKED: 'Revoked',
+      },
+      ForecastRun: {
+        REQUESTED: 'Requested',
+        RUNNING: 'Running',
+        COMPLETED: 'Completed',
+        INSUFFICIENT_DATA: 'Insufficient data',
+        FAILED: 'Failed',
+        SUPERSEDED: 'Superseded',
       },
     },
     transitions: {
@@ -636,6 +663,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REPLACE_CREDENTIAL: 'Replace credential',
         REVOKE: 'Revoke',
       },
+      ForecastRun: {
+        REQUEST: 'Request',
+        START: 'Start',
+        RETRY: 'Retry',
+        COMPLETE: 'Complete',
+        NO_DATA: 'Finish without enough data',
+        FAIL: 'Fail',
+        SUPERSEDE: 'Supersede',
+      },
     },
     element: 'Item',
     currentState: 'Current state',
@@ -682,6 +718,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Document: 'Documento',
       ImportJob: 'Importação',
       ImportConnection: 'Conexão com provedor',
+      ForecastRun: 'Execução de previsão',
     },
     states: {
       Transaction: {
@@ -748,6 +785,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REJECTED: 'Rejeitada',
         NEEDS_CREDENTIAL: 'Requer credencial',
         REVOKED: 'Revogada',
+      },
+      ForecastRun: {
+        REQUESTED: 'Solicitada',
+        RUNNING: 'Em andamento',
+        COMPLETED: 'Concluída',
+        INSUFFICIENT_DATA: 'Sem dados suficientes',
+        FAILED: 'Falhou',
+        SUPERSEDED: 'Substituída',
       },
     },
     transitions: {
@@ -849,6 +894,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         FLAG_ATTENTION: 'Pedir atenção',
         REPLACE_CREDENTIAL: 'Substituir credencial',
         REVOKE: 'Revogar',
+      },
+      ForecastRun: {
+        REQUEST: 'Solicitar',
+        START: 'Iniciar',
+        RETRY: 'Tentar de novo',
+        COMPLETE: 'Concluir',
+        NO_DATA: 'Encerrar sem dados suficientes',
+        FAIL: 'Falhar',
+        SUPERSEDE: 'Substituir',
       },
     },
     element: 'Item',

@@ -21,3 +21,9 @@ tests/traceability
 **/*.log
 tests/e2e/playwright-report
 tests/e2e/test-results
+**/.venv
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/.hypothesis

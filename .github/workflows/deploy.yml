@@ -70,6 +70,7 @@ jobs:
         id: refs
         env:
           SHA: ${{ inputs.commit_sha }}
+          ML_ENABLED: ${{ vars.PFOS_ML_ENABLED }}
         run: |
           ref() {
             local f="$RUNNER_TEMP/digests/$1.json"
@@ -84,6 +85,8 @@ jobs:
             echo "api=$(ref finance-api)"
             echo "web=$(ref finance-web)"
             echo "pg=$(ref pfos-postgres)"
+            # Servicio de pronósticos (opcional): solo si el host lo habilitó (vars.PFOS_ML_ENABLED) y existe su digest.
+            if [ "${ML_ENABLED}" = "true" ]; then echo "ml=$(ref finance-ml)"; fi
           } | tee -a "$GITHUB_OUTPUT"
 
   run:
@@ -124,9 +127,10 @@ jobs:
           API: ${{ needs.resolve.outputs.api }}
           WEB: ${{ needs.resolve.outputs.web }}
           PG: ${{ needs.resolve.outputs.pg }}
+          ML: ${{ needs.resolve.outputs.ml }}
         run: |
           case "$ACTION" in
-            deploy) remote="deploy ${SHA} ${API} ${WEB} ${PG}" ;;
+            deploy) remote="deploy ${SHA} ${API} ${WEB} ${PG}${ML:+ ${ML}}" ;;
             *) remote="$ACTION" ;;
           esac
           ssh -i "$RUNNER_TEMP/deploy_key" -o IdentitiesOnly=yes -o BatchMode=yes \
@@ -142,6 +146,7 @@ jobs:
               echo "| finance-api | \`${API}\` |"
               echo "| finance-web | \`${WEB}\` |"
               echo "| pfos-postgres | \`${PG}\` |"
+              if [ -n "${ML}" ]; then echo "| finance-ml | \`${ML}\` |"; fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Borrar la clave SSH

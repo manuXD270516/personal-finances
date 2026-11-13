@@ -192,3 +192,7 @@ Dos drills fallidos seguidos → escalar a N3 (PostgreSQL gestionado) según ADR
 | Imágenes de terceros | fijadas por digest en `compose.yaml`/`compose.prod.yaml`; se actualizan por PR (Renovate) y llegan con el siguiente deploy |
 | Costos | AWS Budgets (80 % real, 100 % pronosticado de USD 20); B2 y Grafana en sus consolas |
 | Rotación de secretos | editar `/etc/pfos/*.env` y redeploy del release actual (`action=deploy` con el mismo SHA). Contraseñas de roles de BD: `migrate` las realinea al arrancar |
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Servicio de pronósticos (opcional): 1) en el host, `openssl rand -hex 32 > /etc/pfos/ml-service-token && chmod 0444 /etc/pfos/ml-service-token`; 2) en `/etc/pfos/pfos.env`, `COMPOSE_PROFILES=ml` y `FORECASTING_ENABLED=true`; 3) en el entorno `production` de GitHub, `PFOS_ML_ENABLED=true` para que `deploy.yml` envíe el digest de `finance-ml`; 4) desplegar. Para apagarlo: quitar `COMPOSE_PROFILES=ml` y `FORECASTING_ENABLED` y desplegar (el núcleo no cambia; el pronóstico vigente se sigue mostrando con su instante de generación).

@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Series mensuales por periodo financiero"
 scenario: "Periodo en curso fuera de la historia"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001"]
 nfr: ["NFR-DATA-002"]
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/period-series-builder.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["periods"]

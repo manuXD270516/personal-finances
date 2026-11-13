@@ -298,6 +298,8 @@ export const ERROR_CATALOG = {
   },
   // rules (Phase 7, add-rule-suggestions)
   RULE_SUGGESTION_DECIDED: { status: 409, title: 'The rule suggestion was already accepted or dismissed' },
+  FORECAST_RUN_IN_PROGRESS: { status: 409, title: 'The workspace already has a forecast run in progress' },
+  FORECASTING_DISABLED: { status: 409, title: 'Forecasting is not enabled in this installation' },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;
