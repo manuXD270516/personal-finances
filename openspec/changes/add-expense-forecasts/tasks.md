@@ -33,7 +33,7 @@
 
 - [x] 5.1 Migración expand `forecasting_components` (columnas nuevas, `forecast_known_item`, `backtest_result`, RLS forzada fail-closed, grants, registro, matriz TC-SECURITY-RLS-007); timestamp posterior a la del change 64 *(2026-11-13: `20261113100000_forecasting_components.sql`; añade `forecast_run.known_conversion jsonb` (conversión declarada) y `forecast_known_item.category_id`; RLS forzada y registro verificados por TC-SECURITY-RLS-007)*
 - [x] 5.2 Repositorios y test de integración de una corrida completa con el servicio falso y los ejemplos compartidos: TC-FORECAST-EXPENSE-001, -019 *(2026-11-13: `pg-forecasting.int.test.ts` y `forecasting.api.test.ts` con el servicio simulado)*
-- [x] 5.3 Benchmark nightly de la corrida con `phase8-v1` sobre el conjunto Large (≤ 300 s): TC-FORECAST-EXPENSE-023 *(2026-11-13: `services/ml-forecasting/tests/test_perf.py` (`pytest -m perf`, 60 series de 36 periodos con backtesting: ~45 s en local) y el job `ml-perf` de `nightly.yml`; el servicio real con el conjunto Large completo de la corrida queda para el nightly)*
+- [x] 5.3 Benchmark nightly de la corrida con `phase8-v1` sobre el conjunto Large (≤ 300 s): TC-FORECAST-EXPENSE-023 *(2026-11-13: `services/ml-forecasting/tests/test_perf.py` (`pytest -m perf`, 60 series de 36 periodos con backtesting: ~45 s en local) y pasos del job `perf` de `nightly.yml` (el nightly conserva sus cuatro jobs, D291); el servicio real con el conjunto Large completo de la corrida queda para el nightly)*
 - [x] 5.4 Variables nuevas en `docs/config-reference.md` (`pnpm config:docs:check`) *(2026-11-13: `FORECASTING_COHERENCE_GAP_RATIO` en `docs/config-reference.md`; las `ML_*` del servicio se documentan en su README)*
 
 ## 6. API

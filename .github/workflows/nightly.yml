@@ -172,30 +172,6 @@ jobs:
             gh issue create --title "$title" --body "$body"
           fi
 
-  # Pronósticos phase8-v1 (add-expense-forecasts 5.3, TC-FORECAST-EXPENSE-023): ~60 series de 36 periodos con backtesting,
-  # intervalos por simulación y horizonte de 12 deben terminar en 300 s o menos con el servicio real (un hilo).
-  ml-perf:
-    name: perf (servicio de pronósticos phase8-v1)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    env:
-      UV_VERSION: 0.12.20
-    defaults:
-      run:
-        working-directory: services/ml-forecasting
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - name: Instalar uv (versión fijada) y las dependencias del lockfile
-        run: |
-          python3 -m pip install --user "uv==${UV_VERSION}"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/uv" sync --frozen
-      - name: pytest -m perf
-        run: OMP_NUM_THREADS=1 uv run pytest -m perf
-
   perf:
     name: perf (Large Seed + NFR-PERF)
     runs-on: ubuntu-latest # Docker para Testcontainers (PostgreSQL 18)
@@ -210,6 +186,22 @@ jobs:
       - run: pnpm turbo run build --filter=@pf/api...
       # Carga ~97 000 transacciones (principal) + 20 satélites por los casos de uso y mide los p95 (docs/02 §PERF).
       - run: pnpm perf:bench
+      # Pronósticos phase8-v1 (add-expense-forecasts 5.3, TC-FORECAST-EXPENSE-023): ~60 series de 36 periodos con
+      # backtesting, intervalos por simulación y horizonte de 12 deben terminar en 300 s o menos con el servicio real (un
+      # hilo). Va como pasos del job perf: el nightly conserva sus cuatro jobs (D291).
+      - name: Instalar uv (versión fijada) y las dependencias del servicio de pronósticos
+        if: ${{ !cancelled() }}
+        working-directory: services/ml-forecasting
+        env:
+          UV_VERSION: 0.12.20
+        run: |
+          python3 -m pip install --user "uv==${UV_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/uv" sync --frozen
+      - name: Benchmark del servicio de pronósticos (pytest -m perf)
+        if: ${{ !cancelled() }}
+        working-directory: services/ml-forecasting
+        run: OMP_NUM_THREADS=1 uv run pytest -m perf
       - name: Resumen
         if: ${{ !cancelled() }}
         run: cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
