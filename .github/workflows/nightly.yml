@@ -76,7 +76,7 @@ jobs:
       - name: Resumen
         if: ${{ !cancelled() }}
         run: cat tests/traceability/regression-suite.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: regression-suite
@@ -136,7 +136,7 @@ jobs:
             node -e "const s=require('./packages/contexts/identity/coverage/coverage-summary.json').total;console.log('| métrica | % |\n|---|---|\n| líneas | '+s.lines.pct+' |\n| ramas | '+s.branches.pct+' |')" || true
             node -e "const r=require('./packages/shared-kernel/reports/mutation/mutation.json');let k=0,t=0;for(const f of Object.values(r.files))for(const m of f.mutants){if(['Killed','Timeout'].includes(m.status))k++;if(!['CompileError','RuntimeError','Ignored'].includes(m.status))t++;}console.log('\nMutation score: '+(100*k/t).toFixed(2)+' % ('+k+'/'+t+')')" || true
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: shared-kernel-quality
@@ -209,7 +209,7 @@ jobs:
       - name: Resumen
         if: ${{ !cancelled() }}
         run: cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: perf-report
@@ -252,7 +252,7 @@ jobs:
       - name: Resumen
         if: ${{ !cancelled() }}
         run: cat reports/fx-smoke/fx-smoke.md >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: fx-smoke-live
