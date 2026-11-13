@@ -188,6 +188,7 @@ flowchart LR
 - **Objetivo:** forecasting explicable y honesto sobre gastos, ingresos y saldo.
 - **Alcance:** ([15-ml-architecture.md](./15-ml-architecture.md)) servicio `ml-forecasting` (Python/FastAPI), ACL `@pf/forecasting`, horizontes 1/3/6/12, intervalos, baseline, versión de modelo, conocidos vs predichos, backtesting, degradación sin ML.
 - **Capabilities:** `forecast/expense-forecasting`.
+- **Changes (consolidado 2026-11-12, docs/03 §7):** 64 `add-ml-forecasting-service`, 65 `add-expense-forecasts`, 66 `add-predicted-cash-flow-band`, 67 `add-forecast-accuracy`; preguntas en [65-phase-8-consolidation-questions.md](./65-phase-8-consolidation-questions.md); ADR-0033 propuesto.
 - **Exit criteria:** modelos superan baseline en backtesting para las series publicadas; con datos insuficientes se muestra solo baseline + conocidos; apagar `ml-forecasting` no afecta el core (test).
 - **Dependencias:** Phase 3 (conocidos), Phase 4 (cuotas), Phase 7 (read models históricos); ≥ 6 meses de datos reales cerrados (Phase 2).
 - **Riesgos clave:** RISK-014 (datos insuficientes), RISK-005.

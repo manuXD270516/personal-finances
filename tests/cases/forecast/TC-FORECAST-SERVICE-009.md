@@ -1,0 +1,50 @@
+---
+id: TC-FORECAST-SERVICE-009
+title: "El trabajo diario no crea corridas con un pronóstico reciente"
+spec: forecast/expense-forecasting
+related_specs: []
+requirement: "Corridas programadas sin consumidores nuevos"
+scenario: "Pronóstico reciente sin periodo nuevo"
+requirement_status: provisional
+fr: ["FR-FORECAST-001"]
+nfr: ["NFR-PERF-012"]
+invariants: []
+priority: medium
+type: integration
+level: application
+automation_status: not_automated
+automated_tests: []
+status: draft
+regression_suite: false
+phase: 8
+tags: ["scheduler"]
+error_code: null
+preconditions:
+  - "Workspace \"W1 Personal Demo\" con moneda de reporte BOB, TZ America/La_Paz y día de inicio del mes financiero 1 salvo que el escenario diga otro"
+  - "FixedClock en la fecha del escenario (TZ America/La_Paz); datos ficticios"
+input: {}
+steps:
+  - "la última corrida completada es del 2026-11-01 y el 2026-11-05 no terminó ningún periodo nuevo"
+expected_result:
+  - "el trabajo del 2026-11-05 no crea ninguna corrida"
+created: 2026-11-12
+updated: 2026-11-12
+---
+
+# TC-FORECAST-SERVICE-009 — El trabajo diario no crea corridas con un pronóstico reciente
+
+## Intención
+
+Verifica el scenario "Pronóstico reciente sin periodo nuevo" del requirement "Corridas programadas sin consumidores nuevos" de `forecast/expense-forecasting` (FR-FORECAST-001, NFR-PERF-012).
+
+## Escenario
+
+```gherkin
+Dado Workspace "W1 Personal Demo" con moneda de reporte BOB y TZ America/La_Paz
+Cuando la última corrida completada es del 2026-11-01 y el 2026-11-05 no terminó ningún periodo nuevo
+Entonces el trabajo del 2026-11-05 no crea ninguna corrida
+```
+
+## Notas
+
+- Change `add-ml-forecasting-service` (Phase 8). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; montos como strings decimales; ningún dato real del owner.
