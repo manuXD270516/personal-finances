@@ -357,7 +357,7 @@ services:
   # Con este perfil, OTEL_ENABLED=true en `.env` envía trazas/métricas/logs de api y worker a Grafana.
   otel-lgtm:
     profiles: [observability]
-    image: grafana/otel-lgtm:0.34.0@sha256:b966ea107831d526d9eb8fe4d2d86c9e5731392fad9dce8296bcf2072031f07c
+    image: grafana/otel-lgtm:0.40.0@sha256:72e05804790e6e0d8c0b70a6d5ff1f721ef7b203463374631e99aa3429bd0cf6
     restart: unless-stopped
     logging: *default-logging
     volumes:
