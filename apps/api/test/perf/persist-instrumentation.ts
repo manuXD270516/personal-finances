@@ -3,13 +3,17 @@ import { performance } from 'node:perf_hooks';
 import type { PersistStep, PersistTimings } from '@pf/imports/interface/imports.module';
 import type { BatchStep, BatchStepTimer } from '@pf/transactions/interface/transactions.module';
 import { asAdmin, type Harness } from '../support/portability.js';
+import { foreignActiveQueries, purgeBacklog, waitForQuiet } from './isolation.js';
 import {
   buildFingerprint,
+  waitForRest,
   type DbSample,
   type OutboxDiagnosis,
   type PersistBatchSample,
   type PersistTimingsRaw,
   type QueueJobRow,
+  type RestReport,
+  type RestSnapshot,
   type RunnerFingerprint,
 } from './persist-breakdown.js';
 
@@ -131,6 +135,7 @@ export class PersistSampler {
   private inFlight: Promise<void> = Promise.resolve();
   private ticks = 0;
   private queued = 0;
+  private outboxPending = 0;
   private lastCheckpoint: { n: number; ms: number } | undefined;
 
   constructor(
@@ -179,6 +184,10 @@ export class PersistSampler {
           `SELECT count(*)::int AS n FROM pgboss.job WHERE name LIKE 'events.%' AND state = 'created'`,
         );
         this.queued = Number(q.rows[0]?.['n'] ?? 0);
+        const o = await this.client.query(
+          `SELECT count(*)::int AS n FROM platform.outbox WHERE published_at IS NULL`,
+        );
+        this.outboxPending = Number(o.rows[0]?.['n'] ?? 0);
       }
       const now = { n: Number(cp.rows[0]?.['n'] ?? 0), ms: Number(cp.rows[0]?.['ms'] ?? 0) };
       const prev = this.lastCheckpoint;
@@ -190,6 +199,7 @@ export class PersistSampler {
         checkpoints: prev ? Math.max(0, now.n - prev.n) : 0,
         checkpointMs: prev ? Math.max(0, now.ms - prev.ms) : 0,
         queuedEventJobs: this.queued,
+        outboxPending: this.outboxPending,
         loadAvg1m: loadavg()[0] ?? 0,
       });
     } catch {
@@ -372,4 +382,65 @@ export async function diagnoseOutbox(h: Harness): Promise<OutboxDiagnosis> {
       ...(plan ? { relayPlan: plan } : {}),
     };
   });
+}
+
+// ── Aislamiento entre las configuraciones del import ────────────────────────────────────────────────────────────────
+
+/** Tablas que la purga deja con filas muertas: se vacían SIEMPRE antes de medir una configuración (extiende D291). */
+const REST_VACUUM_TABLES = ['platform.outbox', 'pgboss.job'] as const;
+
+/** Estado de la base que contamina una medición: backlog del outbox, trabajos abiertos y consultas ajenas. */
+export async function restSnapshot(client: SqlRunner): Promise<RestSnapshot> {
+  const outbox = await client.query(
+    `SELECT count(*)::int AS n FROM platform.outbox WHERE published_at IS NULL`,
+  );
+  const jobs = await client.query(
+    `SELECT count(*)::int AS n FROM pgboss.job
+      WHERE name LIKE 'events.%' AND name NOT LIKE '%.dlq' AND state IN ('created', 'retry', 'active')`,
+  );
+  return {
+    outboxPending: Number(outbox.rows[0]?.['n'] ?? 0),
+    openEventJobs: Number(jobs.rows[0]?.['n'] ?? 0),
+    foreignActiveQueries: await foreignActiveQueries(client),
+  };
+}
+
+/**
+ * Deja la base lista para medir una configuración del import: con el worker anterior DETENIDO (no hay relay ni
+ * consumidores que repoblen), purga el backlog que dejó (eventos pendientes del outbox y trabajos `events.*`), vacía y
+ * analiza las tablas que la purga ensucia, espera la quietud del host (carga y consultas ajenas) y verifica el reposo.
+ * Sin esto, el backlog de la configuración del código quedaba delante de `ImportApproved` en el outbox (el relay publica
+ * por orden de secuencia) y la persistencia del host medía el drenado ajeno (251 s y 577 s el 10 y el 11 de noviembre).
+ * Nunca lanza: devuelve el estado para que quien llama decida si mide o publica el diagnóstico.
+ */
+export async function isolateConfiguration(
+  client: SqlRunner,
+  log: (message: string) => void = () => undefined,
+): Promise<RestReport> {
+  const purged = await purgeBacklog(client);
+  const vacuumed: string[] = [];
+  for (const table of REST_VACUUM_TABLES) {
+    try {
+      await client.query(`VACUUM (ANALYZE) ${table}`);
+      vacuumed.push(table);
+    } catch (err) {
+      log(`no se pudo vaciar ${table} antes de medir: ${String(err)}`);
+    }
+  }
+  const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+  const quiet = await waitForQuiet({
+    hostLoad1m: () => loadavg()[0] ?? 0,
+    foreignActiveQueries: () => foreignActiveQueries(client),
+    sleep,
+    now: () => Date.now(),
+  });
+  const rest = await waitForRest({ snapshot: () => restSnapshot(client), sleep, now: () => Date.now() });
+  return {
+    purgedOutbox: purged.outbox,
+    purgedJobs: purged.jobs,
+    vacuumed,
+    atRest: rest.atRest,
+    waitedMs: quiet.waitedMs + rest.waitedMs,
+    violations: rest.violations,
+  };
 }

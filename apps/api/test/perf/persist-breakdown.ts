@@ -95,6 +95,8 @@ export interface DbSample {
   readonly checkpointMs: number;
   /** Trabajos `events.*` encolados y carga del host (`os.loadavg()[0]`). */
   readonly queuedEventJobs: number;
+  /** Eventos del outbox sin publicar, contados junto con los trabajos encolados (cada 2 s): el ritmo del relay. */
+  readonly outboxPending?: number;
   readonly loadAvg1m: number;
 }
 
@@ -327,8 +329,13 @@ export function scheduledJobsInWindow(
  * confirmaciones se fija con esas tres primeras corridas (tarea 5.2).
  */
 export const CPU_CALIBRATION_REFERENCE_MS = 54;
-/** Sin fijar hasta tener 3 corridas (tarea 5.2 del change 63). */
-export const COMMIT_CALIBRATION_REFERENCE: number | null = null;
+/**
+ * Referencia de la calibración de confirmaciones (500 `INSERT` + `COMMIT` por segundo): mediana de los tres primeros
+ * nightlies programados con la huella (2026-11-10: 10 674; 2026-11-11: 5 851; 2026-11-12: 9 814). Informativa (D407):
+ * solo da el factor del reporte, nunca cambia un veredicto. Dos generaciones de runner: AMD EPYC 9V45 (≈ 10 000) y 9V74
+ * (≈ 5 900).
+ */
+export const COMMIT_CALIBRATION_REFERENCE: number | null = 9_814;
 
 export interface RunnerFingerprint {
   readonly cpuModel: string;
@@ -440,4 +447,113 @@ export function jobVerdict(input: {
     );
   }
   return { fails: reasons.length > 0, reasons, published: input.incomplete.map((s) => s.suite) };
+}
+
+// ── Base en reposo antes de medir cada configuración del import ─────────────────────────────────────────────────────
+
+/** Estado de la base que contamina una medición si no es el de reposo (lo que dejó la configuración anterior). */
+export interface RestSnapshot {
+  /** Eventos del outbox sin publicar (`published_at IS NULL`). */
+  readonly outboxPending: number;
+  /** Trabajos de las colas `events.*` (sin dead-letter) en `created`, `retry` o `active`. */
+  readonly openEventJobs: number;
+  /** Consultas activas en la base que no son del propio harness. */
+  readonly foreignActiveQueries: number;
+}
+
+/** Por qué la base no está en reposo (vacío si lo está). */
+export function restViolations(s: RestSnapshot): string[] {
+  const out: string[] = [];
+  if (s.outboxPending > 0) out.push(`${String(s.outboxPending)} eventos pendientes en el outbox`);
+  if (s.openEventJobs > 0) out.push(`${String(s.openEventJobs)} trabajos events.* abiertos`);
+  if (s.foreignActiveQueries > 0) out.push(`${String(s.foreignActiveQueries)} consultas ajenas activas`);
+  return out;
+}
+
+export interface RestProbe {
+  snapshot(): Promise<RestSnapshot>;
+  sleep(ms: number): Promise<void>;
+  now(): number;
+}
+
+export interface RestOutcome {
+  readonly atRest: boolean;
+  readonly waitedMs: number;
+  readonly samples: number;
+  readonly last: RestSnapshot;
+  readonly violations: readonly string[];
+}
+
+/** Tope y paso de la espera de reposo de la base entre configuraciones. */
+export const REST_MAX_WAIT_MS = 120_000;
+export const REST_INTERVAL_MS = 2_000;
+
+/**
+ * Muestrea el estado de la base hasta que esté en reposo o venza el tope. Si ya lo está, no espera. Con el worker
+ * detenido el estado no empeora solo: lo que no baja es un trabajo activo sin dueño o una consulta ajena.
+ */
+export async function waitForRest(
+  probe: RestProbe,
+  options: { readonly maxWaitMs?: number; readonly intervalMs?: number } = {},
+): Promise<RestOutcome> {
+  const maxWaitMs = options.maxWaitMs ?? REST_MAX_WAIT_MS;
+  const intervalMs = options.intervalMs ?? REST_INTERVAL_MS;
+  const startedAt = probe.now();
+  let samples = 0;
+  for (;;) {
+    const last = await probe.snapshot();
+    samples += 1;
+    const waitedMs = probe.now() - startedAt;
+    const violations = restViolations(last);
+    if (violations.length === 0 || waitedMs >= maxWaitMs) {
+      return { atRest: violations.length === 0, waitedMs, samples, last, violations };
+    }
+    await probe.sleep(Math.min(intervalMs, maxWaitMs - waitedMs));
+  }
+}
+
+/** Lo que el reporte publica de la preparación de una configuración (purga, limpieza y reposo verificado). */
+export interface RestReport {
+  readonly purgedOutbox: number;
+  readonly purgedJobs: number;
+  /** Tablas con `VACUUM (ANALYZE)` antes de medir. */
+  readonly vacuumed: readonly string[];
+  readonly atRest: boolean;
+  readonly waitedMs: number;
+  readonly violations: readonly string[];
+}
+
+/** Un punto del seguimiento del drenado (cada `DRAIN_TRACE_EVERY_MS`): permite ver el ritmo del relay. */
+export interface DrainTraceEntry {
+  /** Desde el fin de la persistencia (ms). */
+  readonly afterMs: number;
+  readonly outboxPending: number;
+  readonly queuedEventJobs: number;
+}
+
+/** Cada cuántos ms se guarda un punto del seguimiento del drenado. */
+export const DRAIN_TRACE_EVERY_MS = 10_000;
+
+/** Se queda con un punto por intervalo (el primero y el último siempre): el reporte no crece con cada sondeo. */
+export function thinDrainTrace(
+  points: readonly DrainTraceEntry[],
+  everyMs: number = DRAIN_TRACE_EVERY_MS,
+): DrainTraceEntry[] {
+  const out: DrainTraceEntry[] = [];
+  let next = Number.NEGATIVE_INFINITY;
+  for (const p of points) {
+    if (p.afterMs >= next) {
+      out.push(p);
+      next = p.afterMs + everyMs;
+    }
+  }
+  const last = points[points.length - 1];
+  if (last && out[out.length - 1] !== last) out.push(last);
+  return out;
+}
+
+/** El drenado no terminó dentro de su tope: se publica con el diagnóstico del outbox y no invalida la fila informativa. */
+export interface DrainStall {
+  readonly capMs: number;
+  readonly diagnosis: OutboxDiagnosis;
 }
