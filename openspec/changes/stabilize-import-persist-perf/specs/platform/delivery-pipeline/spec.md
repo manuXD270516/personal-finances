@@ -61,3 +61,17 @@ Trace: NFR-PERF-007 · Priority: Should
 - **CUANDO** la vigilancia horaria del flujo de caja corre durante la persistencia y tarda 4 200 ms
 - **ENTONCES** el reporte publica ese trabajo con su inicio y su duración junto a la fila del import
 - **Y** la fila decide su veredicto con la persistencia medida, sin repetirse
+
+### Requirement: Cada configuración del benchmark del import parte de una base en reposo
+El benchmark del import DEBE (MUST), antes de medir cada configuración (la del código y la de la plantilla del host) y con el worker anterior detenido: purgar el backlog que dejó la configuración anterior (eventos pendientes del outbox y trabajos abiertos de las colas `events.*`), vaciar y analizar las tablas que esa purga ensucia, esperar la quietud del host y verificar que la base está en reposo (0 eventos pendientes, 0 trabajos `events.*` abiertos y ninguna consulta ajena activa). Si la configuración bloqueante no queda en reposo dentro del tope, DEBE (MUST) fallar con el motivo en lugar de medir sobre un backlog ajeno. El reporte DEBE (MUST) publicar esa preparación y el seguimiento del outbox durante la persistencia y el drenado; si el drenado no termina dentro de su tope, DEBE (MUST) publicar un diagnóstico del outbox en lugar de lanzar un error. Un drenado que no termina en la fila informativa NO DEBE (MUST NOT) cambiar el veredicto del job ni contaminar la medición de la fila bloqueante.
+Trace: NFR-PERF-007, NFR-PERF-008 · Priority: Must
+
+#### Scenario: Backlog de la configuración anterior
+- **CUANDO** la configuración del código termina con 12 201 eventos pendientes en el outbox y se prepara la configuración del host
+- **ENTONCES** el benchmark purga ese backlog con el worker detenido, vacía y analiza las tablas afectadas y no empieza a medir hasta que el outbox y las colas de eventos están en 0
+- **Y** la persistencia del host no incluye la espera por el drenado de la configuración anterior
+
+#### Scenario: Drenado que no termina en la fila informativa
+- **CUANDO** el drenado de la configuración del código no llega a 0 en 180 s con 12 201 eventos pendientes
+- **ENTONCES** el reporte publica la fila con el seguimiento del outbox y el diagnóstico (pendientes por tipo, intentos, antigüedad, transacción abierta más larga y plan de la consulta del relay) en lugar de lanzar un error
+- **Y** el veredicto del job lo deciden solo las filas bloqueantes

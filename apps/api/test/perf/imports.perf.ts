@@ -35,12 +35,15 @@ import {
   PersistCollector,
   PersistSampler,
   SerialClient,
+  diagnoseOutbox,
+  isolateConfiguration,
   queueJobsSince,
   takeFingerprint,
 } from './persist-instrumentation.js';
 import {
   classifyRetryReason,
   importsVerdict,
+  thinDrainTrace,
   scheduledJobsInWindow,
   summarizeMaintenance,
   summarizePersistBreakdown,
@@ -49,8 +52,11 @@ import {
   type RunnerFingerprint,
   type ConsumerDrain,
   type DbSample,
+  type DrainStall,
+  type DrainTraceEntry,
   type ImportsReport,
   type JobFailure,
+  type RestReport,
   type RetriedJobs,
 } from './perf-report.js';
 
@@ -111,6 +117,8 @@ const HOST_CONFIG: ImportConfig = {
   gate: true,
 };
 let codeReport: ImportsReport | undefined;
+/** Purga, limpieza y reposo de la base que `prepare` dejó antes de medir la configuración en curso. */
+let restReport: RestReport | undefined;
 
 const W = () => `/api/v1/workspaces/${owner.ws}`;
 
@@ -252,6 +260,19 @@ async function prepare(cfg: ImportConfig): Promise<void> {
   for (const restore of restorers.splice(0)) restore();
   await h.stopWorker();
   acquisitions = new AcquisitionRecorder();
+  // Con el worker anterior ya detenido (sin relay ni consumidores que repueblen): purga del backlog que dejó, limpieza y
+  // verificación de que la base está en reposo. Sin esto el backlog de la configuración del código quedaba delante de
+  // `ImportApproved` en el outbox y la fila del host medía su drenado (251 s y 577 s, 10 y 11 de noviembre).
+  restReport = await isolateConfiguration(serial!, (m) => process.stderr.write(`[isolation] ${m}\n`));
+  process.stderr.write(
+    `[isolation] imports.perf.ts (${cfg.label}): purgados ${String(restReport.purgedOutbox)} eventos del outbox y ${String(restReport.purgedJobs)} trabajos events.*; reposo ${String(restReport.atRest)} tras ${String(Math.round(restReport.waitedMs / 1000))} s\n`,
+  );
+  if (!restReport.atRest && cfg.gate) {
+    // Medir la fila bloqueante sobre una base con backlog ajeno daría un rojo falso: se publica el motivo y no se mide.
+    throw new Error(
+      `[TC-PLATFORM-PIPELINE-042] la base no quedó en reposo antes de medir la configuración ${cfg.label}: ${restReport.violations.join('; ')}`,
+    );
+  }
   // Sin pasadas de arranque ni cron horario de los trabajos programados ajenos (H2); con el recolector de tiempos.
   await h.startWorker({ ...PERF_WORKER_ISOLATION, persistTimings: collector }, { env: cfg.workerEnv });
   // Un cron de la vigilancia del flujo de caja programado por un worker anterior de la misma base seguiría disparando.
@@ -305,6 +326,8 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
     let observedAtMs = 0;
     let drainEndMs = 0;
     let failure: unknown;
+    let drainStall: DrainStall | undefined;
+    const drainPoints: DrainTraceEntry[] = [];
     const startedAt = new Date(Date.now() - 1000);
     try {
       const csv = generateCsv(ROWS);
@@ -367,22 +390,33 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
       expect((done['counters'] as Json)['created']).toBe(ROWS);
 
       // Cada consumidor termina de procesar los eventos de esas transacciones; se mide desde el fin de la persistencia
-      // [TC-PLATFORM-PIPELINE-031].
-      await until(
-        async () => {
-          const { backlog, retrying } = await consumerBacklogWithZeros();
-          const outbox = await asAdmin(h, (c) =>
-            c.query(`SELECT count(*)::int AS n FROM platform.outbox WHERE published_at IS NULL`),
-          );
-          const outboxPending = outbox.rows[0]!.n as number;
-          tracker.observe(performance.now() - persistEnd, backlog, outboxPending, retrying);
-          const pendingTotal = [...backlog.values()].reduce((a, b) => a + b, 0);
-          return pendingTotal === 0 && outboxPending === 0 ? true : undefined;
-        },
-        DRAIN_BUDGET_MS + 60_000,
-        500,
-      );
-      drainAfterPersistMs = performance.now() - persistEnd;
+      // [TC-PLATFORM-PIPELINE-031]. Si el drenado no termina dentro del tope, NO se lanza: se publica con el diagnóstico
+      // del outbox (el veredicto lo decide `importsVerdict`; la fila del código es informativa, D311) y la corrida sigue.
+      try {
+        await until(
+          async () => {
+            const { backlog, retrying } = await consumerBacklogWithZeros();
+            const outbox = await asAdmin(h, (c) =>
+              c.query(`SELECT count(*)::int AS n FROM platform.outbox WHERE published_at IS NULL`),
+            );
+            const outboxPending = outbox.rows[0]!.n as number;
+            const pendingTotal = [...backlog.values()].reduce((a, b) => a + b, 0);
+            tracker.observe(performance.now() - persistEnd, backlog, outboxPending, retrying);
+            drainPoints.push({
+              afterMs: Math.round(performance.now() - persistEnd),
+              outboxPending,
+              queuedEventJobs: pendingTotal,
+            });
+            return pendingTotal === 0 && outboxPending === 0 ? true : undefined;
+          },
+          DRAIN_BUDGET_MS + 60_000,
+          500,
+        );
+        drainAfterPersistMs = performance.now() - persistEnd;
+      } catch (err) {
+        if (!(err instanceof Error) || err.message !== 'until: timeout') throw err;
+        drainStall = { capMs: DRAIN_BUDGET_MS + 60_000, diagnosis: await diagnoseOutbox(h) };
+      }
       drainEndMs = Date.now();
       events = await asAdmin(h, async (c) => {
         const { rows } = await c.query<{ event_type: string }>(
@@ -419,6 +453,15 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
             drainEndMs > 0 ? drainEndMs : Date.now(),
           )
         : undefined;
+    const persistTrace: DrainTraceEntry[] = thinDrainTrace(
+      persistSamples
+        .filter((x) => x.outboxPending !== undefined)
+        .map((x) => ({
+          afterMs: Math.max(0, x.atMs - approvedAtMs),
+          outboxPending: x.outboxPending ?? 0,
+          queuedEventJobs: x.queuedEventJobs,
+        })),
+    );
     const verdict = importsVerdict({
       drainAfterPersistMs,
       drainBudgetMs: DRAIN_BUDGET_MS,
@@ -446,6 +489,10 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
         : {}),
       ...(scheduledJobs ? { scheduledJobs } : {}),
       ...(runner ? { runner } : {}),
+      ...(restReport ? { restBeforeMeasure: restReport } : {}),
+      ...(persistTrace.length > 0 ? { persistTrace } : {}),
+      ...(drainPoints.length > 0 ? { drainTrace: thinDrainTrace(drainPoints) } : {}),
+      ...(drainStall ? { drainStall } : {}),
       configuration: {
         label: cfg.label,
         eventConsumerConcurrency: cfg.concurrency,
@@ -516,7 +563,7 @@ describe('import CSV de 5 000 filas', () => {
     await runImportBenchmark(CODE_CONFIG);
   }, 1_800_000);
 
-  it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-008][TC-PLATFORM-THROUGHPUT-014][TC-PLATFORM-PIPELINE-033][TC-PLATFORM-PIPELINE-034][TC-PLATFORM-PIPELINE-035][TC-PLATFORM-PIPELINE-036][TC-PLATFORM-PIPELINE-037][TC-PLATFORM-PIPELINE-040][TC-PLATFORM-PIPELINE-041] ${HOST_CONFIG.title}: vista previa ≤ 30 s, persistencia ≤ 20 s y cada consumidor drena en ≤ 120 s`, async () => {
+  it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-008][TC-PLATFORM-THROUGHPUT-014][TC-PLATFORM-PIPELINE-033][TC-PLATFORM-PIPELINE-034][TC-PLATFORM-PIPELINE-035][TC-PLATFORM-PIPELINE-036][TC-PLATFORM-PIPELINE-037][TC-PLATFORM-PIPELINE-040][TC-PLATFORM-PIPELINE-041][TC-PLATFORM-PIPELINE-042][TC-PLATFORM-PIPELINE-043] ${HOST_CONFIG.title}: vista previa ≤ 30 s, persistencia ≤ 20 s y cada consumidor drena en ≤ 120 s`, async () => {
     await runImportBenchmark(HOST_CONFIG);
   }, 1_800_000);
 });
