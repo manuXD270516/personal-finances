@@ -8,6 +8,7 @@ import {
 } from '@pf/identity/interface/identity.module';
 import { FixedClock, Instant, systemClock, type Clock } from '@pf/shared-kernel';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
+import type { Logger } from '@pf/platform/logging';
 import { Pool } from 'pg';
 import { inject } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
@@ -53,7 +54,13 @@ export class DemoWorld {
   /**
    * `workerClock`: reloj del worker (por omisión, el real). Siempre sin tareas programadas (`scheduledJobs: false`).
    */
-  async start(options: { readonly workerClock?: Clock } = {}): Promise<void> {
+  async start(
+    options: {
+      readonly workerClock?: Clock;
+      /** Logger del worker (por omisi�n, uno descartable): permite a las pruebas leer lo que el worker registra. */
+      readonly workerLogger?: Logger;
+    } = {},
+  ): Promise<void> {
     const pair = await generateKeyPair('RS256', { extractable: true });
     this.signingKey = pair.privateKey;
     const jwks = {
@@ -67,7 +74,7 @@ export class DemoWorld {
     this.baseUrl = await this.api.listen(0, '127.0.0.1');
     this.worker = await createWorkerRuntime(
       workerConfig(baseEnv(this.deps)),
-      capturingLogger('finance-worker', 'worker').logger,
+      options.workerLogger ?? capturingLogger('finance-worker', 'worker').logger,
       {
         // Sin tareas programadas: el reloj real y los crons horarios alterarían la demo cargada con una ancla pasada
         // (fix-demo-golden-clock-dependence).
