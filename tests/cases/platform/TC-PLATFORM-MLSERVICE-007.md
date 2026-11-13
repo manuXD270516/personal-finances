@@ -28,7 +28,7 @@ steps:
 expected_result:
   - "el despliegue termina con todos los demás servicios healthy y la función de pronóstico informa que no está habilitada"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-PLATFORM-MLSERVICE-007 — El despliegue sin el servicio de pronósticos deja todo healthy
@@ -48,3 +48,4 @@ Entonces el despliegue termina con todos los demás servicios healthy y la funci
 ## Notas
 
 - Change `add-ml-forecasting-service` (Phase 8). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; montos como strings decimales; ningún dato real del owner.
+- Depende del despliegue real en N1 (host sin el perfil `ml`: todo healthy y `FORECASTING_ENABLED` apagado). Lo cubre en parte el E2E `tests/e2e/specs/forecast-degradation.spec.ts` (con `ml` detenido los demás servicios siguen healthy); queda `ready` hasta observarlo en el host (2026-11-13).

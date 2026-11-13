@@ -184,6 +184,10 @@ jobs:
         with: { persist-credentials: false }
       - uses: ./.github/actions/setup-workspace
       - run: pnpm turbo run build --filter=@pf/api...
+      # forecast.perf.ts (add-ml-forecasting-service 8.7, NFR-PERF-012): la corrida del workspace principal del Large Seed
+      # con el servicio REAL debe terminar en 300 s o menos; la suite levanta un contenedor de esta imagen con Testcontainers.
+      - name: Construir la imagen finance-ml (servicio real de forecast.perf.ts)
+        run: docker build -f docker/finance-ml.Dockerfile --target runtime -t pfos/finance-ml:local .
       # Carga ~97 000 transacciones (principal) + 20 satélites por los casos de uso y mide los p95 (docs/02 §PERF).
       - run: pnpm perf:bench
       # Pronósticos phase8-v1 (add-expense-forecasts 5.3, TC-FORECAST-EXPENSE-023): ~60 series de 36 periodos con

@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - scripts/stack/test/stack/stack.stack.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["compose","ml"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "todos los servicios de `core` quedan healthy y el servicio de pronósticos no se inicia"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-PLATFORM-MLSERVICE-001 — El perfil core arranca healthy sin el servicio de pronósticos
@@ -48,3 +49,4 @@ Entonces todos los servicios de `core` quedan healthy y el servicio de pronósti
 ## Notas
 
 - Change `add-ml-forecasting-service` (Phase 8). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; montos como strings decimales; ningún dato real del owner.
+- Automatizado en `scripts/stack/test/stack/stack.stack.test.ts` (TC-PLATFORM-STACK-001: el perfil `core` deja exactamente dependencias y apps en ejecución y sin el servicio `ml-forecasting`). Lo valida el job `stack-smoke` de CI (2026-11-13: no se ejecutó localmente porque `test:stack` usa el proyecto compartido `pfos-test`); el E2E `forecast-degradation.spec.ts` comprueba además que con `ml` detenido los demás servicios siguen healthy.

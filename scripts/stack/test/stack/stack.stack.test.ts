@@ -108,7 +108,7 @@ describe('stack local en contenedores (pfos-test)', () => {
     for (const app of [...APPS, 'migrate', 'otel-lgtm', 'valkey']) expect(all).not.toContain(app);
   });
 
-  it('[TC-PLATFORM-STACK-001] pnpm stack:up -- --profile core deja todo healthy, migrate en 0 y las apps como non-root', async () => {
+  it('[TC-PLATFORM-STACK-001] [TC-PLATFORM-MLSERVICE-001] pnpm stack:up -- --profile core deja todo healthy, migrate en 0 y las apps como non-root, sin el servicio de pronósticos', async () => {
     const up = await pnpm('stack:up', ['--profile', 'core'], processEnv);
     expect(up.code, up.stderr + up.stdout).toBe(0);
     timings['core_up_on_top_of_deps'] = up.ms;
@@ -133,6 +133,8 @@ describe('stack local en contenedores (pfos-test)', () => {
       expect(uid.stdout.trim(), svc).not.toBe('0');
       expect(await containerInspect(name, '{{.Config.User}}'), svc).toBe('node:node');
     }
+    // core sin el perfil ml no crea ni inicia el servicio de pronósticos (TC-PLATFORM-MLSERVICE-001).
+    expect((await serviceStates(ctx)).map((s) => s.Service)).not.toContain('ml-forecasting');
     // core sin observability no inicia telemetría (TC-PLATFORM-STACK-007, escenario "Observabilidad opcional").
     expect((await serviceStates(ctx)).map((s) => s.Service)).not.toContain('otel-lgtm');
   });

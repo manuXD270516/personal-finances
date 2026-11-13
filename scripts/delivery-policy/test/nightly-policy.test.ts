@@ -360,6 +360,8 @@ const EXPECTED_THRESHOLDS: readonly ExpectedThreshold[] = [
   { key: 'NFR-PERF-009', unit: 'ms', value: 10_000, doc: '≤ 10 s por workspace' },
   // add-cash-flow-forecast 5.2 (TC-REPORTING-FORECAST-021): calendario de flujo de caja de 90 días, umbral de docs/02.
   { key: 'NFR-PERF-010', unit: 'ms', value: 500, doc: 'p95 ≤ 500 ms' },
+  // add-ml-forecasting-service 8.7 (TC-FORECAST-SERVICE-028): corrida de pronóstico completa por workspace, ≤ 5 min.
+  { key: 'NFR-PERF-012', unit: 'ms', value: 300_000, doc: '≤ 5 min' },
 ];
 
 /** Umbral que declara el código del benchmark (en `perf-report.ts` o como constante local de una suite). */
@@ -460,6 +462,7 @@ const SUITE_THRESHOLD_CONSTANTS: Record<string, Record<string, { key: string; un
   'loan-simulator.perf.ts': { BUDGET_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
   'upcoming-payments.perf.ts': { BUDGET_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
   'subscriptions.perf.ts': { COST_P95_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
+  'forecast.perf.ts': { BUDGET_MS: { key: 'NFR-PERF-012', unit: 'ms' } },
   'commitments.perf.ts': {
     BUDGET_MS: { key: 'NFR-PERF-009', unit: 'ms' },
     GOAL_EVENTS_PER_SECOND: { key: 'NFR-PERF-008', unit: 'ev/s' },
@@ -587,6 +590,7 @@ describe('umbrales de los benchmarks fijados a docs/02 (TC-PLATFORM-PIPELINE-028
         'NFR-PERF-008',
         'NFR-PERF-008:drain',
         'NFR-PERF-009',
+        'NFR-PERF-012',
       ]),
     );
     expect(facts.filter((f) => f.benchmark.endsWith('GOAL_EVENTS_PER_SECOND'))).toHaveLength(1);

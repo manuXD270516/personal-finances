@@ -28,7 +28,7 @@ steps:
 expected_result:
   - "el pipeline de la rama principal falla y la imagen no se publica"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-PLATFORM-MLSERVICE-005 — Una vulnerabilidad crítica en la imagen del servicio bloquea su publicación
@@ -48,3 +48,4 @@ Entonces el pipeline de la rama principal falla y la imagen no se publica
 ## Notas
 
 - Change `add-ml-forecasting-service` (Phase 8). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; montos como strings decimales; ningún dato real del owner.
+- No automatizable en local ni en un PR: exige que el escaneo de Trivy (job `image` de `pr.yml`, antes de la publicación de `main.yml`) falle con una vulnerabilidad crítica real y confirmar que la imagen no se publica. La configuración usa el mismo criterio que las demás imágenes; queda `ready` hasta observarlo en CI (2026-11-13).

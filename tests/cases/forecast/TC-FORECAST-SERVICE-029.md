@@ -18,6 +18,8 @@ automated_tests:
   - packages/contexts/forecasting/src/application/forecasting.test.ts
   - packages/contexts/forecasting/src/domain/forecast-run.test.ts
   - packages/contexts/forecasting/src/infrastructure/ml-service-client.test.ts
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - tests/e2e/specs/forecast-degradation.spec.ts
 status: automated
 regression_suite: false
 phase: 8
@@ -33,7 +35,7 @@ expected_result:
   - "\"R3\" termina fallida con el motivo servicio no disponible"
   - "la consulta muestra el pronóstico de \"R2\" con su instante de generación y la marca de que no pudo actualizarse"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-SERVICE-029 — Con el servicio caído en los 5 intentos la corrida falla y se muestra la vigente marcada

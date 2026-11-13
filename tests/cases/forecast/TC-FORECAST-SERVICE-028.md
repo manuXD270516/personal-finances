@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/forecast.perf.ts
+  - apps/api/test/perf/suite-order.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["perf","NFR-PERF-012"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "la corrida se completa en 300 segundos o menos"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-SERVICE-028 — La corrida del conjunto Large con el servicio real termina en 300 s o menos
