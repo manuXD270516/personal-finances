@@ -268,6 +268,7 @@ export class InMemoryCommitments {
             kind: def?.state.kind as ResolvedForecastRow['kind'],
             managedBy: def?.state.managedBy as ResolvedForecastRow['managedBy'],
             categoryId: def?.versions.find((v) => v.versionNo === o.definitionVersionNo)?.categoryId ?? null,
+            accountId: def?.versions.find((v) => v.versionNo === o.definitionVersionNo)?.accountId ?? '',
           };
         }),
     lastResolvedNominal: async (_ws, definitionId) =>

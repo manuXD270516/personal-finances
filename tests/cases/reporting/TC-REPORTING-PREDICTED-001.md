@@ -5,16 +5,21 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Banda de gasto variable predicho en el calendario"
 scenario: "Banda del periodo en curso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-REPORTING-014"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/forecasting/src/application/liquid-forecast.test.ts
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+  - packages/contexts/reporting/src/domain/predicted-spending-band.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","money"]
@@ -29,7 +34,7 @@ expected_result:
   - "el calendario de 7 días informa el 2026-11-28 la serie con gasto esperado en 4640.00 BOB, con gasto alto en 4320.00 BOB y con gasto bajo en 4880.00 BOB"
   - "la serie principal del 2026-11-28 sigue en 5000.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-001 — La banda reparte por día lo que falta del periodo en curso sin tocar la serie principal

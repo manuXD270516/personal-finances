@@ -17,7 +17,7 @@ import { SpendableSettingsView } from '../spendable/SpendableSettings';
 import { esContext } from '../test-support';
 import { CommitmentsHomeView } from '../upcoming/CommitmentsHomeView';
 import type { UpcomingPayments } from '../upcoming/types';
-import { HOME_BLOCK_HIGH, HOME_BLOCK_NONE, bob } from './fixtures';
+import { HOME_BLOCK_HIGH, HOME_BLOCK_NONE, HOME_BLOCK_PREDICTED, bob } from './fixtures';
 import { homeCashFlowSummary } from './logic';
 import type { SpendableSettings } from './types';
 
@@ -478,5 +478,36 @@ describe('ajustes del disponible (add-cash-flow-forecast, tarea 6.3)', () => {
   it('[TC-REPORTING-FORECAST-027] avisa si se guardó y si no hay cambios', () => {
     expect(strip(settingsView({ notice: 'saved' }))).toContain('Ajustes guardados.');
     expect(strip(settingsView({ notice: 'noChanges' }))).toContain('No hay cambios que guardar.');
+  });
+});
+
+describe('tarjeta Q8 con la probabilidad de déficit con el gasto predicho (add-predicted-cash-flow-band, tarea 6.2)', () => {
+  it('[TC-REPORTING-PREDICTED-010] muestra que los pagos conocidos no tienen riesgo y, aparte, un déficit posible en BOB el 14 dic si el gasto variable es alto', () => {
+    const html = q8(HOME_BLOCK_PREDICTED);
+    expect(strip(html)).toContain('Sin riesgo de déficit');
+    expect(html).toContain('data-testid="cash-flow-q8-risk"');
+    expect(html).toMatch(/data-testid="cash-flow-q8-predicted"\s+data-likelihood="POSSIBLE"/);
+    expect(strip(html)).toContain('Si tu gasto variable es alto: déficit posible en BOB el 14 dic de 2026');
+    // Línea aparte del riesgo de los pagos conocidos y con el enlace al calendario.
+    expect(html).toContain('data-testid="cash-flow-link"');
+    expect(html.indexOf('cash-flow-q8-risk')).toBeLessThan(html.indexOf('cash-flow-q8-predicted'));
+  });
+
+  it('[TC-REPORTING-PREDICTED-010] probable e improbable tienen su propio texto', () => {
+    const likely = q8({
+      ...HOME_BLOCK_NONE,
+      predictedShortfall: { currency: 'BOB', likelihood: 'LIKELY', date: '2026-12-10' },
+    });
+    expect(strip(likely)).toContain('déficit probable en BOB el 10 dic de 2026');
+    const unlikely = q8({
+      ...HOME_BLOCK_NONE,
+      predictedShortfall: { currency: 'BOB', likelihood: 'UNLIKELY', date: null },
+    });
+    expect(strip(unlikely)).toContain('el déficit es improbable en BOB');
+  });
+
+  it('[TC-REPORTING-PREDICTED-010] sin predictedShortfall la tarjeta no cambia', () => {
+    expect(q8(HOME_BLOCK_NONE)).not.toContain('cash-flow-q8-predicted');
+    expect(q8({ ...HOME_BLOCK_NONE, predictedShortfall: null })).not.toContain('cash-flow-q8-predicted');
   });
 });

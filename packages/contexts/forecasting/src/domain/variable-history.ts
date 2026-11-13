@@ -18,6 +18,8 @@ export interface ResolvedInput {
   readonly transactionDate: string;
   readonly amount: { readonly amount: string; readonly currency: string };
   readonly categoryId: string | null;
+  /** Cuenta de la definición que paga la ocurrencia (add-predicted-cash-flow-band); ausente en las fuentes anteriores. */
+  readonly accountId?: string | null;
 }
 
 /** Porción de gasto con componente de préstamo (interés, cargos, seguro, impuestos) que ya está en los flujos. */

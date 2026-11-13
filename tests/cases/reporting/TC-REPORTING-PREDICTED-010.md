@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Probabilidad de déficit en la tarjeta de Q8"
 scenario: "Déficit posible en el Home"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/cash-flow/forecast-home.test.tsx
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+  - tests/e2e/specs/predicted-cash-flow-band.spec.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["home","ui"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "la tarjeta de Q8 muestra que los pagos conocidos no tienen riesgo y, aparte, un déficit posible en BOB el 2026-12-14 si el gasto variable es alto"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-010 — La tarjeta Q8 muestra la probabilidad de déficit aparte del riesgo

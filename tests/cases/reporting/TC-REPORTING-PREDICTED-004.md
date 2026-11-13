@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Probabilidad de déficit con el gasto variable predicho"
 scenario: "Déficit posible solo con gasto alto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+  - packages/contexts/reporting/src/domain/predicted-spending-band.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","shortfall"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "la probabilidad de déficit en BOB es posible con fecha 2026-12-14"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-004 — El déficit es posible si solo la serie con gasto alto baja del umbral

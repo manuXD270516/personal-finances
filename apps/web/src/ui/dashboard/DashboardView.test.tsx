@@ -495,3 +495,46 @@ describe('enlace de Q7 al reporte de ingresos y gastos (add-financial-reports, T
     expect(render(SUMMARY)).not.toContain('expense-report-link');
   });
 });
+
+describe('Q3 con el gasto esperado del periodo (add-predicted-cash-flow-band, tarea 6.2)', () => {
+  const expected = {
+    expectedSpending: {
+      period: '2026-12',
+      prediction: { amount: '4408.00', currency: 'BOB' },
+      interval80: {
+        lower: { amount: '4038.00', currency: 'BOB' },
+        upper: { amount: '4788.00', currency: 'BOB' },
+      },
+      generatedAt: '2026-12-10T10:00:00.000Z',
+      stale: false,
+    },
+  };
+
+  it('[TC-REPORTING-PREDICTED-009] muestra lo gastado y, junto, «Esperado: ~4.408,00 BOB · Rango probable: 4.038,00 BOB a 4.788,00 BOB (80 %)»', () => {
+    const expense = section(render({ ...SUMMARY, forecast: expected }), 'expense');
+    expect(expense).toMatch(/data-testid="expense-amount"[^>]*>1\.305,00 BOB</);
+    expect(text(expense)).toContain(
+      'Esperado: ~4.408,00 BOB · Rango probable: 4.038,00 BOB a 4.788,00 BOB (80 %)',
+    );
+    expect(expense).not.toContain('expense-expected-stale');
+  });
+
+  it('[TC-REPORTING-PREDICTED-009] un pronóstico desactualizado lo dice', () => {
+    const expense = section(
+      render({
+        ...SUMMARY,
+        forecast: { expectedSpending: { ...expected.expectedSpending, stale: true } },
+      }),
+      'expense',
+    );
+    expect(expense).toContain('data-testid="expense-expected-stale"');
+  });
+
+  it('[TC-REPORTING-PREDICTED-009] sin pronóstico la tarjeta queda como hasta ahora', () => {
+    for (const forecast of [undefined, null, { expectedSpending: null }]) {
+      const expense = section(render({ ...SUMMARY, forecast }), 'expense');
+      expect(expense).not.toContain('expense-expected');
+      expect(text(expense)).not.toContain('Esperado');
+    }
+  });
+});

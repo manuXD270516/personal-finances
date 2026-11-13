@@ -14,7 +14,13 @@ export type ForecastRunStatusDto =
 export type ForecastFailureReasonDto =
   'SERVICE_UNAVAILABLE' | 'SERVICE_REJECTED' | 'TIMEOUT' | 'INVALID_OUTPUT';
 export type ForecastScopeDto =
-  'TOTAL_EXPENSE' | 'CATEGORY_GROUP' | 'CATEGORY' | 'OTHER_CATEGORIES' | 'TOTAL_INCOME';
+  | 'TOTAL_EXPENSE'
+  | 'CATEGORY_GROUP'
+  | 'CATEGORY'
+  | 'OTHER_CATEGORIES'
+  | 'TOTAL_INCOME'
+  /** Gasto variable pagado desde cuentas líquidas de UNA moneda, en esa moneda (`currency` de la serie). */
+  | 'LIQUID_VARIABLE_OUTFLOW';
 export type ForecastReadinessDto = 'MODEL' | 'SIMPLE' | 'INSUFFICIENT';
 
 export interface MoneyDto {
@@ -149,7 +155,10 @@ export interface LatestForecastDto {
   };
 }
 
-/** Query pública (para el change 66, REPORTING): el pronóstico vigente del workspace por series y horizonte. */
+/**
+ * Query pública (para el change 66, REPORTING): el pronóstico vigente del workspace por series y horizonte. Sin `scopes`
+ * devuelve las series de siempre (no incluye `LIQUID_VARIABLE_OUTFLOW`: hay que pedirla); cada serie informa su `currency`.
+ */
 export interface LatestForecastQuery {
   getLatest(input: {
     readonly workspaceId: string;
@@ -160,6 +169,27 @@ export interface LatestForecastQuery {
 }
 
 export const LATEST_FORECAST_QUERY = Symbol.for('pf.forecasting.LatestForecastQuery');
+
+export interface LiquidVariableSpendDto {
+  readonly currency: string;
+  /** Decimal a la escala de la moneda. */
+  readonly amount: string;
+}
+
+/**
+ * Gasto variable ya hecho desde cuentas líquidas (add-predicted-cash-flow-band): el mismo criterio que la historia de la
+ * serie `LIQUID_VARIABLE_OUTFLOW`, por moneda y sin conversión, entre `from` y `to` (inclusive). Lo usa REPORTING para
+ * saber cuánto falta del gasto predicho del periodo en curso. En la unidad de trabajo del llamador si existe.
+ */
+export interface LiquidVariableSpendQuery {
+  spentBetween(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly LiquidVariableSpendDto[]>;
+}
+
+export const LIQUID_VARIABLE_SPEND_QUERY = Symbol.for('pf.forecasting.LiquidVariableSpendQuery');
 
 /**
  * Allow-list de redacción de la auditoría (add-audit-trail): la solicitud manual de la corrida (sin montos). Los valores

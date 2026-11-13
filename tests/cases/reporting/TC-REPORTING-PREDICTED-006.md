@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Calendario sin pronóstico disponible"
 scenario: "Función deshabilitada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006","FR-FORECAST-008"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+  - tests/e2e/specs/predicted-cash-flow-band.spec.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","degradation"]
@@ -28,7 +32,7 @@ steps:
 expected_result:
   - "el calendario no tiene bandas, informa el motivo función no habilitada y sus demás cifras son las mismas que sin la función"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-006 — Con la función deshabilitada el calendario no tiene bandas y no cambia

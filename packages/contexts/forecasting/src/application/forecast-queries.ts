@@ -1,5 +1,5 @@
 import type { LifecycleDto } from '@pf/audit/contracts';
-import { DomainError, PeriodCalendar, type PeriodLabel } from '@pf/shared-kernel';
+import { DomainError, PeriodCalendar, dec, type PeriodLabel } from '@pf/shared-kernel';
 import {
   FORECAST_DISCLAIMER_KEY,
   type ForecastDriverDto,
@@ -13,12 +13,15 @@ import {
   type ForecastSeriesSummaryDto,
   type LatestForecastDto,
   type LatestForecastQuery,
+  type LiquidVariableSpendDto,
+  type LiquidVariableSpendQuery,
 } from '../contracts/index.js';
 import {
   FORECAST_RUN_LIFECYCLE,
   FORECAST_RUN_STATUSES,
   ForecastComposer,
   SERIES_SCOPES,
+  VariableLiquidOutflowBuilder,
   type ForecastRun,
 } from '../domain/index.js';
 import type { ForecastingDeps, StoredSeries } from './ports.js';
@@ -60,7 +63,7 @@ const seriesSummary = (s: StoredSeries): ForecastSeriesSummaryDto => ({
 });
 
 /** Consultas de FORECAST: pronóstico vigente, corridas y recorrido. Lectura en la transacción de la petición. */
-export class ForecastQueries implements LatestForecastQuery {
+export class ForecastQueries implements LatestForecastQuery, LiquidVariableSpendQuery {
   constructor(private readonly deps: ForecastingDeps) {}
 
   async getLatest(input: {
@@ -105,7 +108,9 @@ export class ForecastQueries implements LatestForecastQuery {
       const wanted = rows.filter(
         (s) =>
           s.status !== 'INVALID' &&
-          (!input.scopes || input.scopes.length === 0 || input.scopes.includes(s.scope)) &&
+          (!input.scopes || input.scopes.length === 0
+            ? s.scope !== 'LIQUID_VARIABLE_OUTFLOW'
+            : input.scopes.includes(s.scope)) &&
           (input.scopeRef === undefined || s.scopeRef === input.scopeRef),
       );
       const gaps = this.coherenceGaps(rows);
@@ -140,6 +145,46 @@ export class ForecastQueries implements LatestForecastQuery {
         disclaimerKey: FORECAST_DISCLAIMER_KEY,
         meta: { conversion: metadata?.conversion ?? null },
       };
+    });
+  }
+
+  /**
+   * Gasto variable líquido ya hecho entre `from` y `to` por moneda (add-predicted-cash-flow-band): la historia de la serie
+   * `LIQUID_VARIABLE_OUTFLOW` aplicada al rango pedido. Sin el puerto de cuentas líquidas, ninguno.
+   */
+  async spentBetween(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly LiquidVariableSpendDto[]> {
+    const { deps } = this;
+    if (!deps.liquidAccounts || !deps.flows.loadLiquidFlows) return [];
+    const liquidAccounts = deps.liquidAccounts;
+    const loadLiquidFlows = deps.flows.loadLiquidFlows.bind(deps.flows);
+    return deps.uow.run(input.workspaceId, async () => {
+      const ws = await deps.settingsOf.settingsOf(input.workspaceId);
+      // Lecturas en serie: nunca consultas en paralelo sobre el mismo cliente.
+      const accounts = await liquidAccounts.liquidAccounts(input.workspaceId);
+      if (accounts.length === 0) return [];
+      const flows = await loadLiquidFlows(input.workspaceId, input.from, input.to);
+      const resolved = await deps.known.listResolved(input.workspaceId, input.from, input.to, 'OUTFLOW');
+      const history = VariableLiquidOutflowBuilder.build({
+        accounts,
+        flows,
+        resolved: resolved.map((r) => ({
+          kind: r.kind,
+          managedBy: r.managedBy,
+          transactionDate: r.transactionDate,
+          accountId: r.accountId ?? null,
+          amount: r.amount,
+        })),
+        startDay: ws.startDay,
+      });
+      // El rango pedido cabe en un periodo financiero: se suman sus celdas (un rango a caballo de dos periodos también).
+      return [...history.byCurrency].map(([code, h]) => ({
+        currency: code,
+        amount: [...h.periods.values()].reduce((a, f) => a.plus(f.value), dec('0')).toFixed(h.scale),
+      }));
     });
   }
 

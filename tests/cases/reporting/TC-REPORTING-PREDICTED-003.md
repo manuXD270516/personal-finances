@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Banda de gasto variable predicho en el calendario"
 scenario: "Periodo siguiente dentro del horizonte"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-REPORTING-014"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+  - packages/contexts/reporting/src/domain/predicted-spending-band.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","money"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "cada día de diciembre del horizonte resta 50.00 BOB en la serie con gasto esperado"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-003 — El gasto del periodo siguiente se reparte entre todos sus días

@@ -45,8 +45,8 @@ export interface ForecastRequestV1 {
 }
 
 /** Clave estable de una serie dentro de la corrida. */
-export const seriesKey = (s: Pick<EvaluatedSeries, 'scope' | 'scopeRef'>): string =>
-  `${s.scope}:${s.scopeRef ?? ''}`;
+export const seriesKey = (s: Pick<EvaluatedSeries, 'scope' | 'scopeRef' | 'currency'>): string =>
+  s.scope === 'LIQUID_VARIABLE_OUTFLOW' ? `${s.scope}:${s.currency ?? ''}` : `${s.scope}:${s.scopeRef ?? ''}`;
 
 const sortKeys = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(sortKeys);
@@ -84,14 +84,14 @@ export const ForecastRequestBuilder = {
       .map((s) => ({
         ref: refs.get(seriesKey(s)) as string,
         kind: s.kind,
-        currency: input.currency,
-        scale: input.scale,
+        currency: s.currency ?? input.currency,
+        scale: s.scale ?? input.scale,
         readiness: s.readiness as 'MODEL' | 'SIMPLE',
         horizon: s.horizon,
         outlierPolicy: 'MAD_3_5' as const,
         points: s.points.map((p) => ({
           period: p.period,
-          value: p.value.toFixed(input.scale),
+          value: p.value.toFixed(s.scale ?? input.scale),
           txCount: p.txCount,
         })),
       }))

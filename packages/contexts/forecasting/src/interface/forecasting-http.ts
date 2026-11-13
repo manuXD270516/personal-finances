@@ -16,6 +16,7 @@ const SCOPES: readonly string[] = [
   'CATEGORY',
   'OTHER_CATEGORIES',
   'TOTAL_INCOME',
+  'LIQUID_VARIABLE_OUTFLOW',
 ];
 
 const str = (b: Json, k: string): string | undefined =>

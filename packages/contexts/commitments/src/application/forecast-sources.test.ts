@@ -156,6 +156,8 @@ describe('ResolvedOccurrencesQuery.listResolved (add-expense-forecasts, S2)', ()
       managedBy: 'USER',
       direction: 'OUTFLOW',
       categoryId: CATEGORY,
+      // La cuenta de la versión de la definición (add-predicted-cash-flow-band: recurrentes pagados desde cuentas líquidas).
+      accountId: BANK,
       amount: bob('2500.00'),
     });
     const inflow = await s.queries.listResolved({

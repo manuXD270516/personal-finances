@@ -5,6 +5,7 @@ import {
   Money,
   PeriodCalendar,
   currency,
+  dec,
   shiftLabel,
   type FlowRates,
   type PeriodLabel,
@@ -17,10 +18,13 @@ import {
   PeriodSeriesBuilder,
   ReadinessGate,
   VariableHistoryBuilder,
+  VariableLiquidOutflowBuilder,
+  seriesKey,
   FORECAST_GENERATED_EVENT_TYPE,
   type CategoryInfo,
   type EvaluatedSeries,
   type KnownItem,
+  type ResolvedInput,
   type FailureReason,
   type ForecastRequestV1,
   type ForecastResponseV1,
@@ -257,6 +261,12 @@ export class ExecuteForecastRun {
       thresholds: deps.settings.thresholds,
       truncated: gaps.truncated,
     });
+    const liquid = await this.prepareLiquid(workspaceId, {
+      startDay: ws.startDay,
+      currentPeriod,
+      range,
+      resolved: resolvedOut,
+    });
     const collector = rates.collector();
     const known = KnownFutureCalculator.compute({
       occurrences,
@@ -272,12 +282,66 @@ export class ExecuteForecastRun {
       asOfPeriod: history.lastFinished,
       currency: target.code,
       scale: target.scale,
-      evaluated,
+      evaluated: [...evaluated, ...liquid],
       truncated: gaps.truncated,
       known,
       categories: catalog.categories,
       conversion: used.length > 0 ? { rateDate: todayText, ratesUsed: used } : null,
     };
+  }
+
+  /**
+   * Series del gasto variable líquido por moneda (add-predicted-cash-flow-band, decisión 1): sin conversión, historia
+   * de periodos terminados con ceros en los huecos. Sin cuentas líquidas o sin el puerto de flujos por cuenta, ninguna.
+   */
+  private async prepareLiquid(
+    workspaceId: string,
+    input: {
+      readonly startDay: number;
+      readonly currentPeriod: PeriodLabel;
+      readonly range: { readonly dateFrom: string; readonly dateTo: string };
+      readonly resolved: readonly ResolvedInput[];
+    },
+  ): Promise<EvaluatedSeries[]> {
+    const { deps } = this;
+    if (!deps.liquidAccounts || !deps.flows.loadLiquidFlows) return [];
+    const accounts = await deps.liquidAccounts.liquidAccounts(workspaceId);
+    if (accounts.length === 0) return [];
+    const flows = await deps.flows.loadLiquidFlows(workspaceId, input.range.dateFrom, input.range.dateTo);
+    const history = VariableLiquidOutflowBuilder.build({
+      accounts,
+      flows,
+      resolved: input.resolved.map((r) => ({
+        kind: r.kind,
+        managedBy: r.managedBy,
+        transactionDate: r.transactionDate,
+        accountId: r.accountId ?? null,
+        amount: r.amount,
+      })),
+      startDay: input.startDay,
+    });
+    const lastFinished = shiftLabel(input.currentPeriod, -1);
+    const out: EvaluatedSeries[] = [];
+    for (const [code, h] of history.byCurrency) {
+      const labels = [...h.periods.keys()].filter((l) => l <= lastFinished).sort();
+      const first = labels[0];
+      const values: { period: string; value: ReturnType<typeof dec>; txCount: number }[] = [];
+      if (first) {
+        for (let label = first; label <= lastFinished; label = shiftLabel(label, 1)) {
+          const f = h.periods.get(label);
+          values.push({ period: label, value: f?.value ?? dec('0'), txCount: f?.txCount ?? 0 });
+        }
+      }
+      out.push(
+        ReadinessGate.evaluateLiquid({
+          currency: code,
+          scale: h.scale,
+          values,
+          thresholds: deps.settings.thresholds,
+        }),
+      );
+    }
+    return out;
   }
 
   private storedFor(
@@ -303,8 +367,10 @@ export class ExecuteForecastRun {
     let invalid = 0;
     let insufficient = 0;
     for (const s of prepared.evaluated) {
-      const key = `${s.scope}:${s.scopeRef ?? ''}`;
-      const ref = refs.get(key) ?? `x${stored.length + 1}`;
+      const liquid = s.scope === 'LIQUID_VARIABLE_OUTFLOW';
+      const ref = refs.get(seriesKey(s)) ?? `x${stored.length + 1}`;
+      const seriesCurrency = s.currency ?? prepared.currency;
+      const seriesScale = s.scale ?? prepared.scale;
       const base = {
         id: deps.ids.next(),
         runId,
@@ -313,8 +379,8 @@ export class ExecuteForecastRun {
         scope: s.scope,
         scopeRef: s.scopeRef,
         name: s.name,
-        currency: prepared.currency,
-        scale: prepared.scale,
+        currency: seriesCurrency,
+        scale: seriesScale,
         readiness: s.readiness,
         historyFrom: s.historyFrom,
         historyTo: s.historyTo,
@@ -331,7 +397,7 @@ export class ExecuteForecastRun {
       const items = KnownFutureCalculator.forSeries(s, prepared.known, prepared.categories);
       const knownItems: StoredKnownItem[] = items.map((k) => ({ ...k, currency: prepared.currency }));
       if (s.readiness === 'INSUFFICIENT') {
-        insufficient += 1;
+        if (!liquid) insufficient += 1;
         stored.push({
           ...base,
           readinessReasons: s.readinessReasons,
@@ -349,7 +415,7 @@ export class ExecuteForecastRun {
       const req = requestedByRef.get(ref);
       const verdict = result && req ? ForecastResultValidator.validate(req, result) : { ok: false as const };
       if (!result || !req || !verdict.ok || !result.model || !result.baseline) {
-        invalid += 1;
+        if (!liquid) invalid += 1;
         stored.push({
           ...base,
           readinessReasons: [
@@ -365,12 +431,12 @@ export class ExecuteForecastRun {
         });
         continue;
       }
-      published += 1;
+      if (!liquid) published += 1;
       versions.add(`${result.model.name}@${result.model.version}`);
       const outlierPeriods = result.outliers ?? [];
       const points = result.points.map((p) => {
         const known = KnownFutureCalculator.totals(items, p.period as PeriodLabel, () => true);
-        const c = ForecastComposer.compose({ point: p, known, scale: prepared.scale, outlierPeriods });
+        const c = ForecastComposer.compose({ point: p, known, scale: seriesScale, outlierPeriods });
         return {
           period: c.period,
           monthsAhead: c.monthsAhead,

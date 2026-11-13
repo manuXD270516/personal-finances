@@ -6,6 +6,7 @@ import type {
   CashFlowEvent,
   CashFlowHomeBlock,
   Money,
+  PredictedCashFlow,
   ResolvedRate,
 } from './types';
 
@@ -276,4 +277,70 @@ export const HOME_BLOCK_NONE: CashFlowHomeBlock = {
   worst: null,
   consolidatedLowest: { amount: bob('4949.12'), date: '2026-10-28' },
   complete: true,
+};
+
+// ───────────────────────────────────────────── banda del gasto variable predicho (add-predicted-cash-flow-band)
+
+const toCents = (amount: string): bigint => BigInt(amount.replace('.', ''));
+const fromCents = (value: bigint): string => {
+  const sign = value < 0n ? '-' : '';
+  const abs = (value < 0n ? -value : value).toString().padStart(3, '0');
+  return `${sign}${abs.slice(0, -2)}.${abs.slice(-2)}`;
+};
+const minusCents = (amount: string, cents: bigint): Money => bob(fromCents(toCents(amount) - cents));
+
+/**
+ * Banda de BOB: del saldo de la serie principal se resta un gasto variable acumulado de 10.00, 30.00 y 5.00 por día
+ * (esperado, alto y bajo). Con la reserva mínima de 1500.00 el saldo más bajo con gasto alto sigue por encima: improbable.
+ */
+export const PREDICTED_BOB: PredictedCashFlow = {
+  status: 'AVAILABLE',
+  reason: null,
+  forecastRunId: '0190a000-0000-7000-8000-00000000c001',
+  generatedAt: '2026-10-19T10:01:00Z',
+  stale: false,
+  intervalLevel: '0.8',
+  series: BOB_SERIES.map((d, i) => ({
+    date: d.date,
+    expected: minusCents(d.balance.amount, BigInt((i + 1) * 1000)),
+    high: minusCents(d.balance.amount, BigInt((i + 1) * 3000)),
+    low: minusCents(d.balance.amount, BigInt((i + 1) * 500)),
+  })),
+  lowest: {
+    expected: { amount: bob('3511.00'), date: '2026-10-28' },
+    high: { amount: bob('2901.00'), date: '2026-10-28' },
+  },
+  shortfallLikelihood: 'UNLIKELY',
+  firstShortfallDate: null,
+};
+
+export const PREDICTED_POSSIBLE: PredictedCashFlow = {
+  ...PREDICTED_BOB,
+  lowest: {
+    expected: { amount: bob('2150.00'), date: '2026-12-14' },
+    high: { amount: bob('1380.00'), date: '2026-12-14' },
+  },
+  shortfallLikelihood: 'POSSIBLE',
+  firstShortfallDate: '2026-12-14',
+};
+
+export const unavailablePredicted = (
+  reason: NonNullable<PredictedCashFlow['reason']>,
+): PredictedCashFlow => ({
+  status: 'NOT_AVAILABLE',
+  reason,
+  forecastRunId: null,
+  generatedAt: null,
+  stale: false,
+  intervalLevel: '0.8',
+  series: [],
+  lowest: null,
+  shortfallLikelihood: 'NOT_AVAILABLE',
+  firstShortfallDate: null,
+});
+
+/** Q8 con el riesgo de los pagos conocidos en `NONE` y un déficit posible con el gasto predicho (TC-REPORTING-PREDICTED-010). */
+export const HOME_BLOCK_PREDICTED: CashFlowHomeBlock = {
+  ...HOME_BLOCK_NONE,
+  predictedShortfall: { currency: 'BOB', likelihood: 'POSSIBLE', date: '2026-12-14' },
 };

@@ -26,6 +26,33 @@ export interface CashFlowLowest {
   readonly date: string;
 }
 
+export type PredictedUnavailableReason =
+  'DISABLED' | 'NO_FORECAST' | 'NO_SERIES' | 'INSUFFICIENT_DATA' | 'NO_CURRENT_PERIOD';
+export type ShortfallLikelihood = 'LIKELY' | 'POSSIBLE' | 'UNLIKELY' | 'NOT_AVAILABLE';
+
+/**
+ * Banda del gasto variable predicho de una moneda (add-predicted-cash-flow-band). `expected`, `high` y `low` son SALDOS:
+ * la serie principal menos el gasto variable predicho acumulado con el valor esperado, el límite superior (gasto alto,
+ * el saldo más bajo) y el inferior (gasto bajo, el más alto) del intervalo del 80 %. Nunca se suman a la serie principal.
+ */
+export interface PredictedCashFlow {
+  readonly status: 'AVAILABLE' | 'NOT_AVAILABLE';
+  readonly reason: PredictedUnavailableReason | null;
+  readonly forecastRunId: string | null;
+  readonly generatedAt: string | null;
+  readonly stale: boolean;
+  readonly intervalLevel: '0.8';
+  readonly series: readonly {
+    readonly date: string;
+    readonly expected: Money;
+    readonly high: Money;
+    readonly low: Money;
+  }[];
+  readonly lowest: { readonly expected: CashFlowLowest; readonly high: CashFlowLowest } | null;
+  readonly shortfallLikelihood: ShortfallLikelihood;
+  readonly firstShortfallDate: string | null;
+}
+
 export interface CashFlowCurrency {
   readonly currency: string;
   readonly threshold: { readonly amount: Money; readonly source: 'MINIMUM_RESERVE' | 'ZERO' };
@@ -46,6 +73,8 @@ export interface CashFlowCurrency {
     readonly series: readonly { readonly date: string; readonly balance: Money }[];
   } | null;
   readonly withoutExpectedIncome: { readonly lowest: CashFlowLowest; readonly endBalance: Money };
+  /** Banda del gasto variable predicho y probabilidad de déficit; puede faltar en respuestas anteriores a la Phase 8. */
+  readonly predicted?: PredictedCashFlow;
 }
 
 export interface CashFlowAccount {
@@ -130,6 +159,12 @@ export interface CashFlowHomeBlock {
   } | null;
   readonly consolidatedLowest: CashFlowLowest | null;
   readonly complete: boolean;
+  /** Probabilidad de déficit con el gasto predicho, aparte del riesgo de los pagos conocidos. */
+  readonly predictedShortfall?: {
+    readonly currency: string;
+    readonly likelihood: Exclude<ShortfallLikelihood, 'NOT_AVAILABLE'>;
+    readonly date: string | null;
+  } | null;
 }
 
 /** Variación por categoría de los tops del Home (Q7). */

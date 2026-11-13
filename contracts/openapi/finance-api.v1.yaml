@@ -22008,6 +22008,35 @@ components:
           oneOf:
             - $ref: '#/components/schemas/CashFlowHomeBlock'
             - type: 'null'
+        forecast:
+          description: |
+            Expected spending of the period (Home Q3, add-predicted-cash-flow-band): the forecast of the total expense for
+            the period of the summary with its 80 % interval. Null when there is no current forecast of that period, the
+            forecast is disabled or the summary is historical (`asOf`).
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [expectedSpending]
+              properties:
+                expectedSpending:
+                  type: object
+                  additionalProperties: false
+                  required: [period, prediction, interval80, generatedAt, stale]
+                  properties:
+                    period: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+                    prediction:
+                      $ref: '#/components/schemas/Money'
+                      description: Expected total spending of the period (known costs plus predicted variable spending)
+                    interval80:
+                      type: object
+                      additionalProperties: false
+                      required: [lower, upper]
+                      properties:
+                        lower: { $ref: '#/components/schemas/Money' }
+                        upper: { $ref: '#/components/schemas/Money' }
+                    generatedAt: { $ref: '#/components/schemas/Instant' }
+                    stale: { type: boolean, description: The forecast is older than 35 days or the last later run failed }
+            - type: 'null'
         questions:
           type: array
           items: { $ref: '#/components/schemas/HomeQuestionStatus' }
@@ -22119,6 +22148,26 @@ components:
                 date: { $ref: '#/components/schemas/LocalDate' }
             - type: 'null'
         complete: { type: boolean }
+        predictedShortfall:
+          description: |
+            Shortfall likelihood with the predicted variable spending (add-predicted-cash-flow-band) of the currency with the
+            highest likelihood (`LIKELY` > `POSSIBLE` > `UNLIKELY`), separate from `worst` (the risk of the known payments,
+            which it never changes); null when no currency has a predicted band.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [currency, likelihood, date]
+              properties:
+                currency: { $ref: '#/components/schemas/CurrencyCode' }
+                likelihood:
+                  type: string
+                  x-extensible-enum: [LIKELY, POSSIBLE, UNLIKELY]
+                date:
+                  description: First date under the threshold (null with `UNLIKELY`)
+                  oneOf:
+                    - $ref: '#/components/schemas/LocalDate'
+                    - type: 'null'
+            - type: 'null'
     CashFlowDayPoint:
       type: object
       additionalProperties: false
@@ -22160,6 +22209,7 @@ components:
         - series
         - planned
         - withoutExpectedIncome
+        - predicted
       properties:
         currency: { $ref: '#/components/schemas/CurrencyCode' }
         threshold:
@@ -22228,6 +22278,79 @@ components:
           properties:
             lowest: { $ref: '#/components/schemas/CashFlowLowest' }
             endBalance: { $ref: '#/components/schemas/Money' }
+        predicted: { $ref: '#/components/schemas/CashFlowPredicted' }
+    CashFlowPredicted:
+      type: object
+      description: |
+        Band of the predicted variable spending of one currency (add-predicted-cash-flow-band; FR-FORECAST-008). The three
+        balances are the main series minus the predicted variable spending accumulated, in the currency of the account and
+        without conversion: `expected` with the expected value, `high` with the UPPER bound of the 80 % interval (high
+        spending, so the lowest balance) and `low` with the LOWER bound (low spending, so the highest balance). The
+        spending of each period is split in equal parts per day (the period in progress: what is still missing, never less
+        than zero, from today to the end of the period). They are never added to the main series nor to the planned one,
+        and they never change `risk`, the episodes or the alerts. `shortfallLikelihood`: `LIKELY` when the lowest balance
+        with the expected spending is under the threshold (the minimum reserve or zero); `POSSIBLE` when only the one with
+        high spending is (about 1 in 10 or more with an 80 % interval); `UNLIKELY` otherwise; `NOT_AVAILABLE` without band.
+      additionalProperties: false
+      required:
+        - status
+        - reason
+        - forecastRunId
+        - generatedAt
+        - stale
+        - intervalLevel
+        - series
+        - lowest
+        - shortfallLikelihood
+        - firstShortfallDate
+      properties:
+        status: { type: string, enum: [AVAILABLE, NOT_AVAILABLE] }
+        reason:
+          description: Why there is no band. Open set - clients must handle unknown values.
+          oneOf:
+            - type: string
+              x-extensible-enum: [DISABLED, NO_FORECAST, NO_SERIES, INSUFFICIENT_DATA, NO_CURRENT_PERIOD]
+            - type: 'null'
+        forecastRunId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        generatedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        stale: { type: boolean, description: The forecast is older than 35 days or the last later run failed }
+        intervalLevel: { type: string, enum: ['0.8'], description: Level of the interval of the high and low cases }
+        series:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [date, expected, high, low]
+            properties:
+              date: { $ref: '#/components/schemas/LocalDate' }
+              expected: { $ref: '#/components/schemas/Money' }
+              high: { $ref: '#/components/schemas/Money' }
+              low: { $ref: '#/components/schemas/Money' }
+        lowest:
+          description: Lowest balance of the day with the expected and with the high spending; null without band.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [expected, high]
+              properties:
+                expected: { $ref: '#/components/schemas/CashFlowLowest' }
+                high: { $ref: '#/components/schemas/CashFlowLowest' }
+            - type: 'null'
+        shortfallLikelihood:
+          type: string
+          description: Open set - clients must handle unknown values.
+          x-extensible-enum: [LIKELY, POSSIBLE, UNLIKELY, NOT_AVAILABLE]
+        firstShortfallDate:
+          description: First date under the threshold of the series that sets the likelihood (null with `UNLIKELY` or without band)
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
     CashFlowAccount:
       type: object
       additionalProperties: false
@@ -28433,8 +28556,11 @@ components:
       x-extensible-enum: [SERVICE_UNAVAILABLE, SERVICE_REJECTED, TIMEOUT, INVALID_OUTPUT]
     ForecastScope:
       type: string
-      description: Open set. What a series forecasts.
-      x-extensible-enum: [TOTAL_EXPENSE, CATEGORY_GROUP, CATEGORY, OTHER_CATEGORIES, TOTAL_INCOME]
+      description: |
+        Open set. What a series forecasts. `LIQUID_VARIABLE_OUTFLOW` (add-predicted-cash-flow-band) is the variable spending paid
+        from the liquid accounts of ONE currency, in that currency (the `currency` of the series, no conversion); it is only
+        returned when requested with the `scope` filter.
+      x-extensible-enum: [TOTAL_EXPENSE, CATEGORY_GROUP, CATEGORY, OTHER_CATEGORIES, TOTAL_INCOME, LIQUID_VARIABLE_OUTFLOW]
     ForecastReadiness:
       type: string
       description: Open set. `MODEL` (6 or more finished periods), `SIMPLE` (3 to 5, a simple estimate only) or `INSUFFICIENT`.

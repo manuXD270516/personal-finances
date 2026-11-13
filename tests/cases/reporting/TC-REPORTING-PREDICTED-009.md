@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Gasto esperado del periodo en el Home"
 scenario: "Gasto esperado del periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001","FR-FORECAST-004","FR-REPORTING-001"]
 nfr: []
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/dashboard/DashboardView.test.tsx
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+  - tests/e2e/specs/predicted-cash-flow-band.spec.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["home","ui"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "la tarjeta Q3 muestra 2980.00 BOB gastados y el gasto esperado de 4408.00 BOB con rango probable de 4038.00 BOB a 4788.00 BOB (80 %), con los formatos del locale"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-009 — La tarjeta Q3 muestra el gasto esperado del periodo con su rango

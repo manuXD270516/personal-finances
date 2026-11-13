@@ -7,6 +7,7 @@ import type {
   CashFlowHomeBlock,
   CashFlowRisk,
   Money,
+  PredictedCashFlow,
 } from './types';
 
 /** Ruta de la vista (sin prefijo de locale) y parámetros de URL: `horizonte`, `moneda` y `cuenta`. */
@@ -122,6 +123,8 @@ export interface SeriesRow {
   readonly planned: Money | null;
   /** El saldo más bajo del día queda por debajo del umbral. */
   readonly belowThreshold: boolean;
+  /** Saldos con el gasto variable predicho esperado, alto y bajo (si hay banda). */
+  readonly band: { readonly expected: Money; readonly high: Money; readonly low: Money } | null;
 }
 
 /** Filas de la tabla equivalente al gráfico: un punto por día, con la serie del plan alineada por fecha. */
@@ -129,16 +132,23 @@ export function seriesRows(
   series: readonly CashFlowDay[],
   planned: CashFlowCurrency['planned'],
   threshold: Money | null,
+  band: PredictedCashFlow | null = null,
 ): readonly SeriesRow[] {
   const plannedByDate = new Map((planned?.series ?? []).map((p) => [p.date, p.balance]));
+  const bandByDate = new Map((band?.series ?? []).map((p) => [p.date, p]));
   return series.map((d) => ({
     date: d.date,
     balance: d.balance,
     low: d.low,
     planned: plannedByDate.get(d.date) ?? null,
     belowThreshold: threshold ? isBelow(d.low, threshold) : false,
+    band: bandByDate.get(d.date) ?? null,
   }));
 }
+
+/** ¿La moneda trae una banda del gasto variable predicho para dibujar? */
+export const hasBand = (c: CashFlowCurrency): c is CashFlowCurrency & { predicted: PredictedCashFlow } =>
+  c.predicted?.status === 'AVAILABLE' && c.predicted.series.length > 0;
 
 // ───────────────────────────────────────────── eventos
 

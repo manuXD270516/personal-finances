@@ -214,6 +214,9 @@ export const KnownFutureCalculator = {
         return items.filter((k) => k.kind !== 'INCOME');
       case 'TOTAL_INCOME':
         return items.filter((k) => k.kind === 'INCOME');
+      case 'LIQUID_VARIABLE_OUTFLOW':
+        // Solo gasto variable: los conocidos ya están en el calendario (add-predicted-cash-flow-band).
+        return [];
       case 'CATEGORY':
         return items.filter((k) => k.kind === 'EXPENSE' && k.categoryId === series.scopeRef);
       case 'OTHER_CATEGORIES': {

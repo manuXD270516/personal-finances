@@ -148,6 +148,16 @@ export interface ReportSummary {
   readonly spendable?: SpendableSummary | null;
   /** Q8 (add-cash-flow-forecast): saldo más bajo esperado y riesgo de 30 días; `null` sin cuentas líquidas. */
   readonly cashFlow?: CashFlowHomeBlock | null;
+  /** Q3 (add-predicted-cash-flow-band): gasto esperado del periodo con su rango probable; `null` sin pronóstico del periodo. */
+  readonly forecast?: {
+    readonly expectedSpending: {
+      readonly period: string;
+      readonly prediction: Money;
+      readonly interval80: { readonly lower: Money; readonly upper: Money };
+      readonly generatedAt: string;
+      readonly stale: boolean;
+    } | null;
+  } | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;

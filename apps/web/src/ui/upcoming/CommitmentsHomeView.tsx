@@ -54,7 +54,8 @@ function CashFlowLine({
   href: ((currency?: string) => string) | undefined;
 }) {
   const summary = homeCashFlowSummary(cashFlow);
-  if (summary.kind === 'NONE') return null;
+  const predicted = cashFlow?.predictedShortfall ?? null;
+  if (summary.kind === 'NONE' && !predicted) return null;
   const days = cashFlow?.horizonDays ?? 30;
   const link = href ? (
     <a href={href(summary.kind === 'RISK' ? summary.currency : undefined)} data-testid="cash-flow-link">
@@ -67,7 +68,7 @@ function CashFlowLine({
       data-kind={summary.kind}
       data-risk={summary.kind === 'RISK' ? summary.risk : 'NONE'}
     >
-      {summary.kind === 'RISK' ? (
+      {summary.kind === 'NONE' ? null : summary.kind === 'RISK' ? (
         <>
           <p>
             <strong data-testid="cash-flow-q8-risk">
@@ -108,6 +109,19 @@ function CashFlowLine({
           </p>
         </>
       )}
+      {predicted ? (
+        <p
+          className="pf-home-muted"
+          data-testid="cash-flow-q8-predicted"
+          data-likelihood={predicted.likelihood}
+        >
+          <span aria-hidden="true">{predicted.likelihood === 'UNLIKELY' ? '✓' : '⚠'}</span>{' '}
+          {f.t(`home.predictedShortfall.${predicted.likelihood}`, {
+            currency: predicted.currency,
+            date: predicted.date ? formatLocalDate(predicted.date, f.locale) : '',
+          })}
+        </p>
+      ) : null}
       {link ? <p>{link}</p> : null}
     </div>
   );

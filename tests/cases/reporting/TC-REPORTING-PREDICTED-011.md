@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Rendimiento del calendario con la banda predicha"
 scenario: "Workspace grande con pronóstico"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-PERF-010"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/cash-flow-calendar.perf.ts
+  - apps/api/test/perf/perf-report.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["perf","NFR-PERF-010"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "el p95 del calendario de 90 días es como máximo 0.50 s"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-011 — El calendario de 90 días con banda responde con p95 de 500 ms o menos

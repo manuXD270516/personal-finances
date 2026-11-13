@@ -16,6 +16,7 @@ import {
   type CashFlowCalendarDto,
   type CashFlowCurrencyDto,
   type CashFlowEventDto,
+  type PredictedCashFlowDto,
   type CashFlowHomeBlockDto,
   type MoneyDto,
 } from '../contracts/index.js';
@@ -43,6 +44,7 @@ import type {
   UpcomingCommitmentsPort,
   UpcomingPaymentsDeps,
 } from './ports/index.js';
+import { PredictedCashFlow, predictedShortfallOf, unavailablePredicted } from './predicted-cash-flow.js';
 import { isLiquidAccount } from './spendable.queries.js';
 import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS, rateKey, toExact } from './valuation-support.js';
 
@@ -371,7 +373,11 @@ const dayDto = (p: { date: string; balance: Money; low: Money }) => ({
   low: p.low.toJSON(),
 });
 
-export function currencyDto(block: CashFlowCurrencyBlock, a: CashFlowRiskAssessment): CashFlowCurrencyDto {
+export function currencyDto(
+  block: CashFlowCurrencyBlock,
+  a: CashFlowRiskAssessment,
+  predicted: PredictedCashFlowDto = unavailablePredicted('NO_FORECAST'),
+): CashFlowCurrencyDto {
   return {
     currency: block.currency.code,
     threshold: { amount: a.threshold.toJSON(), source: a.thresholdSource },
@@ -400,11 +406,15 @@ export function currencyDto(block: CashFlowCurrencyBlock, a: CashFlowRiskAssessm
       },
       endBalance: block.withoutExpectedIncome.endBalance.toJSON(),
     },
+    predicted,
   };
 }
 
 /** Bloque `cashFlow` del Home (Q8): la moneda con el riesgo más alto o, sin riesgo, el mínimo consolidado. */
-export function homeBlock(c: CashFlowComputation): CashFlowHomeBlockDto {
+export function homeBlock(
+  c: CashFlowComputation,
+  predicted?: ReadonlyMap<string, PredictedCashFlowDto>,
+): CashFlowHomeBlockDto {
   const entries = c.result.currencies.map((block) => ({
     block,
     a: c.assessments.get(block.currency.code) as CashFlowRiskAssessment,
@@ -430,6 +440,7 @@ export function homeBlock(c: CashFlowComputation): CashFlowHomeBlockDto {
       : null,
     consolidatedLowest: c.consolidated.lowest,
     complete: c.consolidated.complete,
+    predictedShortfall: predicted ? predictedShortfallOf(predicted) : null,
   };
 }
 
@@ -624,6 +635,13 @@ export class CashFlowCalendarQueries {
       withSuggestions: true,
     });
     const { result } = computation;
+    // Banda del gasto variable predicho (add-predicted-cash-flow-band): solo añade campos; riesgo y alerta no cambian.
+    const predicted = await new PredictedCashFlow(deps.forecast).bands({
+      workspaceId: ws,
+      today,
+      blocks: result.currencies,
+      assessments: computation.assessments,
+    });
     const accountDtos: CashFlowAccountDto[] = result.accounts.map((a) => ({
       accountId: a.accountId,
       name: a.name,
@@ -643,7 +661,11 @@ export class CashFlowCalendarQueries {
       reportingCurrency: reporting.code,
       coverage: computation.coverage,
       currencies: result.currencies.map((b) =>
-        currencyDto(b, computation.assessments.get(b.currency.code) as CashFlowRiskAssessment),
+        currencyDto(
+          b,
+          computation.assessments.get(b.currency.code) as CashFlowRiskAssessment,
+          predicted.byCurrency.get(b.currency.code),
+        ),
       ),
       accounts: accountDtos,
       events: result.events.map(eventDto),

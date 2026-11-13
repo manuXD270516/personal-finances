@@ -292,3 +292,13 @@ export {
   type SpendableSettingsMode,
   type SpendableSettingsValue,
 } from './spendable-settings.js';
+export {
+  PredictedSpendingBand,
+  type BandDayPoint,
+  type BandDaySpend,
+  type BandLowest,
+  type BandMainDay,
+  type BandPeriodInput,
+  type PredictedBand,
+  type ShortfallLikelihood,
+} from './predicted-spending-band.js';

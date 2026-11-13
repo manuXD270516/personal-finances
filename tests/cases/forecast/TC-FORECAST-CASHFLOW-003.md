@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronóstico del gasto variable por moneda para el flujo de caja"
 scenario: "Serie en dólares sin conversión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-FORECAST-003"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/liquid-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/variable-liquid-outflow.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","multi-currency"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "la serie del gasto variable líquido en USD tiene 120.00 USD en 2026-10 y no se convierte a BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-CASHFLOW-003 — La serie del gasto variable líquido en dólares no se convierte
