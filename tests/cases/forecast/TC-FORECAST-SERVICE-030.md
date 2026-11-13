@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Reintentos y falla de una corrida"
 scenario: "Servicio recuperado en el tercer intento"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-REL-010"]
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - packages/contexts/forecasting/src/domain/forecast-run.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["retries"]

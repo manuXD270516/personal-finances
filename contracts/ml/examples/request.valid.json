@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1",
+  "requestId": "6f1b7c3e-2d54-4b7a-9a52-0d1c3e5a7b90",
+  "seed": 42,
+  "policy": { "modelSet": "baseline-v1", "horizonMax": 12, "intervalLevels": [0.8, 0.95] },
+  "series": [
+    {
+      "ref": "s1",
+      "kind": "EXPENSE",
+      "currency": "BOB",
+      "scale": 2,
+      "readiness": "MODEL",
+      "horizon": 3,
+      "points": [
+        { "period": "2026-03", "value": "4100.00", "txCount": 37 },
+        { "period": "2026-04", "value": "4350.50", "txCount": 41 },
+        { "period": "2026-05", "value": "3980.00", "txCount": 35 },
+        { "period": "2026-06", "value": "4210.25", "txCount": 39 },
+        { "period": "2026-07", "value": "4620.00", "txCount": 44 },
+        { "period": "2026-08", "value": "4015.75", "txCount": 36 },
+        { "period": "2026-09", "value": "4390.00", "txCount": 40 },
+        { "period": "2026-10", "value": "4448.00", "txCount": 42 }
+      ]
+    },
+    {
+      "ref": "s2",
+      "kind": "INCOME",
+      "currency": "BOB",
+      "scale": 2,
+      "readiness": "SIMPLE",
+      "horizon": 2,
+      "points": [
+        { "period": "2026-08", "value": "9000.00", "txCount": 2 },
+        { "period": "2026-09", "value": "9000.00", "txCount": 2 },
+        { "period": "2026-10", "value": "9500.00", "txCount": 3 }
+      ]
+    }
+  ]
+}

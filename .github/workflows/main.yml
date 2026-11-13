@@ -41,6 +41,10 @@ jobs:
           # PostgreSQL 18 + pgBackRest para producción N1 (ADR-0027); el stack local/CI sigue usando postgres oficial.
           - image: pfos-postgres
             dockerfile: docker/postgres.Dockerfile
+          # Servicio interno de pronósticos (ADR-0033, add-ml-forecasting-service): una sola construcción por commit; se
+          # promueve por digest como las demás (FINANCE_ML_IMAGE, opcional en el host).
+          - image: finance-ml
+            dockerfile: docker/finance-ml.Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -116,7 +120,7 @@ jobs:
       # Este job NO tiene buildx ni pasos de build: solo pull por digest (inmutable).
       - name: Pull por digest y verificación de procedencia
         run: |
-          for name in finance-api finance-web; do
+          for name in finance-api finance-web finance-ml; do
             ref="$(jq -r .ref "$RUNNER_TEMP/digests/${name}.json")"
             digest="$(jq -r .digest "$RUNNER_TEMP/digests/${name}.json")"
             docker pull "$ref"

@@ -516,6 +516,57 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
     }
   }, 120_000);
 
+  it('[TC-FORECAST-SERVICE-010] con la función de pronósticos habilitada el worker arranca con los mismos 28 consumidores y el mismo pool (sin consumidores ni conexiones nuevas, D249)', async () => {
+    const env = readFileSync(
+      fileURLToPath(new URL('../../../../deploy/host/etc-pfos/pfos.env.example', import.meta.url)),
+      'utf8',
+    );
+    const value = (name: string): string => {
+      const found = new RegExp(`^${name}=([0-9]+)\\s*$`, 'mu').exec(env);
+      if (!found) throw new Error(`${name} no está en la plantilla del host`);
+      return found[1] as string;
+    };
+    const defaults = {
+      concurrency: Number(value('EVENT_CONSUMER_CONCURRENCY')),
+      batchSize: Number(value('EVENT_CONSUMER_BATCH_SIZE')),
+    };
+    const runtime = await createWorkerRuntime(
+      workerConfig(
+        baseEnv(deps, {
+          EVENT_CONSUMER_CONCURRENCY: String(defaults.concurrency),
+          EVENT_CONSUMER_BATCH_SIZE: String(defaults.batchSize),
+          DATABASE_POOL_MAX: value('DATABASE_POOL_MAX'),
+          FORECASTING_ENABLED: 'true',
+          FORECASTING_SCHEDULE_CRON: 'off',
+          FORECASTING_RUNNER_CRON: 'off',
+        }),
+      ),
+      quiet,
+      {
+        ledgerMaintenanceOnStart: false,
+        fxGapFillOnStart: false,
+        lifecycleBackfillOnStart: false,
+        planningPeriodsOnStart: false,
+        commitmentsOnStart: false,
+        userConversionBackfillOnStart: false,
+      },
+    );
+    try {
+      const definitions = runtime.subscriptions.definitions();
+      expect(definitions.some((d) => d.consumer.startsWith('forecasting'))).toBe(false);
+      expect(definitions).toHaveLength(28);
+      expect(totalConsumerConcurrency(definitions, defaults)).toBe(28);
+      expect(totalConsumerConcurrency(definitions, defaults) + RESERVED_WORKER_CONNECTIONS).toBe(32);
+      expect(Number(value('DATABASE_POOL_MAX'))).toBe(34);
+      // La entrega agrupada no cambia la concurrencia de ningún consumidor.
+      for (const def of definitions) {
+        expect(consumerWorkOptions(def, defaults).concurrency, def.consumer).toBe(1);
+      }
+    } finally {
+      await runtime.close();
+    }
+  }, 120_000);
+
   it('[TC-NOTIFICATIONS-FX-009] las alertas de tasas no agregan consumidores ni colas events.notifications.* y el pool del worker no cambia (add-rate-feed-alerts, D249)', async () => {
     const env = readFileSync(
       fileURLToPath(new URL('../../../../deploy/host/etc-pfos/pfos.env.example', import.meta.url)),

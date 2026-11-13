@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Consulta del pronóstico vigente"
 scenario: "Corrida de otro workspace"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001","FR-FORECAST-002"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: critical
 type: security
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["rls","isolation"]

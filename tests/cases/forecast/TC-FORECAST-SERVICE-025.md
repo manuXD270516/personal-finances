@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Contenido de cada pronóstico publicado"
 scenario: "Punto del gasto total"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-002"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - packages/contexts/forecasting/src/infrastructure/ml-service-client.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["contract"]

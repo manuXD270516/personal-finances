@@ -23,3 +23,10 @@ tests/e2e/test-results
 packages/contexts/fx/test/fixtures/providers
 # Reportes generados (Stryker, benchmarks nightly, smoke de providers)
 reports
+# Python (services/*): entornos virtuales y cachés
+**/.venv
+**/__pycache__
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+**/.hypothesis

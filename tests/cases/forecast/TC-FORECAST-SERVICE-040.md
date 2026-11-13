@@ -5,16 +5,19 @@ spec: audit/lifecycle-timeline
 related_specs: ["forecast/expense-forecasting"]
 requirement: "Recorrido de una corrida de pronóstico"
 scenario: "Corrida reintentada y completada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-AUDIT-009","FR-AUDIT-010","FR-FORECAST-006"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - packages/contexts/forecasting/src/domain/forecast-run.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["lifecycle","D37"]

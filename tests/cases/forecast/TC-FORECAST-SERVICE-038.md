@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Retención de las corridas"
 scenario: "Corridas reemplazadas del mismo periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-009"]
 nfr: ["NFR-COMP-002"]
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["retention"]

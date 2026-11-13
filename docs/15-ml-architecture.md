@@ -279,3 +279,7 @@ ml-forecasting (interno): `POST /v1/forecast-jobs`, `GET /v1/forecast-jobs/{id}`
 4. ¿Feriados/eventos bolivianos a modelar (aguinaldo, segundo aguinaldo cuando aplica, carnaval)?
 5. ¿Prophet merece su dependencia pesada en la imagen o se difiere hasta tener ≥ 24 meses reales?
 6. ¿Re-selección de modelo mensual automática o con aprobación del owner?
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- §2–§3 (as-built): la petición viaja en el cuerpo de `POST /v1/forecasts` y la respuesta vuelve en la misma llamada (sin Object Storage, sin job asíncrono dentro del servicio, sin `HMAC(workspaceId)`); `datasetSnapshotId` = `sha256:` del JSON canónico de la petición sin `requestId`. §4: umbrales por entorno (ver `docs/config-reference.md`). §13: API en `docs/10`. Contratos: `contracts/ml/` y `contracts/openapi/ml-forecasting.v1.yaml` (generado por `services/ml-forecasting/scripts/export_openapi.py`; el job `ml` compara).

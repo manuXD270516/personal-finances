@@ -425,3 +425,7 @@ Cache-Control: no-store            # en respuestas con datos financieros (BFF y 
 6. **Cifrado a nivel de columna** para notas/descripciones: ¿necesario con un solo usuario? Propuesta: no en v1.
 7. **Excepción de hard delete** para el borrado de workspace (rol `pf_purge`): requiere ADR que matice ARCHITECTURE §9.
 8. **Respuesta 403 vs 404** para workspaces ajenos: se sigue ADR-0010 (403); revisar si se prefiere 404 para no revelar existencia (IDs UUIDv7 no son adivinables, riesgo bajo).
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Modelo de amenazas del servicio `finance-ml`: credencial de servicio de 32 bytes en un archivo (`ML_SERVICE_TOKEN_FILE` / `FORECASTING_SERVICE_TOKEN_FILE`), `Authorization: Bearer` comparada en tiempo constante; red `ml-internal` con `internal: true`; la petición solo lleva montos por periodo con referencias opacas por corrida (sin id del workspace, nombres ni ids de transacciones); el servicio no guarda ni registra montos; contenedor sin root (10001), `read_only`, `cap_drop: [ALL]`. El archivo de la credencial queda 0444 dentro de `/etc/pfos` (0700 de root) porque lo leen dos contenedores con usuarios distintos.

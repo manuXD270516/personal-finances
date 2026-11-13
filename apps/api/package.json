@@ -31,6 +31,7 @@
     "@pf/commitments": "workspace:*",
     "@pf/debt": "workspace:*",
     "@pf/documents": "workspace:*",
+    "@pf/forecasting": "workspace:*",
     "@pf/goals": "workspace:*",
     "@pf/rules": "workspace:*",
     "@pf/imports": "workspace:*",

@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Preparación de datos por serie"
 scenario: "Historia de 4 periodos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-005"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/readiness-gate.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["readiness"]

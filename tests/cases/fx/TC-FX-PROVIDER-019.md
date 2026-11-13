@@ -29,11 +29,11 @@ steps:
   - "Inspeccionar las redes del contenedor finance-worker y sus variables de entorno FX_*"
   - "Consultar el log de arranque del worker"
 expected_result:
-  - "finance-worker está conectado solo a redes no internas (Internal = false): puede abrir conexiones HTTPS salientes a paralelo.bo y bo.dolarapi.com"
+  - "finance-worker está conectado al menos a una red no interna (Internal = false): puede abrir conexiones HTTPS salientes a paralelo.bo y bo.dolarapi.com; la única red interna admitida es `ml-internal` (servicio de pronósticos, ADR-0033), sin salida a Internet"
   - "Las variables FX_* del contenedor son exactamente las del `.env` (contrato único; compose no fija ninguna), incluida FX_STALE_AFTER_FALLBACK"
   - "Con FX_PROVIDER_* = none el worker informa providers deshabilitados y no envía ninguna solicitud externa"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-11-13
 ---
 
 # TC-FX-PROVIDER-019 — En el stack en contenedores el worker tiene salida de red y recibe FX_* del contrato único; la suite sigue sin red
@@ -47,7 +47,7 @@ Decisión del owner (2026-10-03): ambos providers habilitados por defecto en `.e
 ```gherkin
 Dado el stack en contenedores levantado con el perfil core
 Cuando inspecciono el contenedor finance-worker
-Entonces sus redes no son internas y sus variables FX_* son las del .env
+Entonces tiene una red no interna (la única interna es ml-internal) y sus variables FX_* son las del .env
   Y con los providers en none no consulta ninguna red
 ```
 

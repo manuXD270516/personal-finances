@@ -5,7 +5,7 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Rendimiento de una corrida"
 scenario: "Benchmark nocturno de la corrida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-012"]
 invariants: []
@@ -14,7 +14,7 @@ type: platform
 level: performance
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 8
 tags: ["perf","NFR-PERF-012"]

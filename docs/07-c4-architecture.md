@@ -530,3 +530,7 @@ flowchart TB
 5. **Notificaciones en tiempo real** (import progress): ¿polling suficiente o SSE desde BFF? Propuesta: polling en Phase 6.
 6. **Worker único vs colas segregadas** por tipo (imports pesados vs projections) para evitar *head-of-line blocking*: propuesta de colas separadas con concurrencia distinta desde Phase 6.
 7. **NAT Gateway** en cloud: costo vs `fck-nat`/VPC endpoints; depende de proveedores externos de tasas (Phase 5) que requieren salida a Internet.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Contenedor `ml-forecasting` (imagen `finance-ml`, FastAPI + statsmodels, un proceso, sin estado, sin acceso a la base ni al almacenamiento de objetos), opcional en N1 (perfil `ml`), red interna `ml-internal` sin salida a Internet compartida solo con el worker. QAS-11 (el núcleo funciona sin el servicio): `TC-FORECAST-SERVICE-001`/`-029` y `apps/api/test/api/forecasting.api.test.ts`.

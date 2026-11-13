@@ -50,3 +50,7 @@ Estas reglas aplican a cualquier sesión, local o en la nube. Complementan los a
 ## Informe al owner
 
 Al terminar un bloque: en español y breve, qué se fusionó (enlaces a los PR), qué quedó pendiente y qué necesita una decisión o una prueba suya. Actualiza `docs/38-estado-y-pendientes.md` en el mismo PR cuando cambie el estado.
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- El servicio `ml-forecasting` (perfil `ml`, imagen `finance-ml`) solo se levanta con `PF_E2E_PROJECT=pfos-e2e-<nombre>` y prefijo de puertos 3 o 4, como el resto del stack; el presupuesto de conexiones no cambia (los trabajos `forecasting.schedule` y `forecasting.runner` comparten la reserva de trabajos periódicos). Los tests de Python viven en `services/ml-forecasting/tests` y se citan con `"""[TC-…] …"""`.

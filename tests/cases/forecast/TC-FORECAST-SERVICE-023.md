@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Resultado validado antes de publicarse"
 scenario: "Intervalo desordenado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-002","FR-FORECAST-006"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - packages/contexts/forecasting/src/domain/forecast-request.test.ts
+  - packages/contexts/forecasting/src/infrastructure/ml-service-client.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["validation"]

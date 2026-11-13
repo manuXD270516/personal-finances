@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Corridas programadas sin consumidores nuevos"
 scenario: "Presupuesto de conexiones intacto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001"]
 nfr: ["NFR-PERF-012"]
 invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/src/worker/forecasting-jobs.test.ts
+  - apps/api/test/events/event-throughput.int.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["connections","D249"]

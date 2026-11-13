@@ -911,6 +911,94 @@ export const VARIABLES = {
       default: '40 * * * *',
     },
   ),
+  // ── FORECAST: servicio de pronósticos (openspec add-ml-forecasting-service, design.md § Plan de migración; D410–D442) ──
+  FORECASTING_ENABLED: variable(bool, {
+    group: 'Forecasting',
+    description:
+      'Habilita los pronósticos en la instalación (API y worker). Deshabilitado (por omisión) no se programan corridas, la consulta informa que la función no está habilitada y el servicio `finance-ml` no hace falta. Con el servicio en el perfil `ml` de Compose se habilita junto con `COMPOSE_PROFILES=ml`.',
+    default: 'false',
+  }),
+  FORECASTING_SERVICE_URL: variable(httpUrl, {
+    group: 'Forecasting',
+    description:
+      'URL interna del servicio `finance-ml` (solo el worker lo llama; red Compose `ml-internal` sin salida a Internet).',
+    default: 'http://ml-forecasting:8090',
+  }),
+  FORECASTING_SERVICE_TOKEN_FILE: variable(z.string().min(1), {
+    group: 'Forecasting',
+    description:
+      'Ruta del archivo con la credencial de servicio (32 bytes aleatorios) que el worker envía como `Authorization: Bearer` al servicio `finance-ml`; montado 0400 fuera del repositorio. Obligatoria para ejecutar corridas con el servicio.',
+    optional: true,
+  }),
+  FORECASTING_SERVICE_TIMEOUT_MS: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Tiempo máximo (ms) que el worker espera la respuesta del servicio por corrida (el servicio corta su cómputo a los 240 s). Excedido, la corrida se reintenta con motivo `TIMEOUT`.',
+    default: '300000',
+  }),
+  FORECASTING_SCHEDULE_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `15 5 * * *`) u `off`',
+      ),
+    {
+      group: 'Forecasting',
+      description:
+        'Cron (5 campos, UTC) del job `forecasting.schedule`: crea una corrida programada por workspace cuando terminó un periodo financiero nuevo o el pronóstico vigente supera `FORECASTING_MAX_AGE_DAYS` (a lo sumo una por día) y purga según la retención. Por omisión 05:15 UTC (01:15 en La Paz). `off` lo desactiva.',
+      default: '15 5 * * *',
+    },
+  ),
+  FORECASTING_RUNNER_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `* * * * *`) u `off`',
+      ),
+    {
+      group: 'Forecasting',
+      description:
+        'Cron (5 campos, UTC) del job `forecasting.runner`: procesa UNA corrida solicitada por pasada dentro de la reserva de trabajos periódicos del worker (sin consumidores ni conexiones nuevas). Por omisión cada minuto. `off` lo desactiva.',
+      default: '* * * * *',
+    },
+  ),
+  FORECASTING_MAX_AGE_DAYS: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Antigüedad (días) del pronóstico vigente a partir de la cual el trabajo diario crea una corrida aunque no haya terminado un periodo nuevo.',
+    default: '7',
+  }),
+  FORECASTING_MAX_ATTEMPTS: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Intentos de una corrida (con espera 5 min × 3^(n−1) entre ellos y como máximo 24 h desde la solicitud) antes de terminar fallida.',
+    default: '5',
+  }),
+  FORECASTING_HISTORY_MAX_PERIODS: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Periodos financieros terminados de historia que se envían al servicio por serie (máximo 120).',
+    default: '60',
+  }),
+  FORECASTING_MIN_PERIODS_MODEL: variable(positiveInt, {
+    group: 'Forecasting',
+    description: 'Periodos terminados con datos desde los cuales una serie admite modelos estadísticos.',
+    default: '6',
+  }),
+  FORECASTING_MIN_PERIODS_SIMPLE: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Periodos terminados con datos desde los cuales una serie admite al menos la estimación simple (por debajo no se pronostica).',
+    default: '3',
+  }),
+  FORECASTING_STALE_DAYS: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Días tras los cuales la consulta marca el pronóstico vigente como desactualizado (`stale`).',
+    default: '35',
+  }),
   COMMITMENTS_SCHEDULER_CRON: variable(
     z
       .string()
@@ -1652,6 +1740,8 @@ export const APP_VARIABLES = {
     'DEMO_DATA_ENABLED',
     'ACCOUNTS_INSTITUTION_CATALOG_DIR',
     ...FX_PROVIDERS,
+    'FORECASTING_ENABLED',
+    'FORECASTING_STALE_DAYS',
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',
     'PLANNING_HISTORY_DEFAULT_PERIODS',
@@ -1731,6 +1821,17 @@ export const APP_VARIABLES = {
     'COMMITMENTS_SCHEDULER_CRON',
     'COMMITMENTS_SUBSCRIPTIONS_CRON',
     'DEBT_CARDS_CRON',
+    'FORECASTING_ENABLED',
+    'FORECASTING_SERVICE_URL',
+    'FORECASTING_SERVICE_TOKEN_FILE',
+    'FORECASTING_SERVICE_TIMEOUT_MS',
+    'FORECASTING_SCHEDULE_CRON',
+    'FORECASTING_RUNNER_CRON',
+    'FORECASTING_MAX_AGE_DAYS',
+    'FORECASTING_MAX_ATTEMPTS',
+    'FORECASTING_HISTORY_MAX_PERIODS',
+    'FORECASTING_MIN_PERIODS_MODEL',
+    'FORECASTING_MIN_PERIODS_SIMPLE',
     'GOALS_DAILY_CRON',
     // add-basic-csv-import: jobs diarios de expiración y purga del staging.
     'IMPORT_STAGING_RETENTION',

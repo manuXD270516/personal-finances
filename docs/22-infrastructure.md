@@ -458,3 +458,7 @@ TOFU=ghcr.io/opentofu/opentofu:1.12.7@sha256:3f068ee39a7233d39d9179fb2116a052a6f
 docker run --rm -v "$PWD/infra:/infra" -w /infra "$TOFU" fmt -check -recursive
 docker run --rm --entrypoint sh -v "$PWD/infra:/infra" -w /infra/environments/prod "$TOFU" -c "tofu init -backend=false && tofu validate"
 ```
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- Host N1: `compose.prod.yaml` define `ml-forecasting` (perfil `ml`, sin puertos, `cpus: 1`, `memory: 320m`, credencial montada desde `/etc/pfos/ml-service-token`). `pfos-deploy.sh` acepta un quinto argumento opcional `finance-ml@sha256` y crea el archivo de la credencial vacío si no existe. Pendiente: el comando forzado de cloud-init (`infra/modules/lightsail-host/cloud-init.yaml.tftpl`) valida exactamente cuatro digests; aceptar el quinto reemplaza la instancia (decisión del owner).

@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Servicio de pronósticos autenticado y sin acceso a datos"
 scenario: "Registros sin montos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-SEC-007","NFR-SEC-014","NFR-COMP-001"]
 invariants: []
 priority: high
 type: security
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - services/ml-forecasting/tests/test_api.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["privacy","logs"]

@@ -264,6 +264,17 @@ services:
       WORKER_DATABASE_URL: *worker-db
       WORKER_HEALTH_PORT: '8082' # solo red interna, no se publica
       WORKER_HEALTH_BIND_ADDRESS: 0.0.0.0
+      # add-ml-forecasting-service: el worker alcanza al servicio por la red interna `ml-internal` (perfil `ml`).
+      FORECASTING_SERVICE_URL: http://ml-forecasting:8090
+      FORECASTING_SERVICE_TOKEN_FILE: /run/secrets/ml-service-token
+    # Solo desarrollo: la credencial es una `config` con `content`, que Compose materializa en el sistema de archivos
+    # del contenedor y no admite con la raíz de solo lectura; en producción (compose.prod.yaml) es un `file` y vuelve a
+    # ser de solo lectura.
+    read_only: false
+    configs:
+      - source: ml-service-token
+        target: /run/secrets/ml-service-token
+    networks: [default, ml-internal]
     # E2E (solo local/ci): `FX_PROVIDER_*_URL` apunta a providers simulados por el harness en el host; en Linux
     # `host.docker.internal` no existe por defecto (Docker Desktop ya lo resuelve).
     extra_hosts:
@@ -367,9 +378,56 @@ services:
         limits: { cpus: '1', memory: 1536m }
 
   # ─────────────────────────── ml ───────────────────────────
-  # Perfil reservado para `ml-forecasting` (finance-ml, Phase 8). Sin servicios todavía.
+  # Servicio interno de pronósticos (finance-ml, ADR-0033; openspec add-ml-forecasting-service). Opcional: ningún servicio de
+  # `core` depende de él para arrancar ni para quedar healthy (FR-FORECAST-006). Misma imagen que producción; sin variables
+  # de la base de datos ni del almacenamiento de objetos; red `ml-internal` (sin salida a Internet) compartida solo con el
+  # worker; el puerto se publica únicamente en loopback. La credencial de servicio viene del `.env` (PF_DEV_ML_SERVICE_TOKEN).
+  ml-forecasting:
+    image: ${FINANCE_ML_IMAGE:-pfos/finance-ml:local}
+    build:
+      context: ../..
+      dockerfile: docker/finance-ml.Dockerfile
+      target: runtime
+    profiles: [ml]
+    environment:
+      ML_SERVICE_TOKEN_FILE: /run/secrets/ml-service-token
+      ML_LOG_LEVEL: INFO
+    configs:
+      - source: ml-service-token
+        target: /run/secrets/ml-service-token
+    networks: [ml-internal]
+    init: true
+    # `read_only` solo en producción (compose.prod.yaml): la credencial de desarrollo es una `config` con `content`, que
+    # Compose materializa en el sistema de archivos del contenedor y no admite con la raíz de solo lectura.
+    tmpfs:
+      - '/tmp:size=64m'
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    logging: *default-logging
+    restart: unless-stopped
+    ports:
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_ML_PORT:-28090}:8090'
+    healthcheck:
+      test: ['CMD', 'python', '/usr/local/lib/pfos/healthcheck.py', 'http://127.0.0.1:8090/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+      start_interval: 1s
+    stop_grace_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 320m }
+
+# Red interna del servicio de pronósticos: sin salida a Internet; la comparten solo el worker y `ml-forecasting`.
+networks:
+  ml-internal:
+    internal: true
 
 configs:
+  # Credencial de servicio de `ml-forecasting` (la lee el worker y el servicio; solo desarrollo local).
+  ml-service-token:
+    content: ${PF_DEV_ML_SERVICE_TOKEN:?run pnpm setup:env}
   # Init de PostgreSQL (solo con el volumen vacío). Roles de la app: `pf_migrator` (propietario, CREATEROLE)
   # aquí; `pf_app` lo crea la migración de bootstrap y `migrate` le fija la contraseña. Keycloak usa su propia
   # base `keycloak` dentro del mismo servidor (no un volumen aparte).

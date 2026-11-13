@@ -256,3 +256,7 @@ Diferencias aceptadas y su mitigación: CPU arch (tests multi-arch nightly), S3 
 ## Almacenamiento de documentos (add-document-attachments)
 
 Tres buckets en SeaweedFS: documentos (versionado, contenido cifrado por la aplicación), exports (sin versioning) y **cuarentena** (sin versioning; efímero: ningún objeto permanece más de 24 h). La inspección de PDF y XLSX usa un `worker_thread` dentro del contenedor de la API (límite de heap de 128 MB por inspección) y no agrega procesos ni consumidores. ClamAV (`clamav/clamav`) es un perfil opcional de Compose y no corre en el VPS de 2 GB (D314).
+
+## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
+
+- `docker/finance-ml.Dockerfile` (real): multi-stage con `uv` y `uv.lock`, base `python:3.14-slim-bookworm` fijada por digest, usuario 10001, compatible con `read_only` y `tmpfs /tmp`, `HEALTHCHECK` con `docker/healthcheck.py` (sin curl), un proceso (`--workers 1`) y `OMP/OPENBLAS/MKL_NUM_THREADS=1`.

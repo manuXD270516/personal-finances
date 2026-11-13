@@ -137,7 +137,7 @@ describe('stack local en contenedores (pfos-test)', () => {
     expect((await serviceStates(ctx)).map((s) => s.Service)).not.toContain('otel-lgtm');
   });
 
-  it('[TC-FX-PROVIDER-019] finance-worker: solo redes con salida (no internas) y FX_* del .env (contrato único); providers en none sin red', async () => {
+  it('[TC-FX-PROVIDER-019] finance-worker: conserva una red con salida (las internas solo ml-internal) y FX_* del .env (contrato único); providers en none sin red', async () => {
     const name = (await stateOf(ctx, 'finance-worker'))!.Name;
     const networks = Object.keys(
       JSON.parse(await containerInspect(name, '{{json .NetworkSettings.Networks}}')) as Record<
@@ -146,12 +146,18 @@ describe('stack local en contenedores (pfos-test)', () => {
       >,
     );
     expect(networks.length).toBeGreaterThan(0);
+    const internalNets: string[] = [];
+    const egressNets: string[] = [];
     for (const net of networks) {
       const internal = await run('docker', ['network', 'inspect', net, '--format', '{{.Internal}}'], {
         mode: 'capture',
       });
-      expect(internal.stdout.trim(), net).toBe('false');
+      (internal.stdout.trim() === 'true' ? internalNets : egressNets).push(net);
     }
+    // Conserva la salida del worker (FX): al menos una red no interna; la única red interna admitida es `ml-internal`
+    // (add-ml-forecasting-service, ADR-0033), compartida con el servicio de pronósticos y sin salida a Internet.
+    expect(egressNets.length, 'redes con salida').toBeGreaterThan(0);
+    for (const net of internalNets) expect(net, 'red interna declarada').toMatch(/(^|_)ml-internal$/);
     const containerEnv = new Map(
       (JSON.parse(await containerInspect(name, '{{json .Config.Env}}')) as string[]).map((kv) => {
         const i = kv.indexOf('=');

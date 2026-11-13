@@ -5,7 +5,7 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Despliegue opcional del servicio de pronósticos en el host"
 scenario: "Host sin el servicio de pronósticos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006"]
 nfr: ["NFR-PORT-006","NFR-REL-010"]
 invariants: []
@@ -14,7 +14,7 @@ type: platform
 level: smoke
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 8
 tags: ["deploy","N1"]

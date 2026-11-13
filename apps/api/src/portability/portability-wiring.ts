@@ -13,6 +13,7 @@ import {
 } from '@pf/documents/interface/documents.module';
 import { FX_PORTABILITY_SECTIONS } from '@pf/fx/contracts';
 import { DEBT_PORTABILITY_SECTIONS } from '@pf/debt/contracts';
+import { FORECASTING_PORTABILITY_EXCLUSIONS } from '@pf/forecasting/contracts';
 import { GOALS_PORTABILITY_SECTIONS } from '@pf/goals/contracts';
 import { IMPORTS_PORTABILITY_EXCLUSIONS, IMPORTS_PORTABILITY_SECTIONS } from '@pf/imports/contracts';
 import { IMPORTS_CONNECTION_RESTORE_HOOK, connectionRestoreHook } from '@pf/imports/interface/imports.module';
@@ -90,6 +91,8 @@ export const PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
   ...IMPORTS_PORTABILITY_EXCLUSIONS,
   ...NOTIFICATIONS_PORTABILITY_EXCLUSIONS,
   ...REPORTING_PORTABILITY_EXCLUSIONS,
+  // add-ml-forecasting-service: los pronósticos se recalculan, no viajan (FR-IDENTITY-010).
+  ...FORECASTING_PORTABILITY_EXCLUSIONS,
 ];
 
 /** Versión de producto que se escribe en el manifiesto (`pfosVersion`). */

@@ -41,6 +41,19 @@ import {
   type DebtRuntime,
 } from '@pf/debt/interface/debt.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
+import {
+  FORECASTING_AUDIT_POLICY,
+  FORECAST_RUN_LIFECYCLE_MACHINE,
+  ForecastingModule,
+  createForecastingRuntime,
+} from '@pf/forecasting/interface/forecasting.module';
+import {
+  forecastingMetrics,
+  forecastingReadPorts,
+  forecastingServiceClient,
+  forecastingSettingsFrom,
+  type ForecastingConfig,
+} from '../forecasting/forecasting-wiring.js';
 import { GOALS_AUDIT_POLICY } from '@pf/goals/contracts';
 import {
   GOAL_LIFECYCLE_MACHINE,
@@ -75,6 +88,7 @@ import {
 } from '@pf/imports/interface/imports.module';
 import {
   IdentityModule,
+  identityActiveWorkspaces,
   identityUserLocales,
   identityUserLocaleTags,
   identityWorkspaceCalendar,
@@ -263,6 +277,8 @@ export const LIFECYCLE_MACHINES = [
   IMPORT_JOB_LIFECYCLE_MACHINE,
   // add-banking-providers (Phase 6): conexión con un proveedor de movimientos externos.
   IMPORT_CONNECTION_LIFECYCLE_MACHINE,
+  // add-ml-forecasting-service (Phase 8): corrida de pronóstico de FORECAST.
+  FORECAST_RUN_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -289,6 +305,8 @@ export const AUDIT_POLICIES = [
   RULES_AUDIT_POLICY,
   // add-financial-reports (Phase 7): exportación de reportes (reporte, filtros y filas; nunca el contenido).
   REPORTING_AUDIT_POLICY,
+  // add-ml-forecasting-service (Phase 8): corrida de pronóstico (sin montos).
+  FORECASTING_AUDIT_POLICY,
 ];
 
 /**
@@ -404,6 +422,7 @@ export function financeRuntimes(input: {
       >
     > &
     Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>> &
+    ForecastingConfig &
     Parameters<typeof parseFxProviderSettings>[0];
   readonly outbox?: OutboxWriter;
   /** Runtime de DOCUMENTS (se crea después; IMPORTS lo consulta de forma diferida). */
@@ -861,6 +880,27 @@ export function financeRuntimes(input: {
     rateValidityWindowDays,
   });
   deferred.goals = goals;
+  // FORECAST (add-ml-forecasting-service): corridas de pronóstico. Solo contratos públicos de IDENTITY, TRANSACTIONS,
+  // CLASSIFICATION y FX; sin consumidores de eventos ni conexiones nuevas (D249). Solo el worker llama al servicio.
+  const forecasting = createForecastingRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    outbox: classificationOutbox(writer),
+    workspaces: identityActiveWorkspaces(input.pool),
+    ...forecastingReadPorts({
+      calendar: actorCalendar,
+      settings: actorSettings,
+      flows: transactions.flows,
+      categories: classification.categories,
+      rates: fx.valuation,
+    }),
+    service: forecastingServiceClient(input.config),
+    settings: forecastingSettingsFrom(input.config, rateValidityWindowDays),
+    metrics: forecastingMetrics(),
+  });
   // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.
   const imports = createImportsRuntime({
     pool: input.pool,
@@ -906,6 +946,7 @@ export function financeRuntimes(input: {
     debtSummary,
     goals,
     rules,
+    forecasting,
   };
 }
 
@@ -963,6 +1004,7 @@ export function identityImports(input: {
     debtSummary,
     goals,
     rules,
+    forecasting,
   } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
@@ -1072,6 +1114,8 @@ export function identityImports(input: {
     DebtModule.register({ runtime: debt, cards, summary: debtSummary, conventions: input.conventions }),
     // GOALS — openspec add-savings-goals (Phase 4): `/goals*`.
     GoalsModule.register({ runtime: goals, conventions: input.conventions }),
+    // FORECAST — openspec add-ml-forecasting-service (Phase 8): `/forecasts*`.
+    ForecastingModule.register({ runtime: forecasting, conventions: input.conventions }),
     // DOCUMENTS — openspec add-document-attachments (Phase 6): `/documents*`.
     DocumentsModule.register({
       runtime: documents ?? disabledDocumentsRuntime(),
