@@ -267,6 +267,10 @@ services:
       # add-ml-forecasting-service: el worker alcanza al servicio por la red interna `ml-internal` (perfil `ml`).
       FORECASTING_SERVICE_URL: http://ml-forecasting:8090
       FORECASTING_SERVICE_TOKEN_FILE: /run/secrets/ml-service-token
+    # Solo desarrollo: la credencial es una `config` con `content`, que Compose materializa en el sistema de archivos
+    # del contenedor y no admite con la raíz de solo lectura; en producción (compose.prod.yaml) es un `file` y vuelve a
+    # ser de solo lectura.
+    read_only: false
     configs:
       - source: ml-service-token
         target: /run/secrets/ml-service-token
@@ -393,7 +397,8 @@ services:
         target: /run/secrets/ml-service-token
     networks: [ml-internal]
     init: true
-    read_only: true
+    # `read_only` solo en producción (compose.prod.yaml): la credencial de desarrollo es una `config` con `content`, que
+    # Compose materializa en el sistema de archivos del contenedor y no admite con la raíz de solo lectura.
     tmpfs:
       - '/tmp:size=64m'
     cap_drop: [ALL]
@@ -401,7 +406,7 @@ services:
     logging: *default-logging
     restart: unless-stopped
     ports:
-      - '127.0.0.1:${PF_ML_PORT:-28090}:8090'
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_ML_PORT:-28090}:8090'
     healthcheck:
       test: ['CMD', 'python', '/usr/local/lib/pfos/healthcheck.py', 'http://127.0.0.1:8090/health/ready']
       interval: 10s

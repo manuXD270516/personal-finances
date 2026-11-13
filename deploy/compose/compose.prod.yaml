@@ -188,6 +188,7 @@ services:
     image: ${FINANCE_API_IMAGE:?digest de finance-api (main.yml)}
     build: !reset null
     pull_policy: missing
+    read_only: true # la credencial del servicio de pronósticos es un `file` del host (en desarrollo es `content`)
     environment:
       <<: *prod-app-env
       # Sin proveedor de email elegido (docs/33 D87, add-alerts): solo notificaciones in-app. Sin mailpit en producción.
@@ -224,6 +225,7 @@ services:
     build: !reset null
     pull_policy: missing
     ports: !reset []
+    read_only: true # con la credencial como `file` del host sí es posible (en desarrollo es `content`)
     deploy:
       resources:
         limits: { cpus: '1', memory: 320m }
