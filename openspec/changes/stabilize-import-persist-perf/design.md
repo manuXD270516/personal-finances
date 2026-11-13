@@ -108,6 +108,28 @@ P1 va primero porque no cuesta corridas y ordena el resto; P2 y P3 deciden si ha
 3. `throughput.perf.ts` completa sus dos fases en esos nightlies o, si no, publica el diagnóstico sin decidir el veredicto y H7 tiene causa medida.
 4. TC-IMPORTS-CSV-029, TC-PLATFORM-THROUGHPUT-008 y TC-PLATFORM-THROUGHPUT-012 enlazan el informe.
 
+## Resultados de P1 y diagnóstico del estancamiento (2026-11-12)
+
+Fuente: `imports-perf.json` y el log del job `perf` de los tres nightlies programados posteriores al #224 (runs 42836095108, 43033178794 y 43242108275).
+
+| Run | Runner (huella) | Código: persistencia / drenado | Host: persistencia = espera inicial + lotes | Pendientes del outbox al terminar el código |
+|---|---|---|---|---|
+| 11-10 | EPYC 9V45, CPU 38 ms (0,71), 10 674 confirmaciones/s | 13,6 s / **no llegó a 0 en 180 s** | **251 s** = 244,3 s + 6,5 s | 12 201 |
+| 11-11 | EPYC 9V74, CPU 55 ms (1,02), 5 851 confirmaciones/s | 19,4 s / **no llegó a 0 en 180 s** | **577 s** = 556,4 s + 20,2 s | 12 801 |
+| 11-12 | EPYC 9V45, CPU 37 ms (0,69), 9 814 confirmaciones/s | 20,3 s / 8,9 s | 16,4 s = 0,01 s + 16,1 s | 6 601 |
+
+- **La espera inicial es todo el exceso.** En los dos rojos los 25 lotes del host duraron 6,5 s y 20,2 s (mediana de lote 275 y 810 ms): el tiempo se fue entre la aprobación y el inicio de `persist` (`initialWaitMs`). La hipótesis H8 (espera de la cola) queda descartada como ruido y reemplazada por esta causa.
+- **Causa de la contaminación (confirmada con los datos).** La fila del código termina su persistencia en tiempo, pero su drenado vence a los 180 s con 12 201 y 12 801 eventos aún sin publicar (el relay publicó solo unos 2 200–2 800 de ≈ 15 000 durante la persistencia y nada más después). `imports.perf.ts` lanzaba entonces el `until: timeout` (el job fallaba por la fila informativa) y la fila del host arrancaba sobre ese backlog: el relay publica por orden de secuencia y `ImportApproved` quedaba detrás de él, y las colas y el relay competían con el worker nuevo. La persistencia del host medía el drenado ajeno. Con la base en reposo (11-12) la espera inicial es de 13 ms.
+- **Causa del estancamiento del relay en la fila del código: no probada.** Ritmo del relay durante la persistencia: ≈ 200 y ≈ 115 eventos/s en los rojos frente a ≈ 420 en el verde (`peakQueuedEventJobs` 300–500 frente a 2 000–3 900). Indicios: en los dos rojos el estancamiento del host termina justo cuando terminan limpiezas automáticas de `pgboss.job_common` (a +247 s en el 11-10; a +432, +492 y +552 s en el 11-11), y ambos arrancan con ≈ 181 000 filas muertas en `pgboss.job` (129 000 en el verde) tras la purga de 1 176 621 trabajos de `spendable.perf.ts` y las suites previas; las esperas muestreadas no explican nada (más del 95 % de las muestras sin espera: no es E/S sino CPU o consultas lentas). Es compatible con H5 (filas muertas y estadísticas viejas) y con H7 (consulta de cabezas del relay), sin descartar las consultas de entrega de las colas `key_strict_fifo` con concurrencia 4. No hay evidencia para tocar el relay ni los lotes de producción; el código de producción no se cambia.
+- **Mantenimiento y trabajos programados.** Código: un punto de control de 250 ms en los tres; el 11-10 y el 11-12 corrieron `__pgboss__send-it` y un trabajo diario (`commitments.subscription-daily` 1 092 ms; `goals.daily-evaluation` 1 807 ms) dentro de la ventana, ahora publicados; ninguno en el host.
+- **Desglose del lote (las tres corridas sin estancamiento de espera).** La confirmación domina en el código (`commit` 8,2 s, 11,7 s y 12,0 s de 13,3, 18,8 y 19,6 s de lotes; en el host del 11-12, 9,3 de 16,1 s) y `tx.ledger` pesa 1,7–2,9 s; esperas dominantes `LWLock:WALWrite` (37–70 %) e `IO:WalSync`. Lo orienta a H6 (confirmaciones y disco) para P1; falta el peso por runner con más corridas.
+- **Huella.** Dos generaciones de runner: EPYC 9V45 (CPU 37–38 ms, ≈ 10 000 confirmaciones/s) y 9V74 (55 ms, ≈ 5 900). La referencia de confirmaciones queda en 9 814 (mediana de las tres corridas); la de CPU de 54 ms sigue provisional: la calibración sintética da 37–38 ms en el runner rápido, así que el factor 0,7 no significa «más rápido que la referencia» sino que la referencia de 54 ms corresponde al 9V74.
+- **H1 (varianza del runner).** Con tres puntos el rojo del 11-11 (CPU 1,02) no se explica por el runner; la normalización por factor no se puede aceptar ni descartar hasta tener 5 corridas sin estancamiento.
+
+**Arreglo en este change (benchmark).** `imports.perf.ts` prepara cada configuración con `isolateConfiguration` (`persist-instrumentation.ts`): con el worker anterior detenido purga el outbox y los trabajos `events.*`, ejecuta `VACUUM (ANALYZE)` de `platform.outbox` y `pgboss.job`, espera la quietud del host y verifica el reposo (0 pendientes, 0 trabajos abiertos, 0 consultas ajenas); la fila bloqueante falla con el motivo si no lo logra. El drenado que vence se publica con el diagnóstico del outbox y el seguimiento (un punto cada 10 s durante la persistencia y el drenado) sin lanzar un error. TC-PLATFORM-PIPELINE-042 y -043.
+
+**No medible sin nightlies reales (pendiente).** Si con el aislamiento la fila del código sigue sin drenar en 180 s: el seguimiento, el `EXPLAIN` del relay y la transacción más larga del reporte dirán si es H5 o H7; P3, P6 y P8 siguen pendientes. El peso de H6 por runner y H1 necesitan más corridas.
+
 ## Contratos
 
 - **OpenAPI:** sin cambios.

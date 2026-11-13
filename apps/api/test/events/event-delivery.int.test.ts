@@ -779,9 +779,16 @@ describe('platform/event-delivery: worker completo', () => {
       await runWithCorrelation({ correlationId }, () => command(w1, [settingsChanged(w1, w1, 2)]));
       const result = await until(async () => seen[0]);
       expect(result).toEqual({ workspaces: [w1], correlationId });
-      const jobLines = logs
-        .records()
-        .filter((r) => r['job.queue'] === eventQueueName(consumer) && r['msg'] === 'job completed');
+      // El handler anota `seen` ANTES de terminar: la línea `job completed` se escribe después de confirmar el trabajo
+      // (inbox, COMMIT, marca de la cola), así que se espera en lugar de leer el log al instante (intermitente en CI).
+      const completedLines = () =>
+        logs
+          .records()
+          .filter((r) => r['job.queue'] === eventQueueName(consumer) && r['msg'] === 'job completed');
+      const jobLines = await until(async () => {
+        const lines = completedLines();
+        return lines.length >= 1 ? lines : undefined;
+      });
       expect(jobLines.length).toBeGreaterThanOrEqual(1);
       for (const line of jobLines) expect(line['correlation_id']).toBe(correlationId);
     } finally {

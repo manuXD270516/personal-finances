@@ -13,12 +13,17 @@ import {
   summarizeMaintenance,
   summarizePersistBreakdown,
   summarizeWaits,
+  thinDrainTrace,
+  waitForRest,
   writeIncompleteReport,
   type DbSample,
+  type DrainTraceEntry,
   type ImportsReport,
   type OutboxDiagnosis,
   type PersistBatchSample,
   type PersistTimingsRaw,
+  type RestProbe,
+  type RestSnapshot,
 } from './perf-report.js';
 
 const BUDGET_MS = 20_000;
@@ -258,6 +263,108 @@ describe('suites informativas sin completar (D300, D359)', () => {
     expect(verdict.reasons).toHaveLength(1);
     expect(verdict.reasons[0]).toContain('21300');
     expect(verdict.published).toEqual(['ráfaga']);
+  });
+});
+
+/** Sonda de reposo con una secuencia de estados: cada `snapshot()` devuelve el siguiente (el último se repite). */
+function restProbe(states: RestSnapshot[], tickMs = 2_000): RestProbe & { slept: number } {
+  let i = 0;
+  let clock = 0;
+  const probe = {
+    slept: 0,
+    snapshot: async () => states[Math.min(i++, states.length - 1)]!,
+    sleep: async (ms: number) => {
+      probe.slept += ms;
+      clock += ms;
+    },
+    now: () => clock + 0 * tickMs,
+  };
+  return probe;
+}
+
+const AT_REST: RestSnapshot = { outboxPending: 0, openEventJobs: 0, foreignActiveQueries: 0 };
+
+describe('aislamiento entre las configuraciones del import (stabilize-import-persist-perf)', () => {
+  it('[TC-PLATFORM-PIPELINE-042] con 12 201 eventos pendientes de la configuración anterior la fila del host no empieza hasta que la base queda en reposo', async () => {
+    // La purga con el worker detenido baja el backlog: el primer sondeo aún ve el residuo, el segundo ya no.
+    const probe = restProbe([
+      { outboxPending: 12_201, openEventJobs: 400, foreignActiveQueries: 0 },
+      AT_REST,
+    ]);
+    const outcome = await waitForRest(probe, { maxWaitMs: 120_000, intervalMs: 2_000 });
+    expect(outcome.atRest).toBe(true);
+    expect(outcome.samples).toBe(2);
+    expect(outcome.violations).toEqual([]);
+    expect(probe.slept).toBe(2_000);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-042] una base en reposo no espera y una que no baja se publica sin reposo con los motivos al vencer el tope', async () => {
+    const calm = await waitForRest(restProbe([AT_REST]), { maxWaitMs: 120_000, intervalMs: 2_000 });
+    expect(calm).toMatchObject({ atRest: true, samples: 1, waitedMs: 0 });
+
+    const stuck = await waitForRest(
+      restProbe([{ outboxPending: 12_201, openEventJobs: 3, foreignActiveQueries: 1 }]),
+      { maxWaitMs: 10_000, intervalMs: 2_000 },
+    );
+    expect(stuck.atRest).toBe(false);
+    expect(stuck.waitedMs).toBe(10_000);
+    expect(stuck.violations).toEqual([
+      '12201 eventos pendientes en el outbox',
+      '3 trabajos events.* abiertos',
+      '1 consultas ajenas activas',
+    ]);
+    const md = renderImportsSection(
+      importsReport({
+        restBeforeMeasure: {
+          purgedOutbox: 12_201,
+          purgedJobs: 3,
+          vacuumed: ['platform.outbox', 'pgboss.job'],
+          atRest: stuck.atRest,
+          waitedMs: stuck.waitedMs,
+          violations: stuck.violations,
+        },
+      }),
+    ).join('\n');
+    expect(md).toContain('purga de 12201 eventos del outbox y 3 trabajos events.*');
+    expect(md).toContain('VACUUM (ANALYZE) de platform.outbox, pgboss.job');
+    expect(md).toContain('NO quedó en reposo tras 10,0 s');
+  });
+
+  it('[TC-PLATFORM-PIPELINE-043] un drenado de 180 s que no llega a 0 se publica con su seguimiento y su diagnóstico sin cambiar el veredicto del job', () => {
+    const points: DrainTraceEntry[] = Array.from({ length: 360 }, (_, i) => ({
+      afterMs: i * 500,
+      outboxPending: 12_201,
+      queuedEventJobs: 200,
+    }));
+    const trace = thinDrainTrace(points);
+    // Un punto cada 10 s más el último: 18 puntos de 10 s + el de 0 s + el final.
+    expect(trace[0]).toMatchObject({ afterMs: 0 });
+    expect(trace.at(-1)).toMatchObject({ afterMs: 179_500 });
+    expect(trace.length).toBe(19);
+
+    const report = importsReport({
+      persistMs: 13_563,
+      drainAfterPersistMs: 180_000,
+      drainTrace: trace,
+      drainStall: { capMs: 180_000, diagnosis },
+      configuration: {
+        label: 'code',
+        eventConsumerConcurrency: 4,
+        workerPoolMax: 52,
+        apiPoolMax: 22,
+        poolsSum: 85,
+        usableConnections: 97,
+        gate: false,
+      },
+    });
+    const md = renderImportsSection(report).join('\n');
+    expect(md).toContain('El drenado NO terminó dentro de 180,0 s');
+    expect(md).toContain('Seguimiento del drenado');
+    expect(md).toContain('+10,0 s 12201 / 200');
+    // La fila del host con 14 400 ms sigue decidiendo el veredicto del job, no la del código.
+    expect(jobVerdict({ hostPersistMs: 14_400, persistBudgetMs: BUDGET_MS, incomplete: [] }).fails).toBe(
+      false,
+    );
   });
 });
 

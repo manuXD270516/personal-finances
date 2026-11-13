@@ -1,9 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
+  DrainStall,
+  DrainTraceEntry,
   IncompleteSuite,
   MaintenanceEntry,
   PersistBreakdown,
+  RestReport,
   RunnerFingerprint,
   ScheduledJobEntry,
   WaitSummary,
@@ -932,6 +935,14 @@ export interface ImportsReport {
   readonly scheduledJobs?: readonly ScheduledJobEntry[];
   /** Huella del runner (informativa: nunca repite ni invalida la medición). */
   readonly runner?: RunnerFingerprint;
+  /** Purga, limpieza y reposo verificado de la base ANTES de medir esta configuración (aislamiento entre filas). */
+  readonly restBeforeMeasure?: RestReport;
+  /** Seguimiento de la persistencia (un punto cada 10 s desde la aprobación): cuánto avanza el relay mientras se persiste. */
+  readonly persistTrace?: readonly DrainTraceEntry[];
+  /** Seguimiento del drenado (un punto cada 10 s): el ritmo del relay y de los consumidores tras la persistencia. */
+  readonly drainTrace?: readonly DrainTraceEntry[];
+  /** Presente solo si el drenado no terminó dentro de su tope: diagnóstico del outbox al vencer. */
+  readonly drainStall?: DrainStall;
 }
 
 /** Costo por evento de un consumidor con su handler real (optimize-consumer-throughput, E6–E8). Siempre informativo. */
@@ -1062,6 +1073,44 @@ export function renderPersistDetail(r: ImportsReport): string[] {
             )
             .join('; ')}.`,
       '',
+    );
+  }
+  if (r.restBeforeMeasure) {
+    const rest = r.restBeforeMeasure;
+    out.push(
+      `Base antes de medir esta configuración: purga de ${String(rest.purgedOutbox)} eventos del outbox y ${String(rest.purgedJobs)} trabajos events.*; ${rest.vacuumed.length > 0 ? `VACUUM (ANALYZE) de ${rest.vacuumed.join(', ')}` : 'sin VACUUM'}; ${rest.atRest ? `en reposo tras ${seconds(rest.waitedMs)}` : `NO quedó en reposo tras ${seconds(rest.waitedMs)} (${rest.violations.join('; ')})`}.`,
+      '',
+    );
+  }
+  if (r.persistTrace && r.persistTrace.length > 0) {
+    out.push(
+      `Seguimiento de la persistencia (desde la aprobación; pendientes del outbox / trabajos de eventos encolados): ${r.persistTrace
+        .map((p) => `+${seconds(p.afterMs)} ${String(p.outboxPending)} / ${String(p.queuedEventJobs)}`)
+        .join('; ')}.`,
+      '',
+    );
+  }
+  if (r.drainTrace && r.drainTrace.length > 0) {
+    out.push(
+      `Seguimiento del drenado (desde el fin de la persistencia; pendientes del outbox / trabajos de eventos encolados): ${r.drainTrace
+        .map((p) => `+${seconds(p.afterMs)} ${String(p.outboxPending)} / ${String(p.queuedEventJobs)}`)
+        .join('; ')}.`,
+      '',
+    );
+  }
+  if (r.drainStall) {
+    const d = r.drainStall.diagnosis;
+    out.push(
+      `El drenado NO terminó dentro de ${seconds(r.drainStall.capMs)}: eventos pendientes en el outbox ${String(d.pending)}${
+        d.byType.length > 0
+          ? ` (${d.byType
+              .slice(0, 5)
+              .map((t) => `${t.eventType} ${String(t.pending)} con ${String(t.maxAttempts)} intentos`)
+              .join(', ')})`
+          : ''
+      }; el más viejo tiene ${d.oldestPendingAgeMs === null ? 'sin dato' : seconds(d.oldestPendingAgeMs)}; transacción abierta más larga: ${d.longestTransactionMs === null ? 'ninguna' : `${seconds(d.longestTransactionMs)} (${d.longestTransactionQuery ?? 'sin consulta'})`}.`,
+      '',
+      ...(d.relayPlan ? ['Plan de la consulta del relay:', '', '```', d.relayPlan, '```', ''] : []),
     );
   }
   if (r.scheduledJobs) {
