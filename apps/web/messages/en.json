@@ -342,6 +342,8 @@
       "days": "{n} d ago"
     },
     "savingsRate": "Savings rate:",
+    "expectedSpending": "Expected: ~{amount} · Likely range: {lower} to {upper} (80 %)",
+    "expectedStale": "Outdated forecast: it is more than 35 days old or the last update failed.",
     "variation": {
       "new": "new",
       "vsPrevious": "compared with last month",
@@ -3600,7 +3602,12 @@
       },
       "lowestLabel": "Lowest expected balance in the next {days} days",
       "lowestOn": "{amount} on {date}",
-      "lowestIncomplete": "incomplete: a rate is missing"
+      "lowestIncomplete": "incomplete: a rate is missing",
+      "predictedShortfall": {
+        "LIKELY": "With your expected variable spending: likely shortfall in {currency} on {date}",
+        "POSSIBLE": "If your variable spending is high: possible shortfall in {currency} on {date}",
+        "UNLIKELY": "With your predicted variable spending, a shortfall in {currency} is unlikely"
+      }
     },
     "committed": {
       "period": "{name} ({from} to {to})",
@@ -6946,6 +6953,8 @@
       "description": "Expected balance day by day; the lowest is {low} on {date}.",
       "balance": "Expected balance",
       "planned": "With the remaining planned spending",
+      "band": "Predicted variable spending range (80 %)",
+      "expected": "With the expected variable spending",
       "thresholdReserve": "Minimum reserve: {amount}",
       "thresholdZero": "Threshold: zero",
       "lowest": "Lowest"
@@ -6956,7 +6965,31 @@
       "balance": "Closing balance",
       "low": "Lowest balance of the day",
       "planned": "With planned spending",
-      "belowThreshold": "under the threshold"
+      "belowThreshold": "under the threshold",
+      "bandExpected": "With expected spending",
+      "bandHigh": "With high spending",
+      "bandLow": "With low spending"
+    },
+    "predicted": {
+      "title": "With your predicted variable spending",
+      "likelihood": {
+        "LIKELY": "Likely shortfall in {currency} with your expected variable spending",
+        "POSSIBLE": "Possible shortfall in {currency} if your variable spending is high",
+        "UNLIKELY": "Shortfall in {currency} is unlikely with your predicted variable spending",
+        "NOT_AVAILABLE": "No variable spending estimate in {currency}"
+      },
+      "firstShortfall": "First date under the threshold: {date}.",
+      "lowestExpected": "Lowest balance with expected spending",
+      "lowestHigh": "Lowest balance with high spending",
+      "help": "High spending is the upper bound of the forecast 80 % interval: \"possible\" means about 1 in 10 or more; \"likely\", about 1 in 2 or more. It is a separate estimate: it does not change the risk of the known payments.",
+      "stale": "This forecast is outdated: it is more than 35 days old or the last update failed.",
+      "reason": {
+        "DISABLED": "Forecasts are not enabled in this installation, so there is no variable spending estimate.",
+        "NO_FORECAST": "There is no variable spending forecast yet.",
+        "NO_SERIES": "The current forecast does not include the variable spending in {currency} yet; it will be calculated in the next update.",
+        "INSUFFICIENT_DATA": "There is not enough variable spending history in {currency} to predict it yet.",
+        "NO_CURRENT_PERIOD": "The current forecast does not cover the period in progress."
+      }
     },
     "scenarios": {
       "withoutIncome": "Worst case without expected income",

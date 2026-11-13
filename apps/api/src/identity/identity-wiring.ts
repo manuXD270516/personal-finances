@@ -46,6 +46,7 @@ import {
   FORECAST_RUN_LIFECYCLE_MACHINE,
   ForecastingModule,
   createForecastingRuntime,
+  type ForecastingRuntime,
 } from '@pf/forecasting/interface/forecasting.module';
 import {
   forecastingMetrics,
@@ -469,6 +470,7 @@ export function financeRuntimes(input: {
     cards?: CardsRuntime;
     accounts?: AccountsRuntime;
     rules?: RulesRuntime;
+    forecasting?: ForecastingRuntime;
   } = {};
   const classification = createClassificationRuntime({
     pool: input.pool,
@@ -620,6 +622,25 @@ export function financeRuntimes(input: {
         Promise.resolve({ items: [], generatedThrough: '9999-12-31' }),
     },
     pending: transactions.pending,
+    // add-predicted-cash-flow-band: FORECAST se compone después de REPORTING (usa COMMITMENTS y DEBT); el pronóstico
+    // vigente y el gasto líquido ya hecho se leen por sus contratos públicos con resolución tardía. Sin FORECAST
+    // compuesto, el calendario informa que no hay pronóstico.
+    forecast: {
+      getLatest: (query) =>
+        deferred.forecasting?.queries.getLatest(query) ??
+        Promise.resolve({
+          status: 'DISABLED' as const,
+          stale: false,
+          lastAttempt: null,
+          run: null,
+          reportingCurrency: '',
+          generatedAt: null,
+          series: [],
+          disclaimerKey: '',
+          meta: { conversion: null },
+        }),
+      spentBetween: (query) => deferred.forecasting?.queries.spentBetween(query) ?? Promise.resolve([]),
+    },
     // add-savings-goals: Q9 y aportes netos a metas del mes (GOALS se compone después de REPORTING).
     goalSummary: {
       listForHome: (query) =>
@@ -897,6 +918,7 @@ export function financeRuntimes(input: {
       flows: transactions.flows,
       categories: classification.categories,
       rates: fx.valuation,
+      accounts: accounts.catalog,
     }),
     ...forecastingKnownPorts({
       upcoming: commitments.queries,
@@ -907,6 +929,7 @@ export function financeRuntimes(input: {
     settings: forecastingSettingsFrom(input.config, rateValidityWindowDays),
     metrics: forecastingMetrics(),
   });
+  deferred.forecasting = forecasting;
   // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.
   const imports = createImportsRuntime({
     pool: input.pool,

@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronóstico del gasto variable por moneda para el flujo de caja"
 scenario: "Compras con tarjeta fuera de la serie"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-FORECAST-003"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/liquid-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/variable-liquid-outflow.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","credit-cards"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "la historia del gasto variable líquido en BOB de 2026-10 sigue en 1152.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-CASHFLOW-002 — Las compras con tarjeta no entran en el gasto variable líquido

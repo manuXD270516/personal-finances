@@ -1349,6 +1349,9 @@ importers:
       '@pf/classification':
         specifier: workspace:*
         version: link:../classification
+      '@pf/forecasting':
+        specifier: workspace:*
+        version: link:../forecasting
       '@pf/fx':
         specifier: workspace:*
         version: link:../fx

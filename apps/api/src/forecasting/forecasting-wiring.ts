@@ -1,3 +1,4 @@
+import type { AccountCatalogQuery } from '@pf/accounts/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { ResolvedOccurrencesQuery, UpcomingPaymentsQuery } from '@pf/commitments/contracts';
 import type { LoanScheduleQuery } from '@pf/debt/contracts';
@@ -95,7 +96,9 @@ export function forecastingReadPorts(input: {
   readonly flows: NominalFlowQuery;
   readonly categories: CategoryCatalogQuery;
   readonly rates: Pick<FxValuationPort, 'resolveValuationRates' | 'enabledCurrencies'>;
-}): Pick<ForecastingRuntimeOptions, 'settingsOf' | 'flows' | 'categories' | 'rates'> {
+  /** Catálogo de cuentas (cuentas líquidas por moneda para la serie del gasto variable líquido). */
+  readonly accounts: Pick<AccountCatalogQuery, 'listAccounts'>;
+}): Pick<ForecastingRuntimeOptions, 'settingsOf' | 'flows' | 'categories' | 'rates' | 'liquidAccounts'> {
   return {
     settingsOf: {
       async settingsOf(workspaceId) {
@@ -125,6 +128,37 @@ export function forecastingReadPorts(input: {
         return rows
           .filter((r) => r.nature === 'EXPENSE' && r.origin?.loanComponent)
           .map((r) => ({ businessDate: r.businessDate, categoryId: r.categoryId, amount: r.amount }));
+      },
+      // add-predicted-cash-flow-band: gasto por cuenta (y su componente de préstamo) para el gasto variable líquido.
+      async loadLiquidFlows(workspaceId, dateFrom, dateTo) {
+        const rows = await input.flows.summarizeNominalFlows({
+          workspaceId,
+          dateFrom,
+          dateTo,
+          groupBy: ['ACCOUNT', 'ORIGIN'],
+        });
+        return rows
+          .filter((r) => r.nature === 'EXPENSE' && r.accountId !== undefined)
+          .map((r) => ({
+            businessDate: r.businessDate,
+            accountId: r.accountId as string,
+            amount: r.amount,
+            loanComponent: Boolean(r.origin?.loanComponent),
+          }));
+      },
+    },
+    liquidAccounts: {
+      async liquidAccounts(workspaceId) {
+        // Una consulta por vez: nunca en paralelo sobre el mismo cliente.
+        const accounts = await input.accounts.listAccounts({ workspaceId });
+        const currencies = await input.rates.enabledCurrencies(workspaceId);
+        return accounts
+          .filter((a) => a.nature === 'ASSET' && a.liquidity === 'LIQUID')
+          .map((a) => ({
+            accountId: a.accountId,
+            currency: a.currency,
+            scale: currencies.find((c) => c.code === a.currency)?.scale ?? 2,
+          }));
       },
     },
     categories: {
@@ -175,6 +209,7 @@ export function forecastingKnownPorts(input: {
           transactionDate: r.transactionDate,
           amount: r.amount,
           categoryId: r.categoryId,
+          accountId: r.accountId,
         }));
       },
       async project(workspaceId, from, to) {

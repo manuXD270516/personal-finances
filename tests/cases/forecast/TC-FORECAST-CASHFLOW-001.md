@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronóstico del gasto variable por moneda para el flujo de caja"
 scenario: "Gasto variable en bolivianos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-FORECAST-003"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - packages/contexts/forecasting/src/application/liquid-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/variable-liquid-outflow.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","money"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "la historia del gasto variable líquido en BOB tiene 1152.00 BOB en 2026-10"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-CASHFLOW-001 — La historia del gasto variable líquido resta los recurrentes resueltos pagados desde cuentas líquidas

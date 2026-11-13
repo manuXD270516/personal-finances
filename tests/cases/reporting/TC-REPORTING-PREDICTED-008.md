@@ -5,16 +5,17 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Riesgo y alerta de déficit sin cambios por el pronóstico"
 scenario: "Banda por debajo del umbral sin riesgo principal"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-015","FR-FORECAST-008"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","shortfall","D379"]
@@ -29,7 +30,7 @@ expected_result:
   - "el nivel de riesgo en BOB es el mismo que sin la banda y no se abre ningún episodio"
   - "la probabilidad de déficit con el gasto predicho es probable"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-008 — La banda no cambia el riesgo ni abre episodios

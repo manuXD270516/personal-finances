@@ -7,6 +7,8 @@ export const SERIES_SCOPES = [
   'CATEGORY',
   'OTHER_CATEGORIES',
   'TOTAL_INCOME',
+  /** Gasto variable pagado desde cuentas líquidas de una moneda, en esa moneda (add-predicted-cash-flow-band). */
+  'LIQUID_VARIABLE_OUTFLOW',
 ] as const;
 export type SeriesScope = (typeof SERIES_SCOPES)[number];
 export type Readiness = 'MODEL' | 'SIMPLE' | 'INSUFFICIENT';
@@ -59,6 +61,9 @@ export interface EvaluatedSeries {
   readonly groupedCategoryIds: readonly string[];
   /** Cantidad de periodos a pronosticar (12 o 6 según la historia; solo con `readiness` distinto de INSUFFICIENT). */
   readonly horizon: number;
+  /** Moneda y escala propias de la serie (`LIQUID_VARIABLE_OUTFLOW`); ausentes, las de reporte de la corrida. */
+  readonly currency?: string;
+  readonly scale?: number;
 }
 
 export interface GapResult {
@@ -85,6 +90,8 @@ const UNCATEGORIZED_PERIODS_SHARE = 0.2;
 const HORIZON_TOTAL = 12;
 const HORIZON_CATEGORY = 6;
 const LONG_HISTORY = 24;
+/** Horizonte del gasto variable líquido: el periodo en curso y 3 más (90 días). */
+export const HORIZON_LIQUID = 4;
 
 const trimFromFirstData = (points: readonly SeriesPoint[]): SeriesPoint[] => {
   const first = points.findIndex((p) => p.txCount > 0 || !p.value.isZero());
@@ -293,5 +300,51 @@ export const ReadinessGate = {
     }
     void labels;
     return series;
+  },
+
+  /**
+   * Serie del gasto variable líquido de UNA moneda (add-predicted-cash-flow-band): mismos umbrales de historia que las
+   * demás series, sin la regla de calidad de la clasificación; horizonte de 4 periodos.
+   */
+  evaluateLiquid(input: {
+    readonly currency: string;
+    readonly scale: number;
+    readonly values: readonly SeriesPoint[];
+    readonly thresholds: ReadinessThresholds;
+  }): EvaluatedSeries {
+    const { thresholds } = input;
+    const points = trimFromFirstData(input.values);
+    const n = points.length;
+    const readiness: Readiness =
+      n >= thresholds.minPeriodsModel
+        ? 'MODEL'
+        : n >= thresholds.minPeriodsSimple
+          ? 'SIMPLE'
+          : 'INSUFFICIENT';
+    const reasons: ReadinessReason[] =
+      n < thresholds.minPeriodsModel
+        ? [
+            {
+              code: 'TOO_FEW_PERIODS',
+              missingForSimple: Math.max(thresholds.minPeriodsSimple - n, 0),
+              missingForModel: thresholds.minPeriodsModel - n,
+            },
+          ]
+        : [];
+    return {
+      scope: 'LIQUID_VARIABLE_OUTFLOW',
+      scopeRef: null,
+      name: input.currency,
+      kind: 'EXPENSE',
+      readiness,
+      readinessReasons: reasons,
+      points,
+      historyFrom: points[0]?.period ?? null,
+      historyTo: points.at(-1)?.period ?? null,
+      groupedCategoryIds: [],
+      horizon: HORIZON_LIQUID,
+      currency: input.currency,
+      scale: input.scale,
+    };
   },
 } as const;

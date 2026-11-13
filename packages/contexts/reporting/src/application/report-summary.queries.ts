@@ -40,6 +40,7 @@ import {
   type ValuedAccount,
 } from '../domain/index.js';
 import { CashFlowCalculation, homeBlock } from './cash-flow-calendar.queries.js';
+import { PredictedCashFlow, expectedSpendingOf } from './predicted-cash-flow.js';
 import type { GoalHomeSummaryRow, ReportingDeps } from './ports/index.js';
 import { isLiquidAccount, SpendableCalculation } from './spendable.queries.js';
 import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS, rateKey, toExact } from './valuation-support.js';
@@ -344,6 +345,20 @@ export class ReportSummaryQueries {
       if (!used.has(key)) used.set(key, r);
     }
 
+    // ---- pronóstico (add-predicted-cash-flow-band): UNA lectura de la corrida vigente para Q3 (gasto esperado) y Q8
+    // (probabilidad de déficit con el gasto predicho); sin pronóstico las tarjetas no cambian.
+    const predictor = new PredictedCashFlow(query.asOf === undefined ? deps.forecast : undefined);
+    const forecastRead = await predictor.read(ws, ['TOTAL_EXPENSE', 'LIQUID_VARIABLE_OUTFLOW']);
+    const predictedBands = cashFlowCalc
+      ? await predictor.bands({
+          workspaceId: ws,
+          today,
+          blocks: cashFlowCalc.result.currencies,
+          assessments: cashFlowCalc.assessments,
+          latest: forecastRead,
+        })
+      : null;
+
     // ---- flujos del periodo
     const periodText = range(period);
     const inPeriod = KpiCalculator.within(flows, periodText);
@@ -549,7 +564,8 @@ export class ReportSummaryQueries {
       goals: goalsBlock(goalSummary),
       goalContributions,
       spendable: spendableCalc?.summary ?? null,
-      cashFlow: cashFlowCalc ? homeBlock(cashFlowCalc) : null,
+      cashFlow: cashFlowCalc ? homeBlock(cashFlowCalc, predictedBands?.byCurrency) : null,
+      forecast: expectedSpendingOf(forecastRead, periodText),
       meta: {
         generatedAt: nowText,
         reportingCurrency: reporting.code,

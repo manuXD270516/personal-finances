@@ -8,6 +8,7 @@ import {
   CASH_FLOW_HORIZONS,
   eventSign,
   eventsByDay,
+  hasBand,
   hasNoAmount,
   occurrencePathOf,
   pickCurrency,
@@ -193,6 +194,65 @@ function RiskDetail({ currency: c, f }: { currency: CashFlowCurrency; f: FormatC
   );
 }
 
+/**
+ * Probabilidad de déficit con el gasto variable predicho (add-predicted-cash-flow-band): aparte del riesgo de los pagos
+ * conocidos, que no cambia. Sin banda, el motivo. El «gasto alto» es el límite superior del intervalo del 80 %.
+ */
+function PredictedCard({ currency: c, f }: { currency: CashFlowCurrency; f: FormatContext }) {
+  const p = c.predicted;
+  if (!p) return null;
+  const { locale } = f;
+  if (p.status !== 'AVAILABLE') {
+    return (
+      <p className="pf-cf-muted" data-testid="cash-flow-predicted-unavailable" data-reason={p.reason ?? ''}>
+        <span aria-hidden="true">ⓘ</span>{' '}
+        {f.t(`predicted.reason.${p.reason ?? 'NO_FORECAST'}`, { currency: c.currency })}
+      </p>
+    );
+  }
+  return (
+    <div
+      className="pf-cf-card"
+      data-testid="cash-flow-predicted"
+      data-likelihood={p.shortfallLikelihood}
+      aria-labelledby={`cash-flow-${c.currency}-predicted-title`}
+    >
+      <h3 id={`cash-flow-${c.currency}-predicted-title`}>{f.t('predicted.title')}</h3>
+      <p>
+        <strong data-testid="cash-flow-predicted-likelihood">
+          <span aria-hidden="true">{p.shortfallLikelihood === 'UNLIKELY' ? '✓' : '⚠'}</span>{' '}
+          {f.t(`predicted.likelihood.${p.shortfallLikelihood}`, { currency: c.currency })}
+        </strong>
+      </p>
+      {p.firstShortfallDate ? (
+        <p data-testid="cash-flow-predicted-date">
+          {f.t('predicted.firstShortfall', { date: formatLocalDate(p.firstShortfallDate, locale) })}
+        </p>
+      ) : null}
+      {p.lowest ? (
+        <div className="pf-cf-kpis">
+          <Kpi label={f.t('predicted.lowestExpected')} testId="cash-flow-predicted-lowest-expected">
+            <strong>{formatMoney(p.lowest.expected.amount, locale)}</strong>
+            <span className="pf-cf-muted">{formatLocalDate(p.lowest.expected.date, locale)}</span>
+          </Kpi>
+          <Kpi label={f.t('predicted.lowestHigh')} testId="cash-flow-predicted-lowest-high">
+            <strong>{formatMoney(p.lowest.high.amount, locale)}</strong>
+            <span className="pf-cf-muted">{formatLocalDate(p.lowest.high.date, locale)}</span>
+          </Kpi>
+        </div>
+      ) : null}
+      <p className="pf-cf-muted" data-testid="cash-flow-predicted-help">
+        {f.t('predicted.help')}
+      </p>
+      {p.stale ? (
+        <p role="status" className="pf-cf-notice" data-testid="cash-flow-predicted-stale">
+          <span aria-hidden="true">⚠</span> {f.t('predicted.stale')}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function Kpi({ label, children, testId }: { label: string; children: ReactNode; testId: string }) {
   return (
     <div className="pf-cf-kpi" data-testid={testId}>
@@ -205,11 +265,13 @@ function Kpi({ label, children, testId }: { label: string; children: ReactNode; 
 function SeriesTable({
   rows,
   hasPlanned,
+  hasBand: withBand,
   f,
   caption,
 }: {
   rows: ReturnType<typeof seriesRows>;
   hasPlanned: boolean;
+  hasBand: boolean;
   f: FormatContext;
   caption: string;
 }) {
@@ -233,6 +295,19 @@ function SeriesTable({
                 <th scope="col" data-num>
                   {f.t('table.planned')}
                 </th>
+              ) : null}
+              {withBand ? (
+                <>
+                  <th scope="col" data-num>
+                    {f.t('table.bandExpected')}
+                  </th>
+                  <th scope="col" data-num>
+                    {f.t('table.bandHigh')}
+                  </th>
+                  <th scope="col" data-num>
+                    {f.t('table.bandLow')}
+                  </th>
+                </>
               ) : null}
             </tr>
           </thead>
@@ -258,6 +333,13 @@ function SeriesTable({
                   ) : null}
                 </td>
                 {hasPlanned ? <td data-num>{r.planned ? formatMoney(r.planned, locale) : '—'}</td> : null}
+                {withBand ? (
+                  <>
+                    <td data-num>{r.band ? formatMoney(r.band.expected, locale) : '—'}</td>
+                    <td data-num>{r.band ? formatMoney(r.band.high, locale) : '—'}</td>
+                    <td data-num>{r.band ? formatMoney(r.band.low, locale) : '—'}</td>
+                  </>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -285,7 +367,8 @@ function CurrencySection({
   const title = useAccount
     ? f.t('chart.accountTitle', { name: accountSeries.name, days: calendar.horizonDays })
     : f.t('chart.title', { currency: c.currency, days: calendar.horizonDays });
-  const rows = seriesRows(series, planned, threshold ?? null);
+  const band = !useAccount && hasBand(c) ? c.predicted : null;
+  const rows = seriesRows(series, planned, threshold ?? null, band);
   return (
     <section
       className="pf-cf-card"
@@ -295,6 +378,7 @@ function CurrencySection({
     >
       <h2 id={`cash-flow-${c.currency}-title`}>{f.t('currency.title', { currency: c.currency })}</h2>
       <RiskDetail currency={c} f={f} />
+      <PredictedCard currency={c} f={f} />
       <div className="pf-cf-kpis">
         <Kpi label={f.t('kpi.start')} testId="cash-flow-start">
           <strong>{formatMoney(c.startBalance, locale)}</strong>
@@ -332,6 +416,7 @@ function CurrencySection({
         id={`cash-flow-chart-${c.currency}`}
         series={series}
         planned={planned?.series}
+        band={band?.series}
         threshold={threshold}
         lowestDate={lowestDate}
         locale={locale}
@@ -343,6 +428,8 @@ function CurrencySection({
           }),
           balance: f.t('chart.balance'),
           planned: f.t('chart.planned'),
+          band: f.t('chart.band'),
+          expected: f.t('chart.expected'),
           threshold: threshold
             ? c.threshold.source === 'MINIMUM_RESERVE'
               ? f.t('chart.thresholdReserve', { amount: formatMoney(threshold, locale) })
@@ -351,7 +438,7 @@ function CurrencySection({
           lowest: f.t('chart.lowest'),
         }}
       />
-      <SeriesTable rows={rows} hasPlanned={planned !== null} f={f} caption={title} />
+      <SeriesTable rows={rows} hasPlanned={planned !== null} hasBand={band !== null} f={f} caption={title} />
       <div className="pf-cf-kpis" data-testid="cash-flow-scenarios">
         <Kpi label={f.t('scenarios.withoutIncome')} testId="cash-flow-without-income">
           <strong>{formatMoney(c.withoutExpectedIncome.lowest.amount, locale)}</strong>

@@ -163,6 +163,32 @@ export function IncomeCard({ summary, ctx }: { summary: ReportSummary; ctx: Form
   );
 }
 
+/**
+ * Gasto esperado del periodo (add-predicted-cash-flow-band, FR-FORECAST-004): «Esperado: ~… · Rango probable: … (80 %)»
+ * junto al gasto del periodo; sin pronóstico vigente del periodo la tarjeta no cambia.
+ */
+function ExpectedSpendingLine({ summary, ctx }: { summary: ReportSummary; ctx: FormatContext }) {
+  const expected = summary.forecast?.expectedSpending;
+  if (!expected) return null;
+  const { t, locale } = ctx;
+  return (
+    <>
+      <p className="pf-home-muted" data-testid="expense-expected">
+        {t('expectedSpending', {
+          amount: formatMoney(expected.prediction, locale),
+          lower: formatMoney(expected.interval80.lower, locale),
+          upper: formatMoney(expected.interval80.upper, locale),
+        })}
+      </p>
+      {expected.stale ? (
+        <p className="pf-home-muted" data-testid="expense-expected-stale">
+          <span aria-hidden="true">ⓘ</span> {t('expectedStale')}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 /** Q3 "¿Cuánto gasté?" (neto de reembolsos). */
 export function ExpenseCard({
   summary,
@@ -183,7 +209,9 @@ export function ExpenseCard({
       perCurrency={summary.byCurrency.map((c) => c.expense)}
       meter={barRatio(summary.consolidated.expense.amount, flowScale(summary))}
       reportsHref={reportsHref}
-    />
+    >
+      <ExpectedSpendingLine summary={summary} ctx={ctx} />
+    </KpiCard>
   );
 }
 

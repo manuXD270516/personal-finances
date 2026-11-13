@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Banda de gasto variable predicho en el calendario"
 scenario: "Gasto ya superado en el periodo en curso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-REPORTING-014"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+  - packages/contexts/reporting/src/domain/predicted-spending-band.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "lo que falta del periodo es 0.00 BOB para el valor esperado y para el límite superior, y las series adicionales coinciden con la principal hasta el 2026-11-30"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-002 — Con el gasto ya superado lo que falta del periodo es cero

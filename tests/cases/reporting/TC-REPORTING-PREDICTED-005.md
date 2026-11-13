@@ -5,16 +5,17 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Probabilidad de déficit con el gasto variable predicho"
 scenario: "Déficit probable con gasto esperado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-008","FR-REPORTING-015"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/predicted-spending-band.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","shortfall"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "la probabilidad de déficit en BOB es probable con fecha 2026-12-10"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-005 — El déficit es probable si la serie con gasto esperado baja del umbral

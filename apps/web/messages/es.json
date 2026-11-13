@@ -342,6 +342,8 @@
       "days": "hace {n} d"
     },
     "savingsRate": "Tasa de ahorro:",
+    "expectedSpending": "Esperado: ~{amount} · Rango probable: {lower} a {upper} (80 %)",
+    "expectedStale": "Pronóstico desactualizado: tiene más de 35 días o la última actualización falló.",
     "variation": {
       "new": "nuevo",
       "vsPrevious": "respecto al mes anterior",
@@ -3600,7 +3602,12 @@
       },
       "lowestLabel": "Saldo más bajo esperado en los próximos {days} días",
       "lowestOn": "{amount} el {date}",
-      "lowestIncomplete": "incompleto: falta una tasa"
+      "lowestIncomplete": "incompleto: falta una tasa",
+      "predictedShortfall": {
+        "LIKELY": "Con tu gasto variable esperado: déficit probable en {currency} el {date}",
+        "POSSIBLE": "Si tu gasto variable es alto: déficit posible en {currency} el {date}",
+        "UNLIKELY": "Con tu gasto variable predicho, el déficit es improbable en {currency}"
+      }
     },
     "committed": {
       "period": "{name} ({from} a {to})",
@@ -6946,6 +6953,8 @@
       "description": "Saldo esperado día a día; el más bajo es {low} el {date}.",
       "balance": "Saldo esperado",
       "planned": "Con el gasto planificado restante",
+      "band": "Rango del gasto variable predicho (80 %)",
+      "expected": "Con el gasto variable esperado",
       "thresholdReserve": "Reserva mínima: {amount}",
       "thresholdZero": "Umbral: cero",
       "lowest": "Mínimo"
@@ -6956,7 +6965,31 @@
       "balance": "Saldo al cierre",
       "low": "Saldo más bajo del día",
       "planned": "Con gasto planificado",
-      "belowThreshold": "bajo el umbral"
+      "belowThreshold": "bajo el umbral",
+      "bandExpected": "Con gasto esperado",
+      "bandHigh": "Con gasto alto",
+      "bandLow": "Con gasto bajo"
+    },
+    "predicted": {
+      "title": "Con tu gasto variable predicho",
+      "likelihood": {
+        "LIKELY": "Déficit probable en {currency} con tu gasto variable esperado",
+        "POSSIBLE": "Déficit posible en {currency} si tu gasto variable es alto",
+        "UNLIKELY": "Déficit improbable en {currency} con tu gasto variable predicho",
+        "NOT_AVAILABLE": "Sin estimación del gasto variable en {currency}"
+      },
+      "firstShortfall": "Primera fecha bajo el umbral: {date}.",
+      "lowestExpected": "Saldo más bajo con gasto esperado",
+      "lowestHigh": "Saldo más bajo con gasto alto",
+      "help": "El gasto alto es el límite superior del intervalo del 80 % del pronóstico: «posible» indica alrededor de 1 de cada 10 o más; «probable», alrededor de 1 de cada 2 o más. Es una estimación aparte: no cambia el riesgo de los pagos conocidos.",
+      "stale": "Este pronóstico está desactualizado: tiene más de 35 días o la última actualización falló.",
+      "reason": {
+        "DISABLED": "Los pronósticos no están habilitados en esta instalación, así que no hay estimación del gasto variable.",
+        "NO_FORECAST": "Todavía no hay un pronóstico del gasto variable.",
+        "NO_SERIES": "El pronóstico vigente aún no incluye el gasto variable de {currency}; se calculará en la próxima actualización.",
+        "INSUFFICIENT_DATA": "Aún no hay historia suficiente del gasto variable en {currency} para predecirlo.",
+        "NO_CURRENT_PERIOD": "El pronóstico vigente no cubre el periodo en curso."
+      }
     },
     "scenarios": {
       "withoutIncome": "Peor caso sin ingresos esperados",

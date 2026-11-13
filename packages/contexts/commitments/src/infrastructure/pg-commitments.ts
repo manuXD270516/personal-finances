@@ -739,10 +739,11 @@ export class PgOccurrenceRepository implements OccurrenceRepository {
       kind: ResolvedForecastRow['kind'];
       managed_by: ResolvedForecastRow['managedBy'];
       category_id: string | null;
+      account_id: string;
     }>`
       SELECT o.id, o.definition_id, d.name,
              to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
-             o.status, o.matched_by, o.transaction_id, o.currency, d.kind, d.managed_by, v.category_id
+             o.status, o.matched_by, o.transaction_id, o.currency, d.kind, d.managed_by, v.category_id, v.account_id
         FROM commitments.recurring_occurrence o
         JOIN commitments.recurring_definition d ON d.workspace_id = o.workspace_id AND d.id = o.definition_id
         JOIN commitments.recurring_definition_version v
@@ -763,6 +764,7 @@ export class PgOccurrenceRepository implements OccurrenceRepository {
       kind: r.kind,
       managedBy: r.managed_by,
       categoryId: r.category_id,
+      accountId: r.account_id,
     }));
   }
 

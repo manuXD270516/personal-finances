@@ -41,6 +41,44 @@ export interface CashFlowDayDto {
   readonly low: MoneyDto;
 }
 
+/** Motivo por el que una moneda no tiene banda del gasto variable predicho (add-predicted-cash-flow-band). */
+export type PredictedUnavailableReasonDto =
+  'DISABLED' | 'NO_FORECAST' | 'NO_SERIES' | 'INSUFFICIENT_DATA' | 'NO_CURRENT_PERIOD';
+
+/** Probabilidad de déficit con el gasto predicho (aparte del nivel de riesgo, que no cambia; D379, D381). */
+export type ShortfallLikelihoodDto = 'LIKELY' | 'POSSIBLE' | 'UNLIKELY' | 'NOT_AVAILABLE';
+
+/**
+ * Banda del gasto variable predicho de una moneda (openspec add-predicted-cash-flow-band; FR-FORECAST-008). Los tres
+ * saldos son la serie principal menos el gasto variable predicho acumulado, en la moneda de la cuenta y sin conversión:
+ * `expected` con el valor esperado, `high` con el límite SUPERIOR del intervalo del 80 % (gasto alto: el saldo más bajo)
+ * y `low` con el límite INFERIOR (gasto bajo: el saldo más alto). Nunca se suman a la serie principal ni a la del plan.
+ * `shortfallLikelihood`: `LIKELY` si el saldo más bajo con gasto esperado queda bajo el umbral del riesgo (la reserva
+ * mínima o cero), `POSSIBLE` si solo queda bajo con gasto alto (alrededor de 1 de cada 10 o más con un intervalo del
+ * 80 %), `UNLIKELY` si ninguno; `NOT_AVAILABLE` sin banda.
+ */
+export interface PredictedCashFlowDto {
+  readonly status: 'AVAILABLE' | 'NOT_AVAILABLE';
+  readonly reason: PredictedUnavailableReasonDto | null;
+  readonly forecastRunId: string | null;
+  readonly generatedAt: string | null;
+  /** El pronóstico tiene más de 35 días o la última corrida posterior falló. */
+  readonly stale: boolean;
+  readonly intervalLevel: '0.8';
+  readonly series: readonly {
+    readonly date: string;
+    readonly expected: MoneyDto;
+    readonly high: MoneyDto;
+    readonly low: MoneyDto;
+  }[];
+  readonly lowest: {
+    readonly expected: { readonly amount: MoneyDto; readonly date: string };
+    readonly high: { readonly amount: MoneyDto; readonly date: string };
+  } | null;
+  readonly shortfallLikelihood: ShortfallLikelihoodDto;
+  readonly firstShortfallDate: string | null;
+}
+
 export interface CashFlowCurrencyDto {
   readonly currency: string;
   readonly threshold: { readonly amount: MoneyDto; readonly source: 'MINIMUM_RESERVE' | 'ZERO' };
@@ -67,6 +105,8 @@ export interface CashFlowCurrencyDto {
     readonly lowest: { readonly amount: MoneyDto; readonly date: string };
     readonly endBalance: MoneyDto;
   };
+  /** Banda del gasto variable predicho y probabilidad de déficit (Should; add-predicted-cash-flow-band). */
+  readonly predicted: PredictedCashFlowDto;
 }
 
 export interface CashFlowAccountDto {
@@ -154,6 +194,15 @@ export interface CashFlowHomeBlockDto {
   } | null;
   readonly consolidatedLowest: { readonly amount: MoneyDto; readonly date: string } | null;
   readonly complete: boolean;
+  /**
+   * Probabilidad de déficit con el gasto variable predicho de la moneda con la probabilidad más alta (orden `LIKELY` >
+   * `POSSIBLE` > `UNLIKELY`), aparte del riesgo de los pagos conocidos; `null` sin banda en ninguna moneda.
+   */
+  readonly predictedShortfall: {
+    readonly currency: string;
+    readonly likelihood: Exclude<ShortfallLikelihoodDto, 'NOT_AVAILABLE'>;
+    readonly date: string | null;
+  } | null;
 }
 
 /** Variación por categoría de los tops del Home (Q7, D389). */

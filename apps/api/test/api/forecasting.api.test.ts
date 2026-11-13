@@ -636,11 +636,92 @@ describe('costos conocidos y descomposición del pronóstico (add-expense-foreca
   });
 });
 
+describe('banda del gasto variable predicho en el calendario y en el Home (add-predicted-cash-flow-band)', () => {
+  let s: Awaited<ReturnType<typeof scenario>>;
+  beforeAll(async () => {
+    clock.set(Instant.parse('2026-11-05T16:00:00Z'));
+    s = await scenario('band');
+  }, 180_000);
+
+  it('[TC-REPORTING-PREDICTED-006] sin ninguna corrida el calendario informa que no hay pronóstico y lo demás no cambia', async () => {
+    const calendar = checked('getCashFlowCalendar', 200, await get(s.viewer, '/reports/cash-flow-calendar'));
+    const bobBlock = (calendar['currencies'] as any[]).find((c) => c.currency === 'BOB');
+    expect(bobBlock.predicted).toMatchObject({
+      status: 'NOT_AVAILABLE',
+      reason: 'NO_FORECAST',
+      series: [],
+      lowest: null,
+      shortfallLikelihood: 'NOT_AVAILABLE',
+    });
+    const summary = checked('getReportSummary', 200, await get(s.viewer, '/reports/summary'));
+    expect(summary['forecast']).toBeNull();
+    expect((summary['cashFlow'] as any).predictedShortfall).toBeNull();
+  });
+
+  it('[TC-FORECAST-CASHFLOW-001] [TC-REPORTING-PREDICTED-001] con la corrida completada el calendario trae la banda de BOB sin tocar la serie principal', async () => {
+    const before = checked('getCashFlowCalendar', 200, await get(s.viewer, '/reports/cash-flow-calendar'));
+    checked('requestForecastRun', 202, await post(s.editor, '/forecasts'));
+    await drain();
+    const latest = checked(
+      'getLatestForecast',
+      200,
+      await get(s.viewer, '/forecasts/latest?scope=LIQUID_VARIABLE_OUTFLOW&horizon=6'),
+    );
+    const liquid = (latest['series'] as any[]).filter((x) => x.scope === 'LIQUID_VARIABLE_OUTFLOW');
+    expect(liquid.map((x) => x.currency)).toEqual(['BOB']);
+    expect(liquid[0].points.map((p: any) => p.period)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
+    // El pronóstico vigente sin el filtro no trae la serie del gasto líquido.
+    const plain = checked('getLatestForecast', 200, await get(s.viewer, '/forecasts/latest'));
+    expect((plain['series'] as any[]).some((x) => x.scope === 'LIQUID_VARIABLE_OUTFLOW')).toBe(false);
+
+    const calendar = checked(
+      'getCashFlowCalendar',
+      200,
+      await get(s.viewer, '/reports/cash-flow-calendar?horizon=30'),
+    );
+    const bobBlock = (calendar['currencies'] as any[]).find((c) => c.currency === 'BOB');
+    const main = (before['currencies'] as any[]).find((c) => c.currency === 'BOB');
+    expect(bobBlock.predicted).toMatchObject({
+      status: 'AVAILABLE',
+      reason: null,
+      intervalLevel: '0.8',
+      stale: false,
+    });
+    expect(bobBlock.predicted.series).toHaveLength(31);
+    // Con un gasto esperado positivo, el saldo con gasto esperado queda bajo la serie principal y el del gasto alto, bajo el esperado.
+    const last = bobBlock.predicted.series.at(-1);
+    expect(dec(last.expected.amount).lte(dec(bobBlock.series.at(-1).balance.amount))).toBe(true);
+    expect(dec(last.high.amount).lte(dec(last.expected.amount))).toBe(true);
+    expect(dec(last.expected.amount).lte(dec(last.low.amount))).toBe(true);
+    // La serie principal, el riesgo y la alerta no cambian por la banda.
+    expect(bobBlock.series).toEqual(main.series);
+    expect(bobBlock.risk).toBe(main.risk);
+    expect(bobBlock.firstShortfallDate).toBe(main.firstShortfallDate);
+
+    const summary = checked('getReportSummary', 200, await get(s.viewer, '/reports/summary'));
+    expect((summary['forecast'] as any).expectedSpending).toMatchObject({
+      period: '2026-11',
+      stale: false,
+    });
+    expect((summary['cashFlow'] as any).predictedShortfall).toMatchObject({ currency: 'BOB' });
+  });
+});
+
 describe('función deshabilitada en la instalación', () => {
   it('[TC-FORECAST-SERVICE-002] la consulta informa que no está habilitada y la solicitud se rechaza', async () => {
     const owner = await user(`kc-fc-off-${randomUUID()}`, disabledUrl);
     const latest = checked('getLatestForecast', 200, await get(owner, '/forecasts/latest'));
     expect(latest).toMatchObject({ status: 'DISABLED', series: [], run: null });
     problem(await post(owner, '/forecasts'), 409, 'FORECASTING_DISABLED');
+  });
+
+  it('[TC-REPORTING-PREDICTED-006] con la función deshabilitada el calendario no tiene bandas y el Home no cambia', async () => {
+    const owner = await user(`kc-fc-off2-${randomUUID()}`, disabledUrl);
+    const calendar = checked('getCashFlowCalendar', 200, await get(owner, '/reports/cash-flow-calendar'));
+    for (const c of calendar['currencies'] as any[]) {
+      expect(c.predicted).toMatchObject({ status: 'NOT_AVAILABLE', reason: 'DISABLED', series: [] });
+    }
+    const summary = checked('getReportSummary', 200, await get(owner, '/reports/summary'));
+    expect(summary['forecast']).toBeNull();
   });
 });
