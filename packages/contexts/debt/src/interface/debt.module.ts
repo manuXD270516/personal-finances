@@ -502,6 +502,7 @@ export {
   DEBT_EVENTS,
   DEBT_HISTORY_QUERY,
   LOAN_PORTFOLIO_QUERY,
+  LOAN_SCHEDULE_QUERY,
 } from '../contracts/index.js';
 export type { OutboxPort } from '../application/ports/index.js';
 

@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Publicación solo si el modelo supera al de referencia"
 scenario: "El suavizado exponencial supera a la referencia"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/backtest-report.test.ts
+  - services/ml-forecasting/tests/test_phase8.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["backtesting","python"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "se publica el suavizado exponencial para \"Supermercado\""
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-010 — Se publica el modelo que mejora al menos 5 % a la referencia

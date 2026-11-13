@@ -315,6 +315,7 @@ jobs:
       PF_STACK_PREBUILT_IMAGES: '1'
       FINANCE_API_IMAGE: pfos/finance-api:ci
       FINANCE_WEB_IMAGE: pfos/finance-web:ci
+      FINANCE_ML_IMAGE: pfos/finance-ml:ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }

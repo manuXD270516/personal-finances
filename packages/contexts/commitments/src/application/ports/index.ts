@@ -148,6 +148,13 @@ export interface ResolvedOutflowRow {
   readonly currency: string;
 }
 
+/** Ocurrencia resuelta con tipo, administrador y categoría de la versión (add-expense-forecasts). */
+export interface ResolvedForecastRow extends ResolvedOutflowRow {
+  readonly kind: RecurringKind;
+  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL';
+  readonly categoryId: string | null;
+}
+
 export interface OccurrenceRepository {
   /**
    * `INSERT … ON CONFLICT (definition_id, occurrence_date) DO NOTHING RETURNING id` (INV-013): devuelve SOLO las
@@ -177,6 +184,13 @@ export interface OccurrenceRepository {
   /** No resueltas con vencimiento anterior a `before`. */
   listUnresolvedBefore(workspaceId: string, before: string): Promise<OccurrenceView[]>;
   listResolvedOutflows(workspaceId: string, from: string, to: string): Promise<ResolvedOutflowRow[]>;
+  /** Resueltas (`MATERIALIZED|MATCHED`) con vencimiento en el rango, de salida o de entrada (sin cuotas de préstamo). */
+  listResolvedForForecast(
+    workspaceId: string,
+    from: string,
+    to: string,
+    direction: 'OUTFLOW' | 'INFLOW',
+  ): Promise<ResolvedForecastRow[]>;
   /** Fecha nominal más reciente de una ocurrencia resuelta (`MATERIALIZED|MATCHED|SKIPPED`) o `null`. */
   lastResolvedNominal(workspaceId: string, definitionId: string): Promise<string | null>;
 }

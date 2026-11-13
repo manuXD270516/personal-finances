@@ -14,6 +14,7 @@
     "start:worker": "node --import @pf/platform/otel/register dist/main.worker.js",
     "migrate": "node dist/entrypoint.js migrate",
     "seed": "node dist/entrypoint.js seed",
+    "forecast:report": "node dist/entrypoint.js forecast-report",
     "perf:bench": "vitest run --config vitest.perf.config.ts"
   },
   "dependencies": {

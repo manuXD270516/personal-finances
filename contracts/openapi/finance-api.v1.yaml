@@ -14994,6 +14994,51 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/forecasts/latest/known-items:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Forecasts]
+      operationId: listForecastKnownItems
+      summary: Known costs (or income) of one period of one series of the current forecast
+      description: |
+        The deterministic known items that the system added to the predicted variable part of the forecast of `period`
+        (recurring expenses and income, subscriptions and the interest, charges, insurance and taxes of loan installments;
+        never principal, card payments or goal contributions), ordered by date. `amount` is in the reporting currency; an
+        item in another currency carries `originalAmount` and was converted at today's rate (`meta.conversion` of the
+        latest forecast); without a rate `amount` is `null` and the item is listed but not summed; a `VARIABLE` item has
+        no amount. An unknown `scope` or a `period` that is not `YYYY-MM` ⇒ 400 `INVALID_FILTER`. Without a current
+        forecast the list is empty.
+      x-openspec-capability: [forecast/expense-forecasting]
+      x-required-role: VIEWER
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          description: One of the `ForecastScope` values (an unknown value ⇒ 400 `INVALID_FILTER`).
+          schema: { type: string }
+        - name: scopeRef
+          in: query
+          description: Category group, category or group of "other categories" (with the matching `scope`).
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: period
+          in: query
+          required: true
+          description: Financial period `YYYY-MM` (another format ⇒ 400 `INVALID_FILTER`).
+          schema: { type: string }
+      responses:
+        '200':
+          description: Known items of the period
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForecastKnownItems' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/forecasts/{runId}:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -28491,6 +28536,95 @@ components:
             method: { type: string, description: 'Open set (NAIVE, SEASONAL_NAIVE, MEAN_LAST_N).' }
             n: { type: [integer, 'null'] }
             value: { $ref: '#/components/schemas/Money' }
+        components:
+          description: |
+            Known future costs (deterministic, added by the system) + predicted variable part (add-expense-forecasts): the
+            expected value is their exact sum and each interval bound is the known part plus the matching bound of the
+            variable interval. `null` in runs prior to add-expense-forecasts.
+          oneOf:
+            - $ref: '#/components/schemas/ForecastPointComponents'
+            - type: 'null'
+        drivers:
+          description: Why the variable part is what it is (average + seasonality + trend and level = predicted variable).
+          oneOf:
+            - type: array
+              items: { $ref: '#/components/schemas/ForecastDriver' }
+            - type: 'null'
+        coherenceGap:
+          description: |
+            Only on the total expense: the total minus the sum of the categories of the period, when its absolute value
+            exceeds `FORECASTING_COHERENCE_GAP_RATIO` of the total (each series is forecast on its own, without
+            reconciliation).
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+    ForecastPointComponents:
+      type: object
+      required: [knownFuture, predictedVariable, predictedVariableInterval80, knownWithoutAmountCount]
+      properties:
+        knownFuture: { $ref: '#/components/schemas/Money' }
+        predictedVariable: { $ref: '#/components/schemas/Money' }
+        predictedVariableInterval80: { $ref: '#/components/schemas/ForecastInterval' }
+        knownWithoutAmountCount:
+          type: integer
+          minimum: 0
+          description: Known items counted without an amount (`VARIABLE`).
+    ForecastDriverType:
+      type: string
+      description: Open set.
+      x-extensible-enum: [HISTORICAL_AVERAGE, SEASONALITY, TREND_AND_LEVEL, OUTLIERS, KNOWN_RECURRING]
+    ForecastDriver:
+      type: object
+      required: [type, value, effect, periods, refCount]
+      properties:
+        type: { $ref: '#/components/schemas/ForecastDriverType' }
+        value:
+          description: Figure of the driver (the average of the last 6 variable periods; the known total).
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        effect:
+          description: Signed effect on the variable part (seasonality, trend and level).
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        periods:
+          type: array
+          description: Periods flagged as atypical (`OUTLIERS`).
+          items: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        refCount: { type: integer, minimum: 0, description: Known items or atypical periods behind the driver. }
+    ForecastKnownItem:
+      type: object
+      required: [date, label, kind, amountType, amount, originalAmount, managedBy, sourceRef]
+      properties:
+        date: { $ref: '#/components/schemas/LocalDate' }
+        label: { type: string, description: 'Name at the time of the run.' }
+        kind:
+          type: string
+          description: Open set.
+          x-extensible-enum: [EXPENSE, INCOME, LOAN_INTEREST]
+        amountType: { type: string, description: 'FIXED, ESTIMATED, MIN_MAX, VARIABLE or SCHEDULE (loan components).' }
+        amount:
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        originalAmount:
+          description: Present when the item is not in the reporting currency.
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        managedBy: { type: [string, 'null'] }
+        sourceRef:
+          type: object
+          required: [context, id]
+          properties:
+            context: { type: string, enum: [COMMITMENTS, DEBT] }
+            id: { $ref: '#/components/schemas/Uuid' }
+    ForecastKnownItems:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ForecastKnownItem' }
+    ForecastConfidence:
+      type: string
+      description: 'Open set. LOW: fewer than 12 periods, simple estimate or MASE above 1; HIGH: 24+ periods, MASE below 0.8 and 80 % coverage between 0.75 and 0.85; MEDIUM otherwise.'
+      x-extensible-enum: [LOW, MEDIUM, HIGH]
+    ForecastSelectedBy:
+      type: string
+      description: 'Open set. BACKTEST: a model beat the best reference by 5 % or more; BASELINE_FALLBACK: the best reference is published; SIMPLE: too few periods for a backtest.'
+      x-extensible-enum: [BACKTEST, BASELINE_FALLBACK, SIMPLE]
     ForecastSeries:
       allOf:
         - $ref: '#/components/schemas/ForecastSeriesSummary'
@@ -28505,7 +28639,17 @@ components:
                   properties:
                     name: { type: string }
                     version: { type: string }
+                    selectedBy:
+                      oneOf: [{ $ref: '#/components/schemas/ForecastSelectedBy' }, { type: 'null' }]
+                    mase:
+                      type: [string, 'null']
+                      description: 'Scaled error (MASE) of the published model in the backtest, 4 decimals.'
+                    baselineMase:
+                      type: [string, 'null']
+                      description: 'MASE of the best reference model in the same backtest, 4 decimals.'
                 - type: 'null'
+            confidence:
+              oneOf: [{ $ref: '#/components/schemas/ForecastConfidence' }, { type: 'null' }]
             points:
               type: array
               items: { $ref: '#/components/schemas/ForecastPoint' }
@@ -28534,3 +28678,20 @@ components:
           type: array
           items: { $ref: '#/components/schemas/ForecastSeries' }
         disclaimerKey: { type: string }
+        meta:
+          type: object
+          required: [conversion]
+          properties:
+            conversion:
+              description: |
+                Known items in another currency are valued at today's rate (declared here); `null` when none was
+                converted.
+              oneOf:
+                - type: object
+                  required: [rateDate, ratesUsed]
+                  properties:
+                    rateDate: { $ref: '#/components/schemas/LocalDate' }
+                    ratesUsed:
+                      type: array
+                      items: { type: object, additionalProperties: true }
+                - type: 'null'

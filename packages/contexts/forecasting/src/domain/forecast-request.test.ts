@@ -122,6 +122,7 @@ describe('ForecastResultValidator', () => {
     scale: 2,
     readiness: 'MODEL',
     horizon: 1,
+    outlierPolicy: 'MAD_3_5',
     points: [{ period: '2026-10', value: '4000.00', txCount: 30 }],
   };
   const result = (over: Partial<ServiceSeriesResult['points'][number]> = {}): ServiceSeriesResult => ({

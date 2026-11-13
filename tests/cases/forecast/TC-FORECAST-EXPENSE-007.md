@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Intereses de préstamos como costo conocido"
 scenario: "Cuota con interés y seguro"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003","FR-DEBT-003"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/application/loan-schedule.queries.test.ts
+  - packages/contexts/forecasting/src/domain/known-future.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["debt","money"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "los costos conocidos de 2026-12 incluyen 435.35 BOB por esa cuota"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-007 — Los conocidos de una cuota suman interés y seguro sin capital

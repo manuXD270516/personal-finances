@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Selección del modelo por backtesting temporal"
 scenario: "Cortes de una serie de 10 periodos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - services/ml-forecasting/tests/test_phase8.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["backtesting","python"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "los cortes son 2026-07, 2026-08, 2026-09 y 2026-10, y desde el corte 2026-07 los candidatos se entrenan solo con 2026-01 a 2026-06"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-009 — El backtesting usa cortes sin fuga de datos posteriores

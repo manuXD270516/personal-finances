@@ -47,7 +47,8 @@
     "documents": "Documentos",
     "rules": "Regras",
     "reports": "Relatórios",
-    "cashFlow": "Fluxo de caixa"
+    "cashFlow": "Fluxo de caixa",
+    "forecasts": "Previsões"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -7021,6 +7022,111 @@
       "freshness": "Dados até: {date}",
       "reportingCurrency": "Moeda de relatório: {currency}",
       "help": "As saídas de cada dia são aplicadas antes das entradas; um valor com faixa usa o máximo nas saídas e o mínimo nas entradas."
+    }
+  },
+  "Forecasts": {
+    "title": "Previsões",
+    "subtitle": "Estimativas estatísticas das suas despesas e receitas para os próximos períodos.",
+    "disclaimer": "As previsões são estimativas estatísticas e não constituem aconselhamento financeiro.",
+    "loading": "Carregando previsões…",
+    "stale": "Esta previsão está desatualizada: tem mais de 35 dias ou a última atualização falhou. Mostra-se a última disponível.",
+    "status": {
+      "disabled": "As previsões não estão habilitadas nesta instalação.",
+      "none": "Ainda não há previsão. Um proprietário ou um editor pode solicitá-la."
+    },
+    "controls": {
+      "series": "Série",
+      "horizon": "Horizonte",
+      "periods": "{n, plural, one {# período} other {# períodos}}",
+      "run": "Atualizar previsão",
+      "running": "Atualizando…"
+    },
+    "run": {
+      "pending": "Previsão solicitada. Será atualizada quando o cálculo terminar.",
+      "failed": "Não foi possível atualizar a previsão. Continua a mostrar-se a última disponível."
+    },
+    "series": {
+      "TOTAL_EXPENSE": "Despesa total",
+      "TOTAL_INCOME": "Receita total",
+      "CATEGORY_GROUP": "Grupo: {name}",
+      "CATEGORY": "Categoria: {name}",
+      "OTHER_CATEGORIES": "Outras categorias de {name}"
+    },
+    "meta": {
+      "generated": "Gerado em {at}",
+      "model": "Modelo: {name} (versão {version})",
+      "selectedBy": {
+        "BACKTEST": "Escolhido por validação temporal",
+        "BASELINE_FALLBACK": "Modelo de referência (nenhum modelo o melhorou o suficiente)",
+        "SIMPLE": "Estimativa simples"
+      }
+    },
+    "confidence": {
+      "label": "Confiança",
+      "LOW": "baixa",
+      "MEDIUM": "média",
+      "HIGH": "alta"
+    },
+    "simpleBadge": "Estimativa simples",
+    "history": "Histórico: {from} a {to} ({count, plural, one {# período} other {# períodos}})",
+    "headline": {
+      "expected": "Esperado",
+      "range": "Intervalo provável",
+      "level": "{level} %"
+    },
+    "coherence": "Em {period} a soma das categorias difere do total em {gap}. Cada série é prevista separadamente.",
+    "chart": {
+      "title": "Previsão de {name}",
+      "description": "Valor esperado e intervalo provável de 80 % por período.",
+      "expected": "Esperado",
+      "band": "Intervalo provável (80 %)"
+    },
+    "table": {
+      "caption": "Previsão de {name} por período",
+      "period": "Período",
+      "expected": "Esperado",
+      "range": "Intervalo provável (80 %)",
+      "known": "Conhecidos",
+      "variable": "Variável"
+    },
+    "detail": {
+      "title": "Detalhe de {period}",
+      "range95": "Intervalo provável de 95 %: {lower} – {upper}",
+      "components": "Conhecidos {known} + variável {variable}",
+      "baseline": "Comparação com a média dos últimos 6 períodos: {value}"
+    },
+    "why": {
+      "title": "Por quê?"
+    },
+    "driver": {
+      "HISTORICAL_AVERAGE": "Média dos últimos 6 períodos da parte variável: {value}",
+      "SEASONALITY": "Sazonalidade: {effect}",
+      "TREND_AND_LEVEL": "Tendência e nível recente: {effect}",
+      "OUTLIERS": "{count, plural, one {Período atípico assinalado} other {Períodos atípicos assinalados}}: {periods}",
+      "KNOWN_RECURRING": "Custos conhecidos: {value} ({count, plural, one {# compromisso} other {# compromissos}})"
+    },
+    "known": {
+      "title": "Conhecidos de {period}",
+      "intro": "São calculados com os seus compromissos e empréstimos; o modelo não os estima.",
+      "empty": "Não há custos conhecidos neste período.",
+      "noAmount": "Sem valor",
+      "original": "{amount} originais",
+      "withoutAmount": "{count, plural, one {# conhecido} other {# conhecidos}} sem valor (conta variável).",
+      "conversion": "Os valores em outra moeda foram convertidos com a taxa de hoje ({date}); períodos distantes podem diferir.",
+      "kind": {
+        "EXPENSE": "Despesa",
+        "INCOME": "Receita",
+        "LOAN_INTEREST": "Juros e encargos de empréstimo"
+      }
+    },
+    "insufficient": {
+      "missing": "{n, plural, one {Falta # período} other {Faltam # períodos}} de histórico em «{name}» para uma previsão estatística.",
+      "noHistory": "Ainda não há histórico em «{name}» para uma previsão estatística.",
+      "simple": "Mostra-se apenas a estimativa simples, assinalada como tal, e os custos conhecidos.",
+      "onlyKnown": "Mostram-se apenas os custos conhecidos.",
+      "lowCategorization": "Há despesa sem categoria que impede prever por categoria.",
+      "link": "Ver as transações",
+      "gap": "Uma lacuna de períodos sem movimentos encurtou o histórico usado."
     }
   }
 }

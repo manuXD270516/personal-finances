@@ -14,7 +14,7 @@ import {
 import { identityWorkspaceTimeZones } from '@pf/identity/interface/identity.module';
 import { ApiContract } from '@pf/platform/api';
 import { PgOutboxWriter } from '@pf/platform/events';
-import { FixedClock, Instant } from '@pf/shared-kernel';
+import { FixedClock, Instant, dec } from '@pf/shared-kernel';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -482,6 +482,157 @@ describe('solicitud manual, ejecución del worker y consulta vigente', () => {
       requestedBy: null,
     });
     await drain();
+  });
+});
+
+describe('costos conocidos y descomposición del pronóstico (add-expense-forecasts)', () => {
+  let s: Awaited<ReturnType<typeof scenario>>;
+  let account: string;
+  const recurring = async (
+    name: string,
+    kind: string,
+    amount: string,
+    cadence: string,
+    startDate: string,
+    categoryId?: string,
+  ) =>
+    ok(
+      post(s.owner, '/recurring', {
+        name,
+        kind,
+        template: {
+          accountId: account,
+          amount: { type: 'FIXED', amount: bob(amount) },
+          ...(categoryId ? { categoryId } : {}),
+          schedule: { cadence, startDate },
+          materialization: { mode: 'PENDING_APPROVAL', leadDays: 3 },
+        },
+      }),
+    );
+  beforeAll(async () => {
+    clock.set(Instant.parse('2026-11-05T16:00:00Z'));
+    s = await scenario('known');
+    const accounts = checked('listAccounts', 200, await get(s.owner, '/accounts'));
+    account = ((accounts['data'] ?? accounts['items']) as any[])[0].id as string;
+    const rent = await recurring('Alquiler', 'EXPENSE', '2500.00', 'MONTHLY', '2026-11-10', s.category);
+    // Una ocurrencia resuelta (aprobada): la historia variable la resta y el worker la lee sin contexto de usuario.
+    const first = (
+      (await ok(get(s.owner, `/recurring/${rent['id'] as string}/occurrences?limit=5`), 200))['data'] as any[]
+    )[0];
+    await ok(post(s.owner, `/recurring/occurrences/${first.id}/materialize`, {}), 201);
+    await recurring('Seguro anual', 'EXPENSE', '900.00', 'ANNUAL', '2026-03-15', s.category);
+    await recurring('Sueldo', 'INCOME', '8000.00', 'MONTHLY', '2026-11-05');
+    // Un préstamo activo: el worker lee su cronograma (interés, cargos, seguro) sin contexto de usuario.
+    const loan = await ok(
+      post(s.owner, '/loans', {
+        name: 'Préstamo vehicular',
+        account: { create: { name: 'Préstamo vehicular fc' } },
+        disbursementAccountId: account,
+        principal: bob('50000.00'),
+        annualRate: '0.115',
+        termInstallments: 24,
+        disbursementDate: '2026-10-15',
+        firstDueDate: '2026-11-15',
+      }),
+    );
+    await ok(post(s.owner, `/loans/${loan['id'] as string}/disburse`, {}), 200);
+    await ok(post(s.editor, '/forecasts'), 202);
+    await drain();
+  }, 240_000);
+
+  it('[TC-FORECAST-EXPENSE-001] el punto de 2026-12 separa los conocidos (Alquiler 2500.00) de la parte variable predicha', async () => {
+    const latest = checked('getLatestForecast', 200, await get(s.viewer, '/forecasts/latest?horizon=12'));
+    expect(latest['status']).toBe('AVAILABLE');
+    const total = (latest['series'] as any[]).find((x) => x.scope === 'TOTAL_EXPENSE');
+    const dic = total.points.find((p: any) => p.period === '2026-12');
+    // 2500.00 del alquiler más el interés de la cuota del préstamo (nunca su capital).
+    expect(dec(dic.components.knownFuture.amount).gt('2500.00')).toBe(true);
+    expect(dec(dic.components.knownFuture.amount).lt('3100.00')).toBe(true);
+    const sum = dec(dic.components.knownFuture.amount).plus(dic.components.predictedVariable.amount);
+    expect(dic.prediction.amount).toBe(sum.toFixed(2));
+    expect(dic.drivers.map((d: any) => d.type)).toContain('KNOWN_RECURRING');
+    expect(total.model).toMatchObject({ name: 'mean_last_n' });
+    expect(['LOW', 'MEDIUM', 'HIGH']).toContain(total.confidence);
+  });
+
+  it('[TC-FORECAST-EXPENSE-007] la cuota del préstamo aporta solo su interés como conocido (sin el capital) y no tiene categoría', async () => {
+    const r = checked(
+      'listForecastKnownItems',
+      200,
+      await get(s.viewer, '/forecasts/latest/known-items?scope=TOTAL_EXPENSE&period=2026-12'),
+    );
+    const loanItem = (r['items'] as any[]).find((i) => i.kind === 'LOAN_INTEREST');
+    expect(loanItem).toMatchObject({ amountType: 'SCHEDULE', sourceRef: { context: 'DEBT' } });
+    expect(loanItem.label).toMatch(/^Préstamo vehicular — cuota \d+$/);
+    // Interés del mes: el capital de 50000.00 al 11.50 % anual (30/360) ronda los 479 BOB, nunca la cuota entera.
+    expect(dec(loanItem.amount.amount).gt('300')).toBe(true);
+    expect(dec(loanItem.amount.amount).lt('600')).toBe(true);
+  });
+
+  it('[TC-FORECAST-EXPENSE-004] el seguro anual fuera del horizonte de generación aparece como conocido de 2027-03', async () => {
+    const r = checked(
+      'listForecastKnownItems',
+      200,
+      await get(s.viewer, '/forecasts/latest/known-items?scope=TOTAL_EXPENSE&period=2027-03'),
+    );
+    const items = r['items'] as any[];
+    expect(items.map((i) => i.label)).toContain('Seguro anual');
+    expect(items.find((i) => i.label === 'Seguro anual')).toMatchObject({
+      date: '2027-03-15',
+      kind: 'EXPENSE',
+      amountType: 'FIXED',
+      amount: bob('900.00'),
+      originalAmount: null,
+      sourceRef: { context: 'COMMITMENTS' },
+    });
+  });
+
+  it('[TC-FORECAST-EXPENSE-001] los conocidos de una categoría y de un periodo sin ellos; los ingresos no son gasto', async () => {
+    const cat = checked(
+      'listForecastKnownItems',
+      200,
+      await get(
+        s.viewer,
+        `/forecasts/latest/known-items?scope=OTHER_CATEGORIES&scopeRef=${s.group}&period=2026-12`,
+      ),
+    );
+    expect((cat['items'] as any[]).map((i) => i.label)).toEqual(['Alquiler']);
+    const expense = checked(
+      'listForecastKnownItems',
+      200,
+      await get(s.viewer, '/forecasts/latest/known-items?scope=TOTAL_EXPENSE&period=2026-12'),
+    );
+    expect((expense['items'] as any[]).map((i) => i.label)).not.toContain('Sueldo');
+    const income = checked(
+      'listForecastKnownItems',
+      200,
+      await get(s.viewer, '/forecasts/latest/known-items?scope=TOTAL_INCOME&period=2026-12'),
+    );
+    expect((income['items'] as any[]).map((i) => i.label)).toEqual(['Sueldo']);
+    const none = checked(
+      'listForecastKnownItems',
+      200,
+      await get(s.viewer, '/forecasts/latest/known-items?scope=TOTAL_EXPENSE&period=2030-01'),
+    );
+    expect(none['items']).toEqual([]);
+  });
+
+  it('[TC-FORECAST-EXPENSE-016] un alcance desconocido o un periodo mal formado se rechazan con INVALID_FILTER y un periodo ausente con VALIDATION_FAILED', async () => {
+    problem(
+      await get(s.viewer, '/forecasts/latest/known-items?scope=NOPE&period=2026-12'),
+      400,
+      'INVALID_FILTER',
+    );
+    problem(
+      await get(s.viewer, '/forecasts/latest/known-items?scope=TOTAL_EXPENSE&period=diciembre'),
+      400,
+      'INVALID_FILTER',
+    );
+    problem(
+      await get(s.viewer, '/forecasts/latest/known-items?scope=TOTAL_EXPENSE'),
+      400,
+      'VALIDATION_FAILED',
+    );
   });
 });
 

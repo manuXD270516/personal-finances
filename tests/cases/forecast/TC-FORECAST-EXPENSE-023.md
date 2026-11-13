@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Rendimiento de una corrida"
 scenario: "Benchmark nocturno de la corrida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-012"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - services/ml-forecasting/tests/test_perf.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["perf","NFR-PERF-012"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "la corrida se completa en 300 segundos o menos"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-023 — La corrida con modelos y backtesting del conjunto Large termina en 300 s o menos

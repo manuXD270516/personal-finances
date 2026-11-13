@@ -19,6 +19,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from . import SERVICE_VERSION
 from .config import Settings, load_settings
 from .forecast import MODEL_NAME, MODEL_VERSION, forecast_series
+from .phase8 import ALL_MODELS, MODEL_SET, Phase8Settings, forecast_series_phase8
 from .schemas import (
     ErrorBody,
     ForecastRequestV1,
@@ -169,17 +170,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def models() -> ModelsResponse:
         return ModelsResponse(
             serviceVersion=SERVICE_VERSION,
-            modelSet="baseline-v1",
+            modelSet=MODEL_SET,
             models=[
                 ModelFamily(name=MODEL_NAME, version=MODEL_VERSION),
                 ModelFamily(name="naive", version=MODEL_VERSION),
                 ModelFamily(name="seasonal_naive", version=MODEL_VERSION),
+                *(ModelFamily(name=name, version="1") for name in ALL_MODELS),
             ],
         )
 
     def compute(body: ForecastRequestV1) -> ForecastResponseV1:
         started = time.perf_counter()
-        results = [forecast_series(s) for s in body.series]
+        if body.policy.modelSet == "phase8-v1":
+            phase8 = Phase8Settings(cfg.backtest_max_origins, cfg.publish_min_improvement, cfg.ets_simulations)
+            results = [forecast_series_phase8(s, body.seed, phase8) for s in body.series]
+        else:
+            results = [forecast_series(s) for s in body.series]
         elapsed = int((time.perf_counter() - started) * 1000)
         return ForecastResponseV1(
             schemaVersion="1",
@@ -193,6 +199,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         "/v1/forecasts",
         operation_id="createForecast",
         response_model=ForecastResponseV1,
+        response_model_exclude_unset=True,
         responses=ERROR_RESPONSES,
         tags=["forecasts"],
     )

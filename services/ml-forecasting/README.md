@@ -7,7 +7,10 @@ interna `ml-internal`, con una credencial de servicio de archivo.
 - `POST /v1/forecasts`: petición `ForecastRequestV1`, respuesta `ForecastResponseV1` (`contracts/ml/`). Una petición a la vez
   (`503` con `Retry-After`), cuerpo ≤ 2 MiB, ≤ 400 series, ≤ 120 periodos, corte de cómputo a 240 s (`504`).
 - `GET /health/live`, `GET /health/ready` (sin autenticación) y `GET /v1/models` (autenticado).
-- Modelos de este change: `baseline-v1` (último periodo, mismo periodo del año anterior y promedio móvil de 6) con intervalos
+- `phase8-v1` (`policy.modelSet`, add-expense-forecasts): `NAIVE`, `MEAN_LAST_N` (3, 6, 12), `SEASONAL_NAIVE`, `ETS_DAMPED` y
+  `ETS_SEASONAL` (statsmodels) con backtesting de origen móvil, regla del 5 % frente a la mejor referencia, atípicos por MAD y
+  motivos de la parte variable; determinista con la semilla de la petición. El benchmark `uv run pytest -m perf` es nocturno.
+- Modelos de `baseline-v1`: `baseline-v1` (último periodo, mismo periodo del año anterior y promedio móvil de 6) con intervalos
   empíricos del 80 % y 95 %, cuantizados con `Decimal` `ROUND_HALF_EVEN` a la escala de la moneda; sin aleatoriedad.
 - Registros JSON solo con tamaños, duración y versión: nunca montos.
 
@@ -24,4 +27,4 @@ uv run python -m scripts.export_openapi   # regenera contracts/openapi/ml-foreca
 
 Los tests citan el TC-id entre corchetes en el docstring (`"""[TC-FORECAST-SERVICE-034] …"""`); `pnpm traceability:check` los
 escanea. Variables: `ML_SERVICE_TOKEN_FILE`, `ML_MAX_BODY_BYTES`, `ML_MAX_SERIES`, `ML_MAX_PERIODS`, `ML_COMPUTE_DEADLINE_S`,
-`ML_LOG_LEVEL`. Imagen: `docker/finance-ml.Dockerfile`; perfil `ml` de `deploy/compose/compose.yaml`.
+`ML_LOG_LEVEL`, `ML_BACKTEST_MAX_ORIGINS` (6), `ML_PUBLISH_MIN_IMPROVEMENT` (0.05) y `ML_ETS_SIMULATIONS` (1000). Imagen: `docker/finance-ml.Dockerfile`; perfil `ml` de `deploy/compose/compose.yaml`.

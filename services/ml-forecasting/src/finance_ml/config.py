@@ -16,6 +16,9 @@ class Settings:
     max_periods: int = 120
     compute_deadline_s: float = 240.0
     log_level: str = "INFO"
+    backtest_max_origins: int = 6
+    publish_min_improvement: float = 0.05
+    ets_simulations: int = 1000
 
 
 def _read_token(path: str | None) -> bytes | None:
@@ -38,4 +41,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         max_periods=int(e.get("ML_MAX_PERIODS", "120")),
         compute_deadline_s=float(e.get("ML_COMPUTE_DEADLINE_S", "240")),
         log_level=e.get("ML_LOG_LEVEL", "INFO").upper(),
+        backtest_max_origins=int(e.get("ML_BACKTEST_MAX_ORIGINS", "6")),
+        publish_min_improvement=float(e.get("ML_PUBLISH_MIN_IMPROVEMENT", "0.05")),
+        ets_simulations=int(e.get("ML_ETS_SIMULATIONS", "1000")),
     )

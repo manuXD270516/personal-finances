@@ -506,3 +506,10 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 - FR-FORECAST-001/002: corridas por periodo financiero (`forecast_run`, series y puntos), valor esperado = promedio móvil de 6 periodos (o los disponibles), intervalos empíricos del 80 % y 95 % y referencia (`NAIVE`/`SEASONAL_NAIVE`/`MEAN_LAST_N`); ETS y selección por backtesting son del change 65.
 - FR-FORECAST-005: `ReadinessGate` puro con umbrales por entorno (`FORECASTING_MIN_PERIODS_MODEL` 6, `FORECASTING_MIN_PERIODS_SIMPLE` 3), «Otras categorías», huecos y calidad de la clasificación.
 - FR-FORECAST-006: el servicio nunca está en el camino crítico; apagado o deshabilitado el núcleo responde igual y la consulta devuelve el último pronóstico con `stale`/`lastAttempt`.
+
+## Nota as-built: `add-expense-forecasts` (Phase 8, 2026-11-13)
+
+- FR-FORECAST-001/003: cada punto de gasto e ingreso es la suma exacta de los **conocidos** (deterministas, calculados en `@pf/forecasting` con Decimal: ocurrencias de gasto o ingreso no resueltas y su proyección sin guardar más allá del horizonte de generación, y el interés, los cargos, el seguro y los impuestos de las cuotas de préstamo; nunca capital, pagos de tarjeta, metas ni transferencias) y la parte **variable** que predice el modelo sobre la historia sin lo recurrente resuelto (sin doble conteo).
+- FR-FORECAST-002/004: se guardan los intervalos del 80 % y del 95 % (la vista muestra el 80 % y el detalle el 95 %); el copy es «Esperado» y «Rango probable», verificado por un test del catálogo i18n; confianza `LOW|MEDIUM|HIGH` por serie.
+- FR-FORECAST-005: la vista explica cuántos periodos faltan por serie, muestra la estimación simple marcada como tal y los conocidos, y enlaza las transacciones cuando la clasificación es insuficiente.
+- FR-FORECAST-007: familia `phase8-v1` (`NAIVE`, `MEAN_LAST_N` 3/6/12, `SEASONAL_NAIVE`, `ETS_DAMPED`, `ETS_SEASONAL`), selección por backtesting de origen móvil y publicación solo si el MASE mejora al de la mejor referencia en al menos el 5 %.

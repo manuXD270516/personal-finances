@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Vista de pronósticos en la aplicación"
 scenario: "Horizonte de 3 periodos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001","FR-FORECAST-002","FR-FORECAST-003"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - tests/e2e/specs/expense-forecasts.spec.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["ui","rbac"]
@@ -29,7 +31,7 @@ expected_result:
   - "ve el gasto total y las categorías de 2026-11 a 2027-01 con la banda del 80 %, los costos conocidos de cada periodo, el modelo y el instante de generación"
   - "no ve el botón para solicitar una corrida"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-018 — Un VIEWER ve la vista de pronósticos con horizonte 3 sin el botón de corrida

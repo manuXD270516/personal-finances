@@ -47,7 +47,8 @@
     "documents": "Documentos",
     "rules": "Reglas",
     "reports": "Reportes",
-    "cashFlow": "Flujo de caja"
+    "cashFlow": "Flujo de caja",
+    "forecasts": "Pronósticos"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -7021,6 +7022,111 @@
       "freshness": "Datos al: {date}",
       "reportingCurrency": "Moneda de reporte: {currency}",
       "help": "Los egresos de cada día se aplican antes que los ingresos; un monto con rango usa el máximo en egresos y el mínimo en ingresos."
+    }
+  },
+  "Forecasts": {
+    "title": "Pronósticos",
+    "subtitle": "Estimaciones estadísticas de tus gastos e ingresos para los próximos periodos.",
+    "disclaimer": "Los pronósticos son estimaciones estadísticas y no constituyen asesoría financiera.",
+    "loading": "Cargando pronósticos…",
+    "stale": "Este pronóstico está desactualizado: tiene más de 35 días o la última actualización falló. Se muestra el último disponible.",
+    "status": {
+      "disabled": "Los pronósticos no están habilitados en esta instalación.",
+      "none": "Todavía no hay un pronóstico. Un propietario o un editor puede solicitarlo."
+    },
+    "controls": {
+      "series": "Serie",
+      "horizon": "Horizonte",
+      "periods": "{n, plural, one {# periodo} other {# periodos}}",
+      "run": "Actualizar pronóstico",
+      "running": "Actualizando…"
+    },
+    "run": {
+      "pending": "Pronóstico solicitado. Se actualizará cuando termine el cálculo.",
+      "failed": "No se pudo actualizar el pronóstico. Se sigue mostrando el último disponible."
+    },
+    "series": {
+      "TOTAL_EXPENSE": "Gasto total",
+      "TOTAL_INCOME": "Ingreso total",
+      "CATEGORY_GROUP": "Grupo: {name}",
+      "CATEGORY": "Categoría: {name}",
+      "OTHER_CATEGORIES": "Otras categorías de {name}"
+    },
+    "meta": {
+      "generated": "Generado el {at}",
+      "model": "Modelo: {name} (versión {version})",
+      "selectedBy": {
+        "BACKTEST": "Elegido por validación temporal",
+        "BASELINE_FALLBACK": "Modelo de referencia (ningún modelo lo mejoró lo suficiente)",
+        "SIMPLE": "Estimación simple"
+      }
+    },
+    "confidence": {
+      "label": "Confianza",
+      "LOW": "baja",
+      "MEDIUM": "media",
+      "HIGH": "alta"
+    },
+    "simpleBadge": "Estimación simple",
+    "history": "Historia: {from} a {to} ({count, plural, one {# periodo} other {# periodos}})",
+    "headline": {
+      "expected": "Esperado",
+      "range": "Rango probable",
+      "level": "{level} %"
+    },
+    "coherence": "En {period} la suma de las categorías difiere del total en {gap}. Cada serie se pronostica por separado.",
+    "chart": {
+      "title": "Pronóstico de {name}",
+      "description": "Valor esperado y rango probable del 80 % por periodo.",
+      "expected": "Esperado",
+      "band": "Rango probable (80 %)"
+    },
+    "table": {
+      "caption": "Pronóstico de {name} por periodo",
+      "period": "Periodo",
+      "expected": "Esperado",
+      "range": "Rango probable (80 %)",
+      "known": "Conocidos",
+      "variable": "Variable"
+    },
+    "detail": {
+      "title": "Detalle de {period}",
+      "range95": "Rango probable del 95 %: {lower} – {upper}",
+      "components": "Conocidos {known} + variable {variable}",
+      "baseline": "Comparación con el promedio de los últimos 6 periodos: {value}"
+    },
+    "why": {
+      "title": "¿Por qué?"
+    },
+    "driver": {
+      "HISTORICAL_AVERAGE": "Promedio de los últimos 6 periodos de la parte variable: {value}",
+      "SEASONALITY": "Estacionalidad: {effect}",
+      "TREND_AND_LEVEL": "Tendencia y nivel reciente: {effect}",
+      "OUTLIERS": "{count, plural, one {Periodo atípico señalado} other {Periodos atípicos señalados}}: {periods}",
+      "KNOWN_RECURRING": "Costos conocidos: {value} ({count, plural, one {# compromiso} other {# compromisos}})"
+    },
+    "known": {
+      "title": "Conocidos de {period}",
+      "intro": "Se calculan con tus compromisos y préstamos; el modelo no los estima.",
+      "empty": "No hay costos conocidos en este periodo.",
+      "noAmount": "Sin monto",
+      "original": "{amount} originales",
+      "withoutAmount": "{count, plural, one {# conocido} other {# conocidos}} sin monto (factura variable).",
+      "conversion": "Los montos en otra moneda se convirtieron con la tasa de hoy ({date}); los periodos lejanos pueden diferir.",
+      "kind": {
+        "EXPENSE": "Gasto",
+        "INCOME": "Ingreso",
+        "LOAN_INTEREST": "Intereses y cargos de préstamo"
+      }
+    },
+    "insufficient": {
+      "missing": "Se {n, plural, one {necesita # periodo más} other {necesitan # periodos más}} de historia en «{name}» para un pronóstico estadístico.",
+      "noHistory": "Todavía no hay historia en «{name}» para un pronóstico estadístico.",
+      "simple": "Se muestra solo la estimación simple, marcada como tal, y los costos conocidos.",
+      "onlyKnown": "Se muestran solo los costos conocidos.",
+      "lowCategorization": "Hay gasto sin categoría que impide pronosticar por categoría.",
+      "link": "Ver las transacciones",
+      "gap": "Un hueco de periodos sin movimientos acortó la historia usada."
     }
   }
 }

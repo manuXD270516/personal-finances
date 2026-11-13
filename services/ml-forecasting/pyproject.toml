@@ -54,6 +54,13 @@ strict = true
 python_version = "3.13"
 plugins = []
 
+[[tool.mypy.overrides]]
+module = ["statsmodels.*", "scipy.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
+# `perf` (benchmark nocturno) no corre en el PR: `uv run pytest -m perf`.
+addopts = "-m 'not perf'"
+markers = ["perf: benchmark de rendimiento (nocturno)"]

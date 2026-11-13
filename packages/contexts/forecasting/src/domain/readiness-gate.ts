@@ -69,6 +69,8 @@ export interface GapResult {
 
 export interface EvaluateInput {
   readonly periods: readonly PeriodAggregate[];
+  /** Historia completa (con lo recurrente) para juzgar la calidad de la clasificación; por omisión, `periods`. */
+  readonly qualityPeriods?: readonly PeriodAggregate[];
   readonly categories: readonly CategoryInfo[];
   readonly groups: readonly GroupInfo[];
   readonly thresholds: ReadinessThresholds;
@@ -174,7 +176,8 @@ export const ReadinessGate = {
     };
 
     // Calidad de la clasificación: gasto sin categoría > 10 % en más del 20 % de los periodos.
-    const badPeriods = periods.filter((p) => {
+    const quality = input.qualityPeriods ?? periods;
+    const badPeriods = quality.filter((p) => {
       if (p.expenseTotal.lte(0)) return false;
       let uncategorized = dec('0');
       for (const [categoryId, fig] of p.expenseByCategory) {
@@ -182,7 +185,7 @@ export const ReadinessGate = {
       }
       return uncategorized.div(p.expenseTotal).gt(UNCATEGORIZED_SPEND_SHARE);
     }).length;
-    const lowCategorization = periods.length > 0 && badPeriods / periods.length > UNCATEGORIZED_PERIODS_SHARE;
+    const lowCategorization = quality.length > 0 && badPeriods / quality.length > UNCATEGORIZED_PERIODS_SHARE;
     const forceCategory = lowCategorization ? ('LOW_CATEGORIZATION' as const) : undefined;
 
     const series: EvaluatedSeries[] = [];

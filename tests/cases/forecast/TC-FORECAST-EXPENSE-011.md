@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Publicación solo si el modelo supera al de referencia"
 scenario: "Mejora insuficiente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - services/ml-forecasting/tests/test_phase8.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["backtesting","python"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "se publica el modelo de referencia informado como tal"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-011 — Con mejora menor al 5 % se publica la referencia

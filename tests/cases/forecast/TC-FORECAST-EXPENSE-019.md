@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronóstico del ingreso total"
 scenario: "Sueldo conocido y extras variables"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001","FR-FORECAST-003"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/expense-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/forecast-composer.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["income","money"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "el ingreso total esperado de 2026-12 es 8350.00 BOB con intervalo del 80 % de 8000.00 BOB a 8900.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-019 — El ingreso total suma el sueldo conocido y el ingreso variable predicho

@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronóstico presentado como rango"
 scenario: "Tarjeta del gasto total en es-BO"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-004"]
 nfr: []
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - tests/e2e/specs/expense-forecasts.spec.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["ui","i18n","copy"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "la vista muestra \"Esperado: ~Bs 4.408,00 · Rango probable: Bs 4.038,00 – Bs 4.788,00 (80 %)\""
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-015 — El pronóstico se presenta como esperado con rango probable en es-BO

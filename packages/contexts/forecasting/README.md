@@ -24,3 +24,11 @@ Esquema de BD: `apps/api/db/migrations/20261112100000_forecasting_schema.sql` (`
 | ----------------------- | ------------------------------------------------------------------------------------------------ |
 | `pnpm test`             | Unitarios, propiedades y aplicación con dobles en memoria (`src/**/*.test.ts`)                   |
 | `pnpm test:integration` | Repositorios, RLS y permisos contra PostgreSQL 18 (Testcontainers; requiere Docker). HTTP: `apps/api/test/api/forecasting.api.test.ts` |
+
+## add-expense-forecasts (Phase 8)
+
+Cada punto es la suma exacta de los **conocidos** (`KnownFutureCalculator`, Decimal, en este contexto y nunca en el servicio) y la
+parte **variable** que predice el servicio sobre la historia sin lo recurrente resuelto (`VariableHistoryBuilder`).
+`ForecastComposer` suma, arma los motivos (el residuo de redondeo cae en `TREND_AND_LEVEL`), la confianza y la diferencia entre
+categorías y total. Fuentes por puerto (`KnownSourcesPort`): COMMITMENTS (`projectForForecast`, `listResolved`) y DEBT
+(`listUpcomingInstallments`). `pnpm forecast:backtest:report` imprime solo métricas agregadas por tipo de serie.

@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1",
+  "requestId": "7a2c8d4f-3e65-4c8b-8b63-1e2d4f6b8c01",
+  "serviceVersion": "0.1.0",
+  "results": [
+    {
+      "ref": "s1",
+      "status": "OK",
+      "error": null,
+      "model": {
+        "name": "MEAN_LAST_3",
+        "version": "1",
+        "selectedBy": "BASELINE_FALLBACK"
+      },
+      "baseline": {
+        "method": "MEAN_LAST_N",
+        "n": 6
+      },
+      "points": [
+        {
+          "period": "2026-11",
+          "monthsAhead": 1,
+          "prediction": "1435.83",
+          "lower80": "1339.49",
+          "upper80": "1564.55",
+          "lower95": "1329.79",
+          "upper95": "1679.20",
+          "baselineValue": "1983.04",
+          "drivers": {
+            "historicalAverage": "1983.04",
+            "seasonality": null,
+            "trendAndLevel": "-547.21"
+          }
+        }
+      ],
+      "backtest": {
+        "origins": [
+          "2026-07",
+          "2026-08",
+          "2026-09",
+          "2026-10"
+        ],
+        "candidates": [
+          {
+            "name": "NAIVE",
+            "cuts": 4,
+            "mase": "1.1635",
+            "coverage80": "0.2500",
+            "bias": "-0.6371"
+          },
+          {
+            "name": "MEAN_LAST_3",
+            "cuts": 4,
+            "mase": "0.8069",
+            "coverage80": "0.2500",
+            "bias": "-0.5203"
+          },
+          {
+            "name": "MEAN_LAST_6",
+            "cuts": 4,
+            "mase": "0.8309",
+            "coverage80": "0.5000",
+            "bias": "-0.8549"
+          },
+          {
+            "name": "MEAN_LAST_12",
+            "cuts": 4,
+            "mase": "0.8611",
+            "coverage80": "0.7500",
+            "bias": "-0.9612"
+          },
+          {
+            "name": "ETS_DAMPED",
+            "cuts": 4,
+            "mase": "0.9689",
+            "coverage80": "0.2500",
+            "bias": "-0.3596"
+          }
+        ],
+        "selected": "MEAN_LAST_3",
+        "fallback": true,
+        "baselineMase": "0.8069"
+      },
+      "outliers": [
+        "2026-07"
+      ]
+    },
+    {
+      "ref": "s2",
+      "status": "OK",
+      "error": null,
+      "model": {
+        "name": "MEAN_LAST_6",
+        "version": "1",
+        "selectedBy": "SIMPLE"
+      },
+      "baseline": {
+        "method": "MEAN_LAST_N",
+        "n": 3
+      },
+      "points": [
+        {
+          "period": "2026-11",
+          "monthsAhead": 1,
+          "prediction": "256.67",
+          "lower80": "0.00",
+          "upper80": "795.85",
+          "lower95": "0.00",
+          "upper95": "1081.28",
+          "baselineValue": "256.67",
+          "drivers": {
+            "historicalAverage": "256.67",
+            "seasonality": null,
+            "trendAndLevel": "0.00"
+          }
+        }
+      ],
+      "backtest": null,
+      "outliers": []
+    }
+  ],
+  "durationMs": 40
+}

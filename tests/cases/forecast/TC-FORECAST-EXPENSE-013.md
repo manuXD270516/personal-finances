@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Nivel de confianza del pronóstico"
 scenario: "Serie corta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-002","FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/forecast-composer.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["confidence"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "su confianza es baja"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-013 — Una serie de menos de 12 periodos tiene confianza baja
