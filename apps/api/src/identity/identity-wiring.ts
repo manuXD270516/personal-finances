@@ -490,7 +490,8 @@ export function financeRuntimes(input: {
     lifecycle: input.lifecycle,
     lifecycleQuery: input.lifecycleQuery,
     outbox: classificationOutbox(writer),
-    workspaces: identityWorkspaceSettings(input.pool),
+    // Seg�n el actor (fix-worker-user-context): el consumidor de tarjetas y el job diario del worker valoran sin usuario.
+    workspaces: actorSettings,
     // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
     providers: parseFxProviderSettings(input.config),
     windowDays: rateValidityWindowDays,
@@ -512,7 +513,7 @@ export function financeRuntimes(input: {
     defaultTimeZone: input.config.APP_TIMEZONE,
     outbox: writer,
     // Equivalente en moneda base con el puerto público de valoración de FX (misma semántica que Reporting).
-    valuation: { rates: fx.valuation, workspaces: identityWorkspaceSettings(input.pool) },
+    valuation: { rates: fx.valuation, workspaces: actorSettings },
     // docs/31 D45: la moneda de una cuenta debe estar habilitada en el workspace (`fx.workspace_currency`).
     workspaceCurrencies: fx.valuation,
     // add-custom-fields: valores de custom fields de cuenta validados por CLASSIFICATION.
