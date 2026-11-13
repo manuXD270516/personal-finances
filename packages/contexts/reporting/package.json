@@ -30,6 +30,7 @@
     "@nestjs/common": "catalog:",
     "@pf/accounts": "workspace:*",
     "@pf/classification": "workspace:*",
+    "@pf/forecasting": "workspace:*",
     "@pf/fx": "workspace:*",
     "@pf/ledger": "workspace:*",
     "@pf/platform": "workspace:*",

@@ -51,6 +51,7 @@ import type {
   GoalSummaryPort,
   NetWorthHistoryDeps,
   PendingTransactionsPort,
+  PredictedForecastPort,
   ReportingMetricsPort,
   SpendableDeps,
   UpcomingCommitmentsPort,
@@ -137,6 +138,11 @@ export interface ReportingRuntimeOptions {
   readonly commitments: UpcomingCommitmentsPort;
   /** Transacciones pendientes (TRANSACTIONS, `PendingFlowQuery`). */
   readonly pending: PendingTransactionsPort;
+  /**
+   * FORECAST (add-predicted-cash-flow-band): `LatestForecastQuery` y `LiquidVariableSpendQuery` para la banda del calendario
+   * y el gasto esperado del Home. FORECAST se compone después de REPORTING: resolución tardía. Opcional.
+   */
+  readonly forecast?: PredictedForecastPort;
   /**
    * GOALS (add-savings-goals): Q9 del Home (`GoalSummaryQuery.listForHome`) y aportes netos del periodo
    * (`GoalFlowsQuery.netForRange`). Opcionales: sin ellos Q9 es `NO_DATA` con `CREATE_GOAL` y `goalContributions` va
@@ -236,6 +242,7 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     balanceHistory: options.balanceHistory,
     commitments: options.commitments,
     pending: options.pending,
+    ...(options.forecast ? { forecast: options.forecast } : {}),
     ...(options.goalSummary ? { goalSummary: options.goalSummary } : {}),
     ...(options.goalFlows ? { goalFlows: options.goalFlows } : {}),
     ...(options.metrics ? { metrics: options.metrics } : {}),

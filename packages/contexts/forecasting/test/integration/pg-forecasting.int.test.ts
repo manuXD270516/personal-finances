@@ -294,6 +294,53 @@ describe('componentes del pronóstico (add-expense-forecasts)', () => {
     ...over,
   });
 
+  it('[TC-FORECAST-CASHFLOW-003] una serie del gasto variable líquido por moneda (BOB y USD) se guarda y se lee en su moneda', async () => {
+    const w = await setupWorkspace('Gasto líquido');
+    const run = newRun(w);
+    await inWs(w, () => runs.insertIfNoActive(run));
+    const liquid = (currency: string, ref: string, prediction: string) =>
+      storedSeries(run.id, w, {
+        opaqueRef: ref,
+        scope: 'LIQUID_VARIABLE_OUTFLOW',
+        scopeRef: null,
+        name: currency,
+        currency,
+        points: [
+          {
+            ...point(1, '2026-11'),
+            prediction,
+            lower80: prediction,
+            upper80: prediction,
+            lower95: prediction,
+            upper95: prediction,
+            knownFuture: '0.00',
+            predictedVariable: prediction,
+            variableLower80: prediction,
+            variableUpper80: prediction,
+          },
+        ],
+      });
+    await inWs(w, () =>
+      series.insertAll([
+        storedSeries(run.id, w),
+        liquid('BOB', 's2', '1152.00'),
+        liquid('USD', 's3', '120.00'),
+      ]),
+    );
+    const loaded = await inWs(w, () => series.listByRun(w, run.id));
+    const byCurrency = loaded.filter((x) => x.scope === 'LIQUID_VARIABLE_OUTFLOW');
+    expect(byCurrency.map((x) => [x.currency, x.points[0]?.prediction])).toEqual([
+      ['BOB', '1152.00'],
+      ['USD', '120.00'],
+    ]);
+    // Dos series del mismo scope y de la misma moneda siguen siendo inválidas.
+    expect(
+      await sqlState(() =>
+        inWs(w, () => series.insertAll([{ ...liquid('BOB', 's4', '10.00'), id: randomUUID() }])),
+      ),
+    ).toBe('23505');
+  });
+
   it('[TC-FORECAST-EXPENSE-001] conocidos, motivos, backtesting y metadatos hacen el round-trip a la escala de la moneda', async () => {
     const w = await setupWorkspace('Componentes');
     const run = newRun(w);

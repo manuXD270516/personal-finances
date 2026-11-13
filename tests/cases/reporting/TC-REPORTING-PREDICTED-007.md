@@ -5,16 +5,17 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: "Calendario sin pronóstico disponible"
 scenario: "Serie en dólares con datos insuficientes"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-006","FR-FORECAST-008"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/predicted-cash-flow.queries.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["cash-flow","readiness"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "el calendario muestra la banda en BOB y para USD informa datos insuficientes sin banda"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-REPORTING-PREDICTED-007 — Una moneda con datos insuficientes queda sin banda con su motivo

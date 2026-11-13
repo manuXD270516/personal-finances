@@ -15,6 +15,7 @@ import type {
   ForecastingDeps,
   ForecastingSettings,
   KnownSourcesPort,
+  LiquidAccountsPort,
   OutboxPort,
   RatesPort,
   WorkspaceDirectory,
@@ -60,6 +61,8 @@ export interface ForecastingRuntimeOptions {
   /** Ocurrencias, proyección y cuotas de los costos conocidos (COMMITMENTS y DEBT). */
   readonly known: KnownSourcesPort;
   readonly categories: CategoriesPort;
+  /** Cuentas líquidas por moneda (add-predicted-cash-flow-band); sin él no hay serie del gasto variable líquido. */
+  readonly liquidAccounts?: LiquidAccountsPort;
   readonly rates: RatesPort;
   /** ACL del servicio `finance-ml` (en la API no se usa: solo el worker llama al servicio). */
   readonly service: ForecastServicePort;
@@ -94,6 +97,7 @@ export function createForecastingRuntime(options: ForecastingRuntimeOptions): Fo
     flows: options.flows,
     known: options.known,
     categories: options.categories,
+    ...(options.liquidAccounts ? { liquidAccounts: options.liquidAccounts } : {}),
     rates: options.rates,
     service: options.service,
     audit: options.audit,
@@ -190,6 +194,7 @@ export {
   FORECAST_RUNNER_JOB,
   FORECAST_SCHEDULE_JOB,
   LATEST_FORECAST_QUERY,
+  LIQUID_VARIABLE_SPEND_QUERY,
 } from '../contracts/index.js';
 export { MlForecastingServiceClient } from '../infrastructure/ml-service-client.js';
 export type { OutboxPort } from '../application/ports.js';

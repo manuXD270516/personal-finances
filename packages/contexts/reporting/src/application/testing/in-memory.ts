@@ -7,6 +7,7 @@ import type {
   ResolvedRateDto,
   ValuationRateDto,
 } from '@pf/fx/contracts';
+import type { LatestForecastDto } from '@pf/forecasting/contracts';
 import type { AccountBalanceDto } from '@pf/ledger/contracts';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import type { ConversionCostRowDto, NominalFlowRowDto } from '@pf/transactions/contracts';
@@ -171,6 +172,12 @@ export class InMemoryReporting {
   readonly budgets = new Map<string, BudgetAvailabilityRow>();
   readonly spendableRequests: { periodFrom: string; periodTo: string }[] = [];
 
+  /** add-predicted-cash-flow-band: pronóstico vigente que entrega `LatestForecastQuery`; `null` = FORECAST no compuesto. */
+  forecastLatest: LatestForecastDto | null = null;
+  /** Gasto variable líquido ya hecho del periodo en curso (`LiquidVariableSpendQuery`), por moneda. */
+  liquidSpent: { currency: string; amount: string }[] = [];
+  readonly forecastCalls: { kind: 'getLatest' | 'spentBetween'; scopes?: readonly string[] }[] = [];
+
   /** add-cash-flow-forecast: ocurrencias no resueltas de todos los tipos (`UpcomingPaymentsQuery.listForCashFlow`). */
   readonly cashFlowOccurrences: CashFlowOccurrenceRow[] = [];
   /** Hasta qué fecha generó ocurrencias el motor de recurrencia (por omisión, muy lejos: cobertura completa). */
@@ -313,6 +320,23 @@ export class InMemoryReporting {
       },
       clock: this.clock,
       commitments: { hasActiveDefinitions: async () => this.hasActiveDefinitions },
+      ...(this.forecastLatest
+        ? {
+            forecast: {
+              getLatest: async (input) => {
+                this.forecastCalls.push({
+                  kind: 'getLatest',
+                  ...(input.scopes ? { scopes: input.scopes } : {}),
+                });
+                return this.forecastLatest as LatestForecastDto;
+              },
+              spentBetween: async () => {
+                this.forecastCalls.push({ kind: 'spentBetween' });
+                return this.liquidSpent;
+              },
+            },
+          }
+        : {}),
       pending: {
         listPending: async (input) =>
           this.pendingTransactions.filter(

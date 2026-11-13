@@ -342,6 +342,8 @@
       "days": "há {n} d"
     },
     "savingsRate": "Taxa de economia:",
+    "expectedSpending": "Esperado: ~{amount} · Faixa provável: {lower} a {upper} (80 %)",
+    "expectedStale": "Previsão desatualizada: tem mais de 35 dias ou a última atualização falhou.",
     "variation": {
       "new": "novo",
       "vsPrevious": "em relação ao mês anterior",
@@ -3600,7 +3602,12 @@
       },
       "lowestLabel": "Menor saldo esperado nos próximos {days} dias",
       "lowestOn": "{amount} em {date}",
-      "lowestIncomplete": "incompleto: falta uma taxa"
+      "lowestIncomplete": "incompleto: falta uma taxa",
+      "predictedShortfall": {
+        "LIKELY": "Com seu gasto variável esperado: déficit provável em {currency} em {date}",
+        "POSSIBLE": "Se seu gasto variável for alto: déficit possível em {currency} em {date}",
+        "UNLIKELY": "Com seu gasto variável previsto, o déficit em {currency} é improvável"
+      }
     },
     "committed": {
       "period": "{name} ({from} a {to})",
@@ -6946,6 +6953,8 @@
       "description": "Saldo esperado dia a dia; o menor é {low} em {date}.",
       "balance": "Saldo esperado",
       "planned": "Com o gasto planejado restante",
+      "band": "Faixa do gasto variável previsto (80 %)",
+      "expected": "Com o gasto variável esperado",
       "thresholdReserve": "Reserva mínima: {amount}",
       "thresholdZero": "Limite: zero",
       "lowest": "Mínimo"
@@ -6956,7 +6965,31 @@
       "balance": "Saldo no fechamento",
       "low": "Menor saldo do dia",
       "planned": "Com gasto planejado",
-      "belowThreshold": "abaixo do limite"
+      "belowThreshold": "abaixo do limite",
+      "bandExpected": "Com gasto esperado",
+      "bandHigh": "Com gasto alto",
+      "bandLow": "Com gasto baixo"
+    },
+    "predicted": {
+      "title": "Com seu gasto variável previsto",
+      "likelihood": {
+        "LIKELY": "Déficit provável em {currency} com seu gasto variável esperado",
+        "POSSIBLE": "Déficit possível em {currency} se seu gasto variável for alto",
+        "UNLIKELY": "Déficit improvável em {currency} com seu gasto variável previsto",
+        "NOT_AVAILABLE": "Sem estimativa do gasto variável em {currency}"
+      },
+      "firstShortfall": "Primeira data abaixo do limite: {date}.",
+      "lowestExpected": "Menor saldo com gasto esperado",
+      "lowestHigh": "Menor saldo com gasto alto",
+      "help": "O gasto alto é o limite superior do intervalo de 80 % da previsão: \"possível\" indica cerca de 1 em cada 10 ou mais; \"provável\", cerca de 1 em cada 2 ou mais. É uma estimativa à parte: não altera o risco dos pagamentos conhecidos.",
+      "stale": "Esta previsão está desatualizada: tem mais de 35 dias ou a última atualização falhou.",
+      "reason": {
+        "DISABLED": "As previsões não estão habilitadas nesta instalação, então não há estimativa do gasto variável.",
+        "NO_FORECAST": "Ainda não há uma previsão do gasto variável.",
+        "NO_SERIES": "A previsão vigente ainda não inclui o gasto variável em {currency}; será calculado na próxima atualização.",
+        "INSUFFICIENT_DATA": "Ainda não há histórico suficiente do gasto variável em {currency} para prevê-lo.",
+        "NO_CURRENT_PERIOD": "A previsão vigente não cobre o período em andamento."
+      }
     },
     "scenarios": {
       "withoutIncome": "Pior caso sem receitas esperadas",

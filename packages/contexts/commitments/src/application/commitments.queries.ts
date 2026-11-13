@@ -773,6 +773,7 @@ export class CommitmentsQueries
           managedBy: r.managedBy,
           direction: input.direction,
           categoryId: r.categoryId,
+          accountId: r.accountId,
         });
       }
       return out;

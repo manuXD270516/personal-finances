@@ -1,5 +1,6 @@
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
 import type { CategoryCatalogQuery, CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import type { LatestForecastQuery, LiquidVariableSpendQuery } from '@pf/forecasting/contracts';
 import type { FxQuoteSideRatesPort, FxValuationPort, ResolvedRateDto } from '@pf/fx/contracts';
 import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
 import type { Clock } from '@pf/shared-kernel';
@@ -44,6 +45,16 @@ export interface DataVersionStore {
  * (`GetBalances` por lote), TRANSACTIONS (`SummarizeNominalFlows`), ACCOUNTS (catálogo), CLASSIFICATION (nombres) y
  * FX (`RateResolver` de valoración). Ningún join cross-schema desde REPORTING.
  */
+/**
+ * FORECAST (add-predicted-cash-flow-band): pronóstico vigente (`LatestForecastQuery`) y gasto variable líquido ya hecho
+ * (`LiquidVariableSpendQuery`). REPORTING lee FORECAST por su contrato público; FORECAST nunca lee REPORTING (sin ciclo).
+ * FORECAST se compone después de REPORTING: la composición lo entrega con resolución tardía.
+ */
+export interface PredictedForecastPort {
+  getLatest: LatestForecastQuery['getLatest'];
+  spentBetween: LiquidVariableSpendQuery['spentBetween'];
+}
+
 export interface ReportingDeps {
   readonly uow: ReportingUnitOfWork;
   readonly workspaces: WorkspaceSettingsPort;
@@ -67,6 +78,8 @@ export interface ReportingDeps {
   readonly commitments: Pick<UpcomingCommitmentsPort, 'hasActiveDefinitions'> &
     Partial<Pick<UpcomingCommitmentsPort, 'listForCashFlow'>>;
   readonly pending: PendingTransactionsPort;
+  /** Banda del gasto variable predicho (calendario) y gasto esperado (Q3); opcional: sin él no hay pronóstico. */
+  readonly forecast?: PredictedForecastPort;
   /**
    * Q9 del Home (add-savings-goals): metas en curso (GOALS, `GoalSummaryQuery.listForHome`). Opcional: sin él, Q9 es
    * `NO_DATA` con la acción `CREATE_GOAL`.

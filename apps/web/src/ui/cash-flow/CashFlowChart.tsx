@@ -2,7 +2,9 @@ import { formatDecimal } from '../AuditHistory';
 import { formatLocalDate } from '../dashboard/format';
 import { highestAmount, lowestAmount, ratioBetween } from '../reports/logic';
 import { compareDecimal } from './logic';
-import type { CashFlowDay, Money } from './types';
+import type { CashFlowDay, Money, PredictedCashFlow } from './types';
+
+export type PredictedCashFlowDay = PredictedCashFlow['series'][number];
 
 /**
  * Gráfico SVG propio del saldo esperado (patrón de `ReportChart`, sin dependencias): la serie del saldo al cierre de cada
@@ -22,12 +24,16 @@ export const CASH_FLOW_CHART_CSS = `
 .pf-cfc-threshold{stroke:var(--pf-error);stroke-width:2;stroke-dasharray:2 4}
 .pf-cfc-dot{fill:var(--pf-primary);stroke:var(--pf-bg);stroke-width:1.5}
 .pf-cfc-dot[data-flag="below"]{fill:var(--pf-bg);stroke:var(--pf-error);stroke-width:2.5}
+.pf-cfc-band{fill:var(--pf-primary);fill-opacity:0.14;stroke:var(--pf-primary);stroke-opacity:0.5;stroke-width:1}
+.pf-cfc-expected{stroke:var(--pf-primary);stroke-width:2.5;fill:none;stroke-dasharray:1 5;stroke-linecap:round}
 .pf-cfc-low{fill:var(--pf-error);stroke:var(--pf-bg);stroke-width:1.5}
 .pf-cfc-legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0.25rem 1rem;font-size:0.875rem;color:var(--pf-fg-muted)}
 .pf-cfc-legend li{display:inline-flex;align-items:center;gap:0.375rem}
 .pf-cfc-swatch{display:inline-block;width:1.5rem;height:0;border-top:3px solid var(--pf-primary)}
 .pf-cfc-swatch[data-kind="planned"]{border-top:3px dashed var(--pf-fin-warning)}
 .pf-cfc-swatch[data-kind="threshold"]{border-top:3px dotted var(--pf-error)}
+.pf-cfc-swatch[data-kind="expected"]{border-top:3px dotted var(--pf-primary)}
+.pf-cfc-swatch[data-kind="band"]{height:0.75rem;border:1px solid var(--pf-primary);background:var(--pf-primary);opacity:0.35}
 `;
 
 const W = 640;
@@ -38,6 +44,9 @@ export interface CashFlowChartLabels {
   readonly description: string;
   readonly balance: string;
   readonly planned: string;
+  /** Rótulos de la banda del gasto variable predicho (área entre el gasto alto y el bajo y línea del esperado). */
+  readonly band: string;
+  readonly expected: string;
   /** Rótulo de la línea del umbral (p. ej. «Reserva mínima: 1.500,00 BOB»); sin umbral no hay línea. */
   readonly threshold: string | undefined;
   /** Rótulo del mínimo (p. ej. «Mínimo»). */
@@ -48,13 +57,15 @@ export function CashFlowChart(props: {
   readonly id: string;
   readonly series: readonly CashFlowDay[];
   readonly planned: readonly { readonly date: string; readonly balance: Money }[] | undefined;
+  /** Banda del gasto variable predicho (saldos con el gasto esperado, alto y bajo); nunca se suma a la serie principal. */
+  readonly band?: readonly PredictedCashFlowDay[] | undefined;
   readonly threshold: Money | undefined;
   /** Fecha del saldo más bajo (se marca con un rombo). */
   readonly lowestDate: string | undefined;
   readonly locale: string;
   readonly labels: CashFlowChartLabels;
 }) {
-  const { series, planned, threshold, lowestDate, locale, labels, id } = props;
+  const { series, planned, band, threshold, lowestDate, locale, labels, id } = props;
   const { left, right, top, bottom, height } = G;
   const plotW = W - left - right;
   const plotH = height - top - bottom;
@@ -62,6 +73,7 @@ export function CashFlowChart(props: {
     ...series.map((d) => d.balance.amount),
     ...series.map((d) => d.low.amount),
     ...(planned ?? []).map((p) => p.balance.amount),
+    ...(band ?? []).flatMap((p) => [p.high.amount, p.low.amount, p.expected.amount]),
     ...(threshold ? [threshold.amount] : []),
   ];
   const max = highestAmount(values);
@@ -81,6 +93,20 @@ export function CashFlowChart(props: {
         }),
       )
     : '';
+  const bandPoints = (band ?? []).flatMap((p) => {
+    const i = indexOf.get(p.date);
+    return i === undefined
+      ? []
+      : [{ x: xAt(i), high: yAt(p.high.amount), low: yAt(p.low.amount), mid: yAt(p.expected.amount) }];
+  });
+  const bandArea =
+    bandPoints.length > 1
+      ? `${path(bandPoints.map((p) => ({ x: p.x, y: p.low })))} ${[...bandPoints]
+          .reverse()
+          .map((p) => `L${p.x.toFixed(1)} ${p.high.toFixed(1)}`)
+          .join(' ')} Z`
+      : '';
+  const expectedPath = bandPoints.length > 1 ? path(bandPoints.map((p) => ({ x: p.x, y: p.mid }))) : '';
   const labelEvery = Math.max(1, Math.ceil(n / 6));
   const ticks = [max, min];
   return (
@@ -111,6 +137,10 @@ export function CashFlowChart(props: {
             y1={yAt(threshold.amount)}
             y2={yAt(threshold.amount)}
           />
+        ) : null}
+        {bandArea ? <path className="pf-cfc-band" data-testid="cash-flow-band-area" d={bandArea} /> : null}
+        {expectedPath ? (
+          <path className="pf-cfc-expected" data-testid="cash-flow-band-expected" d={expectedPath} />
         ) : null}
         {n > 0 ? <path className="pf-cfc-line" d={balancePath} /> : null}
         {plannedPath ? <path className="pf-cfc-planned" d={plannedPath} /> : null}
@@ -158,6 +188,18 @@ export function CashFlowChart(props: {
             <span className="pf-cfc-swatch" data-kind="planned" aria-hidden="true" />
             {labels.planned}
           </li>
+        ) : null}
+        {bandArea ? (
+          <>
+            <li>
+              <span className="pf-cfc-swatch" data-kind="band" aria-hidden="true" />
+              {labels.band}
+            </li>
+            <li>
+              <span className="pf-cfc-swatch" data-kind="expected" aria-hidden="true" />
+              {labels.expected}
+            </li>
+          </>
         ) : null}
         {labels.threshold ? (
           <li>

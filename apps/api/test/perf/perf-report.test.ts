@@ -1199,3 +1199,18 @@ describe('add-cash-flow-forecast: umbral del calendario de flujo de caja', () =>
     expect([row.gate, row.passed]).toEqual([true, false]);
   });
 });
+
+describe('add-predicted-cash-flow-band: el umbral del calendario no cambia con la banda', () => {
+  it('[TC-REPORTING-PREDICTED-011] con la banda del pronóstico el calendario de 90 días mantiene el umbral de p95 500 ms y el resumen del Home el de 300 ms', () => {
+    expect(PERF_THRESHOLDS['NFR-PERF-010']).toMatchObject({ metric: 'p95', limitMs: 500 });
+    expect(PERF_THRESHOLDS['NFR-PERF-004']).toMatchObject({ metric: 'p95', limitMs: 300 });
+    const row = latencyResult({
+      id: 'cash-flow-calendar-90d',
+      nfr: 'NFR-PERF-010',
+      title: 'calendario de flujo de caja 90 días con la banda',
+      samples: Array.from({ length: 20 }, () => 500),
+      limitMs: PERF_THRESHOLDS['NFR-PERF-010'].limitMs,
+    });
+    expect([row.gate, row.passed]).toEqual([true, true]);
+  });
+});

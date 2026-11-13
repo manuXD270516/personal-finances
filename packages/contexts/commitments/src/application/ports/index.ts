@@ -153,6 +153,8 @@ export interface ResolvedForecastRow extends ResolvedOutflowRow {
   readonly kind: RecurringKind;
   readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL';
   readonly categoryId: string | null;
+  /** Cuenta de la versión de la definición que rige la ocurrencia (la que paga o cobra). */
+  readonly accountId: string;
 }
 
 export interface OccurrenceRepository {

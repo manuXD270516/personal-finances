@@ -10,9 +10,12 @@ import {
   BOB_SERIES,
   CALENDAR,
   HIGH_RISK_BOB,
+  PREDICTED_BOB,
+  PREDICTED_POSSIBLE,
   TODAY,
   USD_CURRENCY,
   bob,
+  unavailablePredicted,
   usd,
 } from './fixtures';
 import {
@@ -421,5 +424,66 @@ describe('catálogos i18n del flujo de caja', () => {
     expect(es['App']!['cashFlow']).toBe('Flujo de caja');
     expect(en['App']!['cashFlow']).toBe('Cash flow');
     expect(pt['App']!['cashFlow']).toBe('Fluxo de caixa');
+  });
+});
+
+describe('banda del gasto variable predicho en /flujo-de-caja (add-predicted-cash-flow-band, tarea 6.1)', () => {
+  const withPredicted = (predicted: NonNullable<CashFlowCalendar['currencies'][number]['predicted']>) => ({
+    currencies: [{ ...BOB_CURRENCY, predicted }, USD_CURRENCY],
+  });
+
+  it('[TC-REPORTING-PREDICTED-001] dibuja el área entre el gasto alto y el bajo y la línea del esperado, con su leyenda y las columnas de la tabla', () => {
+    const html = view(withPredicted(PREDICTED_BOB));
+    expect(html).toContain('data-testid="cash-flow-band-area"');
+    expect(html).toContain('data-testid="cash-flow-band-expected"');
+    const text = strip(html);
+    expect(text).toContain('Rango del gasto variable predicho (80 %)');
+    expect(text).toContain('Con el gasto variable esperado');
+    expect(text).toContain('Con gasto esperado');
+    expect(text).toContain('Con gasto alto');
+    expect(text).toContain('Con gasto bajo');
+    // La serie principal sigue pintándose aparte (no se suma).
+    expect(html).toContain('class="pf-cfc-line"');
+  });
+
+  it('[TC-REPORTING-PREDICTED-004] la probabilidad de déficit va aparte del riesgo y explica que el gasto alto es el límite superior del 80 %', () => {
+    const html = view(withPredicted(PREDICTED_POSSIBLE));
+    expect(html).toMatch(/data-testid="cash-flow-predicted"\s+data-likelihood="POSSIBLE"/);
+    const text = strip(html);
+    expect(text).toContain('Déficit posible en BOB si tu gasto variable es alto');
+    expect(text).toContain('Primera fecha bajo el umbral: 14 dic de 2026.');
+    expect(text).toContain('límite superior del intervalo del 80 %');
+    // El riesgo de los pagos conocidos no cambia.
+    expect(html).toContain('data-risk="NONE"');
+  });
+
+  it('[TC-REPORTING-PREDICTED-006] sin banda dice el motivo y no dibuja nada', () => {
+    const html = view(withPredicted(unavailablePredicted('DISABLED')));
+    expect(html).toMatch(/data-testid="cash-flow-predicted-unavailable"\s+data-reason="DISABLED"/);
+    expect(strip(html)).toContain('Los pronósticos no están habilitados en esta instalación');
+    expect(html).not.toContain('cash-flow-band-area');
+    expect(html).not.toContain('Con gasto esperado');
+    for (const reason of ['NO_FORECAST', 'NO_SERIES', 'INSUFFICIENT_DATA', 'NO_CURRENT_PERIOD'] as const) {
+      expect(view(withPredicted(unavailablePredicted(reason)))).toContain(`data-reason="${reason}"`);
+    }
+  });
+
+  it('[TC-REPORTING-PREDICTED-006] sin el campo predicted (respuesta anterior) la vista queda como en Phase 7', () => {
+    const html = view();
+    expect(html).not.toContain('cash-flow-predicted');
+    expect(html).not.toContain('cash-flow-band-area');
+  });
+
+  it('[TC-REPORTING-PREDICTED-001] un pronóstico desactualizado lo avisa', () => {
+    const html = view(withPredicted({ ...PREDICTED_BOB, stale: true }));
+    expect(html).toContain('data-testid="cash-flow-predicted-stale"');
+  });
+
+  it('[TC-REPORTING-PREDICTED-001] las filas de la tabla alinean la banda por fecha', () => {
+    const rows = seriesRows(BOB_SERIES, null, null, PREDICTED_BOB);
+    expect(rows[0]?.band?.expected.amount).toBe('4190.00');
+    expect(rows[0]?.band?.high.amount).toBe('4170.00');
+    expect(rows[0]?.band?.low.amount).toBe('4195.00');
+    expect(seriesRows(BOB_SERIES, null, null)[0]?.band).toBeNull();
   });
 });

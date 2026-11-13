@@ -296,3 +296,16 @@ Todo change declara su impacto en tests (ver [16-testing-strategy.md §11](./16-
 ## Nota as-built: `add-expense-forecasts` (Phase 8, 2026-11-13)
 
 - Matriz: `TC-FORECAST-EXPENSE-001..023` automatizados: dominio (`known-future`, `variable-history`, `forecast-composer`) y aplicación en `@pf/forecasting`, fuentes de COMMITMENTS y DEBT, servicio Python (`tests/test_phase8.py`; el benchmark `TC-FORECAST-EXPENSE-023` con `pytest -m perf` corre en el nightly), vista web (`forecasts.test.tsx`), API (`forecasting.api.test.ts`) y E2E (`expense-forecasts.spec.ts`, perfil `ml`).
+
+## Nota as-built: `add-predicted-cash-flow-band` (Phase 8, 2026-11-13)
+
+| Requisito | TC | Nivel |
+|---|---|---|
+| Serie del gasto variable líquido por moneda (resta de recurrentes resueltos, tarjetas fuera, sin conversión) | TC-FORECAST-CASHFLOW-001..003 | domain / application / integration |
+| Banda del calendario (periodo en curso, gasto superado, periodo siguiente) | TC-REPORTING-PREDICTED-001..003 | domain / application / integration |
+| Probabilidad de déficit con el gasto predicho | TC-REPORTING-PREDICTED-004, -005 | domain / application |
+| Sin pronóstico, motivos y riesgo/alerta sin cambios | TC-REPORTING-PREDICTED-006..008 | api / application |
+| Tarjetas Q3 y Q8 del Home | TC-REPORTING-PREDICTED-009, -010 | unit (vista) / api / e2e |
+| Rendimiento del calendario de 90 días con la banda | TC-REPORTING-PREDICTED-011 | performance (nightly) |
+
+- Tests: `variable-liquid-outflow.test.ts`, `liquid-forecast.test.ts` y `pg-forecasting.int.test.ts` (FORECAST), `predicted-spending-band.test.ts` (con PBT) y `predicted-cash-flow.queries.test.ts` (REPORTING), `cash-flow.test.tsx`, `forecast-home.test.tsx` y `DashboardView.test.tsx` (web), `forecasting.api.test.ts` (API), `cash-flow-calendar.perf.ts` (nightly) y `predicted-cash-flow-band.spec.ts` (E2E, perfil `ml`). La variante E2E con la función deshabilitada de TC-REPORTING-PREDICTED-006 se cubre por API: el stack de E2E trae el pronóstico siempre habilitado.

@@ -325,6 +325,16 @@ export interface ReportSummaryDto {
   readonly spendable: SpendableSummaryDto | null;
   /** Saldo más bajo esperado y riesgo de 30 días (Q8, add-cash-flow-forecast); `null` sin cuentas líquidas. */
   readonly cashFlow: CashFlowHomeBlockDto | null;
+  /** Gasto esperado del periodo (Q3, add-predicted-cash-flow-band); `null` sin pronóstico vigente del periodo. */
+  readonly forecast: {
+    readonly expectedSpending: {
+      readonly period: string;
+      readonly prediction: MoneyDto;
+      readonly interval80: { readonly lower: MoneyDto; readonly upper: MoneyDto };
+      readonly generatedAt: string;
+      readonly stale: boolean;
+    } | null;
+  } | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;

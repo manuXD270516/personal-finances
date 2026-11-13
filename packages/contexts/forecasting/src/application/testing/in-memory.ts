@@ -13,6 +13,8 @@ import {
   type CategoryInfo,
   type FlowRow,
   type InstallmentInput,
+  type LiquidAccountInput,
+  type LiquidFlowInput,
   type LoanComponentInput,
   type OccurrenceInput,
   type ResolvedInput,
@@ -303,6 +305,8 @@ export interface TestWorld {
   readonly metrics: { failures: string[]; durations: string[]; insufficient: number[] };
   flows: FlowRow[];
   loanComponents: LoanComponentInput[];
+  liquidAccounts: LiquidAccountInput[];
+  liquidFlows: LiquidFlowInput[];
   resolved: ResolvedInput[];
   occurrences: OccurrenceInput[];
   installments: InstallmentInput[];
@@ -346,6 +350,8 @@ export function buildWorld(
     metrics,
     flows: [],
     loanComponents: [],
+    liquidAccounts: [],
+    liquidFlows: [],
     resolved: [],
     occurrences: [],
     installments: [],
@@ -373,7 +379,12 @@ export function buildWorld(
         reportingScale: 2,
       }),
     },
-    flows: { loadFlows: async () => world.flows, loadLoanComponents: async () => world.loanComponents },
+    flows: {
+      loadFlows: async () => world.flows,
+      loadLoanComponents: async () => world.loanComponents,
+      loadLiquidFlows: async () => world.liquidFlows,
+    },
+    liquidAccounts: { liquidAccounts: async () => world.liquidAccounts },
     known: {
       listResolved: async (_ws, _from, _to, direction) =>
         world.resolved.filter((r) => (direction === 'INFLOW') === (r.kind === 'INCOME')),

@@ -7,6 +7,8 @@ import type {
   FlowRow,
   InstallmentInput,
   KnownItem,
+  LiquidAccountInput,
+  LiquidFlowInput,
   LoanComponentInput,
   OccurrenceInput,
   ResolvedInput,
@@ -66,6 +68,20 @@ export interface FlowsPort {
     dateFrom: string,
     dateTo: string,
   ): Promise<readonly LoanComponentInput[]>;
+  /**
+   * Porciones de gasto con su cuenta y su componente de préstamo (`NominalFlowQuery` con `groupBy: ['ACCOUNT', 'ORIGIN']`;
+   * add-predicted-cash-flow-band). Opcional: sin él no hay serie del gasto variable líquido.
+   */
+  loadLiquidFlows?(
+    workspaceId: string,
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<readonly LiquidFlowInput[]>;
+}
+
+/** Cuentas líquidas no archivadas con la escala de su moneda (ACCOUNTS `AccountCatalogQuery`; adapter en la composición). */
+export interface LiquidAccountsPort {
+  liquidAccounts(workspaceId: string): Promise<readonly LiquidAccountInput[]>;
 }
 
 /**
@@ -305,6 +321,8 @@ export interface ForecastingDeps {
   readonly flows: FlowsPort;
   readonly known: KnownSourcesPort;
   readonly categories: CategoriesPort;
+  /** Cuentas líquidas por moneda (add-predicted-cash-flow-band); sin él la corrida no pronostica el gasto líquido. */
+  readonly liquidAccounts?: LiquidAccountsPort;
   readonly rates: RatesPort;
   readonly service: ForecastServicePort;
   readonly audit: AuditPort;

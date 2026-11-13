@@ -975,7 +975,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 | FEAT-22.1 Servicio ML y ACL | Must | forecast/expense-forecasting | TS: servicio `ml-forecasting`, contrato ACL, degradación sin ML. |
 | FEAT-22.2 Forecasts explicables | Must | forecast/expense-forecasting | **US-241** Ver forecast de gasto 1/3/6/12 meses con intervalo, baseline, versión y fecha. **US-242** Ver separados costos conocidos vs variables predichos. **US-243** Aviso claro de datos insuficientes. |
 | FEAT-22.3 Calidad del modelo | Should | forecast/expense-forecasting | **US-244** (Should) Ver precisión histórica forecast vs real. TS: backtesting vs baseline como gate de publicación. |
-| FEAT-22.4 Extensiones | Should | forecast/expense-forecasting | **US-245** (Should) Probabilidad de déficit de saldo. (Detección de anomalías → EPIC-26.) |
+| FEAT-22.4 Extensiones | Should | forecast/expense-forecasting | **US-245** (Should) Probabilidad de déficit de saldo. **Implementada** (Phase 8, `add-predicted-cash-flow-band`, 2026-11-13): banda del gasto variable predicho y probabilidad por niveles en el calendario, y Q3/Q8 del Home. (Detección de anomalías → EPIC-26.) |
 
 ## EPIC-26 — Automatización avanzada e insights predictivos (Phase 9)
 

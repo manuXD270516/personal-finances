@@ -122,6 +122,7 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 20 | DOCUMENTS | IMPORTS, TRANSACTIONS, DEBT | C/S | SYNC-Q / referencias por ID | Vínculos por ID; Imports lee el archivo vía `DocumentSourcePort` (`DocumentQuery`, `DocumentContentReader`, `AttachmentCommand.link`; add-import-pipeline). |
 | 21 | PLANNING, COMMITMENTS, DEBT, GOALS, IMPORTS, FORECAST | NOTIFY | OHS/PL | ASYNC | Notify sólo traduce hechos publicados a mensajes. |
 | 22 | REPORTING | FORECAST | C/S | SYNC-Q | Dataset de entrenamiento/inferencia. |
+| 22b | FORECAST | REPORTING | C/S | SYNC-Q | (as-built `add-predicted-cash-flow-band`) REPORTING lee el pronóstico vigente (`LatestForecastQuery`) y el gasto variable líquido ya hecho (`LiquidVariableSpendQuery`) por `@pf/forecasting/contracts`, en la transacción de la petición; sin ciclo (FORECAST no lee REPORTING). |
 | 23 | REPORTING (+ queries públicas) | ASSISTANT | C/S | SYNC-Q | Tools de solo lectura (ADR-0021). |
 | 24 | Market rate APIs | FX | **ACL** | HTTP (job) | Ver §4.1. |
 | 25 | Banking providers | IMPORTS | **ACL** | HTTP (job) | Ver §4.2. |
@@ -187,3 +188,8 @@ Traduce `ExternalTransaction` → `StagedTransaction` (monto string + moneda, fe
 ## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
 
 - Relaciones de FORECAST (§4.3): upstream TRANSACTIONS, CLASSIFICATION, FX e IDENTITY (cliente de sus `contracts`); ACL hacia `finance-ml` (`MlForecastingServiceClient`, `POST /v1/forecasts`); sin dependencia de PLANNING ni de REPORTING. Publica `forecast.ForecastGenerated.v1` sin consumidores.
+
+## Nota as-built: `add-predicted-cash-flow-band` (Phase 8, 2026-11-13)
+
+- Relación REPORTING → FORECAST (fila 22b) en una sola dirección y solo por contratos: `GetCashFlowCalendar` y el resumen del Home llaman a `LatestForecastQuery.getLatest` (una consulta por la corrida vigente) y a `LiquidVariableSpendQuery.spentBetween` en la transacción de la petición; la composición resuelve FORECAST de forma tardía (se compone después de REPORTING). `arch:check` valida que no haya ciclo. Sin consumidores ni conexiones nuevas.
+- COMMITMENTS agrega `accountId` (cuenta de la versión de la definición) a `ResolvedOccurrenceDto` para restar los recurrentes resueltos pagados desde cuentas líquidas.

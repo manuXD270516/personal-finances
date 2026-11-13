@@ -227,7 +227,7 @@ Convenciones de gráficos: ECharts, colores de categoría estables, signos segú
 | Cuotas de préstamo | Debt (`amortization` schedule) | `KNOWN` |
 | Aportes planificados a metas | Goals (plan de contribución) | `PLANNED` (solo si es transfer real a otra cuenta; earmarks no mueven dinero pero sí reducen *disponible* en una vista opcional) |
 | Transacciones `pending` / programadas | Transactions | `KNOWN` |
-| Gasto variable predicho | Forecasting (Phase 8) | `PREDICTED` (banda, nunca sumado a la línea "conocida") |
+| Gasto variable predicho | Forecasting (Phase 8, `add-predicted-cash-flow-band`): serie `LIQUID_VARIABLE_OUTFLOW` por moneda | `PREDICTED` (banda, nunca sumado a la línea "conocida") |
 
 ### 8.2 Algoritmo
 
@@ -259,6 +259,7 @@ input: workspace, horizon h ∈ {7, 30, 60, 90}, accounts = Liquid (default), th
 
 - **Multi-moneda**: cada moneda tiene su propia línea; el consolidado es informativo. Un faltante en BOB cubrible con USDT se muestra como `HIGH` en BOB + sugerencia de conversión (con tasa de hoy, sin ejecutar nada).
 - **Ingresos esperados no confirmados** se dibujan con estilo distinto (línea punteada) y el usuario puede ver la serie "sin ingresos esperados" (peor caso).
+- **As-built del escenario (c)** (Phase 8, `add-predicted-cash-flow-band`, docs/66 D435): la banda va **aparte**, por moneda y sin conversión, en `CashFlowCurrency.predicted`: tres series de saldo (`expected`, `high` = límite superior del intervalo del 80 % y `low` = límite inferior) que restan de la serie principal el gasto variable predicho acumulado; **nunca se suman a la serie principal ni a la del plan**. El gasto de cada periodo (serie `LIQUID_VARIABLE_OUTFLOW` del pronóstico vigente: gasto pagado desde cuentas líquidas menos recurrentes resueltos y componentes de cuotas; las compras con tarjeta quedan fuera porque el calendario ya cuenta su pago) se reparte en partes iguales por día con Decimal (HALF_EVEN; el residuo va al último día del periodo); en el periodo en curso se reparte lo que falta (`max(0, predicho − ya gastado)`) entre los días de hoy al fin del periodo. La **probabilidad de déficit con el gasto predicho** es `LIKELY` (el saldo más bajo con gasto esperado baja del umbral), `POSSIBLE` (solo con gasto alto) o `UNLIKELY`, con la fecha del primer día bajo el umbral; con un intervalo del 80 %, «posible» ≈ 1 de cada 10 o más y «probable» ≈ 1 de cada 2 o más (por niveles, no un porcentaje: RISK-015). **El nivel de riesgo no cambia:** `POSSIBLE` conserva el sentido de D379 (solo por el gasto planificado); el episodio, los eventos y la alerta de D381 usan solo la serie principal. Sin pronóstico, función deshabilitada, serie ausente, datos insuficientes o sin el periodo en curso, la banda se omite con su motivo (`DISABLED`, `NO_FORECAST`, `NO_SERIES`, `INSUFFICIENT_DATA`, `NO_CURRENT_PERIOD`) y el calendario queda idéntico. Reparto uniforme por día: simplificación declarada (el gasto real se concentra en fines de semana y quincenas).
 - Coste: O(eventos + días); se calcula on-demand (no materializado) con caché Redis 5 min invalidada por eventos de Transactions/Commitments/Debt/Goals del workspace.
 
 ### 8.3 Salidas (contrato)
@@ -292,12 +293,12 @@ La lista, la numeración y la redacción canónicas son las de [00-product-visio
 |---|---|---|---|---|
 | Q1 | ¿Cuánto dinero tengo? | `LiquidBalanceCard` (por moneda + consolidado) + `NetWorthCard` | Liquid balance y Net worth (ledger directo) | Phase 1 |
 | Q2 | ¿Cuánto ingresó? | `IncomeCard` | Income del periodo | Phase 1 |
-| Q3 | ¿Cuánto gasté? | `ExpensesCard` + `TopCategoriesWidget` (+ `BudgetProgressWidget` desde Phase 2) | Expenses, expenses by category; Budget utilization y pace | Phase 1 / 2 |
+| Q3 | ¿Cuánto gasté? | `ExpensesCard` + `TopCategoriesWidget` (+ `BudgetProgressWidget` desde Phase 2) | Expenses, expenses by category; Budget utilization y pace; gasto esperado del periodo con su rango probable del 80 % (`ReportSummary.forecast.expectedSpending`) | Phase 1 / 2 / 8 (gasto esperado, `add-predicted-cash-flow-band`) |
 | Q4 | ¿Cuánto está comprometido? | `CommittedCard` | Pending outflows + Upcoming commitments del periodo | Phase 3 (versión simple, `add-upcoming-payments`) |
 | Q5 | ¿Cuánto puedo gastar? | `SafeToSpendCard` (vista "libre de compromisos" + segunda vista "según tu presupuesto") | Safe to spend §4.2 | Phase 2 (presupuesto) / 4 (completo, `add-spendable-amount`) |
 | Q6 | ¿Cuánto ahorré? | `SavingsRateWidget` | Savings, savings rate (mes y promedio 3 m); aportes netos a metas (`goalContributions`) | Phase 1 / 4 (aportes netos, `add-savings-goals`) |
 | Q7 | ¿Cómo estoy respecto al mes pasado? | `MonthComparisonWidget` | Variación de Q2, Q3, Q6 y top categorías (§6, "a la fecha") | Phase 1 (básico) / 7 |
-| Q8 | ¿Qué pagos vienen? | `UpcomingPaymentsList` + `CashFlowMiniChart` | Upcoming commitments; Cash Flow Calendar (lowest, shortfallRisk) | Phase 3 (lista simple, 7 días y hasta 5 ítems en el Home, `add-upcoming-payments`) / 7 (calendario) |
+| Q8 | ¿Qué pagos vienen? | `UpcomingPaymentsList` + `CashFlowMiniChart` | Upcoming commitments; Cash Flow Calendar (lowest, shortfallRisk) | Phase 3 (lista simple, 7 días y hasta 5 ítems en el Home, `add-upcoming-payments`) / 7 (calendario) / 8 (probabilidad de déficit con el gasto predicho, `CashFlowHomeBlock.predictedShortfall`) |
 | Q9 | ¿Voy a cumplir mis metas? | `GoalsSummary` | Goal progress, estado `behind/on-track/ahead` | Phase 4 (as-built, `add-savings-goals`) |
 
 **Phase 1** (rev. 2026-10-04, D14/D15/D35; spec `reporting/dashboard`, change `add-basic-dashboard`):

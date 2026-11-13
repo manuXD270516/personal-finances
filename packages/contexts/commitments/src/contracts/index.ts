@@ -470,6 +470,8 @@ export interface ResolvedOccurrenceDto extends ResolvedOutflowDto {
   readonly managedBy: ManagedByDto;
   readonly direction: 'OUTFLOW' | 'INFLOW';
   readonly categoryId: string | null;
+  /** Cuenta que paga o cobra según la versión de la definición (add-predicted-cash-flow-band). */
+  readonly accountId: string;
 }
 
 export interface ResolvedOccurrencesQuery {
