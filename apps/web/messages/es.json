@@ -7030,6 +7030,28 @@
     "disclaimer": "Los pronósticos son estimaciones estadísticas y no constituyen asesoría financiera.",
     "loading": "Cargando pronósticos…",
     "stale": "Este pronóstico está desactualizado: tiene más de 35 días o la última actualización falló. Se muestra el último disponible.",
+    "service": {
+      "title": "Estado del servicio de pronósticos",
+      "enabled": "Habilitado en esta instalación.",
+      "disabled": "No habilitado en esta instalación.",
+      "last": "Última corrida: {status}, el {at}.",
+      "never": "Todavía no hubo ninguna corrida.",
+      "failure": "Motivo de la falla: {reason}.",
+      "states": {
+        "REQUESTED": "en cola",
+        "RUNNING": "en curso",
+        "COMPLETED": "completada",
+        "INSUFFICIENT_DATA": "sin datos suficientes",
+        "FAILED": "fallida",
+        "SUPERSEDED": "reemplazada"
+      },
+      "reasons": {
+        "SERVICE_UNAVAILABLE": "el servicio no está disponible",
+        "SERVICE_REJECTED": "el servicio rechazó la solicitud",
+        "TIMEOUT": "el servicio no respondió a tiempo",
+        "INVALID_OUTPUT": "el servicio devolvió una respuesta inválida"
+      }
+    },
     "status": {
       "disabled": "Los pronósticos no están habilitados en esta instalación.",
       "none": "Todavía no hay un pronóstico. Un propietario o un editor puede solicitarlo."

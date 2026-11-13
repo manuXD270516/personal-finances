@@ -7030,6 +7030,28 @@
     "disclaimer": "Forecasts are statistical estimates and are not financial advice.",
     "loading": "Loading forecasts…",
     "stale": "This forecast is out of date: it is more than 35 days old or the latest update failed. The latest available one is shown.",
+    "service": {
+      "title": "Forecast service status",
+      "enabled": "Enabled in this installation.",
+      "disabled": "Not enabled in this installation.",
+      "last": "Latest run: {status}, on {at}.",
+      "never": "There has been no run yet.",
+      "failure": "Failure reason: {reason}.",
+      "states": {
+        "REQUESTED": "queued",
+        "RUNNING": "in progress",
+        "COMPLETED": "completed",
+        "INSUFFICIENT_DATA": "not enough data",
+        "FAILED": "failed",
+        "SUPERSEDED": "superseded"
+      },
+      "reasons": {
+        "SERVICE_UNAVAILABLE": "the service is unavailable",
+        "SERVICE_REJECTED": "the service rejected the request",
+        "TIMEOUT": "the service did not respond in time",
+        "INVALID_OUTPUT": "the service returned an invalid response"
+      }
+    },
     "status": {
       "disabled": "Forecasts are not enabled in this installation.",
       "none": "There is no forecast yet. An owner or an editor can request one."

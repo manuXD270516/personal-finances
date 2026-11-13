@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compose, composeContext, serviceStates } from '../../../scripts/stack/src/lib/compose.js';
 import { interpolateEnv, parseEnvLines } from '../../../scripts/stack/src/lib/dotenv.js';
 import { renderEnv } from '../../../scripts/stack/src/lib/env-template.js';
 
@@ -67,6 +68,9 @@ export function createEnvFile(): string {
     ['IMPORTS_PROVIDER_FAKE_ENABLED', 'true'],
     // Pronósticos (add-expense-forecasts): el perfil `ml` del stack E2E levanta el servicio real.
     ['FORECASTING_ENABLED', 'true'],
+    // Reintentos acortados (add-ml-forecasting-service 8.6): con el servicio caído la corrida termina `FAILED` en el
+    // primer intento en vez de esperar la espera creciente de 5 min (el valor por omisión son 5 intentos).
+    ['FORECASTING_MAX_ATTEMPTS', '1'],
   ]);
   const extra = new Map([
     ['FX_PROVIDER_PARALELO_BO_URL', simUrl],
@@ -120,4 +124,31 @@ export function pnpm(script: string, args: readonly string[], env: NodeJS.Proces
 
 export function removeEnvFile(file: string): void {
   rmSync(resolve(file, '..'), { recursive: true, force: true });
+}
+
+const ML_SERVICE = 'ml-forecasting';
+
+/**
+ * Detiene o arranca el servicio `ml-forecasting` del stack E2E (siempre con `-p <proyecto E2E>`; nunca otro proyecto).
+ * `start` espera a que quede healthy. Sirve para las pruebas de degradación (add-ml-forecasting-service 8.6).
+ */
+export async function setMlService(action: 'stop' | 'start'): Promise<void> {
+  const file = process.env[ENV_FILE_VAR];
+  if (!file) throw new Error(`${ENV_FILE_VAR} no apunta a un .env (¿corrió el global setup?)`);
+  const ctx = composeContext(processEnvFor(file));
+  const args =
+    action === 'stop'
+      ? ['stop', ML_SERVICE]
+      : ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '120', ML_SERVICE];
+  const result = await compose(['core', 'ml'], args, { mode: 'capture', env: processEnvFor(file) }, ctx);
+  if (result.code !== 0)
+    throw new Error(`docker compose ${action} ${ML_SERVICE} terminó con ${result.code}: ${result.stderr}`);
+}
+
+/** Estado y salud (`healthy`, `exited`…) de los servicios del stack E2E, por nombre de servicio de Compose. */
+export async function serviceHealth(): Promise<Record<string, { state: string; health: string }>> {
+  const file = process.env[ENV_FILE_VAR];
+  if (!file) throw new Error(`${ENV_FILE_VAR} no apunta a un .env (¿corrió el global setup?)`);
+  const states = await serviceStates(composeContext(processEnvFor(file)));
+  return Object.fromEntries(states.map((s) => [s.Service, { state: s.State, health: s.Health ?? '' }]));
 }

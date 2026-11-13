@@ -16,6 +16,8 @@ automation_status: automated
 automated_tests:
   - apps/api/test/api/forecasting.api.test.ts
   - packages/contexts/forecasting/src/application/forecasting.test.ts
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - tests/e2e/specs/forecast-degradation.spec.ts
 status: automated
 regression_suite: false
 phase: 8
@@ -31,7 +33,7 @@ expected_result:
   - "la respuesta informa que la función no está habilitada, sin series"
   - "el trabajo programado no crea corridas"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-SERVICE-002 — Con la función deshabilitada la consulta lo informa y no se programan corridas

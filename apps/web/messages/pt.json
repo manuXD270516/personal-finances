@@ -7030,6 +7030,28 @@
     "disclaimer": "As previsões são estimativas estatísticas e não constituem aconselhamento financeiro.",
     "loading": "Carregando previsões…",
     "stale": "Esta previsão está desatualizada: tem mais de 35 dias ou a última atualização falhou. Mostra-se a última disponível.",
+    "service": {
+      "title": "Estado do serviço de previsões",
+      "enabled": "Habilitado nesta instalação.",
+      "disabled": "Não habilitado nesta instalação.",
+      "last": "Última execução: {status}, em {at}.",
+      "never": "Ainda não houve nenhuma execução.",
+      "failure": "Motivo da falha: {reason}.",
+      "states": {
+        "REQUESTED": "na fila",
+        "RUNNING": "em andamento",
+        "COMPLETED": "concluída",
+        "INSUFFICIENT_DATA": "sem dados suficientes",
+        "FAILED": "falhou",
+        "SUPERSEDED": "substituída"
+      },
+      "reasons": {
+        "SERVICE_UNAVAILABLE": "o serviço não está disponível",
+        "SERVICE_REJECTED": "o serviço rejeitou a solicitação",
+        "TIMEOUT": "o serviço não respondeu a tempo",
+        "INVALID_OUTPUT": "o serviço devolveu uma resposta inválida"
+      }
+    },
     "status": {
       "disabled": "As previsões não estão habilitadas nesta instalação.",
       "none": "Ainda não há previsão. Um proprietário ou um editor pode solicitá-la."

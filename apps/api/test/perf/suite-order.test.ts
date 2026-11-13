@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { orderPerfSuites, PERF_SUITE_ORDER } from './suite-order.js';
@@ -22,6 +22,7 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
       'loan-simulator',
       'upcoming-payments',
       'subscriptions',
+      'forecast',
     ];
     for (const s of latency) expect(idx(s)).toBeLessThan(idx('commitments'));
     expect(idx('commitments')).toBeLessThan(idx('throughput'));
@@ -44,6 +45,7 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
       paths[4]!,
       paths[10]!,
       paths[11]!,
+      paths[12]!,
     ];
     expect(orderPerfSuites(shuffled, (p) => p)).toEqual(paths);
     expect(orderPerfSuites([...paths].reverse(), (p) => p)).toEqual(paths);
@@ -55,5 +57,18 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
       (p) => p,
     );
     expect(out).toEqual(['/x/nightly.perf.ts', '/x/imports.perf.ts', '/x/alfa.perf.ts', '/x/zeta.perf.ts']);
+  });
+
+  it('[TC-FORECAST-SERVICE-028] forecast.perf.ts mide la corrida con el servicio real, con el umbral de 300 s de NFR-PERF-012 y dentro de la lista de suites', () => {
+    const dir = fileURLToPath(new URL('.', import.meta.url));
+    const suite = readFileSync(`${dir}forecast.perf.ts`, 'utf8');
+    expect(PERF_SUITE_ORDER).toContain('forecast.perf.ts');
+    expect(suite).toMatch(/const BUDGET_MS = 300_000;/u);
+    expect(suite).toContain('[TC-FORECAST-SERVICE-028]');
+    // Servicio REAL (imagen finance-ml por Testcontainers o un servicio indicado por el entorno), nunca un doble.
+    expect(suite).toMatch(/GenericContainer\(ML_IMAGE\)/u);
+    expect(suite).toContain('FORECAST_PERF_SERVICE_URL');
+    expect(suite).toMatch(/runForecastRunner\(forecasting,/u);
+    expect(suite).toMatch(/expect\(elapsed\)\.toBeLessThanOrEqual\(BUDGET_MS\)/u);
   });
 });

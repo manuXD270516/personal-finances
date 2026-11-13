@@ -343,6 +343,53 @@ describe('vista de pronósticos (add-expense-forecasts, tareas 7.1 y 7.2)', () =
   });
 });
 
+describe('estado del servicio de pronósticos (add-ml-forecasting-service, tarea 7.1)', () => {
+  it('[TC-FORECAST-SERVICE-002] deshabilitado: lo dice y no muestra corridas', () => {
+    const html = view({}, latest({ status: 'DISABLED', series: [], lastAttempt: null }));
+    expect(html).toContain('data-testid="forecast-service-status"');
+    expect(html).toContain('data-enabled="false"');
+    const text = strip(html);
+    expect(text).toContain('Estado del servicio de pronósticos');
+    expect(text).toContain('No habilitado en esta instalación.');
+    expect(html).not.toContain('forecast-service-last');
+  });
+
+  it('[TC-FORECAST-SERVICE-002] habilitado y sin corridas: lo dice', () => {
+    const html = view(
+      {},
+      latest({ status: 'NONE', series: [], run: null, generatedAt: null, lastAttempt: null }),
+    );
+    expect(html).toContain('data-enabled="true"');
+    expect(strip(html)).toContain('Habilitado en esta instalación.');
+    expect(strip(html)).toContain('Todavía no hubo ninguna corrida.');
+  });
+
+  it('[TC-FORECAST-SERVICE-001] [TC-FORECAST-SERVICE-029] con la última corrida fallida muestra su estado, el motivo y el aviso de desactualizado con el último pronóstico', () => {
+    const html = view(
+      {},
+      latest({
+        stale: true,
+        lastAttempt: { status: 'FAILED', at: '2026-12-01T14:00:00Z', failureReason: 'SERVICE_UNAVAILABLE' },
+      }),
+    );
+    const text = strip(html);
+    expect(html).toContain('data-run-status="FAILED"');
+    expect(text).toContain('Última corrida: fallida');
+    expect(text).toContain('Motivo de la falla: el servicio no está disponible.');
+    expect(text).toContain('Este pronóstico está desactualizado');
+    expect(html).toContain('data-testid="forecast-series-card"');
+  });
+
+  it('[TC-FORECAST-SERVICE-002] una corrida completada no muestra motivo de falla', () => {
+    const html = view(
+      {},
+      latest({ lastAttempt: { status: 'COMPLETED', at: '2026-12-01T14:00:00Z', failureReason: null } }),
+    );
+    expect(strip(html)).toContain('Última corrida: completada');
+    expect(html).not.toContain('forecast-service-reason');
+  });
+});
+
 describe('catálogo de mensajes de pronósticos (NFR-COMP-004, NFR-I18N)', () => {
   const read = (loc: string) =>
     JSON.parse(readFileSync(new URL(`../../../messages/${loc}.json`, import.meta.url), 'utf8')) as Record<

@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: e2e
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/forecast-degradation.spec.ts
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+status: automated
 regression_suite: false
 phase: 8
 tags: ["degradation"]
@@ -29,7 +31,7 @@ expected_result:
   - "el gasto se registra y el Home responde con las mismas cifras que sin la función de pronóstico"
   - "la consulta del pronóstico devuelve el último pronóstico publicado con su instante de generación"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-SERVICE-001 — Con el servicio de pronósticos apagado el núcleo responde igual y se muestra el último pronóstico

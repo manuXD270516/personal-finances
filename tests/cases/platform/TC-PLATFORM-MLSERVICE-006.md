@@ -28,7 +28,7 @@ steps:
 expected_result:
   - "el servicio de pronósticos ejecuta la imagen con el digest que produjo la corrida exitosa de la rama principal"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-PLATFORM-MLSERVICE-006 — El servicio desplegado ejecuta el digest de la corrida exitosa de la rama principal
@@ -48,3 +48,4 @@ Entonces el servicio de pronósticos ejecuta la imagen con el digest que produjo
 ## Notas
 
 - Change `add-ml-forecasting-service` (Phase 8). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; montos como strings decimales; ningún dato real del owner.
+- Depende del despliegue real en N1: se comprueba con `deploy.yml` y `pfos-deploy.sh` con el digest opcional `FINANCE_ML_IMAGE` sobre el host. Queda `ready` hasta el primer despliegue con el perfil `ml` habilitado (2026-11-13).

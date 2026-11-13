@@ -276,6 +276,50 @@ function ReadinessNotices({
   );
 }
 
+/**
+ * Estado del servicio de pronósticos (add-ml-forecasting-service, tarea 7.1): si la función está habilitada en la
+ * instalación, la última corrida con su estado y, si falló, el motivo. Lo informa la API (`status`, `stale`,
+ * `lastAttempt`); la vista no consulta nada más. El texto no depende solo del color.
+ */
+function ServiceStatus({ latest, f }: { latest: LatestForecast; f: FormatContext }) {
+  const enabled = latest.status !== 'DISABLED';
+  const attempt = latest.lastAttempt;
+  return (
+    <section
+      className="pf-fc-card"
+      aria-labelledby="forecast-service-title"
+      data-testid="forecast-service-status"
+      data-enabled={enabled ? 'true' : 'false'}
+    >
+      <h3 id="forecast-service-title">{f.t('service.title')}</h3>
+      <p data-testid="forecast-service-enabled">
+        {enabled ? f.t('service.enabled') : f.t('service.disabled')}
+      </p>
+      {enabled ? (
+        attempt ? (
+          <>
+            <p data-testid="forecast-service-last" data-run-status={attempt.status}>
+              {f.t('service.last', {
+                status: f.t(`service.states.${attempt.status}`),
+                at: formatInstant(attempt.at, f.locale, f.timeZone),
+              })}
+            </p>
+            {attempt.status === 'FAILED' && attempt.failureReason ? (
+              <p className="pf-fc-notice" role="status" data-testid="forecast-service-reason">
+                {f.t('service.failure', { reason: f.t(`service.reasons.${attempt.failureReason}`) })}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="pf-fc-muted" data-testid="forecast-service-never">
+            {f.t('service.never')}
+          </p>
+        )
+      ) : null}
+    </section>
+  );
+}
+
 /** Vista de pronósticos (`/pronosticos`; add-expense-forecasts, tareas 7.1 y 7.2). Presentacional: los datos los lee la página. */
 export function ForecastsView(props: ForecastsViewProps) {
   const { latest, selection, selectedPeriod, known, f, canRun, run, onSelect, onSelectPeriod, onRun, href } =
@@ -296,6 +340,8 @@ export function ForecastsView(props: ForecastsViewProps) {
       <p className="pf-fc-notice" role="note" data-testid="forecast-disclaimer">
         {f.t('disclaimer')}
       </p>
+
+      <ServiceStatus latest={latest} f={f} />
 
       {run === 'pending' ? (
         <p className="pf-fc-notice" role="status" data-testid="forecast-run-pending">
