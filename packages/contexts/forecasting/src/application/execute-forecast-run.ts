@@ -1,19 +1,42 @@
-import { FlowValuation, LocalDate, Money, currency, type FlowRates } from '@pf/shared-kernel';
 import {
+  FinancialPeriodCalendar,
+  FlowValuation,
+  LocalDate,
+  Money,
+  PeriodCalendar,
+  currency,
+  shiftLabel,
+  type FlowRates,
+  type PeriodLabel,
+} from '@pf/shared-kernel';
+import {
+  ForecastComposer,
   ForecastRequestBuilder,
   ForecastResultValidator,
+  KnownFutureCalculator,
   PeriodSeriesBuilder,
   ReadinessGate,
+  VariableHistoryBuilder,
   FORECAST_GENERATED_EVENT_TYPE,
+  type CategoryInfo,
   type EvaluatedSeries,
+  type KnownItem,
   type FailureReason,
   type ForecastRequestV1,
   type ForecastResponseV1,
   type ForecastRun,
 } from '../domain/index.js';
 import { FORECAST_GENERATED_EVENT } from '../contracts/index.js';
-import { ForecastServiceError, type ForecastingDeps, type RunRef, type StoredSeries } from './ports.js';
-import { datasetSnapshotId, seededRandom } from './snapshot.js';
+import {
+  ForecastServiceError,
+  type ForecastingDeps,
+  type RunMetadata,
+  type RunRef,
+  type StoredBacktest,
+  type StoredKnownItem,
+  type StoredSeries,
+} from './ports.js';
+import { datasetSnapshotId, seedOf, seededRandom } from './snapshot.js';
 import { runChanges, runEntry, runSteps } from './support.js';
 
 export type RunnerOutcome =
@@ -27,7 +50,14 @@ interface Prepared {
   readonly scale: number;
   readonly evaluated: readonly EvaluatedSeries[];
   readonly truncated: boolean;
+  /** Conocidos de todo el horizonte (decisión 1: se calculan aquí, no en el servicio). */
+  readonly known: readonly KnownItem[];
+  readonly categories: readonly CategoryInfo[];
+  readonly conversion: RunMetadata['conversion'];
 }
+
+/** Horizonte máximo de periodos pronosticados (el en curso y los 11 siguientes). */
+const MAX_HORIZON = 12;
 
 const METRIC_REASON = {
   SERVICE_UNAVAILABLE: 'unavailable',
@@ -35,6 +65,14 @@ const METRIC_REASON = {
   TIMEOUT: 'timeout',
   INVALID_OUTPUT: 'invalid_output',
 } as const;
+
+/** El servicio anterior informaba `fixed`/`simple`; phase8-v1 informa `BACKTEST`, `BASELINE_FALLBACK` o `SIMPLE`. */
+const selectedByOf = (value: string): 'BACKTEST' | 'BASELINE_FALLBACK' | 'SIMPLE' =>
+  value === 'BACKTEST' || value === 'BASELINE_FALLBACK' || value === 'SIMPLE'
+    ? value
+    : value === 'simple'
+      ? 'SIMPLE'
+      : 'BASELINE_FALLBACK';
 
 const scaleOfText = (amount: string): number => {
   const dot = amount.indexOf('.');
@@ -112,7 +150,7 @@ export class ExecuteForecastRun {
     }
     const { request, refs } = ForecastRequestBuilder.build({
       requestId: deps.ids.next(),
-      seed: 42,
+      seed: seedOf(runId),
       series: prepared.evaluated,
       currency: prepared.currency,
       scale: prepared.scale,
@@ -141,22 +179,49 @@ export class ExecuteForecastRun {
     const now = deps.clock.now();
     const today = LocalDate.ofInstant(now, ws.timeZone);
     const range = PeriodSeriesBuilder.queryRange(today, ws.startDay, deps.settings.historyMaxPeriods);
-    if (!range)
-      return {
-        asOfPeriod: null,
-        currency: target.code,
-        scale: target.scale,
-        evaluated: [],
-        truncated: false,
-      };
+    const empty: Prepared = {
+      asOfPeriod: null,
+      currency: target.code,
+      scale: target.scale,
+      evaluated: [],
+      truncated: false,
+      known: [],
+      categories: [],
+      conversion: null,
+    };
+    if (!range) return empty;
+    // Lecturas en serie: nunca consultas en paralelo sobre el mismo cliente.
     const rows = await deps.flows.loadFlows(workspaceId, range.dateFrom, range.dateTo);
-    const rates: FlowRates<unknown> = await FlowValuation.resolveRates({
-      flows: rows
+    const loanComponents = await deps.flows.loadLoanComponents(workspaceId, range.dateFrom, range.dateTo);
+    const resolvedOut = await deps.known.listResolved(workspaceId, range.dateFrom, range.dateTo, 'OUTFLOW');
+    const resolvedIn = await deps.known.listResolved(workspaceId, range.dateFrom, range.dateTo, 'INFLOW');
+    const currentPeriod = FinancialPeriodCalendar.periodOf(ws.startDay, today).label;
+    const lastPeriod = shiftLabel(currentPeriod, MAX_HORIZON - 1);
+    const knownFrom = PeriodCalendar.rangeFor(currentPeriod, ws.startDay).start.toString();
+    const knownTo = PeriodCalendar.rangeFor(lastPeriod, ws.startDay).end.toString();
+    const occurrences = await deps.known.project(workspaceId, knownFrom, knownTo);
+    const installments = await deps.known.installments(workspaceId, knownFrom, knownTo);
+    const todayText = today.toString();
+    const foreignKnown = [
+      ...occurrences.flatMap((o) => [o.amount, o.minAmount, o.maxAmount]),
+      ...installments.map((i) => ({ amount: '1', currency: i.currency })),
+    ].filter((m): m is { amount: string; currency: string } => m !== null && m.currency !== target.code);
+    const dated = (
+      list: readonly { date: string; amount: { amount: string; currency: string } }[],
+    ): { date: string; amount: Money }[] =>
+      list
         .filter((r) => r.amount.currency !== target.code)
         .map((r) => ({
-          date: r.businessDate,
+          date: r.date,
           amount: Money.parse(r.amount.amount, r.amount.currency, scaleOfText(r.amount.amount)),
-        })),
+        }));
+    const rates: FlowRates<unknown> = await FlowValuation.resolveRates({
+      flows: [
+        ...dated(rows.map((r) => ({ date: r.businessDate, amount: r.amount }))),
+        ...dated(loanComponents.map((r) => ({ date: r.businessDate, amount: r.amount }))),
+        ...dated([...resolvedOut, ...resolvedIn].map((r) => ({ date: r.transactionDate, amount: r.amount }))),
+        ...dated(foreignKnown.map((amount) => ({ date: todayText, amount }))),
+      ],
       target,
       timeZone: ws.timeZone,
       now,
@@ -173,20 +238,45 @@ export class ExecuteForecastRun {
       rateFor: (code, date) => rates.rateFor(code, date),
     });
     const gaps = ReadinessGate.applyGaps(history.periods);
+    // Historia VARIABLE (decisión 2): sin lo recurrente resuelto ni los componentes de préstamo; la calidad de la
+    // clasificación se evalúa con la historia completa.
+    const variable = VariableHistoryBuilder.build({
+      periods: gaps.periods,
+      resolved: [...resolvedOut, ...resolvedIn],
+      loanComponents,
+      startDay: ws.startDay,
+      target,
+      rateFor: (code, date) => rates.rateFor(code, date),
+    });
     const catalog = await deps.categories.catalog(workspaceId);
     const evaluated = ReadinessGate.evaluate({
-      periods: gaps.periods,
+      periods: variable.periods,
+      qualityPeriods: gaps.periods,
       categories: catalog.categories,
       groups: catalog.groups,
       thresholds: deps.settings.thresholds,
       truncated: gaps.truncated,
     });
+    const collector = rates.collector();
+    const known = KnownFutureCalculator.compute({
+      occurrences,
+      installments,
+      target,
+      startDay: ws.startDay,
+      firstPeriod: currentPeriod,
+      lastPeriod,
+      rateFor: (code) => collector.rateFor(code, todayText),
+    });
+    const used = collector.used();
     return {
       asOfPeriod: history.lastFinished,
       currency: target.code,
       scale: target.scale,
       evaluated,
       truncated: gaps.truncated,
+      known,
+      categories: catalog.categories,
+      conversion: used.length > 0 ? { rateDate: todayText, ratesUsed: used } : null,
     };
   }
 
@@ -230,7 +320,16 @@ export class ExecuteForecastRun {
         historyTo: s.historyTo,
         historyPeriods: s.points.length,
         groupedCategoryIds: s.groupedCategoryIds,
+        selectedBy: null,
+        mase: null,
+        baselineMase: null,
+        coverage80: null,
+        confidence: null,
       };
+      // Los conocidos de la serie (copia de la etiqueta al momento de la corrida) se guardan aun sin pronóstico: la
+      // vista los muestra junto al aviso de datos insuficientes.
+      const items = KnownFutureCalculator.forSeries(s, prepared.known, prepared.categories);
+      const knownItems: StoredKnownItem[] = items.map((k) => ({ ...k, currency: prepared.currency }));
       if (s.readiness === 'INSUFFICIENT') {
         insufficient += 1;
         stored.push({
@@ -242,6 +341,7 @@ export class ExecuteForecastRun {
           baselineN: null,
           status: 'INSUFFICIENT',
           points: [],
+          knownItems,
         });
         continue;
       }
@@ -267,6 +367,39 @@ export class ExecuteForecastRun {
       }
       published += 1;
       versions.add(`${result.model.name}@${result.model.version}`);
+      const outlierPeriods = result.outliers ?? [];
+      const points = result.points.map((p) => {
+        const known = KnownFutureCalculator.totals(items, p.period as PeriodLabel, () => true);
+        const c = ForecastComposer.compose({ point: p, known, scale: prepared.scale, outlierPeriods });
+        return {
+          period: c.period,
+          monthsAhead: c.monthsAhead,
+          prediction: c.prediction,
+          lower80: c.lower80,
+          upper80: c.upper80,
+          lower95: c.lower95,
+          upper95: c.upper95,
+          baselineValue: c.baselineValue,
+          knownFuture: c.knownFuture,
+          predictedVariable: c.predictedVariable,
+          variableLower80: c.variableLower80,
+          variableUpper80: c.variableUpper80,
+          knownBlankCount: c.knownBlankCount,
+          drivers: c.drivers,
+        };
+      });
+      const selectedBy = selectedByOf(result.model.selectedBy);
+      const chosen = result.backtest?.candidates.find((c) => c.name === result.backtest?.selected) ?? null;
+      const mase = chosen?.mase ?? null;
+      const coverage80 = chosen?.coverage80 ?? null;
+      const backtest: StoredBacktest[] = (result.backtest?.candidates ?? []).map((c) => ({
+        modelName: c.name,
+        origins: c.cuts,
+        mase: c.mase,
+        coverage80: c.coverage80,
+        bias: c.bias,
+        selected: c.name === result.backtest?.selected,
+      }));
       stored.push({
         ...base,
         readinessReasons: s.readinessReasons,
@@ -275,7 +408,19 @@ export class ExecuteForecastRun {
         baselineMethod: result.baseline.method,
         baselineN: result.baseline.n,
         status: 'PUBLISHED',
-        points: result.points,
+        points,
+        selectedBy,
+        mase,
+        baselineMase: result.backtest?.baselineMase ?? null,
+        coverage80,
+        confidence: ForecastComposer.confidence({
+          historyPeriods: s.points.length,
+          selectedBy,
+          mase,
+          coverage80,
+        }),
+        backtest,
+        knownItems,
       });
     }
     return { stored, published, invalid, insufficient, versions: [...versions].sort() };
@@ -333,6 +478,11 @@ export class ExecuteForecastRun {
     });
     await this.save(run, before.version);
     await deps.series.insertAll(stored);
+    await deps.series.saveRunMetadata(workspaceId, runId, {
+      seed: request.seed,
+      modelSet: request.policy.modelSet,
+      conversion: prepared.conversion,
+    });
     const eventId = deps.ids.next();
     await deps.outbox.append({
       eventId,

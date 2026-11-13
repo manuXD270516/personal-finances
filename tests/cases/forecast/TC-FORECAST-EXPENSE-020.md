@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Diferencia entre categorías y total"
 scenario: "Categorías que suman más que el total"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-001"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - packages/contexts/forecasting/src/application/expense-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/forecast-composer.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["coherence"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "la vista informa una diferencia de 292.00 BOB entre las categorías y el total"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-020 — La vista informa la diferencia entre categorías y total cuando supera el 5 %

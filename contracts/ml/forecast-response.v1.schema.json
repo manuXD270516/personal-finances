@@ -5,47 +5,121 @@
   "description": "Respuesta del servicio de pronósticos. Montos como string decimal en la escala pedida.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "requestId", "serviceVersion", "results", "durationMs"],
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "serviceVersion",
+    "results",
+    "durationMs"
+  ],
   "properties": {
-    "schemaVersion": { "const": "1" },
-    "requestId": { "type": "string", "minLength": 1 },
-    "serviceVersion": { "type": "string", "minLength": 1 },
-    "durationMs": { "type": "integer", "minimum": 0 },
+    "schemaVersion": {
+      "const": "1"
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "serviceVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 0
+    },
     "results": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ref", "status", "error", "model", "baseline", "points"],
+        "required": [
+          "ref",
+          "status",
+          "error",
+          "model",
+          "baseline",
+          "points"
+        ],
         "properties": {
-          "ref": { "type": "string", "pattern": "^s[1-9][0-9]{0,3}$" },
-          "status": { "enum": ["OK", "ERROR"] },
-          "error": { "type": ["string", "null"] },
+          "ref": {
+            "type": "string",
+            "pattern": "^s[1-9][0-9]{0,3}$"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "ERROR"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "model": {
             "oneOf": [
-              { "type": "null" },
+              {
+                "type": "null"
+              },
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["name", "version", "selectedBy"],
+                "required": [
+                  "name",
+                  "version",
+                  "selectedBy"
+                ],
                 "properties": {
-                  "name": { "type": "string", "minLength": 1 },
-                  "version": { "type": "string", "minLength": 1 },
-                  "selectedBy": { "enum": ["fixed", "simple"] }
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "selectedBy": {
+                    "enum": [
+                      "fixed",
+                      "simple",
+                      "BACKTEST",
+                      "BASELINE_FALLBACK",
+                      "SIMPLE"
+                    ]
+                  }
                 }
               }
             ]
           },
           "baseline": {
             "oneOf": [
-              { "type": "null" },
+              {
+                "type": "null"
+              },
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["method", "n"],
+                "required": [
+                  "method",
+                  "n"
+                ],
                 "properties": {
-                  "method": { "enum": ["NAIVE", "SEASONAL_NAIVE", "MEAN_LAST_N"] },
-                  "n": { "type": ["integer", "null"], "minimum": 1 }
+                  "method": {
+                    "enum": [
+                      "NAIVE",
+                      "SEASONAL_NAIVE",
+                      "MEAN_LAST_N"
+                    ]
+                  },
+                  "n": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  }
                 }
               }
             ]
@@ -67,22 +141,186 @@
                 "baselineValue"
               ],
               "properties": {
-                "period": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
-                "monthsAhead": { "type": "integer", "minimum": 1, "maximum": 12 },
-                "prediction": { "$ref": "#/$defs/Decimal" },
-                "lower80": { "$ref": "#/$defs/Decimal" },
-                "upper80": { "$ref": "#/$defs/Decimal" },
-                "lower95": { "$ref": "#/$defs/Decimal" },
-                "upper95": { "$ref": "#/$defs/Decimal" },
-                "baselineValue": { "$ref": "#/$defs/Decimal" }
+                "period": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                },
+                "monthsAhead": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 12
+                },
+                "prediction": {
+                  "$ref": "#/$defs/Decimal"
+                },
+                "lower80": {
+                  "$ref": "#/$defs/Decimal"
+                },
+                "upper80": {
+                  "$ref": "#/$defs/Decimal"
+                },
+                "lower95": {
+                  "$ref": "#/$defs/Decimal"
+                },
+                "upper95": {
+                  "$ref": "#/$defs/Decimal"
+                },
+                "baselineValue": {
+                  "$ref": "#/$defs/Decimal"
+                },
+                "drivers": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "historicalAverage",
+                    "seasonality",
+                    "trendAndLevel"
+                  ],
+                  "description": "Motivos de la parte variable (phase8-v1): promedio + estacionalidad + tendencia y nivel = predicción.",
+                  "properties": {
+                    "historicalAverage": {
+                      "$ref": "#/$defs/Decimal"
+                    },
+                    "seasonality": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/$defs/Decimal"
+                        }
+                      ]
+                    },
+                    "trendAndLevel": {
+                      "$ref": "#/$defs/Decimal"
+                    }
+                  }
+                }
               }
             }
+          },
+          "backtest": {
+            "description": "Resultado del backtesting (phase8-v1); ausente con estimación simple.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "origins",
+                  "candidates",
+                  "selected",
+                  "fallback",
+                  "baselineMase"
+                ],
+                "properties": {
+                  "origins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                    }
+                  },
+                  "candidates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "cuts",
+                        "mase",
+                        "coverage80",
+                        "bias"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cuts": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "mase": {
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "$ref": "#/$defs/Decimal"
+                            }
+                          ]
+                        },
+                        "coverage80": {
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "$ref": "#/$defs/Decimal"
+                            }
+                          ]
+                        },
+                        "bias": {
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "$ref": "#/$defs/Decimal"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "selected": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fallback": {
+                    "type": "boolean"
+                  },
+                  "baselineMase": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "$ref": "#/$defs/Decimal"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "outliers": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                }
+              }
+            ]
           }
         }
       }
     }
   },
   "$defs": {
-    "Decimal": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "maxLength": 40 }
+    "Decimal": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+      "maxLength": 40
+    }
   }
 }

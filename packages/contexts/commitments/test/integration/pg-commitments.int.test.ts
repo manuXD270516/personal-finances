@@ -220,6 +220,97 @@ describe('Repositorios de COMMITMENTS sobre PostgreSQL', () => {
     ).toBe('23514');
   });
 
+  it('[TC-FORECAST-EXPENSE-002] listResolvedForForecast separa salidas y entradas con tipo, administrador y categoría de la versión', async () => {
+    const w3 = randomUUID();
+    await inCtx(
+      w3,
+      async (c) => {
+        await c.query(
+          `INSERT INTO iam.workspace (id, name, base_currency, time_zone, locale, fiscal_month_start_day)
+           VALUES ($1, 'Rec3', 'BOB', 'America/La_Paz', 'es-BO', 1)`,
+          [w3],
+        );
+        await c.query(
+          `INSERT INTO iam.workspace_membership (workspace_id, user_id, role) VALUES ($1, $2, 'OWNER')`,
+          [w3, user],
+        );
+      },
+      true,
+    );
+    const category = randomUUID();
+    const mk = (kind: 'EXPENSE' | 'INCOME', name: string, categoryId: string | null) =>
+      RecurringDefinition.create({
+        id: randomUUID(),
+        workspaceId: w3,
+        name,
+        kind,
+        version1: buildDefinitionVersion({
+          kind,
+          versionNo: 1,
+          effectiveFrom: '2026-10-20',
+          currency: { code: 'BOB', scale: 2 },
+          template: {
+            accountId: randomUUID(),
+            amount: { type: 'FIXED', amount: '199.00' },
+            ...(categoryId ? { categoryId } : {}),
+            schedule: { cadence: 'MONTHLY', interval: 1, startDate: '2026-10-20' },
+          },
+        }),
+        at: '2026-10-09T16:00:00.000Z',
+        by: user,
+      });
+    const expense = mk('EXPENSE', 'Alquiler', category);
+    const income = mk('INCOME', 'Sueldo', null);
+    const pending = mk('EXPENSE', 'Pendiente', null);
+    await asUser(() =>
+      uow.run(w3, async () => {
+        for (const d of [expense, income, pending]) await defs.insert(d);
+        for (const [d, kind] of [
+          [expense, 'link'],
+          [income, 'link'],
+          [pending, 'none'],
+        ] as const) {
+          const o = occurrence(d, '2026-11-20');
+          await occs.insertIfAbsent([o]);
+          if (kind === 'link') {
+            const loaded = (await occs.findById(w3, o.id))!;
+            loaded.link({
+              transactionId: randomUUID(),
+              matchedBy: 'USER_LINK',
+              at: '2026-11-20T12:00:00.000Z',
+              by: user,
+            });
+            expect(await occs.save(loaded)).toBe(true);
+          }
+        }
+      }),
+    );
+    const out = await asUser(() =>
+      uow.run(w3, () => occs.listResolvedForForecast(w3, '2026-11-01', '2026-11-30', 'OUTFLOW')),
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      definitionName: 'Alquiler',
+      kind: 'EXPENSE',
+      managedBy: 'USER',
+      categoryId: category,
+    });
+    const inflow = await asUser(() =>
+      uow.run(w3, () => occs.listResolvedForForecast(w3, '2026-11-01', '2026-11-30', 'INFLOW')),
+    );
+    expect(inflow.map((r) => [r.definitionName, r.kind, r.categoryId])).toEqual([['Sueldo', 'INCOME', null]]);
+    expect(
+      await asUser(() =>
+        uow.run(w2, () => occs.listResolvedForForecast(w2, '2026-11-01', '2026-11-30', 'OUTFLOW')),
+      ),
+    ).toEqual([]);
+    expect(
+      await asUser(() =>
+        uow.run(w3, () => occs.listResolvedForForecast(w3, '2026-12-01', '2026-12-31', 'OUTFLOW')),
+      ),
+    ).toEqual([]);
+  });
+
   it('RLS: otro workspace no ve ni modifica las filas, y sin contexto de workspace la consulta falla (PF002)', async () => {
     const def = newDefinition(w1);
     await asUser(() => uow.run(w1, () => defs.insert(def)));

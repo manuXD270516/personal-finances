@@ -2,6 +2,80 @@
 # services/ml-forecasting/scripts/export_openapi.py: no se edita a mano (el job `ml` de CI compara).
 components:
   schemas:
+    BacktestCandidate:
+      additionalProperties: false
+      properties:
+        bias:
+          anyOf:
+          - maxLength: 40
+            pattern: ^-?[0-9]+(\.[0-9]+)?$
+            type: string
+          - type: 'null'
+          title: Bias
+        coverage80:
+          anyOf:
+          - maxLength: 40
+            pattern: ^-?[0-9]+(\.[0-9]+)?$
+            type: string
+          - type: 'null'
+          title: Coverage80
+        cuts:
+          minimum: 0.0
+          title: Cuts
+          type: integer
+        mase:
+          anyOf:
+          - maxLength: 40
+            pattern: ^-?[0-9]+(\.[0-9]+)?$
+            type: string
+          - type: 'null'
+          title: Mase
+        name:
+          title: Name
+          type: string
+      required:
+      - name
+      - cuts
+      - mase
+      - coverage80
+      - bias
+      title: BacktestCandidate
+      type: object
+    BacktestInfo:
+      additionalProperties: false
+      properties:
+        baselineMase:
+          anyOf:
+          - maxLength: 40
+            pattern: ^-?[0-9]+(\.[0-9]+)?$
+            type: string
+          - type: 'null'
+          title: Baselinemase
+        candidates:
+          items:
+            $ref: '#/components/schemas/BacktestCandidate'
+          title: Candidates
+          type: array
+        fallback:
+          title: Fallback
+          type: boolean
+        origins:
+          items:
+            pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+            type: string
+          title: Origins
+          type: array
+        selected:
+          title: Selected
+          type: string
+      required:
+      - origins
+      - candidates
+      - selected
+      - fallback
+      - baselineMase
+      title: BacktestInfo
+      type: object
     BaselineInfo:
       additionalProperties: false
       properties:
@@ -21,6 +95,34 @@ components:
       - method
       - n
       title: BaselineInfo
+      type: object
+    Drivers:
+      additionalProperties: false
+      description: 'Motivos de la parte variable de un punto: promedio + estacionalidad
+        + tendencia y nivel = predicción.'
+      properties:
+        historicalAverage:
+          maxLength: 40
+          pattern: ^-?[0-9]+(\.[0-9]+)?$
+          title: Historicalaverage
+          type: string
+        seasonality:
+          anyOf:
+          - maxLength: 40
+            pattern: ^-?[0-9]+(\.[0-9]+)?$
+            type: string
+          - type: 'null'
+          title: Seasonality
+        trendAndLevel:
+          maxLength: 40
+          pattern: ^-?[0-9]+(\.[0-9]+)?$
+          title: Trendandlevel
+          type: string
+      required:
+      - historicalAverage
+      - seasonality
+      - trendAndLevel
+      title: Drivers
       type: object
     ErrorBody:
       additionalProperties: false
@@ -138,6 +240,9 @@ components:
           enum:
           - fixed
           - simple
+          - BACKTEST
+          - BASELINE_FALLBACK
+          - SIMPLE
           title: Selectedby
           type: string
         version:
@@ -177,6 +282,10 @@ components:
           pattern: ^-?[0-9]+(\.[0-9]+)?$
           title: Baselinevalue
           type: string
+        drivers:
+          anyOf:
+          - $ref: '#/components/schemas/Drivers'
+          - type: 'null'
         lower80:
           maxLength: 40
           pattern: ^-?[0-9]+(\.[0-9]+)?$
@@ -238,7 +347,9 @@ components:
           title: Intervallevels
           type: array
         modelSet:
-          const: baseline-v1
+          enum:
+          - baseline-v1
+          - phase8-v1
           title: Modelset
           type: string
       required:
@@ -250,6 +361,10 @@ components:
     ResultOut:
       additionalProperties: false
       properties:
+        backtest:
+          anyOf:
+          - $ref: '#/components/schemas/BacktestInfo'
+          - type: 'null'
         baseline:
           anyOf:
           - $ref: '#/components/schemas/BaselineInfo'
@@ -263,6 +378,14 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ModelInfo'
           - type: 'null'
+        outliers:
+          anyOf:
+          - items:
+              pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+              type: string
+            type: array
+          - type: 'null'
+          title: Outliers
         points:
           items:
             $ref: '#/components/schemas/PointOut'
@@ -305,6 +428,12 @@ components:
           - INCOME
           title: Kind
           type: string
+        outlierPolicy:
+          anyOf:
+          - const: MAD_3_5
+            type: string
+          - type: 'null'
+          title: Outlierpolicy
         points:
           items:
             $ref: '#/components/schemas/SeriesPoint'

@@ -1,4 +1,6 @@
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
+import type { ResolvedOccurrencesQuery, UpcomingPaymentsQuery } from '@pf/commitments/contracts';
+import type { LoanScheduleQuery } from '@pf/debt/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import {
   MlForecastingServiceClient,
@@ -11,7 +13,13 @@ import type { ApiConfig, WorkerConfig } from '@pf/platform/config';
 
 /** Variables `FORECASTING_*` que lee la composición (API y worker; las del worker son opcionales en la API). */
 export type ForecastingConfig = Partial<
-  Pick<ApiConfig, 'FORECASTING_ENABLED' | 'FORECASTING_STALE_DAYS' | 'REPORTING_RATE_VALIDITY_WINDOW'>
+  Pick<
+    ApiConfig,
+    | 'FORECASTING_ENABLED'
+    | 'FORECASTING_STALE_DAYS'
+    | 'FORECASTING_COHERENCE_GAP_RATIO'
+    | 'REPORTING_RATE_VALIDITY_WINDOW'
+  >
 > &
   Partial<
     Pick<
@@ -49,6 +57,7 @@ export function forecastingSettingsFrom(
     },
     staleDays: config.FORECASTING_STALE_DAYS ?? 35,
     rateValidityWindowDays,
+    coherenceGapRatio: String(config.FORECASTING_COHERENCE_GAP_RATIO ?? 0.05),
   };
 }
 
@@ -105,6 +114,18 @@ export function forecastingReadPorts(input: {
     flows: {
       loadFlows: (workspaceId, dateFrom, dateTo) =>
         input.flows.summarizeNominalFlows({ workspaceId, dateFrom, dateTo }),
+      // Porciones con componente de préstamo (interés, cargos, seguro, impuestos): se restan de la historia variable.
+      async loadLoanComponents(workspaceId, dateFrom, dateTo) {
+        const rows = await input.flows.summarizeNominalFlows({
+          workspaceId,
+          dateFrom,
+          dateTo,
+          groupBy: ['ORIGIN'],
+        });
+        return rows
+          .filter((r) => r.nature === 'EXPENSE' && r.origin?.loanComponent)
+          .map((r) => ({ businessDate: r.businessDate, categoryId: r.categoryId, amount: r.amount }));
+      },
     },
     categories: {
       async catalog(workspaceId) {
@@ -130,6 +151,51 @@ export function forecastingReadPorts(input: {
           requests: req.requests,
           windowDays: req.windowDays,
         }),
+    },
+  };
+}
+
+/**
+ * Adaptadores de los costos conocidos (add-expense-forecasts) sobre los contratos públicos de COMMITMENTS (ocurrencias
+ * resueltas, no resueltas y la proyección sin guardar) y DEBT (cuotas futuras con componentes). Lecturas en serie: nunca
+ * en paralelo sobre el mismo cliente.
+ */
+export function forecastingKnownPorts(input: {
+  readonly upcoming: Pick<UpcomingPaymentsQuery, 'projectForForecast'>;
+  readonly resolved: Pick<ResolvedOccurrencesQuery, 'listResolved'>;
+  readonly loans: LoanScheduleQuery;
+}): Pick<ForecastingRuntimeOptions, 'known'> {
+  return {
+    known: {
+      async listResolved(workspaceId, from, to, direction) {
+        const rows = await input.resolved.listResolved({ workspaceId, from, to, direction });
+        return rows.map((r) => ({
+          kind: r.kind,
+          managedBy: r.managedBy,
+          transactionDate: r.transactionDate,
+          amount: r.amount,
+          categoryId: r.categoryId,
+        }));
+      },
+      async project(workspaceId, from, to) {
+        const rows = await input.upcoming.projectForForecast({ workspaceId, from, to });
+        return rows.map((o) => ({
+          date: o.date,
+          definitionId: o.definitionId,
+          occurrenceId: o.occurrenceId,
+          projected: o.projected,
+          kind: o.kind,
+          amountType: o.amountType,
+          amount: o.amount,
+          minAmount: o.minAmount,
+          maxAmount: o.maxAmount,
+          categoryId: o.categoryId,
+          managedBy: o.managedBy,
+          label: o.label,
+        }));
+      },
+      installments: (workspaceId, from, to) =>
+        input.loans.listUpcomingInstallments({ workspaceId, from, to }),
     },
   };
 }

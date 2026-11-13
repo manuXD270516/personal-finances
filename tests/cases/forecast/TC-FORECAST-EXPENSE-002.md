@@ -5,16 +5,20 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Historia variable sin doble conteo de lo recurrente"
 scenario: "Periodo con recurrentes resueltos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/forecast-sources.test.ts
+  - packages/contexts/commitments/test/integration/pg-commitments.int.test.ts
+  - packages/contexts/forecasting/src/application/expense-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/variable-history.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["known-future"]
@@ -28,7 +32,7 @@ steps:
 expected_result:
   - "la historia variable del gasto total en 2026-10 es 1552.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-002 — La historia variable resta los recurrentes resueltos del periodo

@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Costos conocidos de todo el horizonte"
 scenario: "Seguro anual fuera del horizonte de generación"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003","FR-COMMITMENTS-011"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - packages/contexts/commitments/src/application/forecast-sources.test.ts
+  - packages/contexts/forecasting/src/domain/known-future.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["known-future","commitments"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "los costos conocidos de 2027-03 incluyen \"Seguro anual\" por 900.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-004 — Los conocidos incluyen la proyección de definiciones más allá del horizonte de generación

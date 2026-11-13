@@ -192,6 +192,35 @@ export interface LoanPortfolioQuery {
 export const LOAN_PORTFOLIO_QUERY = Symbol.for('pf.debt.LoanPortfolioQuery');
 
 /**
+ * Cuota futura de un préstamo activo con lo que queda por pagar de cada componente (add-expense-forecasts, S3): el
+ * pronóstico de gasto suma interés, cargos, seguro e impuestos como costo conocido y nunca el capital.
+ */
+export interface UpcomingInstallmentDto {
+  readonly loanId: string;
+  /** Nombre del préstamo y número de cuota (p. ej. `Auto — cuota 5`). */
+  readonly label: string;
+  readonly dueDate: string;
+  readonly currency: string;
+  readonly principal: string;
+  readonly interest: string;
+  readonly charges: string;
+  readonly insurance: string;
+  readonly taxes: string;
+}
+
+/** Cronograma vigente de los préstamos activos. Sin efectos; corre en la unidad de trabajo del llamador si existe. */
+export interface LoanScheduleQuery {
+  /** Cuotas no pagadas (por componente, lo pendiente) con vencimiento en `[from, to]`, por fecha y préstamo. */
+  listUpcomingInstallments(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly UpcomingInstallmentDto[]>;
+}
+
+export const LOAN_SCHEDULE_QUERY = Symbol.for('pf.debt.LoanScheduleQuery');
+
+/**
  * Pagos de préstamos por mes para el reporte de evolución de deudas (add-financial-reports-extended, reporte 10): por
  * préstamo y mes, principal, interés y cargos (comisiones + seguro + impuestos) de los pagos vigentes (desglose de cada
  * pago, INV-016) y cada pago con su fecha para valorarlo con la tasa de ese día. Sin efectos; en la unidad de trabajo

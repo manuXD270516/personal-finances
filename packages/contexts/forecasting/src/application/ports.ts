@@ -2,7 +2,14 @@ import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contrac
 import type { Clock, FlowRateResolverInput, FlowResolvedRate } from '@pf/shared-kernel';
 import type {
   CategoryInfo,
+  Confidence,
+  Driver,
   FlowRow,
+  InstallmentInput,
+  KnownItem,
+  LoanComponentInput,
+  OccurrenceInput,
+  ResolvedInput,
   FailureReason,
   ForecastRequestV1,
   ForecastResponseV1,
@@ -53,6 +60,28 @@ export interface WorkspaceSettingsPort {
 /** Flujos nominales diarios (TRANSACTIONS `NominalFlowQuery`; adapter en la composición). */
 export interface FlowsPort {
   loadFlows(workspaceId: string, dateFrom: string, dateTo: string): Promise<readonly FlowRow[]>;
+  /** Porciones de gasto con componente de préstamo (`NominalFlowQuery` con `groupBy: ['ORIGIN']`; add-expense-forecasts). */
+  loadLoanComponents(
+    workspaceId: string,
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<readonly LoanComponentInput[]>;
+}
+
+/**
+ * Insumos de los costos conocidos (add-expense-forecasts, decisiones 2 a 4): COMMITMENTS (ocurrencias resueltas y
+ * no resueltas con la proyección sin guardar) y DEBT (cuotas futuras con componentes). Adapters en la composición; las
+ * lecturas se hacen en serie dentro de la transacción de lectura de la corrida.
+ */
+export interface KnownSourcesPort {
+  listResolved(
+    workspaceId: string,
+    from: string,
+    to: string,
+    direction: 'OUTFLOW' | 'INFLOW',
+  ): Promise<readonly ResolvedInput[]>;
+  project(workspaceId: string, from: string, to: string): Promise<readonly OccurrenceInput[]>;
+  installments(workspaceId: string, from: string, to: string): Promise<readonly InstallmentInput[]>;
 }
 
 /** Catálogo de categorías con su grupo (CLASSIFICATION `CategoryCatalogQuery`; adapter en la composición). */
@@ -96,6 +125,33 @@ export interface StoredPoint {
   readonly lower95: string;
   readonly upper95: string;
   readonly baselineValue: string;
+  /** Componentes (add-expense-forecasts); `null` en las corridas anteriores a este change. */
+  readonly knownFuture: string | null;
+  readonly predictedVariable: string | null;
+  readonly variableLower80: string | null;
+  readonly variableUpper80: string | null;
+  readonly knownBlankCount: number;
+  readonly drivers: readonly Driver[] | null;
+}
+
+export interface StoredBacktest {
+  readonly modelName: string;
+  readonly origins: number;
+  readonly mase: string | null;
+  readonly coverage80: string | null;
+  readonly bias: string | null;
+  readonly selected: boolean;
+}
+
+export interface StoredKnownItem extends KnownItem {
+  readonly currency: string;
+}
+
+export interface RunMetadata {
+  readonly seed: number;
+  readonly modelSet: string;
+  /** Conversión de los conocidos con la tasa de hoy (declarada en `LatestForecast.meta.conversion`). */
+  readonly conversion: { readonly rateDate: string; readonly ratesUsed: readonly unknown[] } | null;
 }
 
 export type StoredSeriesStatus = 'PUBLISHED' | 'INSUFFICIENT' | 'INVALID';
@@ -122,6 +178,15 @@ export interface StoredSeries {
   readonly baselineN: number | null;
   readonly status: StoredSeriesStatus;
   readonly points: readonly StoredPoint[];
+  readonly selectedBy: 'BACKTEST' | 'BASELINE_FALLBACK' | 'SIMPLE' | null;
+  readonly mase: string | null;
+  readonly baselineMase: string | null;
+  readonly coverage80: string | null;
+  readonly confidence: Confidence | null;
+  /** Resultado del backtesting por candidato (con `insertAll`; no se lee con `listByRun`). */
+  readonly backtest?: readonly StoredBacktest[];
+  /** Conocidos del horizonte de la serie (con `insertAll`; se leen con `listKnownItems`). */
+  readonly knownItems?: readonly StoredKnownItem[];
 }
 
 export interface ListRunsFilter {
@@ -153,6 +218,15 @@ export interface RunRepository {
 export interface SeriesRepository {
   insertAll(series: readonly StoredSeries[]): Promise<void>;
   listByRun(workspaceId: string, runId: string): Promise<readonly StoredSeries[]>;
+  /** Conocidos de un periodo de una serie de la corrida, por fecha y etiqueta. */
+  listKnownItems(
+    workspaceId: string,
+    runId: string,
+    series: { readonly scope: SeriesScope; readonly scopeRef: string | null },
+    period: string,
+  ): Promise<readonly StoredKnownItem[]>;
+  saveRunMetadata(workspaceId: string, runId: string, metadata: RunMetadata): Promise<void>;
+  runMetadata(workspaceId: string, runId: string): Promise<RunMetadata | null>;
 }
 
 /** Operación asíncrona consultable (`platform.operation`, kind `FORECAST`): mismo id que la corrida. */
@@ -208,6 +282,8 @@ export interface ForecastingSettings {
   readonly retry: RetryPolicy;
   readonly staleDays: number;
   readonly rateValidityWindowDays: number;
+  /** `FORECASTING_COHERENCE_GAP_RATIO` (por omisión 0.05): umbral de la diferencia entre categorías y total. */
+  readonly coherenceGapRatio: string;
 }
 
 export interface ForecastMetrics {
@@ -227,6 +303,7 @@ export interface ForecastingDeps {
   readonly workspaces: WorkspaceDirectory;
   readonly settingsOf: WorkspaceSettingsPort;
   readonly flows: FlowsPort;
+  readonly known: KnownSourcesPort;
   readonly categories: CategoriesPort;
   readonly rates: RatesPort;
   readonly service: ForecastServicePort;

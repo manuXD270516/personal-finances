@@ -21,7 +21,7 @@ class _Strict(BaseModel):
 
 
 class Policy(_Strict):
-    modelSet: Literal["baseline-v1"]  # noqa: N815
+    modelSet: Literal["baseline-v1", "phase8-v1"]  # noqa: N815
     horizonMax: int = Field(ge=1, le=12)  # noqa: N815
     intervalLevels: list[float] = Field(min_length=2, max_length=2)  # noqa: N815
 
@@ -40,6 +40,8 @@ class SeriesIn(_Strict):
     readiness: Literal["MODEL", "SIMPLE"]
     horizon: int = Field(ge=1, le=12)
     points: list[SeriesPoint] = Field(min_length=1, max_length=120)
+    # Aditivo (phase8-v1): política de atípicos de la parte variable.
+    outlierPolicy: Literal["MAD_3_5"] | None = None  # noqa: N815
 
 
 class ForecastRequestV1(_Strict):
@@ -53,12 +55,36 @@ class ForecastRequestV1(_Strict):
 class ModelInfo(_Strict):
     name: str
     version: str
-    selectedBy: Literal["fixed", "simple"]  # noqa: N815
+    selectedBy: Literal["fixed", "simple", "BACKTEST", "BASELINE_FALLBACK", "SIMPLE"]  # noqa: N815
 
 
 class BaselineInfo(_Strict):
     method: Literal["NAIVE", "SEASONAL_NAIVE", "MEAN_LAST_N"]
     n: int | None
+
+
+class Drivers(_Strict):
+    """Motivos de la parte variable de un punto: promedio + estacionalidad + tendencia y nivel = predicción."""
+
+    historicalAverage: DecimalString  # noqa: N815
+    seasonality: DecimalString | None
+    trendAndLevel: DecimalString  # noqa: N815
+
+
+class BacktestCandidate(_Strict):
+    name: str
+    cuts: int = Field(ge=0)
+    mase: DecimalString | None
+    coverage80: DecimalString | None  # noqa: N815
+    bias: DecimalString | None
+
+
+class BacktestInfo(_Strict):
+    origins: list[Period]
+    candidates: list[BacktestCandidate]
+    selected: str
+    fallback: bool
+    baselineMase: DecimalString | None  # noqa: N815
 
 
 class PointOut(_Strict):
@@ -70,6 +96,7 @@ class PointOut(_Strict):
     lower95: DecimalString
     upper95: DecimalString
     baselineValue: DecimalString  # noqa: N815
+    drivers: Drivers | None = None
 
 
 class ResultOut(_Strict):
@@ -79,6 +106,8 @@ class ResultOut(_Strict):
     model: ModelInfo | None
     baseline: BaselineInfo | None
     points: list[PointOut]
+    backtest: BacktestInfo | None = None
+    outliers: list[Period] | None = None
 
 
 class ForecastResponseV1(_Strict):

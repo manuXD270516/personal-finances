@@ -22,12 +22,15 @@ import type {
   MoneyDto,
   RecurringCostDto,
   RecurringCostQuery,
+  ProjectedOccurrenceDto,
+  ResolvedOccurrenceDto,
   ResolvedOccurrencesQuery,
   ResolvedOutflowDto,
   UpcomingPaymentDto,
   UpcomingPaymentsQuery,
 } from '../contracts/index.js';
 import {
+  OccurrenceGenerator,
   computeCommitted,
   countsAsCommittedOutflow,
   projectedAmount,
@@ -39,6 +42,7 @@ import {
   type OccurrenceStatus,
   type RecurringKind,
 } from '../domain/index.js';
+import { indexCandidates } from './indexation.js';
 import type { CommitmentsDeps, OccurrenceView } from './ports/index.js';
 import {
   definitionDto,
@@ -629,6 +633,149 @@ export class CommitmentsQueries
       });
       const today = await this.todayOf(workspaceId);
       return { items, generatedThrough: today.plusDays(this.deps.horizonDays).toString() };
+    });
+  }
+
+  /**
+   * `UpcomingPaymentsQuery.projectForForecast` (add-expense-forecasts, S1): las no resueltas ya generadas con
+   * vencimiento en `[from, to]` y, de cada definición activa, las fechas posteriores a lo ya generado que el motor
+   * de recurrencia calcularía (mismo `OccurrenceGenerator.candidates`: reglas de fin de mes y de fin de semana, versiones
+   * vigentes y fin de la serie, y la misma estimación de precios indexados). No escribe nada: solo lee.
+   */
+  projectForForecast(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly ProjectedOccurrenceDto[]> {
+    const { workspaceId } = input;
+    return this.deps.uow.run(workspaceId, async () => {
+      const from = LocalDate.parse(input.from);
+      const to = LocalDate.parse(input.to);
+      const direction = (kind: string): 'OUTFLOW' | 'INFLOW' => (kind === 'INCOME' ? 'INFLOW' : 'OUTFLOW');
+      const unresolved = await this.deps.occurrences.list(workspaceId, {
+        statuses: UNRESOLVED,
+        dueFrom: input.from,
+        dueTo: input.to,
+        order: 'DUE_DATE',
+      });
+      const out: ProjectedOccurrenceDto[] = unresolved.map((v) => {
+        const o = v.occurrence;
+        const money = (amount: string | null) => (amount === null ? null : { amount, currency: o.currency });
+        return {
+          date: o.dueDate,
+          definitionId: o.definitionId,
+          occurrenceId: o.id,
+          projected: false,
+          kind: v.kind,
+          direction: direction(v.kind),
+          amountType: o.expected.type,
+          amount: money(o.expected.amount),
+          minAmount: money(o.expected.min),
+          maxAmount: money(o.expected.max),
+          categoryId: v.categoryId,
+          accountId: v.accountId,
+          managedBy: v.managedBy,
+          label: nameOf(v),
+        };
+      });
+      const definitions = await this.deps.definitions.list(workspaceId, { status: 'ACTIVE' });
+      for (const { definition } of definitions) {
+        const through = definition.snapshot.generatedThrough;
+        const start = through ? LocalDate.parse(through).plusDays(1) : from;
+        const lo = start.compare(from) > 0 ? start : from;
+        if (lo.compare(to) > 0) continue;
+        // El ajuste de fin de semana puede mover el vencimiento unos días: se pide una ventana algo mayor.
+        const existing = new Set(
+          (await this.deps.occurrences.listExisting(workspaceId, definition.id, lo.toString())).map(
+            (e) => e.occurrenceDate,
+          ),
+        );
+        const planned = OccurrenceGenerator.plan(
+          definition,
+          { from: lo, to: to.plusDays(7) },
+          existing,
+        ).filter((c) => c.dueDate.compare(from) >= 0 && c.dueDate.compare(to) <= 0);
+        if (planned.length === 0) continue;
+        const indexed = await indexCandidates(this.deps, workspaceId, planned);
+        const kind = definition.snapshot.kind as RecurringKind;
+        for (const c of indexed) {
+          const money = (amount: string | null) =>
+            amount === null ? null : { amount, currency: c.currency };
+          const version = definition.versionNo(c.versionNo);
+          out.push({
+            date: c.dueDate.toString(),
+            definitionId: definition.id,
+            occurrenceId: null,
+            projected: true,
+            kind,
+            direction: direction(kind),
+            amountType: c.expected.type,
+            amount: money(c.expected.amount),
+            minAmount: money(c.expected.min),
+            maxAmount: money(c.expected.max),
+            categoryId: version.categoryId,
+            accountId: version.accountId,
+            managedBy: definition.snapshot.managedBy,
+            label:
+              kind === 'LOAN_PAYMENT' && c.scheduleKey
+                ? `${definition.name} — cuota ${c.scheduleKey}`
+                : definition.name,
+          });
+        }
+      }
+      return out.sort((a, b) =>
+        a.date === b.date ? (a.label < b.label ? -1 : 1) : a.date < b.date ? -1 : 1,
+      );
+    });
+  }
+
+  /** `ResolvedOccurrencesQuery.listResolved` (add-expense-forecasts, S2): la transacción fija la fecha y el monto. */
+  listResolved(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly direction: 'OUTFLOW' | 'INFLOW';
+  }): Promise<readonly ResolvedOccurrenceDto[]> {
+    const { workspaceId } = input;
+    return this.deps.uow.run(workspaceId, async () => {
+      // Una ocurrencia puede vencer en un periodo y pagarse en el siguiente: se amplía el rango del vencimiento y el
+      // filtro definitivo es la fecha de la transacción.
+      const rows = await this.deps.occurrences.listResolvedForForecast(
+        workspaceId,
+        LocalDate.parse(input.from).plusDays(-62).toString(),
+        LocalDate.parse(input.to).plusDays(62).toString(),
+        input.direction,
+      );
+      const txns = new Map(
+        (
+          await this.deps.links.getManyForLink({
+            workspaceId,
+            transactionIds: rows.map((r) => r.transactionId),
+          })
+        ).map((t) => [t.transactionId, t] as const),
+      );
+      const out: ResolvedOccurrenceDto[] = [];
+      for (const r of rows) {
+        const txn = txns.get(r.transactionId);
+        if (!txn || txn.status === 'VOIDED') continue;
+        if (txn.businessDate < input.from || txn.businessDate > input.to) continue;
+        out.push({
+          occurrenceId: r.occurrenceId,
+          definitionId: r.definitionId,
+          definitionName: r.definitionName,
+          generatedAt: r.generatedAt,
+          resolution: r.resolution,
+          matchedBy: r.matchedBy,
+          transactionId: r.transactionId,
+          transactionDate: txn.businessDate,
+          amount: txn.amount,
+          kind: r.kind,
+          managedBy: r.managedBy,
+          direction: input.direction,
+          categoryId: r.categoryId,
+        });
+      }
+      return out;
     });
   }
 

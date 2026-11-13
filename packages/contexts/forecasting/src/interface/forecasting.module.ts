@@ -14,6 +14,7 @@ import type {
   ForecastServicePort,
   ForecastingDeps,
   ForecastingSettings,
+  KnownSourcesPort,
   OutboxPort,
   RatesPort,
   WorkspaceDirectory,
@@ -41,6 +42,7 @@ export const DEFAULT_FORECASTING_SETTINGS: ForecastingSettings = {
   retry: DEFAULT_RETRY_POLICY,
   staleDays: 35,
   rateValidityWindowDays: 7,
+  coherenceGapRatio: '0.05',
 };
 
 export interface ForecastingRuntimeOptions {
@@ -55,6 +57,8 @@ export interface ForecastingRuntimeOptions {
   /** Puertos de lectura sobre los contratos públicos de IDENTITY, TRANSACTIONS, CLASSIFICATION y FX. */
   readonly settingsOf: WorkspaceSettingsPort;
   readonly flows: FlowsPort;
+  /** Ocurrencias, proyección y cuotas de los costos conocidos (COMMITMENTS y DEBT). */
+  readonly known: KnownSourcesPort;
   readonly categories: CategoriesPort;
   readonly rates: RatesPort;
   /** ACL del servicio `finance-ml` (en la API no se usa: solo el worker llama al servicio). */
@@ -88,6 +92,7 @@ export function createForecastingRuntime(options: ForecastingRuntimeOptions): Fo
     workspaces: options.workspaces,
     settingsOf: options.settingsOf,
     flows: options.flows,
+    known: options.known,
     categories: options.categories,
     rates: options.rates,
     service: options.service,
@@ -188,3 +193,4 @@ export {
 } from '../contracts/index.js';
 export { MlForecastingServiceClient } from '../infrastructure/ml-service-client.js';
 export type { OutboxPort } from '../application/ports.js';
+export { BacktestReport, collectBacktestReport } from './backtest-report-runner.js';

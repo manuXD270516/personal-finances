@@ -30,6 +30,7 @@ import type {
   OccurrenceFilter,
   OccurrenceRepository,
   OccurrenceView,
+  ResolvedForecastRow,
   ResolvedOutflowRow,
 } from '../ports/index.js';
 
@@ -240,6 +241,35 @@ export class InMemoryCommitments {
           transactionId: o.transactionId as string,
           currency: o.currency,
         })),
+    listResolvedForForecast: async (_ws, from, to, direction): Promise<ResolvedForecastRow[]> =>
+      this.sorted([...this.occurrencesMap.values()])
+        .filter((o) => {
+          const kind = this.definitionsMap.get(o.definitionId)?.state.kind;
+          return (
+            (o.status === 'MATERIALIZED' || o.status === 'MATCHED') &&
+            o.dueDate >= from &&
+            o.dueDate <= to &&
+            kind !== undefined &&
+            kind !== 'LOAN_PAYMENT' &&
+            (kind === 'INCOME') === (direction === 'INFLOW')
+          );
+        })
+        .map((o) => {
+          const def = this.definitionsMap.get(o.definitionId);
+          return {
+            occurrenceId: o.id,
+            definitionId: o.definitionId,
+            definitionName: def?.state.name ?? '',
+            generatedAt: o.createdAt,
+            resolution: o.status === 'MATCHED' ? ('MATCHED' as const) : ('MATERIALIZED' as const),
+            matchedBy: o.matchedBy,
+            transactionId: o.transactionId as string,
+            currency: o.currency,
+            kind: def?.state.kind as ResolvedForecastRow['kind'],
+            managedBy: def?.state.managedBy as ResolvedForecastRow['managedBy'],
+            categoryId: def?.versions.find((v) => v.versionNo === o.definitionVersionNo)?.categoryId ?? null,
+          };
+        }),
     lastResolvedNominal: async (_ws, definitionId) =>
       this.sorted([...this.occurrencesMap.values()])
         .filter(

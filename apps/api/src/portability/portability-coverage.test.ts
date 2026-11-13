@@ -65,9 +65,11 @@ describe('[TC-IDENTITY-EXPORT-010] cobertura de tablas del export (estática)', 
     }
   });
 
-  it('[TC-FORECAST-SERVICE-039] los pronósticos no viajan en la exportación: sus tres tablas están excluidas con motivo y sin sección', () => {
+  it('[TC-FORECAST-SERVICE-039] los pronósticos no viajan en la exportación: sus cinco tablas están excluidas con motivo y sin sección', () => {
     const excluded = PORTABILITY_EXCLUSIONS.filter((e) => e.table.startsWith('forecasting.'));
     expect(excluded.map((e) => e.table).sort()).toEqual([
+      'forecasting.backtest_result',
+      'forecasting.forecast_known_item',
       'forecasting.forecast_point',
       'forecasting.forecast_run',
       'forecasting.forecast_series',

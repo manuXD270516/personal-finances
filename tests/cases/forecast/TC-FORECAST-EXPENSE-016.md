@@ -5,16 +5,19 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Aviso de no asesoría financiera"
 scenario: "Aviso en la vista"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-COMP-004"]
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - tests/e2e/specs/expense-forecasts.spec.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["ui","i18n","NFR-COMP-004"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "la vista muestra el aviso de estimación estadística sin asesoría financiera en inglés"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-016 — La vista muestra el aviso de no asesoría financiera en el idioma del usuario

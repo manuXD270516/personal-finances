@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Motivos del pronóstico"
 scenario: "Motivos del gasto de diciembre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/forecast-composer.test.ts
+  - services/ml-forecasting/tests/test_phase8.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["explainability"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "los motivos informan promedio 1552.00 BOB, estacionalidad +120.00 BOB, tendencia y nivel reciente −12.00 BOB y costos conocidos 2748.00 BOB con sus tres compromisos"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-012 — Los motivos suman exactamente la parte variable predicha

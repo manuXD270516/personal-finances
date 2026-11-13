@@ -12,6 +12,10 @@ import {
   ForecastRun,
   type CategoryInfo,
   type FlowRow,
+  type InstallmentInput,
+  type LoanComponentInput,
+  type OccurrenceInput,
+  type ResolvedInput,
   type ForecastRequestV1,
   type ForecastResponseV1,
   type ForecastRunStatus,
@@ -22,6 +26,8 @@ import {
   type ForecastingDeps,
   type ForecastingSettings,
   type ListRunsFilter,
+  type RunMetadata,
+  type StoredKnownItem,
   type MaintenancePort,
   type OperationPort,
   type OutboxPort,
@@ -123,11 +129,33 @@ export class InMemoryRuns implements RunRepository {
 
 export class InMemorySeries implements SeriesRepository {
   readonly rows: StoredSeries[] = [];
+  readonly metadata = new Map<string, RunMetadata>();
   async insertAll(series: readonly StoredSeries[]): Promise<void> {
     this.rows.push(...series);
   }
   async listByRun(workspaceId: string, runId: string): Promise<readonly StoredSeries[]> {
     return this.rows.filter((s) => s.workspaceId === workspaceId && s.runId === runId);
+  }
+  async listKnownItems(
+    workspaceId: string,
+    runId: string,
+    series: { scope: StoredSeries['scope']; scopeRef: string | null },
+    period: string,
+  ): Promise<readonly StoredKnownItem[]> {
+    const row = this.rows.find(
+      (s) =>
+        s.workspaceId === workspaceId &&
+        s.runId === runId &&
+        s.scope === series.scope &&
+        s.scopeRef === series.scopeRef,
+    );
+    return (row?.knownItems ?? []).filter((k) => k.period === period);
+  }
+  async saveRunMetadata(_ws: string, runId: string, metadata: RunMetadata): Promise<void> {
+    this.metadata.set(runId, metadata);
+  }
+  async runMetadata(_ws: string, runId: string): Promise<RunMetadata | null> {
+    return this.metadata.get(runId) ?? null;
   }
 }
 
@@ -274,6 +302,10 @@ export interface TestWorld {
   readonly outbox: Parameters<OutboxPort['append']>[0][];
   readonly metrics: { failures: string[]; durations: string[]; insufficient: number[] };
   flows: FlowRow[];
+  loanComponents: LoanComponentInput[];
+  resolved: ResolvedInput[];
+  occurrences: OccurrenceInput[];
+  installments: InstallmentInput[];
   categories: { groups: GroupInfo[]; categories: CategoryInfo[] };
   workspaces: string[];
 }
@@ -286,6 +318,7 @@ export const DEFAULT_SETTINGS: ForecastingSettings = {
   retry: DEFAULT_RETRY_POLICY,
   staleDays: 35,
   rateValidityWindowDays: 7,
+  coherenceGapRatio: '0.05',
 };
 
 /** Mundo de pruebas: fecha fija en America/La_Paz, dobles en memoria y mocks de los contratos de otros contextos. */
@@ -312,6 +345,10 @@ export function buildWorld(
     outbox,
     metrics,
     flows: [],
+    loanComponents: [],
+    resolved: [],
+    occurrences: [],
+    installments: [],
     categories: { groups: [], categories: [] },
     workspaces: ['w1'],
     deps: undefined as never,
@@ -336,7 +373,13 @@ export function buildWorld(
         reportingScale: 2,
       }),
     },
-    flows: { loadFlows: async () => world.flows },
+    flows: { loadFlows: async () => world.flows, loadLoanComponents: async () => world.loanComponents },
+    known: {
+      listResolved: async (_ws, _from, _to, direction) =>
+        world.resolved.filter((r) => (direction === 'INFLOW') === (r.kind === 'INCOME')),
+      project: async () => world.occurrences,
+      installments: async () => world.installments,
+    },
     categories: { catalog: async () => world.categories },
     rates: {
       resolve: async (_ws: string, input: FlowRateResolverInput) =>

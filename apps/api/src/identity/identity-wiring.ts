@@ -49,6 +49,7 @@ import {
 } from '@pf/forecasting/interface/forecasting.module';
 import {
   forecastingMetrics,
+  forecastingKnownPorts,
   forecastingReadPorts,
   forecastingServiceClient,
   forecastingSettingsFrom,
@@ -896,6 +897,11 @@ export function financeRuntimes(input: {
       flows: transactions.flows,
       categories: classification.categories,
       rates: fx.valuation,
+    }),
+    ...forecastingKnownPorts({
+      upcoming: commitments.queries,
+      resolved: commitments.queries,
+      loans: debt.queries,
     }),
     service: forecastingServiceClient(input.config),
     settings: forecastingSettingsFrom(input.config, rateValidityWindowDays),

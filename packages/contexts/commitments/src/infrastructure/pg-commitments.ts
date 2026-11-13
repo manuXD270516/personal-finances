@@ -11,6 +11,7 @@ import type {
   OccurrenceFilter,
   OccurrenceRepository,
   OccurrenceView,
+  ResolvedForecastRow,
   ResolvedOutflowRow,
   UnitOfWork,
 } from '../application/ports/index.js';
@@ -716,6 +717,52 @@ export class PgOccurrenceRepository implements OccurrenceRepository {
       matchedBy: r.matched_by,
       transactionId: r.transaction_id,
       currency: r.currency,
+    }));
+  }
+
+  async listResolvedForForecast(
+    workspaceId: string,
+    from: string,
+    to: string,
+    direction: 'OUTFLOW' | 'INFLOW',
+  ): Promise<ResolvedForecastRow[]> {
+    const inflow = direction === 'INFLOW';
+    const { rows } = await sql<{
+      id: string;
+      definition_id: string;
+      name: string;
+      created_at: string;
+      status: 'MATERIALIZED' | 'MATCHED';
+      matched_by: OccurrenceState['matchedBy'];
+      transaction_id: string;
+      currency: string;
+      kind: ResolvedForecastRow['kind'];
+      managed_by: ResolvedForecastRow['managedBy'];
+      category_id: string | null;
+    }>`
+      SELECT o.id, o.definition_id, d.name,
+             to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+             o.status, o.matched_by, o.transaction_id, o.currency, d.kind, d.managed_by, v.category_id
+        FROM commitments.recurring_occurrence o
+        JOIN commitments.recurring_definition d ON d.workspace_id = o.workspace_id AND d.id = o.definition_id
+        JOIN commitments.recurring_definition_version v
+          ON v.definition_id = o.definition_id AND v.version_no = o.definition_version_no
+       WHERE o.workspace_id = ${workspaceId} AND o.status IN ('MATERIALIZED', 'MATCHED')
+         AND d.kind <> 'LOAN_PAYMENT' AND ((d.kind = 'INCOME') = ${inflow})
+         AND o.due_date BETWEEN ${from}::date AND ${to}::date
+       ORDER BY o.due_date, o.id`.execute(db());
+    return rows.map((r) => ({
+      occurrenceId: r.id,
+      definitionId: r.definition_id,
+      definitionName: r.name,
+      generatedAt: r.created_at,
+      resolution: r.status,
+      matchedBy: r.matched_by,
+      transactionId: r.transaction_id,
+      currency: r.currency,
+      kind: r.kind,
+      managedBy: r.managed_by,
+      categoryId: r.category_id,
     }));
   }
 

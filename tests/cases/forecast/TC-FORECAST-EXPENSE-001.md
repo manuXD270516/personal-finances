@@ -5,16 +5,22 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Costos futuros conocidos separados de los variables predichos"
 scenario: "Gasto total de diciembre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003","FR-FORECAST-002"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/forecasting.api.test.ts
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - packages/contexts/forecasting/src/application/expense-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/forecast-composer.test.ts
+  - packages/contexts/forecasting/src/domain/known-future.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["money","known-future"]
@@ -29,7 +35,7 @@ expected_result:
   - "el gasto total esperado de 2026-12 es 4408.00 BOB con intervalo del 80 % de 4038.00 BOB a 4788.00 BOB"
   - "el punto informa costos conocidos 2748.00 BOB y variable predicho 1660.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-001 — El valor esperado es la suma exacta de conocidos y variable predicho

@@ -673,3 +673,8 @@ Tag Rules (`x-openspec-capability: rules/rule-engine`), todo aditivo: `listRules
 
 - Endpoints (`Forecasts`): `POST /workspaces/{id}/forecasts` (`requestForecastRun`, EDITOR, `Idempotency-Key`, 202 + `Operation` `FORECAST`, `Location` a la corrida), `GET …/forecasts` (`listForecastRuns`), `GET …/forecasts/latest` (`getLatestForecast`, `scope`, `scopeRef`, `horizon` 1/3/6/12) , `GET …/forecasts/{runId}` y `…/lifecycle`.
 - Catálogo §9.1: `FORECAST_RUN_IN_PROGRESS` (409) y `FORECASTING_DISABLED` (409). Pendiente: `GET …/operations/{id}` sigue siendo solo OWNER (`getOperation` de IDENTITY), así que el EDITOR sigue la corrida por `getForecastRun` (mismo id).
+
+## Nota as-built: `add-expense-forecasts` (Phase 8, 2026-11-13)
+
+- `GET /workspaces/{id}/forecasts/latest/known-items` (`listForecastKnownItems`, VIEWER): `scope` y `period` requeridos, `scopeRef` opcional; ítems `{date, label, kind, amountType, amount, originalAmount, managedBy, sourceRef}` ordenados por fecha; `scope` desconocido o `period` que no es `YYYY-MM` ⇒ 400 `INVALID_FILTER`.
+- `ForecastPoint` + `components {knownFuture, predictedVariable, predictedVariableInterval80, knownWithoutAmountCount}`, `drivers[]` y `coherenceGap` (solo en el gasto total y solo si supera `FORECASTING_COHERENCE_GAP_RATIO`; se informa por punto porque la diferencia es por periodo); `ForecastSeries.model` + `selectedBy`, `mase`, `baselineMase` y `confidence`; `LatestForecast.meta.conversion {rateDate, ratesUsed}`. Todo aditivo (oasdiff limpio); sin códigos de error nuevos.

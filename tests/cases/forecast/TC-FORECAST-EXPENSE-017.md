@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Aviso claro de datos insuficientes"
 scenario: "Categoría con 4 periodos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-005"]
 nfr: []
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/forecasts/forecasts.test.tsx
+  - packages/contexts/forecasting/src/application/expense-forecast.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["ui","readiness"]
@@ -29,7 +31,7 @@ expected_result:
   - "la vista indica que se necesitan 2 periodos más de historia en \"Restaurantes\" para un pronóstico estadístico"
   - "muestra la estimación simple marcada como tal y sus costos conocidos"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-017 — La vista explica cuántos periodos faltan y muestra solo la estimación simple y conocidos

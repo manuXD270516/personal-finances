@@ -65,6 +65,8 @@ export function createEnvFile(): string {
     ['DEBT_CARDS_CRON', '* * * * *'],
     // Proveedor de exchange SIMULADO (add-banking-providers): sin red; PROHIBIDO en staging y producción.
     ['IMPORTS_PROVIDER_FAKE_ENABLED', 'true'],
+    // Pronósticos (add-expense-forecasts): el perfil `ml` del stack E2E levanta el servicio real.
+    ['FORECASTING_ENABLED', 'true'],
   ]);
   const extra = new Map([
     ['FX_PROVIDER_PARALELO_BO_URL', simUrl],

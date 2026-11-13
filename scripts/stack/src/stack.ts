@@ -152,9 +152,18 @@ runMain(async () => {
     }
     case 'ps':
       return (await compose(ALL, ['ps', '--all'])).code;
-    case 'build':
-      await composeOrThrow(['core'], ['build', 'migrate', 'finance-web']);
+    case 'build': {
+      // Con `--profile ml` también la imagen del servicio de pronósticos (la suite E2E de pronósticos la necesita).
+      const profiles = profilesFrom(args, ['core']);
+      const withMl = profiles.includes('ml');
+      await composeOrThrow(withMl ? ['core', 'ml'] : ['core'], [
+        'build',
+        'migrate',
+        'finance-web',
+        ...(withMl ? ['ml-forecasting'] : []),
+      ]);
       return 0;
+    }
     case 'reset':
       return reset(args);
     default:

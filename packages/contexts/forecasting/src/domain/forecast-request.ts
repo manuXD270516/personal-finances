@@ -27,6 +27,8 @@ export interface ForecastRequestSeries {
   readonly scale: number;
   readonly readiness: 'MODEL' | 'SIMPLE';
   readonly horizon: number;
+  /** Atípicos de la parte variable (phase8-v1, decisión 11): el servicio recorta al límite para ajustar. */
+  readonly outlierPolicy: 'MAD_3_5';
   readonly points: readonly { readonly period: string; readonly value: string; readonly txCount: number }[];
 }
 
@@ -35,7 +37,7 @@ export interface ForecastRequestV1 {
   readonly requestId: string;
   readonly seed: number;
   readonly policy: {
-    readonly modelSet: 'baseline-v1';
+    readonly modelSet: 'phase8-v1';
     readonly horizonMax: 12;
     readonly intervalLevels: readonly [0.8, 0.95];
   };
@@ -86,6 +88,7 @@ export const ForecastRequestBuilder = {
         scale: input.scale,
         readiness: s.readiness as 'MODEL' | 'SIMPLE',
         horizon: s.horizon,
+        outlierPolicy: 'MAD_3_5' as const,
         points: s.points.map((p) => ({
           period: p.period,
           value: p.value.toFixed(input.scale),
@@ -98,7 +101,7 @@ export const ForecastRequestBuilder = {
         schemaVersion: '1',
         requestId: input.requestId,
         seed: input.seed,
-        policy: { modelSet: 'baseline-v1', horizonMax: 12, intervalLevels: [0.8, 0.95] },
+        policy: { modelSet: 'phase8-v1', horizonMax: 12, intervalLevels: [0.8, 0.95] },
         series,
       },
       refs,
@@ -117,6 +120,26 @@ export interface ServiceResultPoint {
   readonly lower95: string;
   readonly upper95: string;
   readonly baselineValue: string;
+  /** Motivos de la parte variable (phase8-v1). */
+  readonly drivers?: {
+    readonly historicalAverage: string;
+    readonly seasonality: string | null;
+    readonly trendAndLevel: string;
+  } | null;
+}
+
+export interface ServiceBacktest {
+  readonly origins: readonly string[];
+  readonly candidates: readonly {
+    readonly name: string;
+    readonly cuts: number;
+    readonly mase: string | null;
+    readonly coverage80: string | null;
+    readonly bias: string | null;
+  }[];
+  readonly selected: string;
+  readonly fallback: boolean;
+  readonly baselineMase: string | null;
 }
 
 export interface ServiceSeriesResult {
@@ -126,6 +149,8 @@ export interface ServiceSeriesResult {
   readonly model: { readonly name: string; readonly version: string; readonly selectedBy: string } | null;
   readonly baseline: { readonly method: string; readonly n: number | null } | null;
   readonly points: readonly ServiceResultPoint[];
+  readonly backtest?: ServiceBacktest | null;
+  readonly outliers?: readonly string[] | null;
 }
 
 export interface ForecastResponseV1 {
@@ -143,7 +168,8 @@ export type ValidationFailure =
   | 'SCALE_EXCEEDED'
   | 'NOT_FINITE'
   | 'INTERVAL_ORDER'
-  | 'NEGATIVE';
+  | 'NEGATIVE'
+  | 'DRIVERS_MISMATCH';
 
 const DECIMAL_TEXT = /^-?\d+(\.\d+)?$/;
 
@@ -187,6 +213,20 @@ export const ForecastResultValidator = {
         return { ok: false, reason: 'NEGATIVE' };
       if (!(l80.lte(pred) && pred.lte(u80) && l95.lte(l80) && u80.lte(u95))) {
         return { ok: false, reason: 'INTERVAL_ORDER' };
+      }
+      // phase8-v1: los motivos de la parte variable deben cerrar con la predicción (residuo de redondeo incluido).
+      if (p.drivers) {
+        const d = p.drivers;
+        const texts8 = [
+          d.historicalAverage,
+          d.trendAndLevel,
+          ...(d.seasonality === null ? [] : [d.seasonality]),
+        ];
+        if (texts8.some((t) => !DECIMAL_TEXT.test(t))) return { ok: false, reason: 'DRIVERS_MISMATCH' };
+        const sum = dec(d.historicalAverage)
+          .plus(d.trendAndLevel)
+          .plus(d.seasonality ?? '0');
+        if (!sum.eq(pred)) return { ok: false, reason: 'DRIVERS_MISMATCH' };
       }
     }
     return { ok: true };

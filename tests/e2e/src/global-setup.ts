@@ -1,8 +1,8 @@
 import { ENV_FILE_VAR, createEnvFile, pnpm, processEnvFor, removeEnvFile } from './stack.js';
 
 /**
- * Levanta el stack `pfos-e2e` en modo B (perfil core: postgres, Keycloak con el realm de desarrollo, migrate,
- * finance-api, finance-worker y finance-web) y carga la Minimal Seed (W1/W2 y usuarios owner/editor/viewer/outsider).
+ * Levanta el stack `pfos-e2e` en modo B (perfiles core y ml: postgres, Keycloak con el realm de desarrollo, migrate,
+ * finance-api, finance-worker, finance-web y el servicio de pronósticos finance-ml) y carga la Minimal Seed (W1/W2 y usuarios owner/editor/viewer/outsider).
  *
  * - `PF_E2E_ENV_FILE=<ruta>`: reutiliza un stack ya levantado con ese `.env` (iteración local); no lo baja al final.
  * - `PF_STACK_PREBUILT_IMAGES=1`: no reconstruye imágenes (CI carga las del job `image` con FINANCE_*_IMAGE).
@@ -30,8 +30,10 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   };
   try {
     await pnpm('stack:down', ['--volumes', '--yes'], env); // restos de una corrida interrumpida
-    if (process.env['PF_STACK_PREBUILT_IMAGES'] !== '1') await pnpm('images:build', [], env);
-    await pnpm('stack:up', ['--profile', 'core', '--timeout=600'], env);
+    // Perfil `ml`: el servicio de pronósticos real (la spec de pronósticos lo necesita; FORECASTING_ENABLED=true).
+    if (process.env['PF_STACK_PREBUILT_IMAGES'] !== '1')
+      await pnpm('images:build', ['--profile', 'core', '--profile', 'ml'], env);
+    await pnpm('stack:up', ['--profile', 'core', '--profile', 'ml', '--timeout=600'], env);
     await pnpm('db:seed', ['--profile=minimal'], env);
   } catch (err) {
     await teardown();

@@ -292,3 +292,7 @@ Todo change declara su impacto en tests (ver [16-testing-strategy.md §11](./16-
 ## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
 
 - Matriz: `TC-FORECAST-SERVICE-001..040` y `TC-PLATFORM-MLSERVICE-001..009`. Los tests de Python citan el TC-id entre corchetes en el docstring (`"""[TC-FORECAST-SERVICE-034] …"""`) y `scripts/traceability` los escanea (`services/**/test_*.py`). Sin test todavía: `TC-FORECAST-SERVICE-001` (E2E de degradación), `-028` (nightly con el servicio real) y `TC-PLATFORM-MLSERVICE-001/-005/-006/-007` (humo de Compose/CI/despliegue, validados por los workflows).
+
+## Nota as-built: `add-expense-forecasts` (Phase 8, 2026-11-13)
+
+- Matriz: `TC-FORECAST-EXPENSE-001..023` automatizados: dominio (`known-future`, `variable-history`, `forecast-composer`) y aplicación en `@pf/forecasting`, fuentes de COMMITMENTS y DEBT, servicio Python (`tests/test_phase8.py`; el benchmark `TC-FORECAST-EXPENSE-023` con `pytest -m perf` corre en el nightly), vista web (`forecasts.test.tsx`), API (`forecasting.api.test.ts`) y E2E (`expense-forecasts.spec.ts`, perfil `ml`).

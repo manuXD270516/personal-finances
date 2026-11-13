@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Periodos atípicos señalados"
 scenario: "Mes de viaje"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003"]
 nfr: []
 invariants: []
 priority: low
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/forecast-composer.test.ts
+  - services/ml-forecasting/tests/test_phase8.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["outliers","python"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "los motivos señalan 2026-07 como atípico y la historia mostrada conserva 4800.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-022 — Un periodo atípico se señala sin cambiar la historia mostrada

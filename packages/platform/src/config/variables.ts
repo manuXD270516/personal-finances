@@ -999,6 +999,12 @@ export const VARIABLES = {
       'Días tras los cuales la consulta marca el pronóstico vigente como desactualizado (`stale`).',
     default: '35',
   }),
+  FORECASTING_COHERENCE_GAP_RATIO: variable(z.coerce.number().gt(0).lte(1), {
+    group: 'Forecasting',
+    description:
+      'Fracción del gasto total esperado de un periodo a partir de la cual la vista de pronósticos informa la diferencia entre la suma de las categorías y el total (cada serie se pronostica por separado, sin reconciliación). `0.05` = 5 %.',
+    default: '0.05',
+  }),
   COMMITMENTS_SCHEDULER_CRON: variable(
     z
       .string()
@@ -1742,6 +1748,7 @@ export const APP_VARIABLES = {
     ...FX_PROVIDERS,
     'FORECASTING_ENABLED',
     'FORECASTING_STALE_DAYS',
+    'FORECASTING_COHERENCE_GAP_RATIO',
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',
     'PLANNING_HISTORY_DEFAULT_PERIODS',

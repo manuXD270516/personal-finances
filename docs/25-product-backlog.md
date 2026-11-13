@@ -1053,3 +1053,7 @@ Explícitamente fuera del horizonte actual (se revisan al cerrar Phase 9):
 4. ¿US-012 (cuentas virtuales) aporta valor real al owner en Phase 1 o puede pasar a Phase 4 junto con earmarks de metas?
 5. ¿US-149 (CSV básico en Phase 3) se compromete o queda como Could?
 6. ¿Se requiere una historia de onboarding guiado (asistente de primeras cuentas y tasas) en Phase 1?
+
+## Nota as-built: `add-expense-forecasts` (Phase 8, 2026-11-13)
+
+- US-241 (forecast de gasto 1/3/6/12 con intervalo, referencia, versión y fecha), US-242 (conocidos separados de los variables predichos) y US-243 (aviso claro de datos insuficientes): **implementadas** con datos sintéticos; la evidencia con datos reales del owner (criterio de salida de Phase 8) espera su ejecución de `pnpm forecast:backtest:report`.

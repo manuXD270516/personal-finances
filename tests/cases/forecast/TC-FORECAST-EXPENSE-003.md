@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Historia variable sin doble conteo de lo recurrente"
 scenario: "Categoría solo recurrente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/variable-history.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["known-future"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "la historia variable de \"Vivienda\" en 2026-10 es 0.00 BOB"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-003 — Una categoría solo recurrente tiene historia variable cero

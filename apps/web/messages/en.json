@@ -47,7 +47,8 @@
     "documents": "Documents",
     "rules": "Rules",
     "reports": "Reports",
-    "cashFlow": "Cash flow"
+    "cashFlow": "Cash flow",
+    "forecasts": "Forecasts"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -7021,6 +7022,111 @@
       "freshness": "Data as of: {date}",
       "reportingCurrency": "Reporting currency: {currency}",
       "help": "Each day expenses are applied before income; an amount with a range uses the maximum for expenses and the minimum for income."
+    }
+  },
+  "Forecasts": {
+    "title": "Forecasts",
+    "subtitle": "Statistical estimates of your expenses and income for the coming periods.",
+    "disclaimer": "Forecasts are statistical estimates and are not financial advice.",
+    "loading": "Loading forecasts…",
+    "stale": "This forecast is out of date: it is more than 35 days old or the latest update failed. The latest available one is shown.",
+    "status": {
+      "disabled": "Forecasts are not enabled in this installation.",
+      "none": "There is no forecast yet. An owner or an editor can request one."
+    },
+    "controls": {
+      "series": "Series",
+      "horizon": "Horizon",
+      "periods": "{n, plural, one {# period} other {# periods}}",
+      "run": "Update forecast",
+      "running": "Updating…"
+    },
+    "run": {
+      "pending": "Forecast requested. It will update when the calculation finishes.",
+      "failed": "The forecast could not be updated. The latest available one is still shown."
+    },
+    "series": {
+      "TOTAL_EXPENSE": "Total expenses",
+      "TOTAL_INCOME": "Total income",
+      "CATEGORY_GROUP": "Group: {name}",
+      "CATEGORY": "Category: {name}",
+      "OTHER_CATEGORIES": "Other categories of {name}"
+    },
+    "meta": {
+      "generated": "Generated on {at}",
+      "model": "Model: {name} (version {version})",
+      "selectedBy": {
+        "BACKTEST": "Chosen by temporal validation",
+        "BASELINE_FALLBACK": "Reference model (no model improved on it enough)",
+        "SIMPLE": "Simple estimate"
+      }
+    },
+    "confidence": {
+      "label": "Confidence",
+      "LOW": "low",
+      "MEDIUM": "medium",
+      "HIGH": "high"
+    },
+    "simpleBadge": "Simple estimate",
+    "history": "History: {from} to {to} ({count, plural, one {# period} other {# periods}})",
+    "headline": {
+      "expected": "Expected",
+      "range": "Likely range",
+      "level": "{level} %"
+    },
+    "coherence": "In {period} the sum of the categories differs from the total by {gap}. Each series is forecast on its own.",
+    "chart": {
+      "title": "Forecast of {name}",
+      "description": "Expected value and 80 % likely range per period.",
+      "expected": "Expected",
+      "band": "Likely range (80 %)"
+    },
+    "table": {
+      "caption": "Forecast of {name} by period",
+      "period": "Period",
+      "expected": "Expected",
+      "range": "Likely range (80 %)",
+      "known": "Known",
+      "variable": "Variable"
+    },
+    "detail": {
+      "title": "Detail of {period}",
+      "range95": "95 % likely range: {lower} – {upper}",
+      "components": "Known {known} + variable {variable}",
+      "baseline": "Comparison with the average of the last 6 periods: {value}"
+    },
+    "why": {
+      "title": "Why?"
+    },
+    "driver": {
+      "HISTORICAL_AVERAGE": "Average of the last 6 periods of the variable part: {value}",
+      "SEASONALITY": "Seasonality: {effect}",
+      "TREND_AND_LEVEL": "Trend and recent level: {effect}",
+      "OUTLIERS": "{count, plural, one {Atypical period flagged} other {Atypical periods flagged}}: {periods}",
+      "KNOWN_RECURRING": "Known costs: {value} ({count, plural, one {# commitment} other {# commitments}})"
+    },
+    "known": {
+      "title": "Known items of {period}",
+      "intro": "They are computed from your commitments and loans; the model does not estimate them.",
+      "empty": "There are no known costs in this period.",
+      "noAmount": "No amount",
+      "original": "{amount} original",
+      "withoutAmount": "{count, plural, one {# known item} other {# known items}} without an amount (variable bill).",
+      "conversion": "Amounts in another currency were converted at today’s rate ({date}); distant periods may differ.",
+      "kind": {
+        "EXPENSE": "Expense",
+        "INCOME": "Income",
+        "LOAN_INTEREST": "Loan interest and charges"
+      }
+    },
+    "insufficient": {
+      "missing": "{n, plural, one {# more period} other {# more periods}} of history {n, plural, one {is} other {are}} needed in “{name}” for a statistical forecast.",
+      "noHistory": "There is no history yet in “{name}” for a statistical forecast.",
+      "simple": "Only the simple estimate, marked as such, and the known costs are shown.",
+      "onlyKnown": "Only the known costs are shown.",
+      "lowCategorization": "Some spending has no category, which prevents forecasting by category.",
+      "link": "See the transactions",
+      "gap": "A gap of periods without activity shortened the history used."
     }
   }
 }

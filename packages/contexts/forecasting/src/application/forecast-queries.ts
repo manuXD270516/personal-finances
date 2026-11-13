@@ -2,6 +2,8 @@ import type { LifecycleDto } from '@pf/audit/contracts';
 import { DomainError, PeriodCalendar, type PeriodLabel } from '@pf/shared-kernel';
 import {
   FORECAST_DISCLAIMER_KEY,
+  type ForecastDriverDto,
+  type ForecastKnownItemsDto,
   type ForecastPointDto,
   type ForecastRunDto,
   type ForecastRunStatusDto,
@@ -12,7 +14,13 @@ import {
   type LatestForecastDto,
   type LatestForecastQuery,
 } from '../contracts/index.js';
-import { FORECAST_RUN_LIFECYCLE, FORECAST_RUN_STATUSES, type ForecastRun } from '../domain/index.js';
+import {
+  FORECAST_RUN_LIFECYCLE,
+  FORECAST_RUN_STATUSES,
+  ForecastComposer,
+  SERIES_SCOPES,
+  type ForecastRun,
+} from '../domain/index.js';
 import type { ForecastingDeps, StoredSeries } from './ports.js';
 
 export const HORIZONS = [1, 3, 6, 12] as const;
@@ -77,6 +85,7 @@ export class ForecastQueries implements LatestForecastQuery {
         generatedAt: null,
         series: [],
         disclaimerKey: FORECAST_DISCLAIMER_KEY,
+        meta: { conversion: null },
       });
       if (!deps.settings.enabled) return empty('DISABLED');
       const run = await deps.runs.latestCompleted(input.workspaceId);
@@ -99,12 +108,27 @@ export class ForecastQueries implements LatestForecastQuery {
           (!input.scopes || input.scopes.length === 0 || input.scopes.includes(s.scope)) &&
           (input.scopeRef === undefined || s.scopeRef === input.scopeRef),
       );
+      const gaps = this.coherenceGaps(rows);
       const series: ForecastSeriesDto[] = wanted.map((s) => ({
         ...seriesSummary(s),
         currency: s.currency,
-        model: s.modelName ? { name: s.modelName, version: s.modelVersion ?? '' } : null,
-        points: s.points.filter((p) => p.monthsAhead <= horizon).map((p) => this.pointOf(p, s, ws.startDay)),
+        model: s.modelName
+          ? {
+              name: s.modelName,
+              version: s.modelVersion ?? '',
+              selectedBy: s.selectedBy,
+              mase: s.mase,
+              baselineMase: s.baselineMase,
+            }
+          : null,
+        confidence: s.confidence,
+        points: s.points
+          .filter((p) => p.monthsAhead <= horizon)
+          .map((p) =>
+            this.pointOf(p, s, ws.startDay, s.scope === 'TOTAL_EXPENSE' ? gaps.get(p.period) : undefined),
+          ),
       }));
+      const metadata = await deps.series.runMetadata(input.workspaceId, run.id);
       return {
         status: 'AVAILABLE',
         stale: ageMs > deps.settings.staleDays * DAY_MS || newerFailed,
@@ -114,6 +138,73 @@ export class ForecastQueries implements LatestForecastQuery {
         generatedAt,
         series,
         disclaimerKey: FORECAST_DISCLAIMER_KEY,
+        meta: { conversion: metadata?.conversion ?? null },
+      };
+    });
+  }
+
+  /**
+   * Diferencia entre las categorías y el total por periodo (decisión 14): total − Σ de las series que particionan el
+   * gasto (categorías y «Otras categorías»); solo los periodos que superan el umbral.
+   */
+  private coherenceGaps(rows: readonly StoredSeries[]): Map<string, string> {
+    const total = rows.find((s) => s.scope === 'TOTAL_EXPENSE' && s.status === 'PUBLISHED');
+    const out = new Map<string, string>();
+    if (!total) return out;
+    const leaves = rows.filter(
+      (s) => (s.scope === 'CATEGORY' || s.scope === 'OTHER_CATEGORIES') && s.status === 'PUBLISHED',
+    );
+    if (leaves.length === 0) return out;
+    for (const p of total.points) {
+      const parts = leaves.flatMap((l) =>
+        l.points.filter((x) => x.period === p.period).map((x) => x.prediction),
+      );
+      if (parts.length === 0) continue;
+      const g = ForecastComposer.coherenceGap({
+        total: p.prediction,
+        categories: parts,
+        scale: total.scale,
+        ratio: this.deps.settings.coherenceGapRatio,
+      });
+      if (g.exceeds) out.set(p.period, g.gap);
+    }
+    return out;
+  }
+
+  /** `GET W/forecasts/latest/known-items`: los conocidos de un periodo de una serie del pronóstico vigente. */
+  async listKnownItems(input: {
+    readonly workspaceId: string;
+    readonly scope: string;
+    readonly scopeRef?: string;
+    readonly period: string;
+  }): Promise<ForecastKnownItemsDto> {
+    const { deps } = this;
+    if (!(SERIES_SCOPES as readonly string[]).includes(input.scope)) {
+      throw new DomainError('INVALID_FILTER', 'unknown scope').at('/scope');
+    }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.period)) {
+      throw new DomainError('INVALID_FILTER', 'period must be YYYY-MM').at('/period');
+    }
+    return deps.uow.run(input.workspaceId, async () => {
+      const run = deps.settings.enabled ? await deps.runs.latestCompleted(input.workspaceId) : null;
+      if (!run) return { items: [] };
+      const rows = await deps.series.listKnownItems(
+        input.workspaceId,
+        run.id,
+        { scope: input.scope as StoredSeries['scope'], scopeRef: input.scopeRef ?? null },
+        input.period,
+      );
+      return {
+        items: rows.map((k) => ({
+          date: k.date,
+          label: k.label,
+          kind: k.kind,
+          amountType: k.amountType,
+          amount: k.amount === null ? null : { amount: k.amount, currency: k.currency },
+          originalAmount: k.originalAmount,
+          managedBy: k.managedBy,
+          sourceRef: k.source,
+        })),
       };
     });
   }
@@ -123,8 +214,35 @@ export class ForecastQueries implements LatestForecastQuery {
     return { status: s.status, at: s.completedAt ?? s.requestedAt, failureReason: s.failureReason };
   }
 
-  private pointOf(p: StoredSeries['points'][number], s: StoredSeries, startDay: number): ForecastPointDto {
+  private pointOf(
+    p: StoredSeries['points'][number],
+    s: StoredSeries,
+    startDay: number,
+    gap?: string,
+  ): ForecastPointDto {
     const money = (amount: string) => ({ amount, currency: s.currency });
+    const driverMoney = (v: string | null) => (v === null ? null : money(v));
+    const drivers: ForecastDriverDto[] | null = p.drivers
+      ? p.drivers.map((d) => ({
+          type: d.type,
+          value: driverMoney(d.value),
+          effect: driverMoney(d.effect),
+          periods: d.periods,
+          refCount: d.refCount,
+        }))
+      : null;
+    const components =
+      p.knownFuture !== null &&
+      p.predictedVariable !== null &&
+      p.variableLower80 !== null &&
+      p.variableUpper80 !== null
+        ? {
+            knownFuture: money(p.knownFuture),
+            predictedVariable: money(p.predictedVariable),
+            predictedVariableInterval80: { lower: money(p.variableLower80), upper: money(p.variableUpper80) },
+            knownWithoutAmountCount: p.knownBlankCount,
+          }
+        : null;
     const range = PeriodCalendar.rangeFor(p.period as PeriodLabel, startDay);
     return {
       period: p.period,
@@ -135,6 +253,9 @@ export class ForecastQueries implements LatestForecastQuery {
       interval80: { lower: money(p.lower80), upper: money(p.upper80) },
       interval95: { lower: money(p.lower95), upper: money(p.upper95) },
       baseline: { method: s.baselineMethod ?? 'MEAN_LAST_N', n: s.baselineN, value: money(p.baselineValue) },
+      components,
+      drivers,
+      coherenceGap: gap === undefined ? null : money(gap),
     };
   }
 

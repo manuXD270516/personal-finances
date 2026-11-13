@@ -5,7 +5,9 @@ import type {
   DebtHistoryRowDto,
   LoanPortfolioItemDto,
   LoanPortfolioQuery,
+  LoanScheduleQuery,
   LoanStatusDto,
+  UpcomingInstallmentDto,
 } from '../contracts/index.js';
 import { Loan, PAYMENT_COMPONENTS } from '../domain/index.js';
 import type { LoanTermsCommand } from './loans.service.js';
@@ -48,7 +50,7 @@ const daysBetween = (from: string, to: LocalDate): number =>
   Math.max(0, to.toEpochDay() - LocalDate.parse(from).toEpochDay());
 
 /** Consultas de DEBT (sin efectos) y el contrato público `LoanPortfolioQuery`. */
-export class LoansQueries implements LoanPortfolioQuery, DebtHistoryQuery {
+export class LoansQueries implements LoanPortfolioQuery, LoanScheduleQuery, DebtHistoryQuery {
   constructor(private readonly deps: DebtDeps) {}
 
   private async scaleOf(code: string): Promise<number> {
@@ -448,6 +450,45 @@ export class LoansQueries implements LoanPortfolioQuery, DebtHistoryQuery {
       return out;
     };
     return deps.uow.run(workspaceId, run);
+  }
+
+  /**
+   * `LoanScheduleQuery.listUpcomingInstallments` (add-expense-forecasts, S3): de los préstamos activos, las cuotas no
+   * pagadas del cronograma vigente con vencimiento en `[from, to]`, con lo pendiente de cada componente.
+   */
+  async listUpcomingInstallments(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly UpcomingInstallmentDto[]> {
+    LocalDate.parse(input.from);
+    LocalDate.parse(input.to);
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const loans = await this.deps.loans.list(input.workspaceId, { statuses: ['ACTIVE'] });
+      const out: UpcomingInstallmentDto[] = [];
+      for (const loan of loans) {
+        const s = loan.snapshot;
+        const scale = await this.scaleOf(s.currency);
+        for (const state of await this.states(loan, scale)) {
+          const i = state.installment;
+          if (state.status === 'PAID' || i.dueDate < input.from || i.dueDate > input.to) continue;
+          out.push({
+            loanId: loan.id,
+            label: `${s.name} — cuota ${i.n}`,
+            dueDate: i.dueDate,
+            currency: s.currency,
+            principal: fixed(dec(state.pending.principal), scale),
+            interest: fixed(dec(state.pending.interest), scale),
+            charges: fixed(dec(state.pending.fees), scale),
+            insurance: fixed(dec(state.pending.insurance), scale),
+            taxes: fixed(dec(state.pending.taxes), scale),
+          });
+        }
+      }
+      return out.sort((a, b) =>
+        a.dueDate === b.dueDate ? (a.loanId < b.loanId ? -1 : 1) : a.dueDate < b.dueDate ? -1 : 1,
+      );
+    });
   }
 
   /** `DebtHistoryQuery.monthly`: principal, interés y cargos pagados por préstamo y mes (pagos vigentes). */

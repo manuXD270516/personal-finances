@@ -403,7 +403,41 @@ export interface CashFlowOccurrencesDto {
   readonly generatedThrough: string;
 }
 
+/**
+ * Ocurrencia para el pronóstico de gasto (add-expense-forecasts, S1): una ya generada y no resuelta (`projected = false`,
+ * con su `occurrenceId`) o la que el motor de recurrencia calcularía para una fecha posterior al horizonte de generación
+ * (`projected = true`, sin `occurrenceId`; no se guarda nada). `amount` es el esperado de `FIXED`/`ESTIMATED`;
+ * `minAmount`/`maxAmount` los de `MIN_MAX`; los tres son `null` en `VARIABLE`.
+ */
+export interface ProjectedOccurrenceDto {
+  readonly date: string;
+  readonly definitionId: string;
+  readonly occurrenceId: string | null;
+  readonly projected: boolean;
+  readonly kind: RecurringKindDto;
+  readonly direction: 'OUTFLOW' | 'INFLOW';
+  readonly amountType: 'FIXED' | 'ESTIMATED' | 'MIN_MAX' | 'VARIABLE';
+  readonly amount: MoneyDto | null;
+  readonly minAmount: MoneyDto | null;
+  readonly maxAmount: MoneyDto | null;
+  readonly categoryId: string | null;
+  readonly accountId: string;
+  readonly managedBy: ManagedByDto;
+  readonly label: string;
+}
+
 export interface UpcomingPaymentsQuery {
+  /**
+   * Insumo del pronóstico de gasto (add-expense-forecasts, S1): las ocurrencias no resueltas con vencimiento en
+   * `[from, to]` más la proyección, sin guardarla, de las definiciones activas para las fechas posteriores al horizonte
+   * de generación (misma expansión, reglas de fin de mes y de fin de semana, fin de la definición y versiones vigentes;
+   * también los calendarios explícitos de préstamos). Sin escrituras.
+   */
+  projectForForecast(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly ProjectedOccurrenceDto[]>;
   listUpcoming(input: {
     readonly workspaceId: string;
     /** Fecha límite inclusiva (`YYYY-MM-DD`). */
@@ -430,12 +464,31 @@ export interface ResolvedOutflowDto {
   readonly amount: MoneyDto;
 }
 
+/** Ocurrencia resuelta con su tipo y categoría (add-expense-forecasts, S2). */
+export interface ResolvedOccurrenceDto extends ResolvedOutflowDto {
+  readonly kind: RecurringKindDto;
+  readonly managedBy: ManagedByDto;
+  readonly direction: 'OUTFLOW' | 'INFLOW';
+  readonly categoryId: string | null;
+}
+
 export interface ResolvedOccurrencesQuery {
   listResolvedOutflows(input: {
     readonly workspaceId: string;
     readonly from: string;
     readonly to: string;
   }): Promise<readonly ResolvedOutflowDto[]>;
+  /**
+   * Ocurrencias resueltas (materializadas o emparejadas) cuya transacción no anulada tiene fecha en `[from, to]`, de
+   * salida (todo menos ingresos y cuotas de préstamo) o de entrada (ingresos), con su tipo, administrador y categoría.
+   * La de salidas existente no cambia.
+   */
+  listResolved(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly direction: 'OUTFLOW' | 'INFLOW';
+  }): Promise<readonly ResolvedOccurrenceDto[]>;
 }
 
 export interface DefinitionStatsQuery {

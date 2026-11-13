@@ -13,6 +13,7 @@ export type NavKey =
   | 'planning'
   | 'recurring'
   | 'cashFlow'
+  | 'forecasts'
   | 'goals'
   | 'debt'
   | 'reports'
@@ -43,6 +44,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'recurring', path: '/recurring', also: ['/pagos-proximos'] },
   // Phase 7 (add-cash-flow-forecast): calendario de flujo de caja 7/30/60/90 con el saldo esperado y el riesgo de déficit.
   { key: 'cashFlow', path: '/flujo-de-caja' },
+  // Phase 8 (add-expense-forecasts): pronósticos de gasto e ingreso con rango probable, conocidos y motivos.
+  { key: 'forecasts', path: '/pronosticos' },
   // Phase 4 (add-savings-goals): Metas de ahorro (listado, alta, detalle y reservas por cuenta).
   { key: 'goals', path: '/goals' },
   // Phase 4 (add-loans): Deudas → préstamos (lista, alta, detalle y comparación con la tabla del banco).

@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Pronósticos reproducibles"
 scenario: "Mismo conjunto procesado dos veces"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-002","FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/expense-forecast.test.ts
+  - services/ml-forecasting/tests/test_phase8.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["determinism","python"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "las dos respuestas tienen los mismos valores esperados e intervalos en todos los puntos"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-021 — La misma petición con la misma semilla da los mismos resultados

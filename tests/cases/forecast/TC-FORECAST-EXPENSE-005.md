@@ -5,16 +5,18 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Costos conocidos de todo el horizonte"
 scenario: "Suscripción en dólares"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-003","FR-COMMITMENTS-011"]
 nfr: []
 invariants: ["INV-001","INV-002","INV-020"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/expense-forecast.test.ts
+  - packages/contexts/forecasting/src/domain/known-future.test.ts
+status: automated
 regression_suite: false
 phase: 8
 tags: ["multi-currency","money"]
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - "los costos conocidos de cada periodo incluyen \"Spotify\" por 69.53 BOB con la tasa declarada"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-005 — Un conocido en dólares se convierte con la tasa de hoy declarada

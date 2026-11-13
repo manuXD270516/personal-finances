@@ -116,6 +116,17 @@ export class ForecastingController {
     });
   }
 
+  /** Conocidos de un periodo de una serie del pronóstico vigente (ruta literal antes de `:runId`). */
+  @Get('workspaces/:workspaceId/forecasts/latest/known-items')
+  knownItems(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
+    const scope = str(query, 'scope');
+    const period = str(query, 'period');
+    if (!scope || !SCOPES.includes(scope)) throw new ApiProblem('INVALID_FILTER', 'unknown scope');
+    if (!period) throw new ApiProblem('INVALID_FILTER', 'period is required');
+    const scopeRef = str(query, 'scopeRef');
+    return this.queries.listKnownItems({ workspaceId, scope, period, ...(scopeRef ? { scopeRef } : {}) });
+  }
+
   @Get('workspaces/:workspaceId/forecasts/:runId')
   getRun(@Param('workspaceId') workspaceId: string, @Param('runId') runId: string) {
     return this.queries.getRun({ workspaceId, runId });

@@ -5,16 +5,17 @@ spec: forecast/expense-forecasting
 related_specs: []
 requirement: "Modelos candidatos según la historia"
 scenario: "Serie de 14 periodos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - services/ml-forecasting/tests/test_phase8.py
+status: automated
 regression_suite: false
 phase: 8
 tags: ["models","python"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "los candidatos son último periodo, promedio de 3, 6 y 12 periodos, mismo periodo del año anterior y suavizado exponencial con tendencia amortiguada, sin el estacional"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # TC-FORECAST-EXPENSE-008 — Con 14 periodos los candidatos excluyen el suavizado estacional
