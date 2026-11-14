@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "fecha": "2026-11-14",
+  "modo": "proponer",
+  "parametros": {
+    "ruta": ".",
+    "profundidad": "normal",
+    "agentes": 9,
+    "presupuesto": { "minimoUsd": 10, "maximoUsd": 20, "confirmado": "2026-11-14" },
+    "tarjeta": "si",
+    "audiencia": "personal",
+    "datos": "sensibles",
+    "plataforma": "auto",
+    "candidatos": ["lightsail-n1", "oracle-a1", "fly"],
+    "candidatoObligado": "lightsail-n1 (ADR-0027)",
+    "pesos": {
+      "costo": 20,
+      "ajuste": 20,
+      "seguridad": 25,
+      "operacion": 15,
+      "reversibilidad": 15,
+      "esfuerzo": 5
+    },
+    "motivoPesos": "seguridad +5 por datos financieros sensibles; esfuerzo -5 porque la IaC ya existe",
+    "jueces": ["costo", "seguridad", "operacion"],
+    "ramas": "trunk",
+    "idioma": "es",
+    "salida": "docs/despliegue"
+  },
+  "decision": {
+    "ganador": "lightsail-n1",
+    "descripcion": "AWS Lightsail Linux 2 GB en sa-east-1 con Docker Compose (N1 de ADR-0027)",
+    "ratifica": "docs/adr/0027-destino-de-despliegue-inicial-vps-compose.md",
+    "puntaje": 3.18,
+    "borda": 6,
+    "consenso": "3 de 3",
+    "requiereArbitro": false,
+    "costoMensualUsd": 14.5,
+    "planB": {
+      "id": "oracle-a1",
+      "descripcion": "Oracle Cloud A1 en Santiago, Pay-As-You-Go (N1-F de ADR-0027)",
+      "puntaje": 2.68,
+      "disparador": "el PoC de 48 h cruza un umbral de memoria o CPU y el owner no amplia el presupuesto para N2",
+      "listo": false,
+      "requiere": "imagenes multi-arch en main.yml y modulo infra/modules/oci-host"
+    },
+    "vetados": [
+      {
+        "id": "fly",
+        "puntaje": 1.9,
+        "motivo": "costo de USD 37-42 por mes contra el tope de USD 20 (3 de 3 jueces)"
+      }
+    ]
+  },
+  "estado": {
+    "desplegado": false,
+    "faseActual": 0,
+    "pendientesAntesDelApply": ["C1", "C2", "C3", "C9"],
+    "decisionesDelOwner": [
+      "dominio",
+      "salida si el PoC falla (N2 o plan B)",
+      "retencion de los mensuales",
+      "drill programado"
+    ]
+  },
+  "documentos": {
+    "decision": "docs/despliegue/DECISION-DESPLIEGUE.md",
+    "runbook": "docs/despliegue/RUNBOOK-DESPLIEGUE.md",
+    "runbookVigente": "docs/runbooks/deploy-and-restore.md",
+    "cambiosDeCodigo": "docs/despliegue/cambios-de-codigo.md",
+    "perfil": "docs/despliegue/perfil-despliegue.json"
+  }
+}
