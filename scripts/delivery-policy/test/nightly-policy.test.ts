@@ -17,6 +17,24 @@ describe('workflows de GitHub Actions', () => {
       expect(readText(`.github/workflows/${name}`).includes(String.fromCharCode(0)), name).toBe(false);
     }
   });
+
+  // GitHub resuelve `needs.<job>.outputs.<x>` no declarado como cadena vacía, sin error: así deploy.yml nunca enviaba el
+  // digest opcional de finance-ml al host (el job resolve lo calculaba pero no lo exponía).
+  it('[TC-PLATFORM-PIPELINE-009] toda salida needs.<job>.outputs.<x> usada está declarada en ese job', () => {
+    const dir = join(ROOT, '.github/workflows');
+    for (const name of readdirSync(dir).filter((n) => /\.ya?ml$/.test(n))) {
+      const text = readText(`.github/workflows/${name}`);
+      const jobs = loadWorkflow(`.github/workflows/${name}`).jobs as Record<
+        string,
+        { outputs?: Record<string, unknown> }
+      >;
+      for (const [, job, output] of text.matchAll(/needs\.([\w-]+)\.outputs\.([\w-]+)/g)) {
+        expect(Object.keys(jobs[job!]?.outputs ?? {}), `${name}: needs.${job}.outputs.${output}`).toContain(
+          output,
+        );
+      }
+    }
+  });
 });
 
 describe('nightly.yml: permisos y aviso por issue del job perf (TC-PLATFORM-PIPELINE-009)', () => {
