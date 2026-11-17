@@ -45,6 +45,8 @@ jobs:
       api: ${{ steps.refs.outputs.api }}
       web: ${{ steps.refs.outputs.web }}
       pg: ${{ steps.refs.outputs.pg }}
+      # Opcional: vacío salvo con vars.PFOS_ML_ENABLED=true. Sin declararlo aquí, needs.resolve.outputs.ml llega vacío.
+      ml: ${{ steps.refs.outputs.ml }}
     steps:
       - name: Validar commit y localizar la corrida de main.yml
         id: run
