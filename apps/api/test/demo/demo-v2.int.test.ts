@@ -18,6 +18,8 @@ import { httpReports, sqlLedger } from '../support/reports-reconciliation.js';
 const deps = inject('deps');
 const FIXED = '2026-09-30';
 const SECOND = '2026-10-05';
+/** Ancla de borde: A − 20 cae en 31-oct y el desembolso del crédito educativo se recortaba a 28-feb (TC-IDENTITY-DEMO-025). */
+const EDGE = '2026-11-20';
 /** Catálogo de referencia FICTICIO del repositorio, para probar que la demo no adopta entradas del catálogo. */
 const CATALOG_DIR = fileURLToPath(new URL('../../reference/institutions/demo', import.meta.url));
 
@@ -547,6 +549,32 @@ describe('otra fecha ancla e independencia del catálogo (TC-IDENTITY-DEMO-020)'
       expect(structuralOf(summarizeModules(SECOND))).toEqual(structuralOf(summarizeModules(FIXED)));
     } finally {
       await q2.close();
+    }
+  }, 600_000);
+});
+
+describe('ancla de borde de fin de mes (TC-IDENTITY-DEMO-025)', () => {
+  it('[TC-IDENTITY-DEMO-025] con la ancla 2026-11-20 la carga termina READY y la cuota 8 del crédito educativo vence el 2026-10-28', async () => {
+    const edge = await world.load({ anchor: EDGE });
+    expect(edge.outcome, edge.failure ?? '').toBe('READY');
+    const other = edge.job.demoWorkspaceId;
+    const q3 = demoQueryRuntimes({ databaseUrl: deps.databaseUrl, today: EDGE });
+    try {
+      const inEdge = <T>(fn: () => Promise<T>) => q3.inWs(edge.user.id, other, fn);
+      await world.waitPublished(other);
+      const loansList = await inEdge(() => q3.r.debt.queries.list(other, {}));
+      const educativo = loansList.find((l) => l.name === 'Crédito educativo')!;
+      const rows = (await inEdge(() => q3.r.debt.queries.installments(other, educativo.id))).installments;
+      expect(rows[7]).toMatchObject({ n: 8, dueDate: '2026-10-28', status: 'PAID' });
+      expect(rows[8]).toMatchObject({ n: 9, dueDate: '2026-11-28' });
+      expect(rows.filter((r) => r.status === 'PAID')).toHaveLength(8);
+      const consumo = await inEdge(() =>
+        q3.r.debt.queries.get(other, loansList.find((l) => l.name === 'Préstamo de consumo')!.id),
+      );
+      expect(consumo.overdueInstallments.length).toBeGreaterThanOrEqual(1);
+      expect(await unbalancedEntries(migrator, other)).toEqual([]);
+    } finally {
+      await q3.close();
     }
   }, 600_000);
 });
