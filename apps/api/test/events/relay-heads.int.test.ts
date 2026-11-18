@@ -97,6 +97,9 @@ async function publishedIds(ids: readonly string[]): Promise<Set<string>> {
 beforeAll(async () => {
   workerPool = new Pool({ connectionString: deps.workerDatabaseUrl, max: 4 });
   adminPool = new Pool({ connectionString: deps.superuserUrl, max: 2 });
+  // Pendientes que dejaron otros archivos de la misma base: sin relay en marcha, se descartan para que los lotes de
+  // estos tests (de 3 y de 1 000 eventos) solo vean los datos sintéticos propios.
+  await adminPool.query('UPDATE platform.outbox SET published_at = now() WHERE published_at IS NULL');
   queue = new PgBossJobQueue({
     connectionString: deps.workerDatabaseUrl,
     logger: quiet,
