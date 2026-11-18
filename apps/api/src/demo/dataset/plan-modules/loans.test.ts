@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { addDays, addMonthsClamped, dayOfMonth, parseDate } from '../calendar.js';
 import {
   amortize,
   currentSchedule,
@@ -167,5 +168,55 @@ describe('préstamos del dataset Demo v2 (TC-IDENTITY-DEMO-018)', () => {
     expect(() => prepayReduceTerm([], 3, 100n, { rate: '0.12', scale: 2, firstDue: '2026-02-10' })).toThrow(
       RangeError,
     );
+  });
+});
+
+/** 30/360 europeo del motor de DEBT (`days360European`): días 31 → 30. DEBT no se importa desde `apps` (arch:check). */
+const days360 = (from: string, to: string): number => {
+  const a = parseDate(from);
+  const b = parseDate(to);
+  return 360 * (b.y - a.y) + 30 * (b.m - a.m) + (Math.min(b.d, 30) - Math.min(a.d, 30));
+};
+
+describe('fechas de los préstamos con cualquier ancla (TC-IDENTITY-DEMO-025)', () => {
+  // Anclas de 2025 a 2029 (bisiesto 2028): 1826 días.
+  const anchors = Array.from({ length: 1826 }, (_, i) => addDays('2025-01-01', i));
+  const dueOf = (def: { firstDue: string }, n: number) => addMonthsClamped(def.firstDue, n - 1);
+
+  it('[TC-IDENTITY-DEMO-025] el primer periodo de cada préstamo vale 30 días 30/360 y la primera cuota cae en día <= 28', () => {
+    const bad: string[] = [];
+    for (const anchor of anchors) {
+      for (const def of loanDefinitions(anchor)) {
+        if (days360(def.disbursementDate, def.firstDue) !== 30 || dayOfMonth(def.firstDue) > 28) {
+          bad.push(`${anchor} ${def.key}`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  }, 60_000);
+
+  it('[TC-IDENTITY-DEMO-025] la cuota 6 del consumo y la cuota 8 del educativo vencen en o antes de la ancla y la siguiente después', () => {
+    const bad: string[] = [];
+    for (const anchor of anchors) {
+      const byKey = Object.fromEntries(loanDefinitions(anchor).map((d) => [d.key, d]));
+      for (const [key, n] of [
+        ['consumo', 6],
+        ['educativo', 8],
+      ] as const) {
+        const def = byKey[key]!;
+        if (dueOf(def, n) > anchor || dueOf(def, n + 1) <= anchor) bad.push(`${anchor} ${key}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  }, 60_000);
+
+  it('[TC-IDENTITY-DEMO-025] con anclas de borde la cuota se corre a día 28 (consumo 2026-09-08, educativo 2026-11-20) y la ancla fija no cambia', () => {
+    const edge = Object.fromEntries(loanDefinitions('2026-11-20').map((d) => [d.key, d]));
+    expect(edge['educativo']).toMatchObject({ disbursementDate: '2026-02-28', firstDue: '2026-03-28' });
+    expect(dueOf(edge['educativo']!, 8)).toBe('2026-10-28');
+    const sept = Object.fromEntries(loanDefinitions('2026-09-08').map((d) => [d.key, d]));
+    expect(dueOf(sept['consumo']!, 6)).toBe('2026-08-28');
+    expect(defs['consumo']).toMatchObject({ firstDue: '2026-04-21' });
+    expect(defs['educativo']).toMatchObject({ firstDue: '2026-02-10' });
   });
 });
