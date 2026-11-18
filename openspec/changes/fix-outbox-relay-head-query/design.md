@@ -31,6 +31,8 @@ El `NOT EXISTS` se transforma en un anti join que el planner puede resolver de v
 
 ## Decisión
 
+> Reemplazada por la sección «Corrección en la implementación» (más abajo): la consulta final usa `DISTINCT ON` en un InitPlan, no la subconsulta escalar de la decisión 1; las secciones 1 a 3 quedan como registro del razonamiento original.
+
 ### 1. Subconsulta escalar por agregado
 
 ```sql
@@ -63,11 +65,17 @@ La consulta queda en una constante exportada de `@pf/platform/events` (nombre su
 
 El recorrido externo examina cada pendiente hasta juntar `batchSize` cabezas. El primer pendiente por `sequence` siempre es cabeza; si un agregado acapara el backlog, el recorrido puede llegar a todos los pendientes de un lote, pero cada uno paga un acceso por índice acotado: casi lineal (O(n log n)), no cuadrático. Si el planner prefiriera un Seq Scan con Sort externo, el SubPlan sigue siendo por índice y la cota se mantiene.
 
+## Corrección en la implementación (2026-11-17)
+
+La decisión 1 (subconsulta escalar) NO cumplió su premisa. Con el procedimiento de TC-PLATFORM-EVENTS-022 (estadísticas con 5 000 publicados y ningún pendiente, luego 10 000 pendientes), el planner estima `rows=1` tanto para `outbox_pending_idx` como para `outbox_pending_aggregate_idx` y, con costos empatados, el SubPlan eligió `outbox_pending_idx` con Filter por `workspace_id`/`aggregate_id` (≈ 500 entradas descartadas por fila externa): 117 ms para 200 cabezas frente a 367 ms de la consulta anterior, es decir, el mismo defecto cuadrático con otra constante. Variantes probadas y descartadas con el mismo resultado: `min(p.sequence)`, `ORDER BY p.sequence + 0`, rangos sobre `aggregate_id` con `ORDER BY workspace_id, aggregate_id, sequence` (hasta 680 ms).
+
+Decisión final: `SELECT ... WHERE published_at IS NULL AND id = ANY(ARRAY(SELECT DISTINCT ON (workspace_id, aggregate_id) id ... ORDER BY workspace_id, aggregate_id, sequence)) ORDER BY sequence LIMIT $1 FOR UPDATE OF o SKIP LOCKED`. Las cabezas se calculan una sola vez por lote (InitPlan), de modo que ningún plan posible evalúa algo por cada pendiente: 7 ms con 8 000 pendientes con estadísticas viejas y 5 ms con estadísticas frescas, ambos casos O(n log n). El bloqueo se aplica solo a `o` (arriba), así que `DISTINCT ON` no choca con `FOR UPDATE`. Costo asumido: cada lote lee todos los pendientes aunque publique 200. La semántica (equivalencia, cabeza bloqueada) no cambia; TC-PLATFORM-EVENTS-020 y -021 lo verifican, y TC-022 afirma el plan nuevo (sin anti join, sin Join Filter, sin SubPlan por fila, InitPlan con `Unique`) y el tope de tiempo.
+
 ## Alternativas evaluadas
 
 | Alternativa | Resultado |
 | --- | --- |
-| Subconsulta escalar (elegida) | Plan estable con estadísticas buenas o malas; sin migración. 86 ms frente a > 120 s en la reproducción. |
+| Subconsulta escalar (primera elección; descartada en la implementación, ver «Corrección») | Plan estable con estadísticas buenas o malas; sin migración. 86 ms frente a > 120 s en la reproducción. |
 | `DISTINCT ON (workspace_id, aggregate_id)` o `row_number()` sobre todos los pendientes | Lee y ordena todos los pendientes en cada lote (O(n log n) siempre, aunque solo se publiquen 200); `FOR UPDATE` no se permite con `DISTINCT` ni con funciones ventana, obligaría a una segunda sentencia. Descartada. |
 | CTE recursivo de recorrido salteado por el índice de agregados | Mismo efecto que la elegida con más complejidad; el orden global por `sequence` exigiría un paso más. Descartada. |
 | Desactivar el nested loop con `SET LOCAL enable_nestloop = off` | Depende de detalles del planner, castiga otros planes de la transacción y no corrige la estimación. Descartada. |

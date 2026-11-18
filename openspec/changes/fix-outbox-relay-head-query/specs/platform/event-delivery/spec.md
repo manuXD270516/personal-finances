@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Selección de cabezas del relay acotada e independiente de las estadísticas
-El relay del outbox DEBE (MUST) seleccionar en cada lote, por orden de confirmación y hasta el tamaño de lote, solo el evento pendiente más antiguo de cada agregado de cada workspace, saltando sin esperar los que otra transacción tenga bloqueados, y NO DEBE (MUST NOT) seleccionar un evento mientras otro anterior del mismo agregado siga pendiente, aunque esté bloqueado. El costo de seleccionar un lote NO DEBE (MUST NOT) crecer con el cuadrado de los eventos pendientes ni depender de que las estadísticas del outbox estén actualizadas: cada agregado DEBE (MUST) resolverse con un acceso por índice acotado. Esta selección NO DEBE (MUST NOT) apoyarse en índices, migraciones ni conexiones nuevas.
+El relay del outbox DEBE (MUST) seleccionar en cada lote, por orden de confirmación y hasta el tamaño de lote, solo el evento pendiente más antiguo de cada agregado de cada workspace, saltando sin esperar los que otra transacción tenga bloqueados, y NO DEBE (MUST NOT) seleccionar un evento mientras otro anterior del mismo agregado siga pendiente, aunque esté bloqueado. El costo de seleccionar un lote NO DEBE (MUST NOT) crecer con el cuadrado de los eventos pendientes ni depender de que las estadísticas del outbox estén actualizadas: las cabezas pendientes DEBEN (MUST) calcularse en una sola pasada sobre los pendientes por lote, sin evaluar nada por cada evento pendiente. Esta selección NO DEBE (MUST NOT) apoyarse en índices, migraciones ni conexiones nuevas.
 Trace: NFR-PERF-008, NFR-REL-008 · Priority: Must
 
 #### Scenario: Misma selección que antes con varios agregados y workspaces
@@ -18,5 +18,5 @@ Trace: NFR-PERF-008, NFR-REL-008 · Priority: Must
 
 #### Scenario: Estadísticas desactualizadas tras un período tranquilo
 - **CUANDO** las estadísticas del outbox se tomaron con 5 000 eventos publicados y ninguno pendiente, y luego quedan 10 000 eventos pendientes de 2 000 agregados, 5 consecutivos por agregado, con entradas muertas en el índice de pendientes
-- **ENTONCES** el plan de la consulta de cabezas resuelve el evento más antiguo de cada agregado con un acceso por índice acotado y sin una anti-unión que compare los pendientes entre sí
+- **ENTONCES** el plan de la consulta de cabezas calcula el evento más antiguo de cada agregado en una sola pasada sobre los pendientes, sin una anti-unión que compare los pendientes entre sí ni una subconsulta evaluada por cada evento pendiente
 - **Y** un lote de 200 cabezas se selecciona en 5 segundos o menos

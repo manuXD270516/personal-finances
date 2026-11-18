@@ -1,6 +1,6 @@
 ---
 id: TC-PLATFORM-EVENTS-022
-title: "Con estadísticas desactualizadas la consulta de cabezas del relay usa el índice por agregado y no un anti join cuadrático"
+title: "Con estadísticas desactualizadas la consulta de cabezas del relay no usa un anti join ni una subconsulta por fila (costo acotado)"
 spec: platform/event-delivery
 related_specs: ["platform/delivery-pipeline"]
 requirement: "Selección de cabezas del relay acotada e independiente de las estadísticas"
@@ -12,9 +12,10 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - "apps/api/test/events/relay-heads.int.test.ts"
+status: automated
 regression_suite: true
 phase: 8
 tags: ["relay", "outbox", "planner", "perf", "fix-outbox-relay-head-query"]
@@ -32,13 +33,13 @@ steps:
   - "ROLLBACK"
 expected_result:
   - "El plan no tiene un nodo de anti join sobre platform.outbox ni un Join Filter que compare workspace_id o aggregate_id"
-  - "El plan tiene un SubPlan con un Index Scan o Index Only Scan de outbox_pending_aggregate_idx bajo un Limit"
+  - "El plan no tiene SubPlan por fila; las cabezas salen de un InitPlan con un nodo Unique (DISTINCT ON) calculado una sola vez"
   - "La consulta devuelve 200 filas, todas cabezas de su agregado, con Execution Time ≤ 5 000 ms"
 created: 2026-11-17
 updated: 2026-11-17
 ---
 
-# TC-PLATFORM-EVENTS-022 — Con estadísticas desactualizadas la consulta de cabezas del relay usa el índice por agregado y no un anti join cuadrático
+# TC-PLATFORM-EVENTS-022 — Con estadísticas desactualizadas la consulta de cabezas del relay no usa un anti join ni una subconsulta por fila (costo acotado)
 
 ## Intención
 
@@ -50,8 +51,8 @@ Regresión del nightly (issue #147, H7 de `stabilize-import-persist-perf`): con 
 Dado estadísticas del outbox tomadas con 5 000 publicados y ningún pendiente
   Y 10 000 pendientes de 2 000 agregados con entradas muertas en el índice parcial
 Cuando se planifica y ejecuta la consulta de cabezas del relay con lote de 200
-Entonces el plan resuelve cada agregado con un acceso acotado por outbox_pending_aggregate_idx
-  Y no hay anti join con Join Filter de agregado
+Entonces el plan calcula las cabezas en una sola pasada (InitPlan con Unique)
+  Y no hay anti join con Join Filter de agregado ni subconsulta por fila
   Y el lote se selecciona en 5 s o menos
 ```
 

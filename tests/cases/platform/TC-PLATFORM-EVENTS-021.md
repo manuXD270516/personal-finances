@@ -12,9 +12,10 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - "apps/api/test/events/relay-heads.int.test.ts"
+status: automated
 regression_suite: true
 phase: 8
 tags: ["ordering", "relay", "outbox", "skip-locked", "fix-outbox-relay-head-query"]
