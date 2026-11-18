@@ -9,7 +9,7 @@ ARG POSTGRES_IMAGE=postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec2
 FROM ${POSTGRES_IMAGE} AS runtime
 # gosu (binario Go de la imagen oficial) solo se usa al arrancar como root; aquí se arranca como `postgres`, así
 # que se elimina en el RUN de abajo para no arrastrar su stdlib de Go (CVE-2025-68121, CRITICAL).
-ARG PGBACKREST_VERSION=2.59.2-1.pgdg13+1
+ARG PGBACKREST_VERSION=2.59.3-1.pgdg13+1
 ARG GIT_SHA=unknown
 ARG VERSION=0.0.0-local
 ARG BUILD_DATE=unknown
