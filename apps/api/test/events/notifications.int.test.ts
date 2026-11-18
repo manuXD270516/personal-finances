@@ -191,6 +191,11 @@ async function startWorker(
       fxGapFillOnStart: false,
       lifecycleBackfillOnStart: false,
       planningPeriodsOnStart: false,
+      // Los barridos de arranque recorren TODOS los workspaces de la base compartida (cientos al final de la suite):
+      // compiten con el despacho de emails y estos tests no los necesitan (mismo criterio que cash-flow-watch).
+      commitmentsOnStart: false,
+      importsOnStart: false,
+      userConversionBackfillOnStart: false,
       relay: { pollIntervalMs: 200 },
       ...runtimeOptions,
       notifications: { scheduleCrons: false, sweepOnStart: false, ...runtimeOptions.notifications },
@@ -493,10 +498,16 @@ describe('notifications/alerts: fallos del proveedor y canal deshabilitado', () 
     );
     try {
       await publish(f.ws, f.owner.id, thresholdEvent(f.ws));
+      let last: unknown;
       const failed = await until(async () => {
         const rows = (await deliveriesOf(f.ws)).filter((d) => d.user_id === f.owner.id);
+        last = rows.map((d) => ({ status: d.status, attempts: d.attempts, error: d.last_error_code }));
         return rows[0]?.status === 'FAILED' ? rows[0] : undefined;
-      }, 60_000);
+      }, 60_000).catch((err: unknown) => {
+        // Diagnóstico del flake de CI: estado de la entrega y avisos del worker (los logs llevan solo ids opacos).
+        const warnings = log.lines.filter((l) => /"level":"(warn|error)"/.test(l)).slice(-10);
+        throw new Error(`${String(err)}; entrega: ${JSON.stringify(last)}; avisos: ${warnings.join(' | ')}`);
+      });
       expect(failed.attempts).toBe(5);
       expect(failed.last_error_code).toMatch(/^SMTP_/);
       expect((await notificationsOf(f.ws, f.owner.id))[0]?.status).toBe('UNREAD');
@@ -509,7 +520,7 @@ describe('notifications/alerts: fallos del proveedor y canal deshabilitado', () 
     } finally {
       await worker.close();
     }
-  });
+  }, 120_000);
 
   it('[TC-NOTIFICATIONS-EMAIL-007] con EMAIL_DRIVER=none la entrega queda SUPPRESSED/CHANNEL_DISABLED, sin reintentos y con el in-app creado', async () => {
     const f = await fixture();
