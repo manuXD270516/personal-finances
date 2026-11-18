@@ -6,6 +6,9 @@ export interface MailpitMessageSummary {
   readonly MessageID: string;
   readonly Subject: string;
   readonly To: readonly { readonly Address: string }[];
+  /** Fecha de recepción (ISO) que Mailpit agrega al resumen y al detalle; solo para diagnóstico. */
+  readonly Created?: string;
+  readonly Date?: string;
 }
 
 export interface MailpitMessage extends MailpitMessageSummary {

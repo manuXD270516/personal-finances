@@ -48,6 +48,37 @@ const mailTo = async (address: string): Promise<MailpitMessage[]> => {
   );
 };
 
+/** Resumen de TODOS los correos al destinatario (asunto, `Message-ID` y fecha) para el mensaje de fallo. */
+const describeMails = (mails: readonly MailpitMessage[]): string =>
+  `correos al destinatario (${mails.length}): ${mails
+    .map((m) => `[asunto="${m.Subject}" messageId=${m.MessageID} fecha=${m.Created ?? m.Date ?? '?'}]`)
+    .join(' ')}`;
+
+/** Ids de las entregas email de los avisos de déficit de un usuario (el `Message-ID` del correo es `<entrega@dominio>`). */
+const deliveryIdsOf = (user: User): Promise<Set<string>> =>
+  asAdmin(h, async (c) => {
+    const { rows } = await c.query<{ id: string }>(
+      `SELECT d.id::text AS id
+         FROM notifications.notification_delivery d
+         JOIN notifications.notification n ON n.id = d.notification_id AND n.workspace_id = d.workspace_id
+        WHERE d.workspace_id = $1 AND d.channel = 'EMAIL' AND n.user_id = $2
+          AND n.notification_type = 'CASH_FLOW_SHORTFALL_RISK'`,
+      [ws, user.id],
+    );
+    return new Set(rows.map((r) => r.id));
+  });
+
+/**
+ * Correos del aviso de déficit de un usuario: los de Mailpit cuyo `Message-ID` corresponde a una de sus entregas. NO se
+ * deduplica: el producto promete un correo por entrega, y un reenvío con el mismo `Message-ID` debe verse como fallo.
+ */
+async function shortfallMailsTo(user: User): Promise<{ mails: MailpitMessage[]; all: MailpitMessage[] }> {
+  const ids = await deliveryIdsOf(user);
+  const all = await mailTo(emailOf(user));
+  const mails = all.filter((m) => ids.has(m.MessageID.replace(/^<|>$/g, '').split('@')[0] ?? ''));
+  return { mails, all };
+}
+
 /** Envía el job a mano y espera a que el worker lo termine (el cron está apagado). */
 async function runWatch(): Promise<void> {
   const id = await h.worker!.queue.send(CASH_FLOW_WATCH_JOB, { trigger: 'manual' });
@@ -185,8 +216,8 @@ describe('reporting.cash-flow-watch: episodio, aviso por email y cierre', () => 
 
   it('[TC-NOTIFICATIONS-SHORTFALL-003] el email del OWNER indica moneda y fecha, enlaza a la app y no trae montos, umbral ni cuentas', async () => {
     const [mail] = await until(async () => {
-      const m = await mailTo(emailOf(owner));
-      return m.length > 0 ? m : undefined;
+      const { mails } = await shortfallMailsTo(owner);
+      return mails.length > 0 ? mails : undefined;
     });
     const content = `${mail!.Subject}\n${(mail!.Text ?? '').replace(/https?:\/\/\S+/g, '')}`;
     expect(content).toContain('BOB');
@@ -203,7 +234,8 @@ describe('reporting.cash-flow-watch: episodio, aviso por email y cierre', () => 
     expect(await episodeRows()).toHaveLength(1);
     expect(await outboxTypes()).toHaveLength(1);
     expect(await shortfallNotifications()).toHaveLength(2);
-    expect(await mailTo(emailOf(owner))).toHaveLength(1);
+    const { mails, all } = await shortfallMailsTo(owner);
+    expect(mails, describeMails(all)).toHaveLength(1);
   }, 180_000);
 
   it('[TC-REPORTING-FORECAST-019] un ingreso pendiente que cubre el déficit cierra el episodio sin avisar y un déficit nuevo abre otro con su aviso', async () => {
