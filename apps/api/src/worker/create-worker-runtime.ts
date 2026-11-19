@@ -130,8 +130,9 @@ export interface WorkerRuntime {
   /** Publica `/health/live` y `/health/ready` (por defecto en WORKER_HEALTH_PORT). Devuelve el puerto. */
   listenHealth(port?: number, host?: string): Promise<number>;
   /**
-   * Apagado ordenado (NFR-REL-009): readiness pasa a 503, el relay deja de publicar, la cola deja de tomar jobs y
-   * espera a que terminen los activos (pg-boss `offWork({ wait: true })`), y se cierran cola, pool y telemetría.
+   * Apagado ordenado (NFR-REL-009): readiness pasa a 503; en paralelo, el relay deja de publicar (espera su lote en
+   * curso) y la cola deja de tomar jobs y espera a que terminen los activos (pg-boss `offWork({ wait: true })`); luego
+   * se cierran cola, pool y telemetría.
    */
   close(): Promise<void>;
 }
@@ -799,8 +800,12 @@ export async function createWorkerRuntime(
       if (closed) return;
       closed = true;
       draining = true;
-      await relay.stop();
-      await queue.drain();
+      // En paralelo: la cola deja de tomar jobs desde el primer instante, aunque el relay tarde en terminar su lote en
+      // curso (antes, `queue.drain()` esperaba a `relay.stop()` y pg-boss seguía sondeando jobs nuevos; fix-worker-
+      // shutdown-drain-first). Residuo: un fetch de pg-boss ya en vuelo puede devolver un job tras la señal.
+      const settled = await Promise.allSettled([relay.stop(), queue.drain()]);
+      const failed = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (failed) throw failed.reason;
       await context.close();
       await queue.stop();
       await health?.close();
