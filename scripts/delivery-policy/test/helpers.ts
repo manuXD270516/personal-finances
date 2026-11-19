@@ -1,10 +1,14 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import JSON5 from 'json5';
 import { parse as parseYaml } from 'yaml';
 
-/** Raíz del repositorio (este archivo está en scripts/delivery-policy/test). */
-export const ROOT = new URL('../../../', import.meta.url).pathname;
+/**
+ * Raíz del repositorio (este archivo está en scripts/delivery-policy/test). `fileURLToPath` y no `URL.pathname`: en Windows
+ * `pathname` da `/D:/…` y `join` lo convierte en `D:\D:\…`.
+ */
+export const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 export const readText = (relative: string): string => readFileSync(join(ROOT, relative), 'utf8');
 

@@ -18,7 +18,7 @@ import {
   type OutboxRelayOptions,
 } from '@pf/platform/events';
 import { currentCorrelation, runWithCorrelation, uuidv7 } from '@pf/platform/logging';
-import { PgBossJobQueue, type JobQueue } from '@pf/platform/queue';
+import { PgBossJobQueue, PLATFORM_PROBE_QUEUE, type JobQueue } from '@pf/platform/queue';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
@@ -749,6 +749,52 @@ describe('platform/event-delivery: worker completo', () => {
       if (!closed) await first.close();
     }
   });
+
+  it('[TC-PLATFORM-EVENTS-023] el apagado deja de tomar jobs aunque el relay tarde en terminar su lote en curso', async () => {
+    const ws = randomUUID();
+    let releaseRelay: (() => void) | undefined;
+    const relayHeld = new Promise<void>((r) => (releaseRelay = r));
+    let relayBlocked: (() => void) | undefined;
+    const relayInBatch = new Promise<void>((r) => (relayBlocked = r));
+    const config = workerConfig(baseEnv(deps));
+    const worker = await createWorkerRuntime(config, quiet, {
+      eventConsumers: [recordingConsumer(ws)],
+      metrics: new SpyMetrics(),
+      // El lote del relay queda detenido tras encolar y antes de confirmar: `relay.stop()` espera esta promesa.
+      relay: {
+        afterEnqueue: async () => {
+          relayBlocked?.();
+          await relayHeld;
+        },
+      },
+    });
+    const key = `drain-first-${randomUUID()}`;
+    let closing: Promise<void> | undefined;
+    let jobId: string | undefined;
+    try {
+      await command(ws, [settingsChanged(ws, randomUUID(), 1)]);
+      await relayInBatch;
+      closing = worker.close();
+      // Job de diagnóstico encolado DESPUÉS de iniciar el apagado: el worker no debe tomarlo (pg-boss sondea cada 0,5 s).
+      jobId = await worker.queue.send(PLATFORM_PROBE_QUEUE, { key, durationMs: 0 });
+      await sleep(2_500);
+      const state = async () =>
+        (await migratorPool.query<{ state: string }>('SELECT state FROM pgboss.job WHERE id = $1', [jobId]))
+          .rows[0]?.state;
+      expect(await state()).toBe('created');
+      releaseRelay?.();
+      await closing;
+      expect(await state()).toBe('created');
+      const effect = await migratorPool.query('SELECT 1 FROM platform.diagnostic_probe WHERE key = $1', [
+        key,
+      ]);
+      expect(effect.rowCount).toBe(0);
+    } finally {
+      releaseRelay?.();
+      await closing?.catch(() => undefined);
+      if (jobId) await migratorPool.query('DELETE FROM pgboss.job WHERE id = $1', [jobId]);
+    }
+  }, 60_000);
 
   it('[TC-PLATFORM-EVENTS-012] el consumidor procesa el evento aislado en su workspace y con el correlationId de origen', async () => {
     const w1 = randomUUID();

@@ -83,7 +83,7 @@ services:
 
   object-storage:
     <<: *deps
-    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     command:
       - mini
       - -dir=/data
@@ -115,7 +115,7 @@ services:
 
   mailpit:
     <<: *deps
-    image: axllent/mailpit:v1.27.7@sha256:cae83a33cd9b9598e4acb210be673dda7e741d5271ed4045310ab456950a136a
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: '1'
       MP_SMTP_AUTH_ALLOW_INSECURE: '1'
@@ -357,7 +357,7 @@ services:
   # Con este perfil, OTEL_ENABLED=true en `.env` envía trazas/métricas/logs de api y worker a Grafana.
   otel-lgtm:
     profiles: [observability]
-    image: grafana/otel-lgtm:0.34.0@sha256:b966ea107831d526d9eb8fe4d2d86c9e5731392fad9dce8296bcf2072031f07c
+    image: grafana/otel-lgtm:0.41.0@sha256:2e3290657f2f2a256c7a9175f097424a3ac5b54840741ace433e108e109348b6
     restart: unless-stopped
     logging: *default-logging
     volumes:

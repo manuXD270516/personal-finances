@@ -15,6 +15,7 @@ export { ENVELOPE_V1_SCHEMA_ID, EventContractError, EventSchemaRegistry } from '
 export { PgOutboxWriter, buildEnvelope, type OutboxWriter } from './outbox-writer.js';
 export {
   OUTBOX_NOTIFY_CHANNEL,
+  OUTBOX_RELAY_HEADS_SQL,
   OUTBOX_RELAY_LOCK_KEY,
   OutboxRelay,
   type EventRoute,
