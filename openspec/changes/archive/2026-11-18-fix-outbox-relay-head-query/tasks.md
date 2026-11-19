@@ -21,7 +21,7 @@
 
 - [x] 4.1 TC-PLATFORM-EVENTS-020, -021 y -022 en verde; TC-PLATFORM-EVENTS-013 y el resto de `event-delivery.int.test.ts` y `event-throughput.int.test.ts` sin cambios y en verde — 2026-11-17: `test:integration` completo en verde (ver 4.2).
 - [x] 4.2 Gates: `pnpm format:check`, `pnpm turbo typecheck lint test build`, `pnpm arch:check`, `pnpm traceability:check`, `pnpm spec:validate`, `pnpm config:docs:check`, `pnpm contract:breaking` (sin cambios esperados) y `pnpm test:integration` dos veces seguidas en verde
-- [ ] 4.3 Nightly por `workflow_dispatch` desde la rama del fix (o los programados siguientes a la fusión): fila del drenado de `imports.perf.ts` ≤ 120 s y fase A de `throughput.perf.ts` completa, sin tocar presupuestos; registrar el resultado aquí y cerrar el issue #147 si corresponde — Pendiente tras la fusión (la corre la sesión principal con `workflow_dispatch` o los nightly siguientes); sin evidencia todavía.
+- [x] 4.3 Nightly por `workflow_dispatch` desde la rama del fix (o los programados siguientes a la fusión): fila del drenado de `imports.perf.ts` ≤ 120 s y fase A de `throughput.perf.ts` completa, sin tocar presupuestos; registrar el resultado aquí y cerrar el issue #147 si corresponde — 2026-11-19, nightly run 44441471740 sobre `main` tras #237: drenado de la fila del host de `imports.perf.ts` 1 122 ms (≤ 120 s) y fase A de `throughput.perf.ts` completa (5 000 filas, drenado total 12 874 ms de 120 000), sin tocar presupuestos. El job `perf` quedó en rojo por otra causa: persistencia del import CSV de la fila del host 22 856 ms frente al presupuesto de 20 000 ms, que pertenece a `stabilize-import-persist-perf`. El issue #147 queda abierto hasta que ese change ponga el nightly en verde.
 
 ## 5. DOCS y cierre
 
