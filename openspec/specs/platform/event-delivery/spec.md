@@ -136,6 +136,11 @@ Trace: NFR-REL-009 · Priority: Must
 - **Y** no se toman eventos nuevos después de la señal
 - **Y** al reiniciar el worker el evento no se vuelve a aplicar
 
+#### Scenario: El relay tarda en terminar su lote y la cola ya no toma jobs
+- **CUANDO** el worker recibe la señal de apagado mientras el relay del outbox tiene un lote en curso que todavía no termina
+- **Y** se encola un job después de la señal
+- **ENTONCES** el worker no toma ese job (sigue en cola sin efecto) ni antes ni después de que el relay termine su lote
+
 ### Requirement: Contexto de tenant y correlación propagados al consumidor
 Cada consumidor DEBE (MUST) procesar un evento dentro del aislamiento del workspace del evento y con el `correlationId` y el contexto de traza del comando que lo originó, de modo que no pueda leer ni escribir datos de otro workspace y sus logs se correlacionen con la petición original.
 Trace: NFR-OBS-002, NFR-REL-008 · Priority: Must
