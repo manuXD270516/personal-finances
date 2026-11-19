@@ -24,6 +24,29 @@ export const OUTBOX_NOTIFY_CHANNEL = 'pf_outbox';
  */
 export const OUTBOX_RELAY_LOCK_KEY = 7_311_853_002_771_001n;
 
+/**
+ * Cabezas pendientes del outbox: la fila con menor `sequence` de cada `(workspace_id, aggregate_id)`, por orden de
+ * `sequence`, bloqueadas con `SKIP LOCKED`; `$1` es el tamaño del lote.
+ *
+ * Las cabezas se calculan UNA vez por lote (`DISTINCT ON` en un InitPlan que se materializa como arreglo de ids) y
+ * el recorrido externo solo las filtra: el costo es O(n log n) en los pendientes y no depende de las estimaciones del
+ * planner. Las formas anteriores dependían de ellas: con `NOT EXISTS` (anti join con Join Filter) y con una subconsulta
+ * escalar correlacionada, cuando las estadísticas dicen que casi no hay pendientes el planner estima `rows=1` y recorre
+ * `outbox_pending_idx` por cada fila externa, sin usar `outbox_pending_aggregate_idx`: costo cuadrático en los
+ * pendientes (openspec fix-outbox-relay-head-query, TC-PLATFORM-EVENTS-022). Las cabezas se leen sin bloquear: una
+ * cabeza bloqueada por otra transacción sigue contando, así que su sucesor no se selecciona.
+ */
+export const OUTBOX_RELAY_HEADS_SQL = `SELECT o.id, o.event_type, o.event_version, o.aggregate_id, o.correlation_id, o.envelope, o.trace_context
+  FROM platform.outbox o
+ WHERE o.published_at IS NULL
+   AND o.id = ANY(ARRAY(SELECT DISTINCT ON (p.workspace_id, p.aggregate_id) p.id
+                          FROM platform.outbox p
+                         WHERE p.published_at IS NULL
+                         ORDER BY p.workspace_id, p.aggregate_id, p.sequence))
+ ORDER BY o.sequence
+ LIMIT $1
+ FOR UPDATE OF o SKIP LOCKED`;
+
 export interface OutboxRelayOptions {
   /** Pool con el rol `pf_worker` (lee el outbox de todos los workspaces). */
   readonly pool: Pool;
@@ -86,23 +109,7 @@ export class OutboxRelay {
       // (created_on, id), y todos los jobs de esta transacción comparten created_on; si dos eventos del mismo
       // agregado se encolaran juntos, el desempate por eventId podría invertirlos. Los sucesores salen en lotes
       // posteriores (created_on mayor), así que la cola los ve en orden de confirmación (TC-PLATFORM-EVENTS-013).
-      rows = (
-        await client.query<PendingRow>(
-          `SELECT o.id, o.event_type, o.event_version, o.aggregate_id, o.correlation_id, o.envelope, o.trace_context
-             FROM platform.outbox o
-            WHERE o.published_at IS NULL
-              AND NOT EXISTS (
-                    SELECT 1 FROM platform.outbox p
-                     WHERE p.published_at IS NULL
-                       AND p.workspace_id = o.workspace_id
-                       AND p.aggregate_id = o.aggregate_id
-                       AND p.sequence < o.sequence)
-            ORDER BY o.sequence
-            LIMIT $1
-            FOR UPDATE OF o SKIP LOCKED`,
-          [batchSize],
-        )
-      ).rows;
+      rows = (await client.query<PendingRow>(OUTBOX_RELAY_HEADS_SQL, [batchSize])).rows;
       if (rows.length === 0) {
         await client.query('COMMIT');
         return 0;

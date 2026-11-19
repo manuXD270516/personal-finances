@@ -1,6 +1,7 @@
 import { cpus, loadavg, totalmem } from 'node:os';
 import { performance } from 'node:perf_hooks';
 import type { PersistStep, PersistTimings } from '@pf/imports/interface/imports.module';
+import { OUTBOX_RELAY_HEADS_SQL } from '@pf/platform/events';
 import type { BatchStep, BatchStepTimer } from '@pf/transactions/interface/transactions.module';
 import { asAdmin, type Harness } from '../support/portability.js';
 import { foreignActiveQueries, purgeBacklog, waitForQuiet } from './isolation.js';
@@ -320,18 +321,6 @@ export async function takeFingerprint(client: SqlRunner): Promise<RunnerFingerpr
 
 // ── Diagnóstico del outbox ──────────────────────────────────────────────────────────────────────────────────────
 
-const RELAY_HEADS_QUERY = `SELECT o.id
-             FROM platform.outbox o
-            WHERE o.published_at IS NULL
-              AND NOT EXISTS (
-                    SELECT 1 FROM platform.outbox p
-                     WHERE p.published_at IS NULL
-                       AND p.workspace_id = o.workspace_id
-                       AND p.aggregate_id = o.aggregate_id
-                       AND p.sequence < o.sequence)
-            ORDER BY o.sequence
-            LIMIT 500`;
-
 /**
  * Diagnóstico del outbox al vencer el tope de la preparación de la ráfaga (H7 del design): pendientes por tipo con
  * intentos y último error, antigüedad del más viejo, `EXPLAIN` de la consulta de cabezas del relay y la transacción
@@ -358,7 +347,7 @@ export async function diagnoseOutbox(h: Harness): Promise<OutboxDiagnosis> {
     );
     let plan: string | undefined;
     try {
-      const explain = await c.query<Record<string, string>>(`EXPLAIN ${RELAY_HEADS_QUERY}`);
+      const explain = await c.query<Record<string, string>>(`EXPLAIN ${OUTBOX_RELAY_HEADS_SQL}`, [500]);
       plan = explain.rows
         .map((r) => Object.values(r)[0] ?? '')
         .join('\n')

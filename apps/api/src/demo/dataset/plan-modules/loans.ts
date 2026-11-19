@@ -1,5 +1,5 @@
 import { dec } from '@pf/shared-kernel';
-import { addDays, addMonthsClamped, parseDate, withDay } from '../calendar.js';
+import { addDays, addMonthsClamped, dayOfMonth, parseDate, withDay } from '../calendar.js';
 import type { DemoCurrency, DemoMoney } from '../plan-types.js';
 import type { LoanKey, ModuleOp } from '../module-ops.js';
 
@@ -125,11 +125,14 @@ export function loanDefinitions(anchor: string): readonly LoanDefinition[] {
   const monthBack = (date: string, k: number) => addMonthsClamped(date, -k);
   const vehicularLast = withDay(anchor, 1); // cuota 19 = día 1 del mes de A
   const vehicularFirst = monthBack(vehicularLast, 18);
-  const consumoDue6 = addDays(anchor, -9); // cuota 6 = A − 9
+  // Día máximo 28: con día 29-31 el desembolso (un mes antes) se recorta en febrero y el motor cobra un primer periodo
+  // de 31-32 días 30/360 en vez de 30 (fix-demo-loan-month-end). Mueve la cuota hasta 3 días antes de la referencia.
+  const cap28 = (date: string) => withDay(date, Math.min(dayOfMonth(date), 28));
+  const consumoDue6 = cap28(addDays(anchor, -9)); // cuota 6 = A − 9 (día <= 28)
   const consumoFirst = monthBack(consumoDue6, 5);
   const familiarDue3 = withDay(monthBack(anchor, 7), 10); // cuota 3 = día 10 del mes de A − 7 meses
   const familiarFirst = monthBack(familiarDue3, 2);
-  const educativoDue8 = addDays(anchor, -20); // cuota 8 = A − 20
+  const educativoDue8 = cap28(addDays(anchor, -20)); // cuota 8 = A − 20 (día <= 28)
   const educativoFirst = monthBack(educativoDue8, 7);
   return [
     {
