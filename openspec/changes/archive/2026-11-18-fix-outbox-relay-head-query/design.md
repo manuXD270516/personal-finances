@@ -75,8 +75,8 @@ Decisión final: `SELECT ... WHERE published_at IS NULL AND id = ANY(ARRAY(SELEC
 
 | Alternativa | Resultado |
 | --- | --- |
-| Subconsulta escalar (primera elección; descartada en la implementación, ver «Corrección») | Plan estable con estadísticas buenas o malas; sin migración. 86 ms frente a > 120 s en la reproducción. |
-| `DISTINCT ON (workspace_id, aggregate_id)` o `row_number()` sobre todos los pendientes | Lee y ordena todos los pendientes en cada lote (O(n log n) siempre, aunque solo se publiquen 200); `FOR UPDATE` no se permite con `DISTINCT` ni con funciones ventana, obligaría a una segunda sentencia. Descartada. |
+| Subconsulta escalar (primera elección; descartada en la implementación, ver «Corrección») | Plan estable con estadísticas buenas o malas; sin migración. 86 ms frente a > 120 s en la reproducción, pero sigue evaluando un SubPlan por cada pendiente. Reemplazada por la elegida. |
+| `DISTINCT ON (workspace_id, aggregate_id)` en un InitPlan (`id = ANY(ARRAY(...))`) con `FOR UPDATE OF o` sobre la consulta externa | **Elegida** (ver «Corrección en la implementación»). Lee y ordena todos los pendientes en cada lote (O(n log n)), costo asumido. El bloqueo se aplica solo a `o`, así que no choca con `DISTINCT ON`; la objeción original (`FOR UPDATE` incompatible con `DISTINCT`) solo aplicaba a ponerlo en la misma sentencia que el bloqueo. `row_number()` queda descartada por el mismo costo sin ventaja. |
 | CTE recursivo de recorrido salteado por el índice de agregados | Mismo efecto que la elegida con más complejidad; el orden global por `sequence` exigiría un paso más. Descartada. |
 | Desactivar el nested loop con `SET LOCAL enable_nestloop = off` | Depende de detalles del planner, castiga otros planes de la transacción y no corrige la estimación. Descartada. |
 | `ANALYZE platform.outbox` desde el relay o el harness | El relay correría mantenimiento en cada ráfaga y el harness solo taparía el síntoma en CI; producción seguiría expuesta. Descartada. |
@@ -96,7 +96,7 @@ En `apps/api/test/events/event-delivery.int.test.ts` (PostgreSQL 18.6 real, `pf_
 - **TC-PLATFORM-EVENTS-022 (estadísticas desactualizadas).** Todo dentro de UNA transacción revertida con `pf_migrator` (o el rol dueño de la tabla), para no dejar filas ni estadísticas en la base compartida y para que el autoanalyze no pueda cambiar las estadísticas a mitad del test (`ANALYZE` toma `SHARE UPDATE EXCLUSIVE` hasta el final de la transacción):
   1. Insertar 5 000 eventos sintéticos ya publicados de un workspace propio (historia) y ejecutar `ANALYZE platform.outbox` (estadísticas con casi ningún pendiente).
   2. Insertar 10 000 pendientes de 2 000 agregados, 5 consecutivos por agregado (cabezas dispersas: el peor caso del anti join), y marcar publicados 2 000 de ellos para dejar entradas muertas en el índice parcial.
-  3. `EXPLAIN (FORMAT JSON)` de `OUTBOX_RELAY_HEADS_SQL` con `$1 = 200`: el plan NO DEBE tener un nodo de anti join sobre `platform.outbox` ni un Join Filter que compare `workspace_id`/`aggregate_id`; DEBE tener un SubPlan con un Index Scan o Index Only Scan de `outbox_pending_aggregate_idx` bajo un `Limit`.
+  3. `EXPLAIN (FORMAT JSON)` de `OUTBOX_RELAY_HEADS_SQL` con `$1 = 200`: el plan NO DEBE tener un nodo de anti join sobre `platform.outbox`, ni un Join Filter que compare `workspace_id`/`aggregate_id`, ni un SubPlan evaluado por fila; DEBE tener un InitPlan con un nodo `Unique` (el `DISTINCT ON`). (Redacción original, superada por la «Corrección»: un SubPlan con Index Scan de `outbox_pending_aggregate_idx` bajo un `Limit`.)
   4. `EXPLAIN (ANALYZE, FORMAT JSON)` de la misma consulta: devuelve 200 filas, todas cabezas, y `Execution Time` ≤ 5 000 ms (tope holgado: la consulta nueva tarda decenas de milisegundos; la anterior, segundos o más con este volumen).
   5. `ROLLBACK`.
 
