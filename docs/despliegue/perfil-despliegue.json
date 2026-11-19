@@ -1,0 +1,688 @@
+{
+  "proyecto": {
+    "nombre": "pfos",
+    "ruta": "D:\\projects\\personal-finances",
+    "version": "0.0.0",
+    "tipo": "multi-servicio en contenedores"
+  },
+  "stack": {
+    "lenguajes": [
+      "typescript",
+      "python"
+    ],
+    "gestor": "pnpm",
+    "frameworks": [
+      "next",
+      "react",
+      "nestjs",
+      "fastapi"
+    ],
+    "runtime": {
+      "node": ">=22.12 <27"
+    },
+    "monorepo": true,
+    "paquetes": [
+      "apps/api/package.json",
+      "apps/web/package.json",
+      "package.json",
+      "packages/contexts/accounts/package.json",
+      "packages/contexts/audit/package.json",
+      "packages/contexts/classification/package.json",
+      "packages/contexts/commitments/package.json",
+      "packages/contexts/debt/package.json",
+      "packages/contexts/documents/package.json",
+      "packages/contexts/forecasting/package.json",
+      "packages/contexts/fx/package.json",
+      "packages/contexts/goals/package.json",
+      "packages/contexts/identity/package.json",
+      "packages/contexts/imports/package.json",
+      "packages/contexts/ledger/package.json",
+      "packages/contexts/notifications/package.json",
+      "packages/contexts/planning/package.json",
+      "packages/contexts/reporting/package.json",
+      "packages/contexts/rules/package.json",
+      "packages/contexts/transactions/package.json",
+      "packages/eslint-config/package.json",
+      "packages/platform/package.json",
+      "packages/shared-kernel/package.json",
+      "scripts/architecture/package.json",
+      "scripts/contract/package.json",
+      "scripts/delivery-policy/package.json",
+      "scripts/stack/package.json",
+      "scripts/traceability/package.json",
+      "spikes/SPIKE-02-data-access/package.json",
+      "spikes/SPIKE-03-money/package.json",
+      "spikes/SPIKE-04-modular-monolith/apps/api/package.json",
+      "spikes/SPIKE-04-modular-monolith/package.json",
+      "spikes/SPIKE-04-modular-monolith/packages/platform/package.json",
+      "spikes/SPIKE-04-modular-monolith/packages/shared-kernel/package.json",
+      "spikes/SPIKE-05-outbox-queue/package.json",
+      "spikes/SPIKE-06-auth-bff/package.json",
+      "spikes/SPIKE-07-object-storage/package.json",
+      "spikes/SPIKE-08-compose-windows/app/package.json",
+      "spikes/SPIKE-08-compose-windows/package.json",
+      "spikes/SPIKE-10-observability/package.json",
+      "tests/e2e/package.json"
+    ]
+  },
+  "datos": {
+    "motores": [
+      "postgres",
+      "redis",
+      "prisma",
+      "drizzle",
+      "s3"
+    ],
+    "migraciones": [
+      "apps/api/db/migrations/",
+      "apps/api/src/migrate/",
+      "spikes/SPIKE-02-data-access/db/migrations/",
+      "spikes/SPIKE-02-data-access/src/drizzle/",
+      "spikes/SPIKE-08-compose-windows/migrate/"
+    ],
+    "prismaProvider": "provider = \"postgresql\""
+  },
+  "autenticacion": [
+    "jwt (jose)"
+  ],
+  "señales": {
+    "procesoPersistente": {
+      "activa": true,
+      "evidencia": [
+        "apps/api/src/api/create-api-runtime.ts:133",
+        "apps/api/src/main.api.ts:20",
+        "packages/platform/src/health/http-server.ts:25",
+        "spikes/SPIKE-06-auth-bff/api/src/main.ts:39",
+        "spikes/SPIKE-07-object-storage/src/browser-check.ts:51"
+      ]
+    },
+    "websockets": {
+      "activa": false,
+      "evidencia": []
+    },
+    "tareasProgramadas": {
+      "activa": true,
+      "evidencia": [
+        "apps/api/src/demo/demo-jobs-port.ts:27",
+        "apps/api/src/documents/restore-jobs.ts:22",
+        "apps/api/src/main.migrate.ts:1",
+        "apps/api/src/migrate/pgboss.ts:6",
+        "apps/api/src/migrate/run-migrate.ts:19"
+      ]
+    },
+    "escribeEnDisco": {
+      "activa": true,
+      "evidencia": [
+        "spikes/SPIKE-07-object-storage/src/run-all.ts:79",
+        "spikes/SPIKE-07-object-storage/src/s3-suite.ts:306",
+        "spikes/SPIKE-08-compose-windows/hotreload/writer.mjs:6"
+      ]
+    },
+    "navegadorSinCabeza": {
+      "activa": false,
+      "evidencia": []
+    },
+    "dependenciasNativas": {
+      "activa": false,
+      "evidencia": []
+    },
+    "contenedores": {
+      "activa": true,
+      "evidencia": [
+        "spikes/SPIKE-05-outbox-queue/Dockerfile",
+        "spikes/SPIKE-08-compose-windows/app/Dockerfile",
+        "spikes/SPIKE-08-compose-windows/crlf/Dockerfile",
+        "spikes/SPIKE-08-compose-windows/hotreload/Dockerfile",
+        "deploy/compose/compose.prod.yaml"
+      ]
+    },
+    "renderEnServidor": {
+      "activa": true,
+      "evidencia": [
+        "next"
+      ]
+    },
+    "pwa": {
+      "activa": false,
+      "evidencia": []
+    },
+    "compatibleConBorde": {
+      "activa": false,
+      "evidencia": []
+    }
+  },
+  "contenedores": {
+    "compose": [
+      "deploy/compose/compose.prod.yaml",
+      "deploy/compose/compose.yaml",
+      "scripts/stack/test/fixtures/compose.migrate-fail.yaml",
+      "spikes/SPIKE-02-data-access/compose.yaml",
+      "spikes/SPIKE-05-outbox-queue/compose.yaml",
+      "spikes/SPIKE-06-auth-bff/compose.fargate-like.yaml",
+      "spikes/SPIKE-06-auth-bff/compose.yaml",
+      "spikes/SPIKE-07-object-storage/compose.limits.yaml",
+      "spikes/SPIKE-07-object-storage/compose.yaml",
+      "spikes/SPIKE-08-compose-windows/compose.yaml",
+      "spikes/SPIKE-08-compose-windows/signals/compose.signals.yaml",
+      "spikes/SPIKE-10-observability/compose.yaml"
+    ],
+    "servicios": [
+      "caddy",
+      "postgres",
+      "object-storage",
+      "mailpit",
+      "keycloak",
+      "migrate",
+      "finance-api",
+      "finance-worker",
+      "finance-web",
+      "ml-forecasting",
+      "caddy-data",
+      "caddy-config",
+      "options",
+      "env_file",
+      "postgres",
+      "object-storage",
+      "mailpit",
+      "keycloak",
+      "valkey",
+      "migrate",
+      "finance-api",
+      "finance-worker",
+      "finance-web",
+      "seed",
+      "otel-lgtm",
+      "ml-forecasting",
+      "ml-internal",
+      "ml-service-token",
+      "postgres-init",
+      "seaweedfs-s3",
+      "pg-data",
+      "object-storage-data",
+      "valkey-data",
+      "otel-lgtm-data",
+      "migrate",
+      "postgres",
+      "migrate",
+      "pgdata",
+      "postgres",
+      "valkey",
+      "worker",
+      "keycloak",
+      "keycloak",
+      "valkey",
+      "seaweedfs",
+      "volumes",
+      "seaweedfs",
+      "seaweedfs-init",
+      "garage",
+      "garage-init",
+      "rustfs",
+      "rustfs-init",
+      "seaweedfs-data",
+      "garage-data",
+      "rustfs-data",
+      "postgres",
+      "redis",
+      "migrate",
+      "api",
+      "worker",
+      "seed",
+      "otel",
+      "pg-data",
+      "redis-data",
+      "sig-node-pid1-handler",
+      "sig-node-pid1-nohandler",
+      "sig-tini-handler",
+      "sig-tini-nohandler",
+      "sig-shell-wrapper",
+      "sig-shell-wrapper-tini",
+      "sig-npm-start",
+      "zombie-no-init",
+      "zombie-tini",
+      "otel-lgtm"
+    ],
+    "imagenes": [
+      "caddy:2.11.6-alpine@sha256:d44355d3c2149dc580ce2cac735955d1c08d3d00882c30489c241aa51a5c10d9",
+      "${PFOS_POSTGRES_IMAGE:?digest",
+      "${FINANCE_API_IMAGE:?digest",
+      "${FINANCE_WEB_IMAGE:?digest",
+      "${FINANCE_ML_IMAGE:-pfos/finance-ml:unset}",
+      "${FINANCE_API_IMAGE:-pfos/finance-api:local}",
+      "postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722",
+      "chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+      "axllent/mailpit:v1.27.7@sha256:cae83a33cd9b9598e4acb210be673dda7e741d5271ed4045310ab456950a136a",
+      "quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+      "valkey/valkey:9.1.3-alpine@sha256:bf09d58e96d6b4524a15396b65b242bbe18beebbcc15a04d8ee75ddac62fae0b",
+      "${FINANCE_WEB_IMAGE:-pfos/finance-web:local}",
+      "grafana/otel-lgtm:0.34.0@sha256:b966ea107831d526d9eb8fe4d2d86c9e5731392fad9dce8296bcf2072031f07c",
+      "${FINANCE_ML_IMAGE:-pfos/finance-ml:local}",
+      "postgres:18",
+      "PGDATA",
+      "ghcr.io/amacneil/dbmate:2.36.0",
+      "postgres:18-alpine",
+      "valkey/valkey:9-alpine",
+      "quay.io/keycloak/keycloak:26.8.0",
+      "valkey/valkey:9.1.2-alpine",
+      "amazon/aws-cli:2.37.8@sha256:420ab345e847291b541b45d989535f55bcff957c27fa1100fae4aa233e86398c",
+      "dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020",
+      "rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff",
+      "pf-spike-08/app:local",
+      "PGDATA=/var/lib/postgresql/18/docker",
+      "valkey/valkey:8-alpine",
+      "busybox:1.36",
+      "grafana/otel-lgtm:0.34.0"
+    ]
+  },
+  "plataformasConfiguradas": [
+    "terraform"
+  ],
+  "configuracion": {
+    "variables": [
+      "PF_BIND_ADDR",
+      "PF_POSTGRES_PORT",
+      "PF_OBJECT_STORAGE_PORT",
+      "PF_MAILPIT_UI_PORT",
+      "PF_MAILPIT_SMTP_PORT",
+      "PF_KEYCLOAK_PORT",
+      "PF_API_PORT",
+      "PF_WORKER_HEALTH_PORT",
+      "PF_WEB_PORT",
+      "PF_VALKEY_PORT",
+      "PF_ML_PORT",
+      "PF_GRAFANA_PORT",
+      "PF_OTLP_GRPC_PORT",
+      "PF_OTLP_HTTP_PORT",
+      "PF_DEV_PG_SUPERUSER_PASSWORD",
+      "PF_DEV_DB_MIGRATOR_PASSWORD",
+      "PF_DEV_DB_APP_PASSWORD",
+      "PF_DEV_DB_BFF_PASSWORD",
+      "PF_DEV_DB_WORKER_PASSWORD",
+      "PF_DEV_KEYCLOAK_DB_PASSWORD",
+      "PF_DEV_KEYCLOAK_ADMIN_PASSWORD",
+      "PF_DEV_OIDC_CLIENT_SECRET",
+      "PF_DEV_KC_OWNER_PASSWORD",
+      "PF_DEV_KC_EDITOR_PASSWORD",
+      "PF_DEV_KC_VIEWER_PASSWORD",
+      "PF_DEV_KC_OUTSIDER_PASSWORD",
+      "PF_DEV_BFF_SESSION_SECRET",
+      "PF_DEV_S3_ACCESS_KEY",
+      "PF_DEV_S3_SECRET_KEY",
+      "PF_DEV_ML_SERVICE_TOKEN",
+      "PF_DEV_EXPORT_MASTER_KEY",
+      "PF_DEV_DOCUMENT_MASTER_KEY",
+      "PF_DEV_CONNECTION_PRIVATE_KEY",
+      "PF_DEV_CONNECTION_PUBLIC_KEY",
+      "PFOS_ENV",
+      "LOG_LEVEL",
+      "APP_DEFAULT_LOCALE",
+      "APP_REPORTING_CURRENCY",
+      "APP_TIMEZONE",
+      "DEMO_DATA_ENABLED",
+      "DATABASE_URL",
+      "DATABASE_MIGRATOR_URL",
+      "WORKER_DATABASE_URL",
+      "DATABASE_POOL_MAX",
+      "OBJECT_STORAGE_ENDPOINT",
+      "OBJECT_STORAGE_REGION",
+      "OBJECT_STORAGE_BUCKET",
+      "OBJECT_STORAGE_ACCESS_KEY",
+      "OBJECT_STORAGE_SECRET_KEY",
+      "OBJECT_STORAGE_FORCE_PATH_STYLE",
+      "OBJECT_STORAGE_ENSURE_BUCKET",
+      "OBJECT_STORAGE_CORS_ORIGINS",
+      "OBJECT_STORAGE_EXPORTS_BUCKET",
+      "EXPORT_ENCRYPTION_KEYS",
+      "EXPORT_ENCRYPTION_ACTIVE_KEY_ID",
+      "EXPORT_RETENTION",
+      "REAUTH_MAX_AGE",
+      "WORKSPACE_IMPORT_MAX_BYTES",
+      "OBJECT_STORAGE_QUARANTINE_BUCKET",
+      "OBJECT_STORAGE_PUBLIC_ENDPOINT",
+      "DOCUMENT_ENCRYPTION_KEYS",
+      "DOCUMENT_ENCRYPTION_ACTIVE_KEY_ID",
+      "DOCUMENT_MAX_BYTES",
+      "DOCUMENT_IMPORT_SOURCE_MAX_BYTES",
+      "DOCUMENT_WORKSPACE_QUOTA_BYTES",
+      "DOCUMENT_MALWARE_SCANNER",
+      "CONNECTION_CREDENTIALS_PUBLIC_KEYS",
+      "CONNECTION_CREDENTIALS_PRIVATE_KEYS",
+      "IMPORTS_PROVIDER_FAKE_ENABLED",
+      "JOB_QUEUE_DRIVER",
+      "JOB_QUEUE_POLLING_INTERVAL_SECONDS",
+      "SESSION_STORE",
+      "VALKEY_URL",
+      "API_PORT",
+      "API_BIND_ADDRESS",
+      "HEALTH_CHECK_TIMEOUT_MS",
+      "SHUTDOWN_TIMEOUT_MS",
+      "IDEMPOTENCY_RETENTION",
+      "RATE_LIMIT_STORE",
+      "RATE_LIMIT_READS_PER_MIN",
+      "RATE_LIMIT_WRITES_PER_MIN",
+      "WORKER_CONCURRENCY",
+      "EVENT_CONSUMER_CONCURRENCY",
+      "EVENT_CONSUMER_BATCH_SIZE",
+      "EVENT_CONSUMER_GROUP_BATCH_SIZE",
+      "WORKER_HEALTH_PORT",
+      "WORKER_HEALTH_BIND_ADDRESS",
+      "FX_PROVIDER_PRIMARY",
+      "FX_PROVIDER_FALLBACK",
+      "FX_PROVIDER_OFFICIAL",
+      "FX_POLL_INTERVAL",
+      "FX_STALE_AFTER_PARALLEL",
+      "FX_STALE_AFTER_OFFICIAL",
+      "FX_STALE_AFTER_FALLBACK",
+      "FX_MANUAL_FALLBACK_MAX_AGE",
+      "FX_ANOMALY_THRESHOLD_PCT",
+      "FX_PROVIDER_TIMEOUT",
+      "FX_BACKFILL_ENABLED",
+      "FX_PROVIDER_CRYPTO_PRIMARY",
+      "FX_PROVIDER_CRYPTO_FALLBACK",
+      "FX_STALE_AFTER_MARKET",
+      "FX_STALE_AFTER_MARKET_FALLBACK",
+      "FX_FEED_STALE_ALERT_AFTER",
+      "FX_ANOMALY_THRESHOLD_VOLATILE_PCT",
+      "FX_STABLECOIN_CODES",
+      "FX_CRYPTO_HISTORY_FROM",
+      "FX_PROVIDER_INSTITUTION_RATES",
+      "FX_INSTITUTION_RATES_INTERVAL",
+      "FX_STALE_AFTER_INSTITUTION",
+      "ACCOUNTS_INSTITUTION_CATALOG_DIR",
+      "REPORTING_RATE_VALIDITY_WINDOW",
+      "PLANNING_PERIOD_LOOKAHEAD",
+      "PLANNING_PERIODS_CRON",
+      "PLANNING_CLOSE_PENDING_DELAY_DAYS",
+      "COMMITMENTS_HORIZON_DAYS",
+      "COMMITMENTS_SCHEDULER_CRON",
+      "REPORTING_CASH_FLOW_WATCH_CRON",
+      "REPORTING_SHORTFALL_ALERT_HORIZON_DAYS",
+      "COMMITMENTS_SUBSCRIPTIONS_CRON",
+      "DEBT_CARDS_CRON",
+      "GOALS_DAILY_CRON",
+      "IMPORT_CSV_MAX_BYTES",
+      "IMPORT_CSV_MAX_ROWS",
+      "IMPORT_CSV_MAX_COLUMNS",
+      "IMPORT_PERSIST_BATCH_SIZE",
+      "IMPORT_REVIEW_TTL",
+      "IMPORT_STAGING_RETENTION",
+      "IMPORT_FUTURE_DATE_TOLERANCE_DAYS",
+      "IMPORT_MAINTENANCE_CRON",
+      "EMAIL_DRIVER",
+      "SMTP_HOST",
+      "SMTP_PORT",
+      "SMTP_SECURE",
+      "EMAIL_FROM",
+      "APP_PUBLIC_URL",
+      "NOTIFY_EMAIL_MAX_ATTEMPTS",
+      "NOTIFY_RETENTION",
+      "NOTIFICATIONS_DIGEST_CRON",
+      "OIDC_PUBLIC_BASE_URL",
+      "WEB_PUBLIC_URL",
+      "OIDC_ISSUER_URL",
+      "FINANCE_API_URL",
+      "OIDC_CLIENT_ID",
+      "OIDC_CLIENT_SECRET",
+      "OIDC_SCOPES",
+      "BFF_DATABASE_URL",
+      "BFF_SESSION_ENC_KEY",
+      "SESSION_IDLE_TIMEOUT",
+      "SESSION_ABSOLUTE_TIMEOUT",
+      "OTEL_ENABLED",
+      "OTEL_EXPORTER_OTLP_ENDPOINT",
+      "OTEL_NODE_RESOURCE_DETECTORS",
+      "FINANCE_API_IMAGE",
+      "FINANCE_WEB_IMAGE",
+      "KC_BOOTSTRAP_ADMIN_USERNAME",
+      "KC_BOOTSTRAP_ADMIN_PASSWORD",
+      "APP_ORIGIN",
+      "OIDC_ISSUER",
+      "OIDC_REDIRECT_URI",
+      "OIDC_POST_LOGOUT_REDIRECT_URI",
+      "OIDC_SCOPE",
+      "SESSION_ENC_KEY",
+      "API_URL",
+      "BFF_DEV_ENDPOINTS",
+      "JWT_AUDIENCE",
+      "JWT_ALLOWED_AZP",
+      "E2E_CLIENT_ID",
+      "E2E_CLIENT_SECRET",
+      "E2E_NOAUD_CLIENT_ID",
+      "E2E_NOAUD_CLIENT_SECRET",
+      "E2E_OWNER_PASSWORD",
+      "E2E_EDITOR_PASSWORD",
+      "E2E_VIEWER_PASSWORD",
+      "E2E_OUTSIDER_PASSWORD",
+      "PF_PG_PORT",
+      "PF_PG_PASSWORD",
+      "PF_MIGRATE_FILE"
+    ],
+    "archivosDeEjemplo": [
+      ".env.example",
+      "spikes/SPIKE-06-auth-bff/.env.example",
+      "spikes/SPIKE-08-compose-windows/.env.example"
+    ],
+    "archivosDeSecretos": [
+      {
+        "archivo": ".env",
+        "ignoradoPorGit": true
+      },
+      {
+        "archivo": "spikes/SPIKE-06-auth-bff/.env",
+        "ignoradoPorGit": true
+      }
+    ]
+  },
+  "calidad": {
+    "scripts": [
+      "build",
+      "typecheck",
+      "lint",
+      "test",
+      "test:integration",
+      "test:e2e",
+      "perf:bench",
+      "fx:smoke-live",
+      "imports:pdf:probe",
+      "format",
+      "format:check",
+      "spec:validate",
+      "arch:check",
+      "config:docs",
+      "config:docs:check",
+      "setup:env",
+      "stack:up",
+      "stack:down",
+      "stack:restart",
+      "stack:logs",
+      "stack:ps",
+      "stack:reset",
+      "db:migrate",
+      "db:seed",
+      "backup:local",
+      "restore:local",
+      "images:build",
+      "dev",
+      "check:hosts",
+      "test:stack",
+      "contract:breaking",
+      "forecast:backtest:report",
+      "traceability:check",
+      "traceability:matrix",
+      "traceability:regression"
+    ],
+    "build": [
+      "build"
+    ],
+    "pruebas": [
+      "typecheck",
+      "lint",
+      "test",
+      "test:integration",
+      "test:e2e",
+      "format:check",
+      "arch:check",
+      "config:docs:check",
+      "check:hosts",
+      "test:stack",
+      "forecast:backtest:report",
+      "traceability:check"
+    ],
+    "ci": [
+      ".github/workflows/deploy.yml",
+      ".github/workflows/main.yml",
+      ".github/workflows/nightly.yml",
+      ".github/workflows/pr.yml"
+    ]
+  },
+  "git": {
+    "esRepo": true,
+    "rama": "main",
+    "remoto": "https://github.com/manuXD270516/personal-finances.git",
+    "etiquetas": 0,
+    "ultimaEtiqueta": null,
+    "limpio": true,
+    "flujo": "trunk"
+  },
+  "documentos": [
+    "README.md"
+  ],
+  "avisos": [],
+  "correccionesDelDetector": [
+    "tipo multi-servicio es correcto aquí: compose.yaml tiene 12 servicios reales (postgres, object-storage, keycloak, valkey, migrate, finance-api, finance-worker, finance-web, ml-forecasting, mailpit, seed, otel-lgtm) — deploy/compose/compose.yaml",
+    "motores: prisma y drizzle aparecen solo en spikes/; la app usa Kysely sobre pg (packages/platform). Redis: Valkey opcional (perfil valkey), no requerido en N1",
+    "autenticación: OIDC con Keycloak 26 propio + BFF (cookies de sesión) en finance-web, no solo JWT — ADR-0027, deploy/compose/keycloak/"
+  ],
+  "parametros": {
+    "presupuesto": "USD 10–20 por mes (ADR-0027; confirmado por el owner 2026-11-14)",
+    "tarjeta": "sí (la carga el owner)",
+    "audiencia": "personal",
+    "datos": "sensibles",
+    "ramas": "trunk: main es la rama protegida y el deploy es manual por digest (deploy.yml)"
+  },
+  "hechos": [
+    {
+      "pregunta": 1,
+      "hecho": "Mezcla: web Next.js 16 con render en servidor y BFF (finance-web), API NestJS (finance-api), worker pg-boss (finance-worker), migraciones dbmate (migrate), servicio Python opcional (ml-forecasting)",
+      "evidencia": "deploy/compose/compose.yaml"
+    },
+    {
+      "pregunta": 2,
+      "hecho": "Proceso persistente obligatorio: worker con pg-boss (28 consumidores + 4 reservadas para trabajos periódicos) y relay de outbox con LISTEN/NOTIFY",
+      "evidencia": "apps/api/src/worker/create-worker-runtime.ts; CLAUDE.md (presupuesto de conexiones)"
+    },
+    {
+      "pregunta": 3,
+      "hecho": "Tareas programadas internas al worker (crons de pg-boss en America/La_Paz: FX, recurrentes, tarjetas, metas, cash-flow-watch, forecasting.schedule diario, digest) y respaldos por systemd en el host",
+      "evidencia": "packages/platform/src/config/variables.ts (*_CRON); deploy/host/systemd/"
+    },
+    {
+      "pregunta": 4,
+      "hecho": "Estado en disco: volúmenes de PostgreSQL 18 y de SeaweedFS (documentos adjuntos cifrados); el resto de contenedores son read_only en producción",
+      "evidencia": "deploy/compose/compose.prod.yaml"
+    },
+    {
+      "pregunta": 5,
+      "hecho": "Sin navegador sin cabeza; lectura de PDF en un worker_thread aislado (ADR-0032); imágenes propias por digest (finance-api, finance-web, pfos-postgres, finance-ml)",
+      "evidencia": "docs/adr/0032-*; .github/workflows/main.yml"
+    },
+    {
+      "pregunta": 6,
+      "hecho": "PostgreSQL 18 obligatorio con RLS forzada fail-closed, roles propios (pf_app, pf_worker, pf_workspace_directory, pf_maintenance), GRANT MAINTAIN sobre pgboss.job_common y PITR con pgBackRest; no se puede cambiar de motor",
+      "evidencia": "apps/api/db/migrations/; deploy/pgbackrest/pgbackrest.conf; D360"
+    },
+    {
+      "pregunta": 8,
+      "hecho": "Datos reales todavía no en producción (despliegue N1 pendiente); migraciones versionadas expand-only con dbmate; restauración de workspace por export firmado",
+      "evidencia": "docs/38-estado-y-pendientes.md §2; docs/runbooks/restaurar-workspace-desde-export.md"
+    },
+    {
+      "pregunta": 9,
+      "hecho": "Datos financieros personales sensibles: RLS por workspace, cifrado de documentos de la aplicación, credenciales de exchanges con sobre X25519; repo público sin secretos",
+      "evidencia": "ADR-0031; docs/12; CLAUDE.md §Seguridad"
+    },
+    {
+      "pregunta": 11,
+      "hecho": "Techos de memoria en producción: caddy 64m, postgres 384m, object-storage 192m, keycloak 704m, finance-api 320m, finance-worker 448m, finance-web 288m (= 2400m) y ml-forecasting 320m opcional (= 2720m); estable medido ≈ 1.4–1.7 GiB sin ML",
+      "evidencia": "deploy/compose/compose.prod.yaml; docs/runbooks/deploy-and-restore.md §0"
+    },
+    {
+      "pregunta": 11,
+      "hecho": "Conexiones: max_connections=70 con API 22 + worker 34 = 56 (64 de 67 útiles con las colas pg-boss)",
+      "evidencia": "deploy/compose/compose.prod.yaml:79-94"
+    },
+    {
+      "pregunta": 13,
+      "hecho": "18 checks obligatorios en main (unit, integración con Testcontainers, e2e Playwright, stack-smoke, Trivy por imagen, gitleaks, contrato, ml); nightly con Large Seed y benchmarks",
+      "evidencia": ".github/workflows/pr.yml, nightly.yml; protección de main"
+    },
+    {
+      "pregunta": 14,
+      "hecho": "Deploy manual (workflow_dispatch) con environment production y aprobación del owner, por SSH vía Tailscale a un comando forzado que valida 4 digests; sin SSH público",
+      "evidencia": ".github/workflows/deploy.yml; deploy/host/pfos-deploy.sh"
+    },
+    {
+      "pregunta": 16,
+      "hecho": "Servicios externos: correo SMTP (notificaciones), proveedores FX y bancarios/exchanges salientes, Grafana Cloud Free por OTLP, Backblaze B2 para respaldos con Object Lock",
+      "evidencia": "ADR-0027; docs/runbooks/notification-email.md"
+    },
+    {
+      "pregunta": 17,
+      "hecho": "Ya existe una decisión aceptada: ADR-0027 (Lightsail 2 GB São Paulo + Compose, niveles N1–N4) con IaC OpenTofu (infra/), cloud-init y runbook deploy-and-restore; nunca se desplegó",
+      "evidencia": "docs/adr/0027-destino-de-despliegue-inicial-vps-compose.md; infra/environments/prod/main.tf"
+    },
+    {
+      "pregunta": 17,
+      "hecho": "Desde ADR-0027 se sumaron: servicio ml-forecasting (ADR-0033, +320m, perfil ml apagado por omisión, cloud-init debe aceptar un 5.º digest y eso reemplaza la instancia), clave privada de conexiones montada como archivo 0400 (volumen pendiente en compose.prod.yaml)",
+      "evidencia": "docs/adr/0033-*; docs/38 §4"
+    }
+  ],
+  "supuestos": [
+    {
+      "pregunta": 10,
+      "supuesto": "Un usuario (el owner) desde Bolivia, unas cientos de peticiones por día; imports de hasta 5 000 filas",
+      "motivo": "Audiencia personal; NFR-PERF-007"
+    },
+    {
+      "pregunta": 7,
+      "supuesto": "Datos < 2 GB el primer año; adjuntos (PDF, imágenes) de hasta pocos MB",
+      "motivo": "Uso personal; cuotas de documentos del change 53"
+    },
+    {
+      "pregunta": 12,
+      "supuesto": "Disponibilidad de uso personal: RPO ≤ 15 min y RTO ≤ 4 h (docs/30) pesan más que el uptime",
+      "motivo": "docs/30-backup-and-disaster-recovery.md"
+    },
+    {
+      "pregunta": 17,
+      "supuesto": "Dominio propio del owner disponible para Caddy/TLS",
+      "motivo": "ADR-0027 lo supone; no verificado"
+    }
+  ],
+  "mediciones": [
+    {
+      "que": "Memoria estable del stack sin ML",
+      "valor": "≈ 1.4–1.7 GiB",
+      "como": "SPIKE-09 §3 y §17, citado en deploy-and-restore.md"
+    },
+    {
+      "que": "Imagen finance-ml en reposo y con 400 series × 60 periodos",
+      "valor": "48 MiB y 56 MiB",
+      "como": "medición del change 64 (ADR-0033)"
+    }
+  ],
+  "restricciones": [
+    "Costo ≤ USD 20 por mes (incluidos respaldos y DNS)",
+    "PostgreSQL 18 con RLS, roles propios y PITR (RPO ≤ 15 min, RTO ≤ 4 h)",
+    "Worker persistente con pg-boss y LISTEN/NOTIFY",
+    "Keycloak propio (OIDC) y SeaweedFS para documentos cifrados",
+    "Latencia aceptable desde Bolivia",
+    "Operación por una sola persona; secretos solo en el host o la consola",
+    "Mismas imágenes por digest que CI (paridad local ↔ prod)"
+  ],
+  "pendientesDelOwner": [
+    "Dominio definitivo",
+    "Aceptar el 5.º digest en cloud-init (servicio ml) cuando quiera encenderlo",
+    "Ejecutar el despliegue N1 (fases del owner del runbook)"
+  ]
+}
