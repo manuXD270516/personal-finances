@@ -1,6 +1,6 @@
 # ADR-0034: Validación por sentencia de los invariantes del ledger y de los splits, diferida al confirmar
 
-- Estado: Propuesto (2026-11-20; pasa a Aceptado cuando se cumple la Validación)
+- Estado: **Aceptado** (2026-11-20; Validación 1 y 2 cumplidas, ver Notas; la 3, los nightlies de la tarea 8.1, queda tras fusionar)
 - Fecha: 2026-11-20
 - Decisores: Owner (Product/Tech Lead)
 - Relacionado: D404 ([docs/64](../64-import-persist-perf-decisions.md)), D445 y D447 ([docs/69](../69-import-persist-perf-decisions-2.md)), pregunta 4 de [docs/68](../68-import-persist-perf-questions-2.md); evidencia en [docs/67](../67-import-persist-perf-findings.md) §5; D403, D405, D443, D444 y D446; [ADR-0004](0004-ledger-model-double-entry.md) (doble entrada), [ADR-0023](0023-multi-tenancy-and-row-level-security.md) (RLS); docs/ARCHITECTURE.md §4.1; migraciones `20261003170000_ledger_core.sql`, `20261003200000_txn_transactions_core.sql` y `20261011100100_txn_loan_kinds.sql`; OpenSpec change `stabilize-import-persist-perf` (tarea 7.6) y capabilities `ledger/journal-posting`, `transactions/splits`, `transactions/transaction-recording`
@@ -192,3 +192,16 @@ El ADR pasa a **Aceptado** cuando se cumplen las tres condiciones, en este orden
     - las colas quedan vacías.
 
   El prototipo no reemplaza la medición de la Validación: no reproduce la contención del runner.
+- **2026-11-20, Validación 2 (medición en la rama de experimentos): cumplida.** Rama `claude/import-persist-perf-experiments`, variantes `ledger-row` (disparadores por fila: el bloque `migrate:down`) y `ledger-stmt` (la migración `20261120100000_ledger_statement_validation.sql`) entrelazadas en el mismo job, 3 repeticiones y `track_functions = 'pl'`. El tiempo propio de validación es la suma de `txn.assert_splits_sum`, `ledger.assert_entry_balanced` y `ledger.assert_entry_has_postings` frente a la suma de los recolectores y validadores nuevos.
+
+  | Run | Runner | Validación, mediana fila / sentencia | Persistencia mediana fila / sentencia |
+  |---|---|---|---|
+  | 44706595827 | EPYC 9V45 | 9,43 s / 0,48 s (−95 %) | 16,6 s / 8,8 s (−47 %) |
+  | 44706600430 | EPYC 9V74 | 12,26 s / 0,59 s (−95 %) | 21,0 s / 12,4 s (−41 %) |
+
+  Criterio: validación ≥ 50 % (−95 % en ambos) y persistencia ≥ 10 % (−41 % y −47 %). NFR-PERF-003 (run 44706604889, `nightly.perf.ts -t NFR-PERF-003`, Large Seed a escala 0,2, 3 rondas alternadas fila / sentencia): medianas de p95 de gasto 40,0 / 40,1 ms, transferencia 31,6 / 30,9 ms y conversión 43,7 / 43,2 ms, sin empeoramiento fuera del ruido (p50 de 24 a 36 ms en los dos estados).
+- **2026-11-20, hallazgos de la medición.**
+  - Los primeros validadores (runs 44701067797 y 44704491048, 44704500238) no bajaron la persistencia: con las colas sin estadísticas, el planificador elegía planes cuadráticos (unir `txn.transaction` y `txn.transaction_split` completos antes de la cola, o recorrer en orden todo el índice de postings por el `LIMIT 1`): hasta 0,4 s por llamada. La versión final agrega dentro de un subselect con `OFFSET 0` y consulta por clave (el commit de un lote de 200 queda en ≈ 5 ms con y sin `ANALYZE`). Esas corridas se descartan.
+  - Los disparadores por fila tienen el mismo problema de plan: en la repetición 1 (base recién creada) `ledger.assert_entry_balanced` cuesta 0,013 ms por llamada y desde la repetición 2 cuesta 0,6 ms. Eso explica en parte la «modalidad lenta» de docs/67 y por qué la mejora aparece sobre todo desde la repetición 2 (repetición 1: 9,9 / 10,9 s y 15,0 / 13,4 s).
+  - Gate local: `pnpm test:integration` completo en verde (963 tests de la API y todos los contextos) con la migración.
+- **2026-11-20, Aceptado.** Condiciones 1 y 2 de la Validación cumplidas; la 3 (nightlies de la tarea 8.1) queda tras fusionar.

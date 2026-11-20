@@ -12,8 +12,10 @@ invariants: [INV-005]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 6
 tags: [ledger, database, defense-in-depth, bulk-write, stabilize-import-persist-perf, ADR-0034]

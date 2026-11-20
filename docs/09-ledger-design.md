@@ -593,8 +593,11 @@ CREATE TRIGGER posting_immutable BEFORE UPDATE OR DELETE ON ledger.posting
 --    BEFORE INSERT ON ledger.journal_entry: rechaza (PF004, PERIOD_CLOSED) si existe period_lock para (workspace_id, to_char(entry_date,'YYYY-MM'))
 -- SQLSTATE propios: PF001 desbalanceado, PF002 contexto de workspace ausente (RLS, la consulta falla), PF003 mutación prohibida,
 --                   PF004 periodo cerrado, PF005 menos de 2 postings (docs/08 §10; rev. 2026-10-02, docs/31 D19).
---   En la migración real (20261003170000_ledger_core.sql) el chequeo PF005 es un constraint trigger diferido propio
---   sobre ledger.journal_entry (assert_entry_has_postings) y PF001 queda en el trigger de ledger.posting.
+--   En la migración real (20261003170000_ledger_core.sql) el chequeo PF005 era un constraint trigger diferido propio
+--   sobre ledger.journal_entry (assert_entry_has_postings) y PF001 estaba en el trigger de ledger.posting. Desde la migración
+--   20261120100000 (ADR-0034) ambos los valida por conjunto ledger.validate_pending_entries(), un constraint trigger diferido
+--   por transacción sobre ledger.pending_check_sentinel; recolectores por sentencia en journal_entry y posting encolan los
+--   asientos tocados (docs/08 §10). Misma semántica: al confirmar, estados intermedios admitidos, mismos SQLSTATE.
 
 -- 5) Reversa única
 --    ledger.entry_reversal(original_entry_id PRIMARY KEY, reversal_entry_id UNIQUE)
