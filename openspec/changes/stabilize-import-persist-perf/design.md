@@ -143,6 +143,24 @@ Detalle en [docs/67](../../../docs/67-import-persist-perf-findings.md); pregunta
 
 Respuestas del owner el 2026-11-20 en [docs/69](../../../docs/69-import-persist-perf-decisions-2.md) (D443 a D446): no regular el relay, mantener `ubuntu-latest`, medir los disparadores y decidir la meta de 20 s después de medir. El único arreglo que quedaba era regular el relay o los consumidores (D406), que depende de una decisión del owner (docs/68, preguntas 1 y 2). D404 sigue sin evidencia (pregunta 3).
 
+## Disparadores del ledger por sentencia (D447, ADR-0034)
+
+El owner respondió «sí» a la pregunta 4 de [docs/68](../../../docs/68-import-persist-perf-questions-2.md) (D447, [docs/69](../../../docs/69-import-persist-perf-decisions-2.md)). La decisión técnica está en [ADR-0034](../../../docs/adr/0034-validacion-por-sentencia-de-los-invariantes-del-ledger.md) (Propuesto) y se implementa en la tarea 7.6, no en un change de seguimiento, porque es el arreglo que este change necesita para su criterio de salida (D403).
+
+- **Qué cambia:** las comprobaciones de cuadre por moneda (`PF001`), mínimo de dos postings (`PF005`) y suma de los splits (`23514`, `transaction_splits_sum_ck`) dejan de ser disparadores de restricción por fila. Recolectores `AFTER … REFERENCING NEW TABLE … FOR EACH STATEMENT` encolan las claves tocadas en colas `UNLOGGED` por transacción, y un único disparador de restricción `DEFERRABLE INITIALLY DEFERRED` sobre una fila centinela por transacción las valida por conjunto al confirmar. Hay una cola y un centinela en `ledger` y otros en `txn`.
+- **Qué no cambia:**
+  - la evaluación al confirmar, con los estados intermedios admitidos;
+  - la reversión de todo el lote si una fila falla;
+  - los SQLSTATE, la restricción y el formato de los mensajes;
+  - `SET CONSTRAINTS ALL IMMEDIATE`, los savepoints, la RLS forzada, el ledger append-only y las escrituras por fila y por conjunto;
+  - el código de aplicación, los contratos y la configuración.
+- **Por qué no las alternativas:**
+  - PostgreSQL 18 no admite disparadores de restricción por sentencia ni con tablas de transición (verificado en 18.6).
+  - Validar al final de la sentencia rompe los estados intermedios: el asiento antes que sus postings, el registro posting a posting y las revisiones en varias sentencias.
+  - Abaratar la función por fila no reduce las ≈ 25 000 llamadas por import.
+  - Quitar la barrera de la base de datos contradice ARCHITECTURE §4.1 y D404.
+- **Incertidumbre:** el prototipo local cuesta de 40 a 50 veces menos que lo medido en el runner. Por eso la migración solo se fusiona si la medición en la rama de experimentos baja la persistencia (tarea 7.6.6, criterio del ADR). Si no la baja, la meta vuelve al owner (D446).
+
 ## Contratos
 
 - **OpenAPI:** sin cambios.
@@ -150,6 +168,18 @@ Respuestas del owner el 2026-11-20 en [docs/69](../../../docs/69-import-persist-
 - **Contratos públicos:** sin cambios. El puerto `PersistTimings` es interno de IMPORTS (`application/ports`), opcional y sin implementación en producción; no se exporta por `@pf/imports/contracts`. Si una optimización de H4 necesita un método por lote nuevo en un contrato de otro contexto, será aditivo y se describe aquí con `/opsx:update` antes de implementarlo.
 - **Configuración:** sin variables de producto nuevas. `IMPORT_PERSIST_BATCH_SIZE` puede cambiar su valor por omisión según P5 (decisión 4 del change 52). Variables del harness en la rama de experimentos: `PF_PERF_SUITES` y las de cada variante; no se fusionan.
 - **ErrorCode:** sin códigos nuevos.
+- **Base de datos (tarea 7.6, ADR-0034):** una migración expand con timestamp posterior a la última de `main`. No cambia ningún contrato público y el código N−1 funciona igual.
+  - Tablas `UNLOGGED` sin `workspace_id`, con RLS habilitada y forzada y la política `USING/WITH CHECK (xact = pg_current_xact_id())` para todos los roles:
+    - `ledger.pending_entry_check (xact xid8, journal_entry_id uuid, PRIMARY KEY (xact, journal_entry_id))`;
+    - `ledger.pending_check_sentinel (xact xid8 PRIMARY KEY)`;
+    - `txn.pending_splits_check (xact xid8, transaction_id uuid, PRIMARY KEY (xact, transaction_id))`;
+    - `txn.pending_check_sentinel (xact xid8 PRIMARY KEY)`.
+  - Recolectores por sentencia:
+    - `AFTER INSERT` en `ledger.journal_entry`, `ledger.posting`, `txn.transaction` y `txn.transaction_split`;
+    - `AFTER UPDATE` en `txn.transaction` (solo filas con `amount` distinto) y en `txn.transaction_split`.
+  - Un validador `DEFERRABLE INITIALLY DEFERRED FOR EACH ROW` sobre cada centinela.
+  - Se eliminan `posting_balanced_trg`, `journal_entry_postings_trg`, `transaction_splits_sum_tx` y `transaction_splits_sum_split`. Las funciones viejas se conservan para `migrate:down`.
+  - Las colas no entran en `platform.workspace_scoped_table` ni en el export: no tienen `workspace_id` y sus filas no sobreviven a la transacción.
 
 ## Riesgos / Trade-offs
 
@@ -161,7 +191,7 @@ Respuestas del owner el 2026-11-20 en [docs/69](../../../docs/69-import-persist-
 
 ## Plan de migración
 
-Sin migraciones previstas. Si P6 justifica parámetros de limpieza automática en `platform.outbox`, o P8 un índice, van en una migración expand aparte con timestamp posterior a la última de `main`, sin RLS nueva (la tabla ya la tiene). Orden: instrumentación y aislamiento (se fusionan) → P1 en los programados → P2/P3/P8 → P4–P7 según P1 → arreglos → nightlies del criterio de salida. Rollback: la instrumentación es un no-op en producción; cada optimización es reversible por configuración (`IMPORT_PERSIST_BATCH_SIZE`) o por revertir su commit.
+Una migración, la de la tarea 7.6 (ADR-0034), descrita en «Contratos». Se aplica solo si se cumple la medición de la 7.6.6, y su rollback es `migrate:down`, que restaura los disparadores por fila. Si P6 justifica parámetros de limpieza automática en `platform.outbox`, o P8 un índice, van en una migración expand aparte con timestamp posterior a la última de `main`, sin RLS nueva (la tabla ya la tiene). Orden: instrumentación y aislamiento (se fusionan) → P1 en los programados → P2/P3/P8 → P4–P7 según P1 → arreglos → nightlies del criterio de salida. Rollback: la instrumentación es un no-op en producción; cada optimización es reversible por configuración (`IMPORT_PERSIST_BATCH_SIZE`) o por revertir su commit.
 
 ## Dependencias entre changes
 
@@ -170,4 +200,11 @@ Sin migraciones previstas. Si P6 justifica parámetros de limpieza automática e
 
 ## Preguntas abiertas
 
-Resueltas el 2026-11-09 en [docs/64](../../../docs/64-import-persist-perf-decisions.md) (pregunta N de [docs/63](../../../docs/63-import-persist-perf-questions.md) → D(402+N)), todas con la recomendación: D403 (criterio de salida: 5 nightlies programados seguidos ≤ 20 s y objetivo interno ≤ 12 s), D404 (disparadores por sentencia solo con ≥ 25 % de peso en P5 y un ADR), D405 (sin `synchronous_commit` asíncrono), D406 (regular el relay o los consumidores solo si el drenado sigue ≤ 120 s y los demás eventos no se retrasan más), D407 (huella solo informativa), D408 (el runner de D302 no se decide ahora) y D409 (la tarea 5.2 del change 52 se cierra trasladando la evidencia a este change). No queda ninguna pregunta abierta.
+Resueltas el 2026-11-09 en [docs/64](../../../docs/64-import-persist-perf-decisions.md) (pregunta N de [docs/63](../../../docs/63-import-persist-perf-questions.md) → D(402+N)), todas con la recomendación: D403 (criterio de salida: 5 nightlies programados seguidos ≤ 20 s y objetivo interno ≤ 12 s), D404 (disparadores por sentencia solo con ≥ 25 % de peso en P5 y un ADR), D405 (sin `synchronous_commit` asíncrono), D406 (regular el relay o los consumidores solo si el drenado sigue ≤ 120 s y los demás eventos no se retrasan más), D407 (huella solo informativa), D408 (el runner de D302 no se decide ahora) y D409 (la tarea 5.2 del change 52 se cierra trasladando la evidencia a este change). Las preguntas de la segunda ronda ([docs/68](../../../docs/68-import-persist-perf-questions-2.md)) se resolvieron el 2026-11-20 en [docs/69](../../../docs/69-import-persist-perf-decisions-2.md):
+- D443: no regular el relay.
+- D444: mantener `ubuntu-latest`.
+- D445: medir los disparadores.
+- D446: decidir la meta de 20 s después de medir.
+- D447: redactar el ADR de los disparadores por sentencia, que es [ADR-0034](../../../docs/adr/0034-validacion-por-sentencia-de-los-invariantes-del-ledger.md).
+
+No queda ninguna pregunta abierta. Si la medición de la 7.6.6 no cumple el criterio del ADR, la meta de 20 s vuelve al owner por D446, sin pregunta nueva.

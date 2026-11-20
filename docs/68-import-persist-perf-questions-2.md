@@ -1,6 +1,6 @@
 # 68: Preguntas abiertas tras los experimentos de la persistencia del import (change 63)
 
-> **Respuestas:** [69](69-import-persist-perf-decisions-2.md) (D443 a D446) · **Fecha:** 2026-11-20 · **Change:** `stabilize-import-persist-perf` · **Evidencia:** [67](67-import-persist-perf-findings.md) · **Decisiones previas:** [64](64-import-persist-perf-decisions.md) (D403 a D409)
+> **Respuestas:** [69](69-import-persist-perf-decisions-2.md) (D443 a D447) · **Fecha:** 2026-11-20 · **Change:** `stabilize-import-persist-perf` · **Evidencia:** [67](67-import-persist-perf-findings.md) · **Decisiones previas:** [64](64-import-persist-perf-decisions.md) (D403 a D409)
 
 La causa dominante de la fila del host en rojo es la contención de CPU entre la persistencia y el trabajo concurrente del relay y de los consumidores (H3, ≈ 35 %). Ningún arreglo que no sea regular ese trabajo tiene respaldo en los datos (lotes, `synchronous_commit`, estadísticas, `VACUUM`, `CHECKPOINT` y lote del relay no cambian la persistencia). Regular exige decisiones que ni el diseño ni D403 a D409 toman del todo.
 
@@ -33,3 +33,5 @@ Medido en [67 §5](67-import-persist-perf-findings.md): los disparadores pesan d
 
 - **Opción A (recomendada):** sí. ADR y change de seguimiento que pasa esas dos comprobaciones a disparadores por sentencia con tablas de transición, diferidos al confirmar y con la misma semántica (un asiento descuadrado inyectado sigue revirtiendo el lote); medir después con el nightly. Es la única palanca con respaldo para llegar al objetivo de D403.
 - **Opción B:** no; aceptar que la fila del host queda en rojo con probabilidad alta y revisar la meta de 20 s (D403), que el owner dejó «decidir después de medir».
+
+**Respondida el 2026-11-20:** «sí» (D447 en [69](69-import-persist-perf-decisions-2.md)); ADR en [ADR-0034](adr/0034-validacion-por-sentencia-de-los-invariantes-del-ledger.md).
