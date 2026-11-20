@@ -271,6 +271,7 @@ export class PgBossJobQueue implements JobQueue {
   }
 
   private refreshStatistics(force: boolean): Promise<void> {
+    if (process.env['PF_EXP_NO_STATS'] === '1') return Promise.resolve(); // solo rama de experimentos (P3)
     if (this.statisticsRefresh) return this.statisticsRefresh;
     const schema = this.options.schema ?? PGBOSS_SCHEMA;
     const run = async (): Promise<void> => {

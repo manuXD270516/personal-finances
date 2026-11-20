@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import { createHash, randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { Client } from 'pg';
+import type { EventConsumerDefinition } from '@pf/platform/events';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import {
   asAdmin,
@@ -13,6 +15,7 @@ import {
   type User,
 } from '../support/portability.js';
 import { perfOutDir, recordSuiteLoad } from './background-load.js';
+import { BURST_EVENT_TYPES } from './burst-support.js';
 import { renderPdf } from '../../../../packages/contexts/imports/test/support/render-pdf.js';
 import { paintLargeStatement } from '../../../../tests/fixtures/imports/statements-bo/pdf/paint-statement.js';
 import {
@@ -117,6 +120,62 @@ const HOST_CONFIG: ImportConfig = {
   gate: true,
 };
 let codeReport: ImportsReport | undefined;
+
+// ---- RAMA DE EXPERIMENTOS (stabilize-import-persist-perf, grupo 6; no se fusiona) ----
+const VARIANT_NAMES = (process.env['PF_PERF_VARIANTS'] ?? '')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
+const REPEAT = Math.max(1, Number(process.env['PF_PERF_REPEAT'] ?? '1'));
+const EXPERIMENT = VARIANT_NAMES.length > 0;
+interface Variant {
+  readonly name: string;
+  readonly base: ImportConfig;
+  readonly env?: Record<string, string>;
+  readonly noBurstConsumers?: boolean;
+  readonly pauseRelay?: boolean;
+  readonly noCollector?: boolean;
+  readonly noStatsRefresh?: boolean;
+  readonly dbSettings?: Record<string, string>;
+}
+const isBurstDef = (def: EventConsumerDefinition): boolean =>
+  def.events.some((e) => (BURST_EVENT_TYPES as readonly string[]).includes(e.type));
+function variantOf(name: string): Variant {
+  switch (name) {
+    case 'host':
+      return { name, base: HOST_CONFIG };
+    case 'code':
+      return { name, base: CODE_CONFIG };
+    case 'no-consumers':
+      return { name, base: HOST_CONFIG, noBurstConsumers: true };
+    case 'no-relay':
+      return { name, base: HOST_CONFIG, pauseRelay: true };
+    case 'batch-100':
+      return { name, base: HOST_CONFIG, env: { IMPORT_PERSIST_BATCH_SIZE: '100' } };
+    case 'batch-500':
+      return { name, base: HOST_CONFIG, env: { IMPORT_PERSIST_BATCH_SIZE: '500' } };
+    case 'batch-1000':
+      return { name, base: HOST_CONFIG, env: { IMPORT_PERSIST_BATCH_SIZE: '1000' } };
+    case 'track-fn':
+      return { name, base: HOST_CONFIG, dbSettings: { track_functions: "'pl'" } };
+    case 'sync-off':
+      return { name, base: HOST_CONFIG, dbSettings: { synchronous_commit: "'off'" } };
+    case 'no-stats':
+      return { name, base: HOST_CONFIG, noStatsRefresh: true };
+    case 'no-collector':
+      return { name, base: HOST_CONFIG, noCollector: true };
+    default:
+      throw new Error(`variante desconocida: ${name}`);
+  }
+}
+let activeVariant: Variant | undefined;
+async function applyDbSettings(settings: Record<string, string>, reset: boolean): Promise<void> {
+  for (const [k, v] of Object.entries(settings)) {
+    await serial!.query(reset ? `ALTER SYSTEM RESET ${k}` : `ALTER SYSTEM SET ${k} = ${v}`);
+  }
+  await serial!.query('SELECT pg_reload_conf()');
+  await new Promise((r) => setTimeout(r, 1500));
+}
 /** Purga, limpieza y reposo de la base que `prepare` dejó antes de medir la configuración en curso. */
 let restReport: RestReport | undefined;
 
@@ -256,7 +315,7 @@ beforeAll(async () => {
  * suma de los pools máximos no cabe en el servidor, falla ANTES de subir el archivo y no publica ninguna medición como
  * válida) y crea el usuario y la cuenta de la corrida.
  */
-async function prepare(cfg: ImportConfig): Promise<void> {
+async function prepare(cfg: ImportConfig, variant: Variant | undefined = activeVariant): Promise<void> {
   for (const restore of restorers.splice(0)) restore();
   await h.stopWorker();
   acquisitions = new AcquisitionRecorder();
@@ -274,7 +333,18 @@ async function prepare(cfg: ImportConfig): Promise<void> {
     );
   }
   // Sin pasadas de arranque ni cron horario de los trabajos programados ajenos (H2); con el recolector de tiempos.
-  await h.startWorker({ ...PERF_WORKER_ISOLATION, persistTimings: collector }, { env: cfg.workerEnv });
+  if (variant?.noStatsRefresh) process.env['PF_EXP_NO_STATS'] = '1';
+  else delete process.env['PF_EXP_NO_STATS'];
+  await h.startWorker(
+    {
+      ...PERF_WORKER_ISOLATION,
+      ...(variant?.noCollector ? {} : { persistTimings: collector }),
+      ...(variant?.noBurstConsumers
+        ? { startConsumers: (def: EventConsumerDefinition) => !isBurstDef(def) }
+        : {}),
+    },
+    { env: { ...cfg.workerEnv, ...(variant?.env ?? {}) } },
+  );
   // Un cron de la vigilancia del flujo de caja programado por un worker anterior de la misma base seguiría disparando.
   await asAdmin(h, (c) =>
     c.query(`DELETE FROM pgboss.schedule WHERE name = 'reporting.cash-flow-watch'`),
@@ -305,8 +375,23 @@ afterAll(async () => {
 });
 
 /** Una corrida completa del benchmark con la configuración `cfg`; publica su fila y aplica sus umbrales. */
-async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
-  await prepare(cfg);
+async function runImportBenchmark(cfg: ImportConfig, variant?: Variant, rep = 1): Promise<void> {
+  activeVariant = variant;
+  if (variant?.dbSettings) await applyDbSettings(variant.dbSettings, false);
+  try {
+    await runImportBenchmarkInner(cfg, variant, rep);
+  } finally {
+    if (variant?.dbSettings) await applyDbSettings(variant.dbSettings, true).catch(() => undefined);
+    delete process.env['PF_EXP_NO_STATS'];
+  }
+}
+
+async function runImportBenchmarkInner(
+  cfg: ImportConfig,
+  variant: Variant | undefined,
+  rep: number,
+): Promise<void> {
+  await prepare(cfg, variant);
   {
     const connections = new ConnectionSampler(
       { api: h.api.resources.pool, worker: h.worker!.pool },
@@ -365,13 +450,27 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
 
       const t1 = performance.now();
       collector.reset();
-      persistSampler.start();
+      if (!variant?.noCollector) persistSampler.start();
       const approved = await h.call('POST', `${W()}/imports/${upload.body['id'] as string}/approve`, {
         token: owner.token,
         headers: { 'idempotency-key': randomUUID(), 'if-match': `"${String(mapped.body['version'])}"` },
       });
       expect(approved.status, JSON.stringify(approved.body)).toBe(202);
       approvedAtMs = Date.now();
+      if (variant?.pauseRelay) {
+        // P4: el relay se pausa durante la persistencia (una vez publicado ImportApproved) y se reanuda al terminar.
+        await until(
+          async () => {
+            const r = await h.call('GET', `${W()}/imports/${upload.body['id'] as string}`, {
+              token: owner.token,
+            });
+            return r.body['status'] === 'PERSISTING' ? true : undefined;
+          },
+          60_000,
+          50,
+        );
+        await h.worker!.relay.stop();
+      }
       const done = await until(
         async () => {
           const r = await h.call('GET', `${W()}/imports/${upload.body['id'] as string}`, {
@@ -384,6 +483,7 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
       );
       persistMs = performance.now() - t1;
       observedAtMs = Date.now();
+      if (variant?.pauseRelay) await h.worker!.relay.start();
       persistSamples = await persistSampler.stop();
       const persistEnd = t1 + persistMs;
       expect(done['status']).toBe('COMPLETED');
@@ -510,6 +610,34 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
       perfOutDir(),
     );
 
+    if (variant) {
+      const dir = `${perfOutDir()}exp`;
+      mkdirSync(dir, { recursive: true });
+      const line = {
+        test: 'EXP-PERSIST',
+        variant: variant.name,
+        rep,
+        persistMs: report.persistMs,
+        drainAfterPersistMs: report.drainAfterPersistMs,
+        initialWaitMs: breakdown?.initialWaitMs,
+        batchesMs: breakdown?.batchesMs,
+        medianBatchMs: breakdown?.medianBatchMs,
+        batchCount: breakdown?.batchCount,
+        stepTotalsMs: breakdown?.stepTotalsMs,
+        waits: report.waits?.byWait?.slice(0, 5),
+        maintenance: report.maintenance,
+        runner: report.runner,
+        restWaitedMs: report.restBeforeMeasure?.waitedMs,
+        peakQueuedEventJobs: report.waits?.peakQueuedEventJobs,
+        stalled: Boolean(drainStall),
+      };
+      writeFileSync(
+        `${dir}/${variant.name}-${String(rep)}-${String(Date.now())}.json`,
+        JSON.stringify({ line, report }, null, 1),
+      );
+      console.log(JSON.stringify(line));
+    }
+
     // Informe para el job nightly (informativo + umbrales de la spec).
     console.log(
       JSON.stringify({
@@ -533,7 +661,7 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
       (failure instanceof Error && ACQUIRE_TIMEOUT_MESSAGE.test(failure.message));
     if (failure && !connectionFailure) throw failure;
     // La fila del código es informativa (D311): se publica y no decide el veredicto.
-    if (!cfg.gate) return;
+    if (!cfg.gate || EXPERIMENT) return;
 
     // Una adquisición de conexión vencida es un fallo de conexiones, no del drenado (TC-PLATFORM-PIPELINE-030).
     if (connectionFailure) {
@@ -558,7 +686,17 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
   }
 }
 
-describe('import CSV de 5 000 filas', () => {
+describe.runIf(EXPERIMENT)('experimentos P2-P7: import CSV de 5 000 filas', () => {
+  for (let rep = 1; rep <= REPEAT; rep += 1) {
+    for (const name of VARIANT_NAMES) {
+      it(`[EXP] ${name} #${String(rep)}`, async () => {
+        await runImportBenchmark(variantOf(name).base, variantOf(name), rep);
+      }, 1_800_000);
+    }
+  }
+});
+
+describe.skipIf(EXPERIMENT)('import CSV de 5 000 filas', () => {
   it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-014] ${CODE_CONFIG.title}: se publica la fila sin decidir el veredicto`, async () => {
     await runImportBenchmark(CODE_CONFIG);
   }, 1_800_000);
@@ -602,7 +740,7 @@ function ofxOf(count: number): Buffer {
   );
 }
 
-describe('import por documento OFX de 5 000 movimientos', () => {
+describe.skipIf(EXPERIMENT)('import por documento OFX de 5 000 movimientos', () => {
   it('[TC-IMPORTS-PIPELINE-066] llega a revisión en ≤ 30 s con el pipeline completo (lectura, normalización, validación, clasificación con 200 reglas activas, duplicados y coincidencias)', async () => {
     await prepare(HOST_CONFIG);
     // 200 reglas activas del disparador IMPORT (add-rule-engine): la evaluación entra en el presupuesto (TC-066).
@@ -669,7 +807,7 @@ describe('import por documento OFX de 5 000 movimientos', () => {
 // Fila informativa del extracto PDF (openspec add-pdf-statement-parser, decisión 16, TC-IMPORTS-PDF-046, Should): un PDF
 // de 100 páginas y 5 000 movimientos, generado aquí con pdfkit (no se versiona), llega a revisión en ≤ 30 s con el
 // pipeline completo; el presupuesto interno es hilo ≤ 0,5 s, extracción ≤ 6 s y reconstrucción ≤ 2 s.
-describe('import por documento PDF de 100 páginas y 5 000 movimientos', () => {
+describe.skipIf(EXPERIMENT)('import por documento PDF de 100 páginas y 5 000 movimientos', () => {
   it('[TC-IMPORTS-PDF-046] llega a revisión en ≤ 30 s (extracción en el hilo aislado, reconstrucción, coherencia y el resto del pipeline)', async () => {
     await prepare(HOST_CONFIG);
     const content = Buffer.from(await renderPdf(paintLargeStatement(ROWS, 50)));

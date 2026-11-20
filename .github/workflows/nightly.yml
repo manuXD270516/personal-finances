@@ -21,13 +21,26 @@ on:
   schedule:
     - cron: '0 6 * * *' # 06:00 UTC = 02:00 America/La_Paz (UTC−4, sin horario de verano)
   workflow_dispatch:
+    inputs:
+      files:
+        description: 'Archivos de vitest (filtro), p. ej. test/perf/imports.perf.ts; vacío = toda la suite'
+        default: 'test/perf/imports.perf.ts'
+      variants:
+        description: 'Variantes de imports.perf.ts (PF_PERF_VARIANTS)'
+        default: 'host'
+      repeat:
+        description: 'Repeticiones de cada variante en el mismo job (PF_PERF_REPEAT)'
+        default: '3'
+      loops:
+        description: 'Veces que se repite el comando de vitest completo (para throughput.perf.ts)'
+        default: '1'
 
 permissions:
   contents: read
 
 concurrency:
-  group: nightly
-  cancel-in-progress: true
+  group: nightly-import-perf-${{ github.run_id }}
+  cancel-in-progress: false
 
 env:
   TURBO_TELEMETRY_DISABLED: '1'
@@ -37,6 +50,7 @@ env:
 
 jobs:
   regression:
+    if: false
     name: regression (Financial Regression Suite)
     runs-on: ubuntu-latest # Docker para Testcontainers
     timeout-minutes: 60
@@ -105,6 +119,7 @@ jobs:
           fi
 
   mutation:
+    if: false
     name: mutation (shared-kernel) + cobertura de dominio
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -184,28 +199,26 @@ jobs:
         with: { persist-credentials: false }
       - uses: ./.github/actions/setup-workspace
       - run: pnpm turbo run build --filter=@pf/api...
-      # forecast.perf.ts (add-ml-forecasting-service 8.7, NFR-PERF-012): la corrida del workspace principal del Large Seed
-      # con el servicio REAL debe terminar en 300 s o menos; la suite levanta un contenedor de esta imagen con Testcontainers.
-      - name: Construir la imagen finance-ml (servicio real de forecast.perf.ts)
-        run: docker build -f docker/finance-ml.Dockerfile --target runtime -t pfos/finance-ml:local .
-      # Carga ~97 000 transacciones (principal) + 20 satélites por los casos de uso y mide los p95 (docs/02 §PERF).
-      - run: pnpm perf:bench
-      # Pronósticos phase8-v1 (add-expense-forecasts 5.3, TC-FORECAST-EXPENSE-023): ~60 series de 36 periodos con
-      # backtesting, intervalos por simulación y horizonte de 12 deben terminar en 300 s o menos con el servicio real (un
-      # hilo). Va como pasos del job perf: el nightly conserva sus cuatro jobs (D291).
-      - name: Instalar uv (versión fijada) y las dependencias del servicio de pronósticos
-        if: ${{ !cancelled() }}
-        working-directory: services/ml-forecasting
+      # Rama de experimentos (stabilize-import-persist-perf, grupo 6): no se fusiona nunca.
+      - name: Benchmarks de la rama de experimentos
         env:
-          UV_VERSION: 0.12.20
+          PF_PERF_VARIANTS: ${{ inputs.variants }}
+          PF_PERF_REPEAT: ${{ inputs.repeat }}
+          PF_PERF_FILES: ${{ inputs.files }}
+          PF_PERF_LOOPS: ${{ inputs.loops }}
+        working-directory: apps/api
         run: |
-          python3 -m pip install --user "uv==${UV_VERSION}"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/uv" sync --frozen
-      - name: Benchmark del servicio de pronósticos (pytest -m perf)
-        if: ${{ !cancelled() }}
-        working-directory: services/ml-forecasting
-        run: OMP_NUM_THREADS=1 uv run pytest -m perf
+          set +e
+          rc=0
+          for i in $(seq 1 "${PF_PERF_LOOPS:-1}"); do
+            echo "::group::vitest pasada $i"
+            pnpm exec vitest run --config vitest.perf.config.ts ${PF_PERF_FILES}
+            r=$?
+            [ $r -ne 0 ] && rc=$r
+            mkdir -p ../../reports/perf-loops/$i && cp -r ../../reports/perf/. ../../reports/perf-loops/$i/ 2>/dev/null
+            echo "::endgroup::"
+          done
+          exit $rc
       - name: Resumen
         if: ${{ !cancelled() }}
         run: cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
@@ -213,29 +226,14 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: perf-report
-          path: reports/perf
+          path: |
+            reports/perf
+            reports/perf-loops
           if-no-files-found: warn
-          retention-days: 90
-      # D270: si el job falla (un p95 supera su umbral), abre el issue de aviso o comenta el que ya está abierto con ese
-      # título exacto (nunca duplica). No es check requerido: el rojo avisa sin bloquear PR.
-      - name: Abrir o comentar el aviso de umbral superado
-        if: ${{ failure() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          title='nightly perf: umbral superado'
-          body="$(printf 'El job perf del nightly falló en %s.\n\n%s\n' "$RUN_URL" "$(cat reports/perf/perf-summary.md 2>/dev/null || echo 'sin reporte')")"
-          number="$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
-            --jq "map(select(.title == \"$title\")) | .[0].number // empty")"
-          if [ -n "$number" ]; then
-            gh issue comment "$number" --body "$body"
-          else
-            gh issue create --title "$title" --body "$body"
-          fi
+          retention-days: 30
 
   fx-smoke-live:
+    if: false
     name: fx-smoke-live (no bloqueante)
     runs-on: ubuntu-latest
     timeout-minutes: 10
