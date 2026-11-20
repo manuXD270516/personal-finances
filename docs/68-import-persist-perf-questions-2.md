@@ -1,6 +1,6 @@
 # 68: Preguntas abiertas tras los experimentos de la persistencia del import (change 63)
 
-> **Fecha:** 2026-11-20 · **Change:** `stabilize-import-persist-perf` · **Evidencia:** [67](67-import-persist-perf-findings.md) · **Decisiones previas:** [64](64-import-persist-perf-decisions.md) (D403 a D409)
+> **Respuestas:** [69](69-import-persist-perf-decisions-2.md) (D443 a D446) · **Fecha:** 2026-11-20 · **Change:** `stabilize-import-persist-perf` · **Evidencia:** [67](67-import-persist-perf-findings.md) · **Decisiones previas:** [64](64-import-persist-perf-decisions.md) (D403 a D409)
 
 La causa dominante de la fila del host en rojo es la contención de CPU entre la persistencia y el trabajo concurrente del relay y de los consumidores (H3, ≈ 35 %). Ningún arreglo que no sea regular ese trabajo tiene respaldo en los datos (lotes, `synchronous_commit`, estadísticas, `VACUUM`, `CHECKPOINT` y lote del relay no cambian la persistencia). Regular exige decisiones que ni el diseño ni D403 a D409 toman del todo.
 
@@ -26,3 +26,10 @@ La condición de D404 (disparadores por sentencia solo con ≥ 25 % del lote y u
 
 - **Opción A (recomendada):** sí, una corrida con `track_functions = 'pl'` que lea `pg_stat_user_functions` por función; solo si la cifra pasa de 25 % se escribe el ADR.
 - **Opción B:** no; la persistencia queda explicada por H3 y H1 y no se toca el ledger.
+
+## Pregunta 4 (surgida de D445): ¿se redacta el ADR de los disparadores por sentencia del ledger (D404)?
+
+Medido en [67 §5](67-import-persist-perf-findings.md): los disparadores pesan del 26 al 60 % de la persistencia de la fila del host (mediana 43 %), sobre todo `txn.assert_splits_sum` y `ledger.assert_entry_balanced`. D404 pide un ADR y la equivalencia del change 52; no se implementó nada.
+
+- **Opción A (recomendada):** sí. ADR y change de seguimiento que pasa esas dos comprobaciones a disparadores por sentencia con tablas de transición, diferidos al confirmar y con la misma semántica (un asiento descuadrado inyectado sigue revirtiendo el lote); medir después con el nightly. Es la única palanca con respaldo para llegar al objetivo de D403.
+- **Opción B:** no; aceptar que la fila del host queda en rojo con probabilidad alta y revisar la meta de 20 s (D403), que el owner dejó «decidir después de medir».

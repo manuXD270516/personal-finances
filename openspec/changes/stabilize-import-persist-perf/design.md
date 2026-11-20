@@ -141,7 +141,7 @@ Detalle en [docs/67](../../../docs/67-import-persist-perf-findings.md); pregunta
 | H7 estancamiento del relay | Aceptada y resuelta (#237) | `throughput.perf.ts` ×3 completo |
 | H2, H4, H5, H6, H8 | Descartadas | ≤ 5 % cada una (sin trabajos ajenos, lotes de 500/1 000, `VACUUM`/`ANALYZE`/`CHECKPOINT`, `synchronous_commit = off`, espera inicial ≤ 0,3 s) |
 
-El único arreglo que queda es regular el relay o los consumidores (D406), que depende de una decisión del owner (docs/68, preguntas 1 y 2). D404 sigue sin evidencia (pregunta 3).
+Respuestas del owner el 2026-11-20 en [docs/69](../../../docs/69-import-persist-perf-decisions-2.md) (D443 a D446): no regular el relay, mantener `ubuntu-latest`, medir los disparadores y decidir la meta de 20 s después de medir. El único arreglo que quedaba era regular el relay o los consumidores (D406), que depende de una decisión del owner (docs/68, preguntas 1 y 2). D404 sigue sin evidencia (pregunta 3).
 
 ## Contratos
 
