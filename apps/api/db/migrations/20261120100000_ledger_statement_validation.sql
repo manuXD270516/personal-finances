@@ -70,24 +70,27 @@ DECLARE
   v_ccy   text;
   v_sum   numeric;
 BEGIN
+  -- Cada consulta parte de las claves de la cola y consulta los postings por clave (índice posting_entry_ix): las tablas de
+  -- cola no tienen estadísticas y, sin esta forma, el planificador puede recorrer todos los postings del ledger.
   SELECT q.journal_entry_id INTO v_entry
     FROM ledger.pending_entry_check q
-    LEFT JOIN ledger.posting p ON p.journal_entry_id = q.journal_entry_id
    WHERE q.xact = v_xact
-   GROUP BY q.journal_entry_id
-  HAVING count(p.id) < 2
+     AND (SELECT count(*) FROM ledger.posting p WHERE p.journal_entry_id = q.journal_entry_id) < 2
    ORDER BY q.journal_entry_id
    LIMIT 1;
   IF FOUND THEN
     RAISE EXCEPTION 'LEDGER_ENTRY_TOO_FEW_POSTINGS: entry %', v_entry USING ERRCODE = 'PF005';
   END IF;
-  SELECT p.journal_entry_id, p.currency, sum(p.amount) INTO v_entry, v_ccy, v_sum
+  SELECT g.journal_entry_id, g.currency, g.total INTO v_entry, v_ccy, v_sum
     FROM ledger.pending_entry_check q
-    JOIN ledger.posting p ON p.journal_entry_id = q.journal_entry_id
+   CROSS JOIN LATERAL (
+          SELECT p.journal_entry_id, p.currency, sum(p.amount) AS total
+            FROM ledger.posting p
+           WHERE p.journal_entry_id = q.journal_entry_id
+           GROUP BY p.journal_entry_id, p.currency
+          HAVING sum(p.amount) <> 0) g
    WHERE q.xact = v_xact
-   GROUP BY p.journal_entry_id, p.currency
-  HAVING sum(p.amount) <> 0
-   ORDER BY p.journal_entry_id, p.currency
+   ORDER BY g.journal_entry_id, g.currency
    LIMIT 1;
   IF FOUND THEN
     RAISE EXCEPTION 'LEDGER_UNBALANCED_ENTRY: entry % currency % sum %', v_entry, v_ccy, v_sum
@@ -174,30 +177,33 @@ DECLARE
   v_sum      numeric;
   v_expected numeric;
 BEGIN
+  -- Misma forma que en LEDGER: las claves de la cola mandan (LATERAL con OFFSET 0 impide que el planificador aplane el
+  -- subselect y empiece por las tablas grandes) y la suma de splits es una subconsulta por clave (transaction_split_tx_idx).
   SELECT x.id, x.sum_splits, x.expected INTO v_tx, v_sum, v_expected
     FROM (
-      SELECT e.id, e.expected, COALESCE(sum(s.amount), 0) AS sum_splits
-        FROM (
-          SELECT t.workspace_id, t.id,
-                 CASE t.kind
-                   WHEN 'LOAN_PAYMENT' THEN
-                     t.amount - COALESCE((t.loan_payment_breakdown ->> 'principal')::numeric, 0)
-                   WHEN 'LOAN_DISBURSEMENT' THEN
-                     t.amount - COALESCE((
-                       SELECT l.amount FROM txn.transaction_leg l
-                        WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
-                          AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL
-                        LIMIT 1), t.amount)
-                   ELSE t.amount
-                 END AS expected
-            FROM txn.pending_splits_check c
-            JOIN txn.transaction t ON t.id = c.transaction_id
-           WHERE c.xact = v_xact
-             AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND', 'LOAN_PAYMENT', 'LOAN_DISBURSEMENT')
-        ) e
-        LEFT JOIN txn.transaction_split s
-               ON s.workspace_id = e.workspace_id AND s.transaction_id = e.id AND s.superseded_in_revision IS NULL
-       GROUP BY e.id, e.expected
+      SELECT t.id,
+             CASE t.kind
+               WHEN 'LOAN_PAYMENT' THEN
+                 t.amount - COALESCE((t.loan_payment_breakdown ->> 'principal')::numeric, 0)
+               WHEN 'LOAN_DISBURSEMENT' THEN
+                 t.amount - COALESCE((
+                   SELECT l.amount FROM txn.transaction_leg l
+                    WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
+                      AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL
+                    LIMIT 1), t.amount)
+               ELSE t.amount
+             END AS expected,
+             (SELECT COALESCE(sum(s.amount), 0) FROM txn.transaction_split s
+               WHERE s.workspace_id = t.workspace_id AND s.transaction_id = t.id
+                 AND s.superseded_in_revision IS NULL) AS sum_splits
+        FROM txn.pending_splits_check c
+       CROSS JOIN LATERAL (
+              SELECT t0.id, t0.workspace_id, t0.kind, t0.amount, t0.loan_payment_breakdown
+                FROM txn.transaction t0
+               WHERE t0.id = c.transaction_id
+                 AND t0.kind IN ('INCOME', 'EXPENSE', 'REFUND', 'LOAN_PAYMENT', 'LOAN_DISBURSEMENT')
+               OFFSET 0) t
+       WHERE c.xact = v_xact
     ) x
    WHERE x.sum_splits <> x.expected
    ORDER BY x.id
