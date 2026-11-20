@@ -77,3 +77,22 @@ Otros resultados: el recolector y el muestreador cuestan ≈ 7 % en promedio (18
 - **P3 con pares `7d825710` frente a `main`:** las dos causas que nombra H2 ya están excluidas por medición directa (sin trabajos programados en la ventana; sin el refresco de #205 no baja).
 - **Disparadores por sentencia (D404, tarea 7.6):** la condición es que `track_functions` muestre ≥ 25 % del lote. No se recogió `pg_stat_user_functions` en la variante; la comisión rápida (2–3 s de 10 s) es una cota superior que incluye los disparadores diferidos más la confirmación, no una medición. Queda sin evidencia.
 - **Arreglos de producto:** ninguno de los aceptados (H3) tiene un arreglo dentro de lo decidido; ver [68](68-import-persist-perf-questions-2.md).
+
+## 5. Peso de los disparadores del ledger (D404 y D445, 2026-11-20)
+
+Variante `track_functions = 'pl'` con `pg_stat_reset()` antes de aprobar y lectura de `pg_stat_user_functions` al terminar la persistencia de la fila del host; runs 44689564779 (Xeon, 47 ms) y 44689580742 (EPYC 7763, 80 ms), 3 repeticiones cada uno entrelazadas con la variante `host`. Peso = tiempo propio (`self_time`) de las funciones de disparador dividido por la persistencia de esa misma repetición.
+
+| Run | Repetición | Persistencia (s) | Disparadores (s) | Peso |
+|---|---|---|---|---|
+| 44689564779 | 1 | 15,5 | 7,6 | 49 % |
+| 44689564779 | 2 | 13,9 | 5,3 | 38 % |
+| 44689564779 | 3 | 19,1 | 11,4 | 60 % |
+| 44689580742 | 1 | 21,1 | 5,6 | 27 % |
+| 44689580742 | 2 | 18,7 | 4,9 | 26 % |
+| 44689580742 | 3 | 27,1 | 15,9 | 58 % |
+
+Las funciones que pesan, con llamadas por import y tiempo propio de la repetición 1 (Xeon): `txn.assert_splits_sum` (10 000 llamadas, 3,6 s), `ledger.assert_entry_balanced` (10 002, 2,2 s) y `ledger.assert_entry_has_postings` (5 001, 1,4 s); `txn.assert_transfer_consistency` y `ledger.assert_period_open` suman menos de 0,3 s. En el EPYC 7763 `txn.assert_splits_sum` es 4,7 s de 5,6.
+
+**Resultado: peso ≥ 25 % en las seis repeticiones (26 % a 60 %).** Condición de D404 cumplida. Reservas: el tiempo propio es de reloj, así que se infla con la contención de CPU (las repeticiones del 49 % al 60 % coinciden con el modo lento de la sección 3), y `track_functions` añade su propio costo (las persistencias con la variante no son menores que las del host). Aun con ambas reservas, en el modo menos contendido el peso es del 26 al 27 %. No se implementa nada: el ADR de D404 queda como pregunta al owner ([68](68-import-persist-perf-questions-2.md), pregunta 4).
+
+**Palancas que quedan para D403 (meta de 20 s):** (1) disparadores por sentencia con tablas de transición para `txn.assert_splits_sum` y `ledger.assert_entry_balanced` (D404, ADR; ahorro estimado de 3 a 8 s por import según el modo); (2) ninguna otra con respaldo: regular el relay y cambiar el runner quedaron descartadas por el owner (D443, D444) y lotes, `synchronous_commit`, estadísticas y `VACUUM` no cambian la persistencia.
