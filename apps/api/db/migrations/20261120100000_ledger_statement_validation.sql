@@ -70,27 +70,32 @@ DECLARE
   v_ccy   text;
   v_sum   numeric;
 BEGIN
-  -- Cada consulta parte de las claves de la cola y consulta los postings por clave (índice posting_entry_ix): las tablas de
-  -- cola no tienen estadísticas y, sin esta forma, el planificador puede recorrer todos los postings del ledger.
-  SELECT q.journal_entry_id INTO v_entry
-    FROM ledger.pending_entry_check q
-   WHERE q.xact = v_xact
-     AND (SELECT count(*) FROM ledger.posting p WHERE p.journal_entry_id = q.journal_entry_id) < 2
-   ORDER BY q.journal_entry_id
+  -- Cada consulta agrega por conjunto dentro de un subselect con OFFSET 0 y ordena fuera: sin esa barrera, el LIMIT 1 hace
+  -- que el planificador prefiera recorrer en orden todo el índice de postings (las colas no tienen estadísticas).
+  SELECT f.journal_entry_id INTO v_entry
+    FROM (
+      SELECT q.journal_entry_id
+        FROM ledger.pending_entry_check q
+        LEFT JOIN ledger.posting p ON p.journal_entry_id = q.journal_entry_id
+       WHERE q.xact = v_xact
+       GROUP BY q.journal_entry_id
+      HAVING count(p.id) < 2
+      OFFSET 0) f
+   ORDER BY f.journal_entry_id
    LIMIT 1;
   IF FOUND THEN
     RAISE EXCEPTION 'LEDGER_ENTRY_TOO_FEW_POSTINGS: entry %', v_entry USING ERRCODE = 'PF005';
   END IF;
-  SELECT g.journal_entry_id, g.currency, g.total INTO v_entry, v_ccy, v_sum
-    FROM ledger.pending_entry_check q
-   CROSS JOIN LATERAL (
-          SELECT p.journal_entry_id, p.currency, sum(p.amount) AS total
-            FROM ledger.posting p
-           WHERE p.journal_entry_id = q.journal_entry_id
-           GROUP BY p.journal_entry_id, p.currency
-          HAVING sum(p.amount) <> 0) g
-   WHERE q.xact = v_xact
-   ORDER BY g.journal_entry_id, g.currency
+  SELECT f.journal_entry_id, f.currency, f.total INTO v_entry, v_ccy, v_sum
+    FROM (
+      SELECT p.journal_entry_id, p.currency, sum(p.amount) AS total
+        FROM ledger.pending_entry_check q
+        JOIN ledger.posting p ON p.journal_entry_id = q.journal_entry_id
+       WHERE q.xact = v_xact
+       GROUP BY p.journal_entry_id, p.currency
+      HAVING sum(p.amount) <> 0
+      OFFSET 0) f
+   ORDER BY f.journal_entry_id, f.currency
    LIMIT 1;
   IF FOUND THEN
     RAISE EXCEPTION 'LEDGER_UNBALANCED_ENTRY: entry % currency % sum %', v_entry, v_ccy, v_sum
@@ -204,6 +209,7 @@ BEGIN
                  AND t0.kind IN ('INCOME', 'EXPENSE', 'REFUND', 'LOAN_PAYMENT', 'LOAN_DISBURSEMENT')
                OFFSET 0) t
        WHERE c.xact = v_xact
+       OFFSET 0
     ) x
    WHERE x.sum_splits <> x.expected
    ORDER BY x.id
