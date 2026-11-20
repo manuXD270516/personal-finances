@@ -28,6 +28,7 @@ const C1 = '0190a000-0000-7000-8000-0000000000c1';
 
 let app: Pool;
 let migrator: Pool;
+let superuser: Pool;
 let ledger: LedgerRuntime;
 let u1: string;
 const w1 = randomUUID();
@@ -167,6 +168,10 @@ let ledgerExpense: string;
 beforeAll(async () => {
   app = new Pool({ connectionString: deps.databaseUrl, max: 6 });
   migrator = new Pool({ connectionString: deps.migratorUrl, max: 2 });
+  superuser = new Pool({
+    connectionString: (deps as unknown as { superuserUrl: string }).superuserUrl,
+    max: 1,
+  });
   // Posterior a todas las fechas de negocio del archivo: el saldo "actual" por defecto (hoy en la zona del workspace)
   // incluye todos los asientos (TC-LEDGER-BALANCES-002 cubre el borde de día en ledger-maintenance.int.test.ts).
   const clock = new FixedClock(Instant.parse('2026-12-31T14:00:00Z'));
@@ -232,7 +237,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await Promise.all([app?.end(), migrator?.end()]);
+  await Promise.all([app?.end(), migrator?.end(), superuser?.end()]);
 });
 
 describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzada)', () => {
@@ -491,6 +496,14 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     return ids;
   }
 
+  /** ADR-0034: las colas de validación (sin RLS para el superusuario) no conservan filas tras COMMIT o ROLLBACK. */
+  const queuesEmpty = async (): Promise<boolean> => {
+    const r = await superuser.query(
+      `SELECT (SELECT count(*) FROM ledger.pending_entry_check) + (SELECT count(*) FROM ledger.pending_check_sentinel) AS n`,
+    );
+    return Number(r.rows[0].n) === 0;
+  };
+
   const entriesLeft = (ws: string, ids: string[]) =>
     inCtx(app, ws, async (c) => {
       const r = await c.query(
@@ -533,19 +546,26 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     expect(failure?.message).toContain('LEDGER_UNBALANCED_ENTRY');
     expect(failedIds).toHaveLength(200);
     expect(await entriesLeft(ws, failedIds)).toEqual({ entries: 0, postings: 0 });
+    expect(await queuesEmpty()).toBe(true);
 
     const okIds = await inCtx(
       app,
       ws,
-      (c) =>
-        bulkEntries(
+      async (c) => {
+        const ids = await bulkEntries(
           c,
           ws,
           '2026-03-13',
           Array.from({ length: 200 }, () => good()),
-        ),
+        );
+        // Dentro de la transacción la cola de la sesión tiene las 200 claves distintas (no 400, una por posting).
+        const queued = await c.query('SELECT count(*)::int AS n FROM ledger.pending_entry_check');
+        expect(queued.rows[0].n).toBe(200);
+        return ids;
+      },
       true,
     );
+    expect(await queuesEmpty()).toBe(true);
     expect(await entriesLeft(ws, okIds)).toEqual({ entries: 200, postings: 400 });
     const unbalanced = await inCtx(app, ws, async (c) =>
       Number(
@@ -584,6 +604,7 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
       ),
     ).toBe('PF005');
     expect(await entriesLeft(ws, ids)).toEqual({ entries: 0, postings: 0 });
+    expect(await queuesEmpty()).toBe(true);
 
     // 2. SET CONSTRAINTS ALL IMMEDIATE falla en ese momento, antes de confirmar (importador de portabilidad).
     let reachedAfterImmediate = false;
@@ -599,6 +620,7 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     ).toBe('PF005');
     expect(reachedAfterImmediate).toBe(false);
     expect(await entriesLeft(ws, ids)).toEqual({ entries: 0, postings: 0 });
+    expect(await queuesEmpty()).toBe(true);
 
     // 3. Un savepoint revertido no deja la validación sin correr.
     ids = [];
@@ -618,10 +640,32 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
       ),
     ).toBe('PF005');
     expect(await entriesLeft(ws, ids)).toEqual({ entries: 0, postings: 0 });
+    expect(await queuesEmpty()).toBe(true);
+
+    // 3b. Tras validar con SET CONSTRAINTS ALL IMMEDIATE, una escritura posterior se vuelve a validar al confirmar.
+    ids = [];
+    expect(
+      await sqlState(() =>
+        inCtx(
+          app,
+          ws,
+          async (c) => {
+            await bulkEntries(c, ws, '2026-03-14', [two()]);
+            await c.query('SET CONSTRAINTS ALL IMMEDIATE');
+            await c.query('SET CONSTRAINTS ALL DEFERRED');
+            ids = await bulkEntries(c, ws, '2026-03-14', [one]);
+          },
+          true,
+        ),
+      ),
+    ).toBe('PF005');
+    expect(await entriesLeft(ws, ids)).toEqual({ entries: 0, postings: 0 });
+    expect(await queuesEmpty()).toBe(true);
 
     // 4. Control: los mismos asientos con sus dos postings confirman.
     ids = await inCtx(app, ws, (c) => bulkEntries(c, ws, '2026-03-14', [two(), two()]), true);
     expect(await entriesLeft(ws, ids)).toEqual({ entries: 2, postings: 4 });
+    expect(await queuesEmpty()).toBe(true);
   }, 60_000);
 
   it('[TC-LEDGER-IMMUTABILITY-001] UPDATE/DELETE/TRUNCATE fallan para pf_app (42501) y para el owner (PF003)', async () => {

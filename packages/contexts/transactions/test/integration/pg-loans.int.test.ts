@@ -25,6 +25,7 @@ const BOB = currency('BOB', 2);
 const bob = (v: string) => Money.parse(v, BOB);
 let app: Pool;
 let migrator: Pool;
+let superuser: Pool;
 let uow: PgUnitOfWork;
 let u1: string;
 const ws = randomUUID();
@@ -35,6 +36,14 @@ const interestCategory = randomUUID();
 const feesCategory = randomUUID();
 const repo = new PgTransactionRepository();
 const inWs = <T>(fn: () => Promise<T>) => uow.run({ userId: u1, workspaceId: ws }, fn);
+
+/** ADR-0034: las colas de validación (sin RLS para el superusuario) no conservan filas tras COMMIT o ROLLBACK. */
+const queuesEmpty = async (): Promise<boolean> => {
+  const r = await superuser.query(
+    `SELECT (SELECT count(*) FROM txn.pending_splits_check) + (SELECT count(*) FROM txn.pending_check_sentinel) AS n`,
+  );
+  return Number(r.rows[0].n) === 0;
+};
 
 async function pgError(p: Promise<unknown>): Promise<{ code?: string; constraint?: string } | undefined> {
   try {
@@ -99,6 +108,10 @@ const disbursement = (fee?: string, id = loanId) => {
 beforeAll(async () => {
   app = new Pool({ connectionString: deps.databaseUrl, max: 4 });
   migrator = new Pool({ connectionString: deps.migratorUrl, max: 2 });
+  superuser = new Pool({
+    connectionString: (deps as unknown as { superuserUrl: string }).superuserUrl,
+    max: 1,
+  });
   uow = new PgUnitOfWork(app);
   const { rows } = await migrator.query<{ id: string }>(
     `SELECT iam.provision_user('https://idp.test/txn-loans', $1, $2, 'U1') AS id`,
@@ -120,6 +133,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.end();
   await migrator?.end();
+  await superuser?.end();
 });
 
 describe('PgTransactionRepository — transacciones de préstamo', () => {
@@ -223,6 +237,7 @@ describe('PgTransactionRepository — transacciones de préstamo', () => {
       inWs(() => exec(`UPDATE txn.transaction SET amount = amount + 5.00 WHERE id = $1`, [paid.id])),
     );
     expect(amountOnly).toMatchObject({ code: '23514', constraint: 'transaction_splits_sum_ck' });
+    expect(await queuesEmpty()).toBe(true);
     expect((amountOnly as { message?: string }).message).toMatch(
       /splits of transaction [0-9a-f-]{36} sum [0-9.]+ but the expected amount is [0-9.]+/,
     );
@@ -244,6 +259,7 @@ describe('PgTransactionRepository — transacciones de préstamo', () => {
     );
     expect(lote).toMatchObject({ code: '23514', constraint: 'transaction_splits_sum_ck' });
     expect(await present([a.id, b.id, d.id])).toBe(0);
+    expect(await queuesEmpty()).toBe(true);
 
     // Desembolso: la comisión retenida de 100.00 debe coincidir con monto − neto recibido.
     const ok = disbursement('100.00', randomUUID());
@@ -253,6 +269,7 @@ describe('PgTransactionRepository — transacciones de préstamo', () => {
       inWs(() => exec(`UPDATE txn.transaction_split SET amount = 99.99 WHERE transaction_id = $1`, [ok.id])),
     );
     expect(fee).toMatchObject({ code: '23514', constraint: 'transaction_splits_sum_ck' });
+    expect(await queuesEmpty()).toBe(true);
   }, 60_000);
 
   it('el trigger rechaza un desembolso cuya comisión no coincide con monto − neto recibido', async () => {

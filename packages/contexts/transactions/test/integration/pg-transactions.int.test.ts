@@ -20,6 +20,7 @@ const BOB = currency('BOB', 2);
 const bob = (v: string) => Money.parse(v, BOB);
 let app: Pool;
 let migrator: Pool;
+let superuser: Pool;
 let uow: PgUnitOfWork;
 let u1: string;
 const w1 = randomUUID();
@@ -28,6 +29,14 @@ const bank = randomUUID();
 const repo = new PgTransactionRepository();
 
 const inWs = <T>(workspaceId: string, fn: () => Promise<T>) => uow.run({ userId: u1, workspaceId }, fn);
+
+/** ADR-0034: las colas de validación (sin RLS para el superusuario) no conservan filas tras COMMIT o ROLLBACK. */
+const queuesEmpty = async (): Promise<boolean> => {
+  const r = await superuser.query(
+    `SELECT (SELECT count(*) FROM txn.pending_splits_check) + (SELECT count(*) FROM txn.pending_check_sentinel) AS n`,
+  );
+  return Number(r.rows[0].n) === 0;
+};
 
 async function pgError(p: Promise<unknown>): Promise<string | undefined> {
   try {
@@ -61,6 +70,10 @@ const record = (workspaceId: string, over: Partial<RecordTransactionInput> = {})
 beforeAll(async () => {
   app = new Pool({ connectionString: deps.databaseUrl, max: 4 });
   migrator = new Pool({ connectionString: deps.migratorUrl, max: 2 });
+  superuser = new Pool({
+    connectionString: (deps as unknown as { superuserUrl: string }).superuserUrl,
+    max: 1,
+  });
   uow = new PgUnitOfWork(app);
   const { rows } = await migrator.query<{ id: string }>(
     `SELECT iam.provision_user('https://idp.test/txn', $1, $2, 'U1') AS id`,
@@ -84,6 +97,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.end();
   await migrator?.end();
+  await superuser?.end();
 });
 
 describe('PgTransactionRepository', () => {
@@ -150,6 +164,7 @@ describe('PgTransactionRepository', () => {
       );
     });
     expect(await amountOf(tx.id)).toBe(175);
+    expect(await queuesEmpty()).toBe(true);
 
     // 2. Cambio de monto sin splits nuevos: falla al confirmar con la restricción y el formato de siempre.
     const amountOnly = await failure(
@@ -161,6 +176,7 @@ describe('PgTransactionRepository', () => {
       /splits of transaction [0-9a-f-]{36} sum 175(\.0+)? but the expected amount is 200(\.0+)?/,
     );
     expect(await amountOf(tx.id)).toBe(175);
+    expect(await queuesEmpty()).toBe(true);
 
     // 3. Lote por conjunto con un split inyectado de 17.00: no queda ninguna de las 200 transacciones.
     const writeBatch = (ids: string[], badIndex: number | null) =>
@@ -194,9 +210,11 @@ describe('PgTransactionRepository', () => {
       new RegExp(`splits of transaction ${bad[58]} sum 17(\\.0+)? but the expected amount is 18(\\.0+)?`),
     );
     expect(await countOf(bad)).toBe(0);
+    expect(await queuesEmpty()).toBe(true);
     const good = Array.from({ length: 200 }, () => randomUUID());
     await writeBatch(good, null);
     expect(await countOf(good)).toBe(200);
+    expect(await queuesEmpty()).toBe(true);
   }, 60_000);
 
   it('[TC-TRANSACTIONS-BULKIMPORT-005] (BD) insertMany escribe las mismas filas que insert + linkEntry, también con splits y tags', async () => {
