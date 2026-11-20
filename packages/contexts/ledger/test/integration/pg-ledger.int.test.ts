@@ -429,6 +429,201 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     expect(await count()).toBe(n);
   });
 
+  /** Un workspace propio con cuentas de ledger `EXPENSE:BOB` y de banco, para los casos que escriben por conjunto. */
+  async function isolatedWorkspace(): Promise<{ ws: string; bank: string; expense: string }> {
+    const ws = randomUUID();
+    await createWorkspace(ws);
+    const account = randomUUID();
+    await post(ws, [sysLine('EXPENSE', '1.00', 'BOB', S1), userLine(account, '-1.00')], {
+      entryDate: '2026-01-02',
+    });
+    return inCtx(app, ws, async (c) => {
+      const rows = (await c.query(`SELECT id, code FROM ledger.ledger_account`)).rows as {
+        id: string;
+        code: string;
+      }[];
+      return {
+        ws,
+        bank: String(rows.find((r) => r.code !== 'EXPENSE:BOB' && !r.code.startsWith('EQUITY'))?.id),
+        expense: String(rows.find((r) => r.code === 'EXPENSE:BOB')?.id),
+      };
+    });
+  }
+
+  type RawLine = { account: string; type: string; amount: string; split?: string };
+
+  /**
+   * Escritura por conjunto como la de `appendMany`: un `INSERT … SELECT FROM unnest` para los asientos y otro para
+   * todos sus postings. Devuelve los ids de los asientos en el orden recibido.
+   */
+  async function bulkEntries(
+    c: PoolClient,
+    workspaceId: string,
+    date: string,
+    entries: RawLine[][],
+  ): Promise<string[]> {
+    const ids = entries.map(() => randomUUID());
+    await c.query(
+      `INSERT INTO ledger.journal_entry (id, workspace_id, entry_date, entry_type, source_type, source_id, source_revision)
+       SELECT t.id, $1::uuid, $2::date, 'STANDARD', 'Transaction', gen_random_uuid(), 1 FROM unnest($3::uuid[]) AS t(id)`,
+      [workspaceId, date, ids],
+    );
+    const lines = entries.flatMap((group, i) => group.map((l, n) => ({ entry: ids[i], line: n + 1, ...l })));
+    if (lines.length > 0) {
+      await c.query(
+        `INSERT INTO ledger.posting (id, workspace_id, journal_entry_id, entry_date, line_no, ledger_account_id, account_type,
+                                     currency, amount, split_id)
+         SELECT gen_random_uuid(), $1::uuid, t.entry, $2::date, t.line, t.account, t.type, 'BOB', t.amount, t.split
+           FROM unnest($3::uuid[], $4::int[], $5::uuid[], $6::text[], $7::numeric[], $8::uuid[])
+                AS t(entry, line, account, type, amount, split)`,
+        [
+          workspaceId,
+          date,
+          lines.map((l) => l.entry),
+          lines.map((l) => l.line),
+          lines.map((l) => l.account),
+          lines.map((l) => l.type),
+          lines.map((l) => l.amount),
+          lines.map((l) => l.split ?? null),
+        ],
+      );
+    }
+    return ids;
+  }
+
+  const entriesLeft = (ws: string, ids: string[]) =>
+    inCtx(app, ws, async (c) => {
+      const r = await c.query(
+        `SELECT (SELECT count(*) FROM ledger.journal_entry WHERE id = ANY($1::uuid[]))::int AS entries,
+                (SELECT count(*) FROM ledger.posting WHERE journal_entry_id = ANY($1::uuid[]))::int AS postings`,
+        [ids],
+      );
+      return r.rows[0] as { entries: number; postings: number };
+    });
+
+  it('[TC-LEDGER-BALANCE-004] un asiento descuadrado inyectado en una escritura por conjunto revierte los 200 asientos al confirmar', async () => {
+    const { ws, bank, expense } = await isolatedWorkspace();
+    const good = (): RawLine[] => [
+      { account: expense, type: 'EXPENSE', amount: '18.00', split: S1 },
+      { account: bank, type: 'ASSET', amount: '-18.00' },
+    ];
+    const batch = Array.from({ length: 200 }, (_, i) =>
+      i === 136
+        ? [
+            { account: expense, type: 'EXPENSE', amount: '18.00', split: S1 },
+            { account: bank, type: 'ASSET', amount: '-17.00' },
+          ]
+        : good(),
+    );
+    let failedIds: string[] = [];
+    let failure: { code?: string; message?: string } | undefined;
+    try {
+      await inCtx(
+        app,
+        ws,
+        async (c) => {
+          failedIds = await bulkEntries(c, ws, '2026-03-13', batch);
+        },
+        true,
+      );
+    } catch (err) {
+      failure = err as { code?: string; message?: string };
+    }
+    expect(failure?.code).toBe('PF001');
+    expect(failure?.message).toContain('LEDGER_UNBALANCED_ENTRY');
+    expect(failedIds).toHaveLength(200);
+    expect(await entriesLeft(ws, failedIds)).toEqual({ entries: 0, postings: 0 });
+
+    const okIds = await inCtx(
+      app,
+      ws,
+      (c) =>
+        bulkEntries(
+          c,
+          ws,
+          '2026-03-13',
+          Array.from({ length: 200 }, () => good()),
+        ),
+      true,
+    );
+    expect(await entriesLeft(ws, okIds)).toEqual({ entries: 200, postings: 400 });
+    const unbalanced = await inCtx(app, ws, async (c) =>
+      Number(
+        (
+          await c.query(
+            `SELECT count(*) FROM (SELECT journal_entry_id FROM ledger.posting WHERE journal_entry_id = ANY($1::uuid[])
+                                   GROUP BY journal_entry_id, currency HAVING sum(amount) <> 0) x`,
+            [okIds],
+          )
+        ).rows[0].count,
+      ),
+    );
+    expect(unbalanced).toBe(0);
+  }, 60_000);
+
+  it('[TC-LEDGER-STRUCTURE-003] un asiento con un solo posting en una escritura por conjunto falla al confirmar, con SET CONSTRAINTS ALL IMMEDIATE y tras un savepoint revertido', async () => {
+    const { ws, bank, expense } = await isolatedWorkspace();
+    const two = (): RawLine[] => [
+      { account: expense, type: 'EXPENSE', amount: '18.00', split: S1 },
+      { account: bank, type: 'ASSET', amount: '-18.00' },
+    ];
+    const one: RawLine[] = [{ account: expense, type: 'EXPENSE', amount: '18.00', split: S1 }];
+
+    // 1. COMMIT de un lote con un asiento de un solo posting.
+    let ids: string[] = [];
+    expect(
+      await sqlState(() =>
+        inCtx(
+          app,
+          ws,
+          async (c) => {
+            ids = await bulkEntries(c, ws, '2026-03-14', [two(), two(), one]);
+          },
+          true,
+        ),
+      ),
+    ).toBe('PF005');
+    expect(await entriesLeft(ws, ids)).toEqual({ entries: 0, postings: 0 });
+
+    // 2. SET CONSTRAINTS ALL IMMEDIATE falla en ese momento, antes de confirmar (importador de portabilidad).
+    let reachedAfterImmediate = false;
+    ids = [];
+    expect(
+      await sqlState(() =>
+        inCtx(app, ws, async (c) => {
+          ids = await bulkEntries(c, ws, '2026-03-14', [two(), two(), one]);
+          await c.query('SET CONSTRAINTS ALL IMMEDIATE');
+          reachedAfterImmediate = true;
+        }),
+      ),
+    ).toBe('PF005');
+    expect(reachedAfterImmediate).toBe(false);
+    expect(await entriesLeft(ws, ids)).toEqual({ entries: 0, postings: 0 });
+
+    // 3. Un savepoint revertido no deja la validación sin correr.
+    ids = [];
+    expect(
+      await sqlState(() =>
+        inCtx(
+          app,
+          ws,
+          async (c) => {
+            await c.query('SAVEPOINT s');
+            await bulkEntries(c, ws, '2026-03-14', [two()]);
+            await c.query('ROLLBACK TO SAVEPOINT s');
+            ids = await bulkEntries(c, ws, '2026-03-14', [one]);
+          },
+          true,
+        ),
+      ),
+    ).toBe('PF005');
+    expect(await entriesLeft(ws, ids)).toEqual({ entries: 0, postings: 0 });
+
+    // 4. Control: los mismos asientos con sus dos postings confirman.
+    ids = await inCtx(app, ws, (c) => bulkEntries(c, ws, '2026-03-14', [two(), two()]), true);
+    expect(await entriesLeft(ws, ids)).toEqual({ entries: 2, postings: 4 });
+  }, 60_000);
+
   it('[TC-LEDGER-IMMUTABILITY-001] UPDATE/DELETE/TRUNCATE fallan para pf_app (42501) y para el owner (PF003)', async () => {
     const tables = ['ledger.posting', 'ledger.journal_entry', 'ledger.entry_reversal'];
     for (const t of tables) {

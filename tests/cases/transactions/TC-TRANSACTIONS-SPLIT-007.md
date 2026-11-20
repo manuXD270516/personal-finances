@@ -12,8 +12,11 @@ invariants: [INV-021]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+  - packages/contexts/transactions/test/integration/pg-loans.int.test.ts
+status: automated
 regression_suite: true
 phase: 6
 tags: [splits, database, defense-in-depth, bulk-write, stabilize-import-persist-perf, ADR-0034]

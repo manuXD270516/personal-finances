@@ -194,6 +194,67 @@ describe('PgTransactionRepository — transacciones de préstamo', () => {
     expect(err?.constraint).toBe('transaction_splits_sum_ck');
   });
 
+  it('[TC-TRANSACTIONS-SPLIT-007] la barrera de splits al confirmar conserva la lógica de LOAN_PAYMENT y LOAN_DISBURSEMENT, en revisiones y en lotes', async () => {
+    const exec = (text: string, params: unknown[]) => requireSqlExecutor().query(text, params);
+    const present = async (ids: string[]) =>
+      Number(
+        (
+          (
+            await inWs(() =>
+              exec(`SELECT count(*)::int AS n FROM txn.transaction WHERE id = ANY($1::uuid[])`, [ids]),
+            )
+          ).rows[0] as { n: number }
+        ).n,
+      );
+
+    // Pago: revisión en dos sentencias fuera de orden (primero el split nuevo, después el monto): confirma.
+    const paid = payment('2026-12-10');
+    await inWs(() => repo.insert(paid));
+    await inWs(async () => {
+      await exec(
+        `INSERT INTO txn.transaction_split (id, workspace_id, transaction_id, position, amount, currency, category_id, revision)
+         VALUES ($1, $2, $3, 9, 10.00, 'BOB', $4, 2)`,
+        [randomUUID(), ws, paid.id, feesCategory],
+      );
+      await exec(`UPDATE txn.transaction SET amount = amount + 10.00 WHERE id = $1`, [paid.id]);
+    });
+    // El monto solo, sin tocar los splits: falla con la restricción y el formato de siempre.
+    const amountOnly = await pgError(
+      inWs(() => exec(`UPDATE txn.transaction SET amount = amount + 5.00 WHERE id = $1`, [paid.id])),
+    );
+    expect(amountOnly).toMatchObject({ code: '23514', constraint: 'transaction_splits_sum_ck' });
+    expect((amountOnly as { message?: string }).message).toMatch(
+      /splits of transaction [0-9a-f-]{36} sum [0-9.]+ but the expected amount is [0-9.]+/,
+    );
+
+    // Lote: dos pagos y un desembolso; el split de uno de los pagos se descuadra: no queda ninguno.
+    const a = payment('2026-12-11');
+    const b = payment('2026-12-11');
+    const d = disbursement('100.00', randomUUID());
+    const lote = await pgError(
+      inWs(async () => {
+        await repo.insert(a);
+        await repo.insert(b);
+        await repo.insert(d);
+        await exec(
+          `UPDATE txn.transaction_split SET amount = amount - 0.01 WHERE transaction_id = $1 AND position = 0`,
+          [b.id],
+        );
+      }),
+    );
+    expect(lote).toMatchObject({ code: '23514', constraint: 'transaction_splits_sum_ck' });
+    expect(await present([a.id, b.id, d.id])).toBe(0);
+
+    // Desembolso: la comisión retenida de 100.00 debe coincidir con monto − neto recibido.
+    const ok = disbursement('100.00', randomUUID());
+    await inWs(() => repo.insert(ok));
+    expect(await present([ok.id])).toBe(1);
+    const fee = await pgError(
+      inWs(() => exec(`UPDATE txn.transaction_split SET amount = 99.99 WHERE transaction_id = $1`, [ok.id])),
+    );
+    expect(fee).toMatchObject({ code: '23514', constraint: 'transaction_splits_sum_ck' });
+  }, 60_000);
+
   it('el trigger rechaza un desembolso cuya comisión no coincide con monto − neto recibido', async () => {
     const tx = disbursement('500.00', randomUUID());
     const err = await pgError(

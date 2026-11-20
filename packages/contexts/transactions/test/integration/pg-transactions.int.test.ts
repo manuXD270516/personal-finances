@@ -116,6 +116,89 @@ describe('PgTransactionRepository', () => {
     expect(await inWs(w1, () => pgCurrencyCatalog.scaleOf('BOB'))).toBe(2);
   });
 
+  it('[TC-TRANSACTIONS-SPLIT-007] la BD rechaza al confirmar unos splits que no suman, admite revisiones en varias sentencias y revierte el lote entero', async () => {
+    const failure = async (p: Promise<unknown>) => {
+      try {
+        await p;
+      } catch (err) {
+        return err as { code?: string; constraint?: string; message?: string };
+      }
+      return undefined;
+    };
+    const exec = (text: string, params: unknown[]) => requireSqlExecutor().query(text, params);
+    const tx = record(w1, { amount: bob('150.00') });
+    await inWs(w1, () => repo.insert(tx));
+    const amountOf = async (id: string) =>
+      Number(
+        (
+          (await inWs(w1, () => exec(`SELECT amount::text AS a FROM txn.transaction WHERE id = $1`, [id])))
+            .rows[0] as { a: string }
+        ).a,
+      );
+
+    // 1. Revisión en tres sentencias: el estado intermedio no suma, el confirmado sí.
+    await inWs(w1, async () => {
+      await exec(`UPDATE txn.transaction SET amount = 175.00 WHERE id = $1`, [tx.id]);
+      await exec(
+        `UPDATE txn.transaction_split SET superseded_in_revision = 2 WHERE transaction_id = $1 AND superseded_in_revision IS NULL`,
+        [tx.id],
+      );
+      await exec(
+        `INSERT INTO txn.transaction_split (id, workspace_id, transaction_id, position, amount, currency, category_id, revision)
+         VALUES ($1, $2, $3, 0, 175.00, 'BOB', $4, 2)`,
+        [randomUUID(), w1, tx.id, randomUUID()],
+      );
+    });
+    expect(await amountOf(tx.id)).toBe(175);
+
+    // 2. Cambio de monto sin splits nuevos: falla al confirmar con la restricción y el formato de siempre.
+    const amountOnly = await failure(
+      inWs(w1, () => exec(`UPDATE txn.transaction SET amount = 200.00 WHERE id = $1`, [tx.id])),
+    );
+    expect(amountOnly?.code).toBe('23514');
+    expect(amountOnly?.constraint).toBe('transaction_splits_sum_ck');
+    expect(amountOnly?.message).toMatch(
+      /splits of transaction [0-9a-f-]{36} sum 175(\.0+)? but the expected amount is 200(\.0+)?/,
+    );
+    expect(await amountOf(tx.id)).toBe(175);
+
+    // 3. Lote por conjunto con un split inyectado de 17.00: no queda ninguna de las 200 transacciones.
+    const writeBatch = (ids: string[], badIndex: number | null) =>
+      inWs(w1, async () => {
+        await exec(
+          `INSERT INTO txn.transaction (id, workspace_id, kind, status, transaction_date, account_id, amount, currency, source)
+           SELECT t.id, $1::uuid, 'EXPENSE', 'PENDING', '2026-10-01', $2::uuid, 18.00, 'BOB', 'IMPORT'
+             FROM unnest($3::uuid[]) AS t(id)`,
+          [w1, bank, ids],
+        );
+        await exec(
+          `INSERT INTO txn.transaction_split (id, workspace_id, transaction_id, position, amount, currency, category_id, revision)
+           SELECT gen_random_uuid(), $1::uuid, t.id, 0, CASE WHEN t.ord = $3 THEN 17.00 ELSE 18.00 END, 'BOB', $4::uuid, 1
+             FROM unnest($2::uuid[]) WITH ORDINALITY AS t(id, ord)`,
+          [w1, ids, badIndex ?? -1, randomUUID()],
+        );
+      });
+    const countOf = async (ids: string[]) =>
+      (
+        (
+          await inWs(w1, () =>
+            exec(`SELECT count(*)::int AS n FROM txn.transaction WHERE id = ANY($1::uuid[])`, [ids]),
+          )
+        ).rows[0] as { n: number }
+      ).n;
+    const bad = Array.from({ length: 200 }, () => randomUUID());
+    const batch = await failure(writeBatch(bad, 59));
+    expect(batch?.code).toBe('23514');
+    expect(batch?.constraint).toBe('transaction_splits_sum_ck');
+    expect(batch?.message).toMatch(
+      new RegExp(`splits of transaction ${bad[58]} sum 17(\\.0+)? but the expected amount is 18(\\.0+)?`),
+    );
+    expect(await countOf(bad)).toBe(0);
+    const good = Array.from({ length: 200 }, () => randomUUID());
+    await writeBatch(good, null);
+    expect(await countOf(good)).toBe(200);
+  }, 60_000);
+
   it('[TC-TRANSACTIONS-BULKIMPORT-005] (BD) insertMany escribe las mismas filas que insert + linkEntry, también con splits y tags', async () => {
     const tag = randomUUID();
     const make = (extra: Partial<RecordTransactionInput> = {}) =>
