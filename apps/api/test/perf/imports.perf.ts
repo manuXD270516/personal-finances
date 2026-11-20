@@ -136,6 +136,8 @@ interface Variant {
   readonly pauseRelay?: boolean;
   readonly noCollector?: boolean;
   readonly noStatsRefresh?: boolean;
+  readonly preSql?: string;
+  readonly relayBatch?: number;
   readonly dbSettings?: Record<string, string>;
 }
 const isBurstDef = (def: EventConsumerDefinition): boolean =>
@@ -162,6 +164,14 @@ function variantOf(name: string): Variant {
       return { name, base: HOST_CONFIG, dbSettings: { synchronous_commit: "'off'" } };
     case 'no-stats':
       return { name, base: HOST_CONFIG, noStatsRefresh: true };
+    case 'vacuum-all':
+      return { name, base: HOST_CONFIG, preSql: 'VACUUM (ANALYZE)' };
+    case 'analyze-all':
+      return { name, base: HOST_CONFIG, preSql: 'ANALYZE' };
+    case 'checkpoint':
+      return { name, base: HOST_CONFIG, preSql: 'CHECKPOINT' };
+    case 'relay-1000':
+      return { name, base: HOST_CONFIG, relayBatch: 1000 };
     case 'no-collector':
       return { name, base: HOST_CONFIG, noCollector: true };
     default:
@@ -333,12 +343,14 @@ async function prepare(cfg: ImportConfig, variant: Variant | undefined = activeV
     );
   }
   // Sin pasadas de arranque ni cron horario de los trabajos programados ajenos (H2); con el recolector de tiempos.
+  if (variant?.preSql) await serial!.query(variant.preSql);
   if (variant?.noStatsRefresh) process.env['PF_EXP_NO_STATS'] = '1';
   else delete process.env['PF_EXP_NO_STATS'];
   await h.startWorker(
     {
       ...PERF_WORKER_ISOLATION,
       ...(variant?.noCollector ? {} : { persistTimings: collector }),
+      ...(variant?.relayBatch ? { relay: { batchSize: variant.relayBatch } } : {}),
       ...(variant?.noBurstConsumers
         ? { startConsumers: (def: EventConsumerDefinition) => !isBurstDef(def) }
         : {}),
