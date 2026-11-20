@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { setLedgerValidation, type LedgerValidationMode } from './ledger-validation.js';
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
@@ -44,6 +45,9 @@ import { perfApiEnv } from './perf-env.js';
  * PF_PERF_ITERATIONS (por defecto 200), PF_PERF_OUT (por defecto `reports/perf/` en la raíz del repo).
  */
 const deps = inject('deps');
+// ADR-0034 (rama de experimentos): `PF_LEDGER_VALIDATION=both` mide NFR-PERF-003 alternando 3 veces los disparadores por fila y
+// la validación por sentencia en la misma corrida (la migración se aplica y se revierte entre rondas).
+const LEDGER_BOTH = process.env['PF_LEDGER_VALIDATION'] === 'both';
 // Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
 const loadRecorder = recordSuiteLoad(import.meta.url, deps.superuserUrl);
 const env = process.env;
@@ -1106,20 +1110,26 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
         }),
       ],
     ];
-    for (const [title, path, body] of commands) {
-      const samples = await timed(n, async (i) => {
-        const r = await call('POST', `${W}${path}`, body(i));
-        if (r.status !== 201) throw new Error(`${title}: ${r.status} ${JSON.stringify(r.body)}`);
-      });
-      results.push(
-        latencyResult({
-          id: `write-${path.slice(1)}`,
-          nfr: 'NFR-PERF-003',
-          title,
-          samples,
-          limitMs: PERF_THRESHOLDS['NFR-PERF-003'].limitMs,
-        }),
-      );
+    const rounds: (LedgerValidationMode | null)[] = LEDGER_BOTH
+      ? ['row', 'statement', 'row', 'statement', 'row', 'statement']
+      : [null];
+    for (const [round, mode] of rounds.entries()) {
+      if (mode) await setLedgerValidation(deps.migratorUrl, mode);
+      for (const [title, path, body] of commands) {
+        const samples = await timed(n, async (i) => {
+          const r = await call('POST', `${W}${path}`, body(i));
+          if (r.status !== 201) throw new Error(`${title}: ${r.status} ${JSON.stringify(r.body)}`);
+        });
+        results.push(
+          latencyResult({
+            id: mode ? `write-${path.slice(1)}-${mode}-${String(Math.floor(round / 2) + 1)}` : `write-${path.slice(1)}`,
+            nfr: 'NFR-PERF-003',
+            title: mode ? `${title} [${mode} ${String(Math.floor(round / 2) + 1)}]` : title,
+            samples,
+            limitMs: PERF_THRESHOLDS['NFR-PERF-003'].limitMs,
+          }),
+        );
+      }
     }
   });
 

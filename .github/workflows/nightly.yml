@@ -34,6 +34,12 @@ on:
       loops:
         description: 'Veces que se repite el comando de vitest completo (para throughput.perf.ts)'
         default: '1'
+      ledger_validation:
+        description: 'PF_LEDGER_VALIDATION (ADR-0034): both = NFR-PERF-003 alterna filas y sentencia 3 veces'
+        default: ''
+      scale:
+        description: 'PF_PERF_SCALE del Large Seed de nightly.perf.ts'
+        default: '1'
 
 permissions:
   contents: read
@@ -206,6 +212,8 @@ jobs:
           PF_PERF_REPEAT: ${{ inputs.repeat }}
           PF_PERF_FILES: ${{ inputs.files }}
           PF_PERF_LOOPS: ${{ inputs.loops }}
+          PF_LEDGER_VALIDATION: ${{ inputs.ledger_validation }}
+          PF_PERF_SCALE: ${{ inputs.scale }}
         working-directory: apps/api
         run: |
           set +e

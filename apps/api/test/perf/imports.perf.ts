@@ -15,6 +15,7 @@ import {
   type User,
 } from '../support/portability.js';
 import { perfOutDir, recordSuiteLoad } from './background-load.js';
+import { setLedgerValidation, VALIDATION_FUNCTIONS, type LedgerValidationMode } from './ledger-validation.js';
 import { BURST_EVENT_TYPES } from './burst-support.js';
 import { renderPdf } from '../../../../packages/contexts/imports/test/support/render-pdf.js';
 import { paintLargeStatement } from '../../../../tests/fixtures/imports/statements-bo/pdf/paint-statement.js';
@@ -139,6 +140,8 @@ interface Variant {
   readonly preSql?: string;
   readonly relayBatch?: number;
   readonly dbSettings?: Record<string, string>;
+  /** ADR-0034: estado de la validación del ledger antes de medir (`row` = disparadores por fila, `statement` = migración). */
+  readonly ledger?: LedgerValidationMode;
 }
 const isBurstDef = (def: EventConsumerDefinition): boolean =>
   def.events.some((e) => (BURST_EVENT_TYPES as readonly string[]).includes(e.type));
@@ -160,6 +163,10 @@ function variantOf(name: string): Variant {
       return { name, base: HOST_CONFIG, env: { IMPORT_PERSIST_BATCH_SIZE: '1000' } };
     case 'track-fn':
       return { name, base: HOST_CONFIG, dbSettings: { track_functions: "'pl'" } };
+    case 'ledger-row':
+      return { name, base: HOST_CONFIG, dbSettings: { track_functions: "'pl'" }, ledger: 'row' };
+    case 'ledger-stmt':
+      return { name, base: HOST_CONFIG, dbSettings: { track_functions: "'pl'" }, ledger: 'statement' };
     case 'sync-off':
       return { name, base: HOST_CONFIG, dbSettings: { synchronous_commit: "'off'" } };
     case 'no-stats':
@@ -343,6 +350,7 @@ async function prepare(cfg: ImportConfig, variant: Variant | undefined = activeV
     );
   }
   // Sin pasadas de arranque ni cron horario de los trabajos programados ajenos (H2); con el recolector de tiempos.
+  if (variant?.ledger) await setLedgerValidation(inject('deps').migratorUrl, variant.ledger);
   if (variant?.preSql) await serial!.query(variant.preSql);
   if (variant?.noStatsRefresh) process.env['PF_EXP_NO_STATS'] = '1';
   else delete process.env['PF_EXP_NO_STATS'];
@@ -504,7 +512,7 @@ async function runImportBenchmarkInner(
           `SELECT f.schemaname || '.' || f.funcname AS fn, f.calls::bigint AS calls, f.total_time AS total_ms, f.self_time AS self_ms,
                   (p.prorettype = 'trigger'::regtype) AS is_trigger
              FROM pg_stat_user_functions f JOIN pg_proc p ON p.oid = f.funcid
-            ORDER BY f.self_time DESC LIMIT 30`,
+            ORDER BY f.self_time DESC LIMIT 200`,
         );
         trackedFunctions = fn.rows;
       }
@@ -661,6 +669,10 @@ async function runImportBenchmarkInner(
                 .filter((f) => f['is_trigger'] === true)
                 .reduce((a, f) => a + Number(f['self_ms']), 0),
               functionsSelfMs: trackedFunctions.reduce((a, f) => a + Number(f['self_ms']), 0),
+              validationSelfMs: trackedFunctions
+                .filter((f) => VALIDATION_FUNCTIONS.includes(String(f['fn'])))
+                .reduce((a, f) => a + Number(f['self_ms']), 0),
+              ledgerMode: variant.ledger ?? null,
             }
           : {}),
       };
