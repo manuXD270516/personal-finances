@@ -31,6 +31,8 @@ Hoy el reporte solo publica la persistencia total: no dice cuánto es espera de 
 ### Modified Capabilities
 
 - `platform/delivery-pipeline`: desglose de la persistencia del benchmark del import, huella del runner, suites informativas que no deciden el veredicto aunque su preparación no termine, y benchmark del import sin trabajos programados ajenos (4 requirements ADDED: 2 Must, 2 Should).
+- `ledger/journal-posting`: la barrera de base de datos de «Asientos balanceados por moneda» y «Asiento con al menos dos postings distintos de cero» también vale para escrituras por conjunto y para `SET CONSTRAINTS ALL IMMEDIATE` (2 requirements MODIFIED, Must; scenarios nuevos, sin cambio de conducta; ADR-0034, D447).
+- `transactions/splits`: «Los splits suman exactamente el total» explicita la barrera de base de datos al confirmar, por fila, por conjunto y en varias sentencias (1 requirement MODIFIED, Must; ADR-0034, D447).
 
 ## Impact
 
