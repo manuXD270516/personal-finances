@@ -7,7 +7,9 @@ import { inflateSync } from 'node:zlib';
 export function pdfVisibleText(pdf: Uint8Array): string {
   const raw = Buffer.from(pdf).toString('latin1');
   const out: string[] = [];
-  const re = /stream\r?\n([\s\S]*?)\r?\nendstream/gu;
+  // El contenido llega hasta el `\n` previo a `endstream` sin quitar un `\r` final: los bytes comprimidos pueden
+  // terminar en 0x0D (1 de cada 256 streams) y recortarlo rompe el inflate; zlib ignora el `\r` sobrante del EOL.
+  const re = /stream\r?\n([\s\S]*?)\nendstream/gu;
   for (let m = re.exec(raw); m; m = re.exec(raw)) {
     let content: string;
     try {
