@@ -130,6 +130,19 @@ Fuente: `imports-perf.json` y el log del job `perf` de los tres nightlies progra
 
 **No medible sin nightlies reales (pendiente).** Si con el aislamiento la fila del código sigue sin drenar en 180 s: el seguimiento, el `EXPLAIN` del relay y la transacción más larga del reporte dirán si es H5 o H7; P3, P6 y P8 siguen pendientes. El peso de H6 por runner y H1 necesitan más corridas.
 
+## Resultados de P2 a P8 y pesos finales (2026-11-20)
+
+Detalle en [docs/67](../../../docs/67-import-persist-perf-findings.md); preguntas nuevas en [docs/68](../../../docs/68-import-persist-perf-questions-2.md). Seis `workflow_dispatch` sobre la rama de experimentos (runs 44649169232, 44649184440, 44649199678, 44649214820, 44651996652 y 44652012288) y los nightlies del 13 al 19 de noviembre.
+
+| Hipótesis | Veredicto | Peso |
+|---|---|---|
+| H3 contención del relay y los consumidores (CPU) | Aceptada, dominante | ≈ 35 % de la persistencia (consumidores detenidos −35 %, relay pausado −37 %); explica la bimodalidad dentro de un runner |
+| H1 varianza del runner | Aceptada en parte | ≈ 1,7× entre EPYC 7763 y 9V45; no explica la dispersión intra-runner |
+| H7 estancamiento del relay | Aceptada y resuelta (#237) | `throughput.perf.ts` ×3 completo |
+| H2, H4, H5, H6, H8 | Descartadas | ≤ 5 % cada una (sin trabajos ajenos, lotes de 500/1 000, `VACUUM`/`ANALYZE`/`CHECKPOINT`, `synchronous_commit = off`, espera inicial ≤ 0,3 s) |
+
+El único arreglo que queda es regular el relay o los consumidores (D406), que depende de una decisión del owner (docs/68, preguntas 1 y 2). D404 sigue sin evidencia (pregunta 3).
+
 ## Contratos
 
 - **OpenAPI:** sin cambios.
