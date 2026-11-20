@@ -423,6 +423,7 @@ async function runImportBenchmarkInner(
     let observedAtMs = 0;
     let drainEndMs = 0;
     let failure: unknown;
+    let trackedFunctions: Record<string, unknown>[] | undefined;
     let drainStall: DrainStall | undefined;
     const drainPoints: DrainTraceEntry[] = [];
     const startedAt = new Date(Date.now() - 1000);
@@ -462,6 +463,7 @@ async function runImportBenchmarkInner(
 
       const t1 = performance.now();
       collector.reset();
+      if (variant?.dbSettings?.['track_functions']) await serial!.query('SELECT pg_stat_reset()');
       if (!variant?.noCollector) persistSampler.start();
       const approved = await h.call('POST', `${W()}/imports/${upload.body['id'] as string}/approve`, {
         token: owner.token,
@@ -496,6 +498,16 @@ async function runImportBenchmarkInner(
       persistMs = performance.now() - t1;
       observedAtMs = Date.now();
       if (variant?.pauseRelay) await h.worker!.relay.start();
+      if (variant?.dbSettings?.['track_functions']) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const fn = await serial!.query(
+          `SELECT f.schemaname || '.' || f.funcname AS fn, f.calls::bigint AS calls, f.total_time AS total_ms, f.self_time AS self_ms,
+                  (p.prorettype = 'trigger'::regtype) AS is_trigger
+             FROM pg_stat_user_functions f JOIN pg_proc p ON p.oid = f.funcid
+            ORDER BY f.self_time DESC LIMIT 30`,
+        );
+        trackedFunctions = fn.rows;
+      }
       persistSamples = await persistSampler.stop();
       const persistEnd = t1 + persistMs;
       expect(done['status']).toBe('COMPLETED');
@@ -642,6 +654,15 @@ async function runImportBenchmarkInner(
         restWaitedMs: report.restBeforeMeasure?.waitedMs,
         peakQueuedEventJobs: report.waits?.peakQueuedEventJobs,
         stalled: Boolean(drainStall),
+        ...(trackedFunctions
+          ? {
+              functions: trackedFunctions,
+              triggerSelfMs: trackedFunctions
+                .filter((f) => f['is_trigger'] === true)
+                .reduce((a, f) => a + Number(f['self_ms']), 0),
+              functionsSelfMs: trackedFunctions.reduce((a, f) => a + Number(f['self_ms']), 0),
+            }
+          : {}),
       };
       writeFileSync(
         `${dir}/${variant.name}-${String(rep)}-${String(Date.now())}.json`,
