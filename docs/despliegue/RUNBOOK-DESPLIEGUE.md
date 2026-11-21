@@ -315,7 +315,7 @@ Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock; des
 
 ## Publicar una actualización
 
-1. PR contra `main` con los 17 checks en verde (auto-merge squash, trunk).
+1. PR contra `main` con los 18 checks en verde (auto-merge squash, trunk).
 2. Las migraciones son solo expand y las aplica `migrate` **antes** de que arranquen api y worker (dependencia de `up --wait`). Antes de migrar, `pfos-deploy.sh` hace un backup incremental anotado con el SHA.
 3. `main.yml` construye una vez y registra los digests. Despliegue: `gh workflow run deploy.yml -f action=deploy -f commit_sha=<SHA>` y aprobación en el environment `production`.
 4. Repetir las comprobaciones 1 a 6 de la fase 6.

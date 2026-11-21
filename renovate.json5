@@ -3,7 +3,7 @@
 // política `scripts/delivery-policy` (TC-PLATFORM-PIPELINE-005..007), que corre con `pnpm test` (job `unit`).
 //
 // Esta configuración NO toca la protección de `main` ni los checks requeridos (D224): cada PR del bot pasa los mismos
-// 17 checks, con `strict` y `enforce_admins`. Las fusiones automáticas las hace el auto-merge nativo de GitHub
+// 18 checks, con `strict` y `enforce_admins`. Las fusiones automáticas las hace el auto-merge nativo de GitHub
 // (`platformAutomerge`), que espera esos checks; Renovate nunca fusiona por sí mismo.
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
@@ -41,7 +41,7 @@
   commitMessageAction: 'actualizar',
   commitMessageTopic: '{{depName}}',
   commitMessageExtra: 'a {{#if isPinDigest}}{{{newDigestShort}}}{{else}}{{#if isMajor}}{{prettyNewMajor}}{{else}}{{#if isSingleVersion}}{{prettyNewVersion}}{{else}}{{#if newValue}}{{{newValue}}}{{else}}{{{newDigestShort}}}{{/if}}{{/if}}{{/if}}{{/if}}',
-  prHeader: 'Actualización de dependencias propuesta por Renovate (change add-dependency-updates). Debe pasar los 17 checks requeridos con la rama al día; las versiones mayores no se fusionan solas.',
+  prHeader: 'Actualización de dependencias propuesta por Renovate (change add-dependency-updates). Debe pasar los 18 checks requeridos con la rama al día; las versiones mayores no se fusionan solas.',
   prFooter: 'Esta PR no modifica la protección de `main` ni los checks requeridos. Si un check falla, se corrige en esta rama o se cierra; nunca se fusiona en rojo.',
   dependencyDashboardTitle: 'Panel de dependencias (Renovate)',
   dependencyDashboardHeader: 'Estado de las actualizaciones de dependencias. Ventana semanal: lunes antes de las 06:00 (America/La_Paz). Sin datos sensibles.',
@@ -97,7 +97,7 @@
       rangeStrategy: 'widen',
     },
 
-    // Fusión automática (pregunta 4, D264), delegada en el auto-merge nativo con los 17 checks: solo parches de
+    // Fusión automática (pregunta 4, D264), delegada en el auto-merge nativo con los 18 checks: solo parches de
     // dependencias de desarrollo y digests y parches de acciones de CI e imágenes de desarrollo.
     {
       description: 'Parches de dependencias de desarrollo',

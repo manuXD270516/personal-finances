@@ -22,7 +22,7 @@ tags: ["ci", "dependencies", "renovate"]
 error_code: null
 preconditions:
   - "Configuración del servicio de actualización versionada en la raíz del repositorio"
-  - "Protección de main con los 17 checks requeridos, strict y enforce_admins"
+  - "Protección de main con los 18 checks requeridos, strict y enforce_admins"
 input:
   - update: "parche y versión menor de dos dependencias de desarrollo del workspace, publicadas hace más de 3 días"
     expected: "una sola PR del grupo del workspace dentro de la ventana semanal, con manifiestos y lockfile"

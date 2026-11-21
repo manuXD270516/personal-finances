@@ -22,14 +22,14 @@ tags: ["ci", "dependencies", "renovate", "automerge"]
 error_code: null
 preconditions:
   - "Configuración del servicio de actualización versionada en la raíz del repositorio"
-  - "Auto-merge nativo de GitHub activo; main exige los 17 checks con strict y enforce_admins"
+  - "Auto-merge nativo de GitHub activo; main exige los 18 checks con strict y enforce_admins"
 input:
   - update: "TypeScript 6.0.3 -> 7.0.0 (catálogo)"
     expected: "PR propia, fuera del grupo semanal, sin auto-merge aunque todos los checks pasen"
   - update: "versión menor con el check integration en rojo"
     expected: "no se fusiona; queda abierta"
   - update: "parche con automerge permitido y un check pendiente"
-    expected: "no se fusiona hasta que los 17 checks estén en verde con la rama al día"
+    expected: "no se fusiona hasta que los 18 checks estén en verde con la rama al día"
 steps:
   - "Test de política: ninguna regla con automerge activo aplica a actualizaciones major; platformAutomerge activo; ninguna opción que salte checks o protección"
   - "Primera ventana con una major disponible: comprobar que la PR no tiene auto-merge"
