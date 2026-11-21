@@ -61,3 +61,4 @@ Entonces abre una PR propia fuera del grupo semanal
 - Qué clases sí se fusionan solas depende de la pregunta 4 de design.md; este caso cubre lo que no cambia con la respuesta.
 
 - 2026-10-16: la parte de política está automatizada (`scripts/delivery-policy/test/renovate-policy.test.ts`). Pendiente de verificación manual (tarea 3.3): primera ventana semanal con una PR de grupo en verde y, si hay una major, comprobar que queda abierta sin auto-merge.
+- 2026-11-20: verificado con `gh` que ninguna PR del bot se fusionó con checks en rojo (#200, #201, #202, #203, #204, #218, #235). Sigue sin comprobarse la parte «major abierta sin auto-merge»: no hay ninguna PR major abierta (typescript 7, node 26, openspec 2, @opentelemetry/core 3 y postgres 19 están en el panel #146 como ramas propias sin abrir); tarea 3.3 abierta por eso.
