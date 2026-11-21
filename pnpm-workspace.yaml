@@ -9,7 +9,7 @@ packages:
 # Versiones fijadas en un solo lugar (ADR-0018). Renovate las actualiza vía PR.
 # TypeScript 6.0.3 en todo el repo: dependency-cruiser y typescript-eslint aún no soportan TS 7 (SPIKE-04, R1).
 catalog:
-  typescript: 6.0.3
+  typescript: 7.0.2
   '@types/node': 24.19.1
   vitest: 5.0.3
   tsx: 4.23.15
