@@ -75,7 +75,7 @@
 
 ## 8. VERIFICACIÓN del criterio de salida
 
-- [ ] 8.1 Fila del host de TC-IMPORTS-CSV-029 con persistencia ≤ 20 s en los nightlies programados seguidos (5 seguidos, D403; objetivo interno ≤ 12 s), con desglose y huella en cada uno; drenado ≤ 120 s y vista previa ≤ 30 s sin cambios
+- [ ] 8.1 Fila del host de TC-IMPORTS-CSV-029 con persistencia ≤ 20 s en los nightlies programados seguidos (5 seguidos, D403; objetivo interno ≤ 12 s), con desglose y huella en cada uno; drenado ≤ 120 s y vista previa ≤ 30 s sin cambios — 2026-11-23 (D449, [docs/70](../../../docs/70-trends-report-perf-decisions.md)): el nightly programado 45231166087 cuenta para la serie: la fila del host pasó (persistencia de 18,6 s ≤ 20 s) y el job `perf` terminó en rojo solo por la fila `report-trends-24m` (845 ms de 800), que sigue el change `fix-trends-report-perf`.
 - [ ] 8.2 `throughput.perf.ts` completa sus dos fases en esos nightlies o publica el diagnóstico sin decidir el veredicto con H7 resuelta
 - [ ] 8.3 Regresión: NFR-PERF-003 (registro manual) y los demás benchmarks sin cambios de aserciones ni de umbrales (`git diff` de `apps/api/test/perf/*.perf.ts` y del test de política)
 
