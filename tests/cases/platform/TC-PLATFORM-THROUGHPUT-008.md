@@ -12,11 +12,9 @@ invariants: []
 priority: high
 type: platform
 level: performance
-automation_status: automated
-automated_tests:
-  - apps/api/test/perf/imports.perf.ts
-  - apps/api/test/perf/throughput.perf.ts
-status: automated
+automation_status: manual
+automated_tests: []
+status: ready
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301", "nightly", "perf"]
@@ -60,4 +58,4 @@ Entonces cada consumidor termina de procesar sus eventos en 120 segundos o menos
 
 **Evidencia (2026-11-04):** se verifica en el benchmark `apps/api/test/perf/imports.perf.ts`, que el escáner de trazabilidad no cuenta. Nightlies programados 41470065467 (2026-11-02) y 41648631472 (2026-11-03): ráfaga del host drenada en ≤ 9,1 s.
 
-- **Evidencia (2026-11-24, change 63):** Nightlies programados 44760461447 (20-11), 44913986214 (21-11), 45032465801 (22-11), 45231166087 (23-11, cuenta por D449) y 45446974855 (24-11), todos con la migración de ADR-0034 (#246). `throughput.perf.ts` completa la fase A (ráfaga del host) con el drenado total de los seis consumidores en 14,3; 9,8; 9,2; 15,1 y 13,9 s (≤ 120 s) y la fila del host de `imports.perf.ts` con drenado de 5,2 a 7,2 s tras la persistencia. Causa del estancamiento anterior de la fase A: plan cuadrático de la consulta del relay (H7), corregido por `fix-outbox-relay-head-query` (#237).
+- **Evidencia (2026-11-24, change 63; sigue `manual` porque el escáner de trazabilidad no cuenta los benchmarks `*.perf.ts`, como en TC-IMPORTS-CSV-029):** Nightlies programados 44760461447 (20-11), 44913986214 (21-11), 45032465801 (22-11), 45231166087 (23-11, cuenta por D449) y 45446974855 (24-11), todos con la migración de ADR-0034 (#246). `throughput.perf.ts` completa la fase A (ráfaga del host) con el drenado total de los seis consumidores en 14,3; 9,8; 9,2; 15,1 y 13,9 s (≤ 120 s) y la fila del host de `imports.perf.ts` con drenado de 5,2 a 7,2 s tras la persistencia. Causa del estancamiento anterior de la fase A: plan cuadrático de la consulta del relay (H7), corregido por `fix-outbox-relay-head-query` (#237).
