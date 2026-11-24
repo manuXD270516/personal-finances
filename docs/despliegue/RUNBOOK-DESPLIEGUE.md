@@ -16,7 +16,7 @@
 | Pieza | Estado | Dónde |
 |---|---|---|
 | IaC del host (instancia, IP estática, firewall, snapshots, cloud-init) | Escrita, nunca aplicada | `infra/modules/lightsail-host/` |
-| IaC de respaldos (bucket con Object Lock, clave del host y clave de solo lectura) | Escrita, nunca aplicada | `infra/modules/b2-backups/` |
+| IaC de respaldos (dos buckets con Object Lock: principal de 21 d y mensuales de 395 d; clave del host y clave de solo lectura) | Escrita, nunca aplicada | `infra/modules/b2-backups/` |
 | Composición, AWS Budgets (USD 20) y VM de drill opcional | Escrita | `infra/environments/prod/` |
 | Override de producción con techos de memoria | Escrito | `deploy/compose/compose.prod.yaml` |
 | Caddy con HSTS, `nosniff`, `Referrer-Policy`, `/admin` de Keycloak en 404 y `files` limitado a `PUT` firmado | Escrito | `deploy/compose/caddy/Caddyfile` |
@@ -257,7 +257,7 @@ Seguí §2.1 de [deploy-and-restore.md](../runbooks/deploy-and-restore.md) con e
 Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Actions ni en un chat.
 
 1. Seguí §2.3 en la consola web de Lightsail.
-   - **Prefijo del PoC (C4), antes del primer deploy:** agregá al final de `/etc/pfos/pgbackrest.env` `PGBACKREST_REPO1_PATH=/pgbackrest/poc/pitr` y `PGBACKREST_REPO2_PATH=/pgbackrest/poc/monthly`. Tiene que estar antes de la fase 6: el primer deploy crea la stanza y el primer full, y si caen en el prefijo de producción, la stanza queda atada al cluster ficticio (otro `system-id`) y `stanza-create` falla después de borrar los datos del PoC, con esos objetos bloqueados 21 días.
+   - **Prefijo del PoC (C4), antes del primer deploy:** agregá al final de `/etc/pfos/pgbackrest.env` `PGBACKREST_REPO1_PATH=/pgbackrest/poc/pitr` y `PGBACKREST_REPO2_PATH=/pgbackrest/poc/monthly`. Tiene que estar antes de la fase 6: el primer deploy crea la stanza y el primer full, y si caen en el prefijo de producción, la stanza queda atada al cluster ficticio (otro `system-id`) y `stanza-create` falla después de borrar los datos del PoC, con esos objetos bloqueados (21 días en repo1; 395 en repo2, el bucket de mensuales). `pgbackrest.env` también lleva `PGBACKREST_REPO2_S3_BUCKET` = `b2_monthly_bucket_name`, distinto de `b2_bucket_name`. pgBackRest da precedencia a las variables `PGBACKREST_*` sobre `pgbackrest.conf` (la línea de comandos manda sobre el entorno y este sobre el archivo).
 2. Generá el par X25519 y el token de ML según [conectar-un-exchange-y-revocar-una-clave.md](../runbooks/conectar-un-exchange-y-revocar-una-clave.md) y la nota as-built del final del runbook vigente, aunque todavía no los uses.
 3. **Custodia (B5):** cifrá `pfos.env`, `pgbackrest.env` y el archivo de la clave privada X25519 con `age -p` y guardalos en tu gestor de contraseñas, **fuera del host y fuera de AWS**. Los archivos en claro nunca salen del host:
    - En el host (`sudo -i`), instalá `age` y cifrá en una carpeta que `ubuntu` pueda leer. `age -p` pide la passphrase por la terminal; usá una del gestor, distinta de las de pgBackRest:
@@ -386,7 +386,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
    $C exec -T postgres pgbackrest --stanza=pfos --repo=1 --repo1-retention-full-type=count --repo1-retention-full=1 expire
    ```
 
-   Después, con la **clave del host** y el CLI de B2 en tu máquina, intentá borrar una versión bloqueada del prefijo `pgbackrest/poc/`: debe fallar. En Git Bash, la clave se lee sin eco y viaja por variables de entorno, nunca en los argumentos ni en el historial (`<bucket>` es `b2_bucket_name` de `prod.tfvars`):
+   Después, con la **clave del host** y el CLI de B2 en tu máquina, intentá borrar una versión bloqueada del prefijo `pgbackrest/poc/` del bucket principal (`b2_bucket_name`) y otra de `pgbackrest/poc/monthly/` en el bucket de mensuales (`b2_monthly_bucket_name`, lock de 395 d): las dos deben fallar. En Git Bash, la clave se lee sin eco y viaja por variables de entorno, nunca en los argumentos ni en el historial (`<bucket>` es `b2_bucket_name` de `prod.tfvars`):
 
    ```bash
    echo 'Pegá el keyID del host y Enter:'
@@ -435,7 +435,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 3. Deploy del mismo SHA (fase 6, paso 1): `migrate` crea el esquema vacío, Keycloak reimporta el realm y `ensure_stanza` crea la stanza limpia en el prefijo de producción, que está vacío.
 4. Repetí §2.6.2 (`pfos-bootstrap-storage.sh` y el primer full) y §2.6.3 (admin permanente con OTP y tu usuario).
 
-Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock; después el lifecycle los purga.
+Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock (21 días en el bucket principal, 395 en el de mensuales, centavos de almacenamiento); después el lifecycle los purga.
 
 **Terminada cuando:** las diez pruebas pasan, `/var/log/pfos-poc-mem.log` muestra 48 h sin cruzar ningún umbral de la regla de corte (memoria y CPU), y, después de la limpieza, `$C exec -T postgres pgbackrest --stanza=pfos info` muestra solo el full nuevo en el prefijo de producción y la comprobación 8 de la fase 6 vuelve a dar ninguno en `true`.
 
@@ -480,7 +480,7 @@ Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock; des
 |---|---|---|---|
 | WAL continuo (repo1) | `archive_timeout` de 5 min | PITR, RPO ≤ 5 min | Spool de 2 GiB: si B2 no responde, se descarta WAL |
 | Full semanal y diff diario (repo1) | Dom 06:00 y lun–sáb 06:00 UTC | PITR de 14 días | Lock de 21 días |
-| Full mensual (repo2) | Día 1, 07:00 UTC | 12 meses | **Borrable desde el host después de 21 días hasta cerrar B2** |
+| Full mensual (repo2) | Día 1, 07:00 UTC | 12 meses | Bucket aparte con Object Lock de 395 días: el host puede ocultar versiones (`expire`), no destruirlas hasta que venza el lock |
 | Réplica de documentos | 07:30 UTC | Bucket de documentos cifrados | Hasta 24 h de documentos sin réplica |
 | Snapshot de Lightsail | Diario, 7 retenidos | Host completo | Vive en AWS, igual que los datos. Pierde hasta 24 h |
 | Check horario | Cada hora | Archivado y antigüedad del último backup | Avisa solo si configuraste el heartbeat |
