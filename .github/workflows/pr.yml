@@ -21,6 +21,7 @@ env:
   OPENSPEC_NO_UPDATE_CHECK: '1'
   TRIVY_VERSION: 0.74.0
   TRIVY_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+  TRIVY_SHA256_ARM64: b94ce1976bbf3c15b514b605ee88be7c6d94a29be2302847ff01cb794d47aad5
   GITLEAKS_VERSION: 8.30.1
   GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
   OSV_SCANNER_VERSION: 2.7.0
@@ -218,14 +219,28 @@ jobs:
       - uses: ./.github/actions/setup-workspace
       - run: pnpm test:integration
 
+  # Cada imagen se construye y escanea en linux/amd64 (filas con el nombre histórico `image (<imagen>)`, checks obligatorios)
+  # y en linux/arm64 con runner nativo (filas `image (<imagen>, arm64)`, checks NUEVOS y no obligatorios; C12a, plan B Oracle A1).
+  # Las filas arm64 solo construyen (sin push), verifican no-root y pasan Trivy: no exportan artefacto, así que stack-smoke y
+  # e2e siguen cargando únicamente las imágenes amd64.
   image:
-    name: image (${{ matrix.image }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    name: image (${{ matrix.image }}${{ matrix.arch == 'arm64' && ', arm64' || '' }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64]
+        image: [finance-api, finance-web, pfos-postgres, finance-ml, pfos-keycloak]
         include:
+          - arch: amd64
+            runner: ubuntu-latest
+            platform: linux/amd64
+            trivy_tarball: trivy_0.74.0_Linux-64bit.tar.gz
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            trivy_tarball: trivy_0.74.0_Linux-ARM64.tar.gz
           - image: finance-api
             dockerfile: docker/api.Dockerfile
           - image: finance-web
@@ -251,23 +266,26 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           target: runtime
-          platforms: linux/amd64
+          platforms: ${{ matrix.platform }}
           push: false
           load: true
           tags: ${{ env.IMAGE_REF }}
           build-args: |
             GIT_SHA=${{ github.event.pull_request.head.sha }}
             VERSION=0.0.0-pr.${{ github.event.pull_request.number }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }},mode=max
       - name: Non-root
         run: |
           user="$(docker image inspect --format '{{.Config.User}}' "$IMAGE_REF")"
           echo "USER=${user}"
           case "${user%%:*}" in ''|0|root) echo "::error::${IMAGE_REF} corre como root"; exit 1;; esac
       - name: Instalar Trivy (versión fijada + SHA-256)
+        env:
+          TRIVY_TARBALL: ${{ matrix.trivy_tarball }}
+          TRIVY_SHA256: ${{ matrix.arch == 'arm64' && env.TRIVY_SHA256_ARM64 || env.TRIVY_SHA256 }}
         run: |
-          curl -fsSLo trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLo trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${TRIVY_TARBALL}"
           echo "${TRIVY_SHA256}  trivy.tgz" | sha256sum --check --strict
           tar -xzf trivy.tgz -C "$RUNNER_TEMP" trivy && rm trivy.tgz
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
@@ -277,8 +295,10 @@ jobs:
           trivy image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1
           --ignorefile .trivyignore.yaml --no-progress "$IMAGE_REF"
       - name: Exportar imagen para stack-smoke (build once)
+        if: matrix.arch == 'amd64'
         run: docker save "$IMAGE_REF" -o "$RUNNER_TEMP/${{ matrix.image }}.tar"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.arch == 'amd64'
         with:
           name: image-${{ matrix.image }}
           path: ${{ runner.temp }}/${{ matrix.image }}.tar
