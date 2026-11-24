@@ -45,9 +45,24 @@ write_files:
       # delega en deploy/host/pfos-deploy.sh del commit (de main) que se despliega.
       set -euo pipefail
       repo=/opt/pfos/repo
-      read -r action sha api web pg extra <<<"$1" || true
+      read -ra args <<<"$1" || true
+      action="$${args[0]:-}"; sha="$${args[1]:-}"; api="$${args[2]:-}"; web="$${args[3]:-}"; pg="$${args[4]:-}"
       die() { echo "pfos-deploy: $*" >&2; exit 64; }
-      [ -z "$extra" ] || die "argumentos de más"
+      # Imágenes opcionales (0 a 2 tras las 4 obligatorias): lista cerrada del namespace, identificadas por nombre y no por
+      # posición, sin duplicados. Cualquier otro valor o un argumento de más se rechaza.
+      [ "$${#args[@]}" -le 7 ] || die "argumentos de más"
+      ml=""; kc=""
+      for opt in "$${args[@]:5}"; do
+        if [[ "$opt" =~ ^ghcr\.io/manuxd270516/finance-ml@sha256:[0-9a-f]{64}$ ]]; then
+          [ -z "$ml" ] || die "finance-ml duplicada"
+          ml="$opt"
+        elif [[ "$opt" =~ ^ghcr\.io/manuxd270516/pfos-keycloak@sha256:[0-9a-f]{64}$ ]]; then
+          [ -z "$kc" ] || die "pfos-keycloak duplicada"
+          kc="$opt"
+        else
+          die "ref opcional inválida"
+        fi
+      done
       case "$action" in
         deploy)
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "sha inválido"
@@ -57,10 +72,13 @@ write_files:
           git -C "$repo" fetch --quiet origin main
           git -C "$repo" merge-base --is-ancestor "$sha" origin/main || die "$sha no está en main"
           git -C "$repo" -c advice.detachedHead=false checkout --quiet --detach "$sha"
-          exec /bin/bash "$repo/deploy/host/pfos-deploy.sh" deploy "$sha" "$api" "$web" "$pg"
+          # finance-ml va 6.º (como hoy); pfos-keycloak 7.º (con "" en el 6.º si no hay ML: pfos-deploy.sh trata "" como ausente).
+          extras=()
+          if [ -n "$kc" ]; then extras=("$ml" "$kc"); elif [ -n "$ml" ]; then extras=("$ml"); fi
+          exec /bin/bash "$repo/deploy/host/pfos-deploy.sh" deploy "$sha" "$api" "$web" "$pg" "$${extras[@]}"
           ;;
         rollback|status)
-          [ -z "$sha" ] || die "$action no recibe argumentos"
+          [ "$${#args[@]}" -eq 1 ] || die "$action no recibe argumentos"
           exec /bin/bash "$repo/deploy/host/pfos-deploy.sh" "$action"
           ;;
         *) die "acción desconocida (deploy|rollback|status)" ;;
@@ -111,7 +129,9 @@ runcmd:
   - ufw allow 80/tcp
   - ufw allow 443/tcp
   - ufw allow 443/udp
-  - ufw allow 22/tcp
+  # La capa principal del puerto 22 es el firewall de Lightsail (la fase 6 del runbook lo comprueba desde afuera); aquí `limit`
+  # frena la fuerza bruta (6 intentos por 30 s y por IP) y sshd conserva AllowUsers y MaxAuthTries.
+  - ufw limit 22/tcp
   - ufw allow in on tailscale0
   - ufw --force enable
   # Directorios de PFOS: secretos (root, 0700), estado de releases y checkout del repo público.
