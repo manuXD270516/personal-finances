@@ -7,7 +7,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { cashFlowHref } from '../cash-flow/logic';
 import type { CashFlowHomeBlock } from '../cash-flow/types';
 import { problemOf, WithWorkspace, type WorkspaceContext } from '../common/workspace';
-import { HOME_CSS } from '../dashboard/styles';
+import '../dashboard/home.css';
 import type { FormatContext, HomeQuestionStatus } from '../dashboard/types';
 import { looksLikeCardPayment } from '../debt/cards/logic';
 import { useCardLookup } from '../debt/cards/useCardLookup';
@@ -146,7 +146,6 @@ function Upcoming({ ctx }: { ctx: WorkspaceContext }) {
 
   return (
     <div className="pf-home" data-testid="upcoming-payments-page">
-      <style>{HOME_CSS}</style>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {!upcoming && !problem ? (
         <p aria-busy="true" role="status">

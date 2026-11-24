@@ -12,8 +12,13 @@ invariants: []
 priority: critical
 type: security
 level: e2e
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/content-security-policy.spec.ts
+  - apps/web/src/security/csp.test.ts
+  - apps/web/src/security/proxy.test.ts
+  - packages/platform/src/config/load.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["csp","security-headers","add-web-content-security-policy"]

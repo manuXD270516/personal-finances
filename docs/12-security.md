@@ -332,6 +332,11 @@ Flujo en [07-c4-architecture.md](07-c4-architecture.md) §4.2.
 Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{random}' 'strict-dynamic'; style-src 'self' 'nonce-{random}';
   img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://{object-storage-host};
   frame-ancestors 'none'; form-action 'self' https://{idp-host}; base-uri 'none'; object-src 'none'; upgrade-insecure-requests
+```
+
+> **As-built (2026-11-24, `add-web-content-security-policy`, D457/D458):** la política real de `apps/web/proxy.ts` es `default-src 'self'; script-src 'self' 'nonce-{N}' 'strict-dynamic'; style-src 'self' 'nonce-{N}'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' {origen de OBJECT_STORAGE_PUBLIC_ENDPOINT}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests` (esta última solo con `WEB_PUBLIC_URL` en HTTPS). Diferencias con el bloque de arriba: `style-src-attr 'unsafe-inline'` (React serializa `style={…}` como atributos y los nonces no aplican a atributos; los scripts siguen sin `unsafe-inline`), `form-action 'self'` (el login y el logout navegan por redirección, no por un envío nativo al IdP), y COOP y `Permissions-Policy` los agrega Caddy. `Cross-Origin-Resource-Policy` queda fuera. Caddy suma `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` solo a las respuestas de la web y del hostname de archivos que no traen la suya.
+
+```http
 Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
 X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
@@ -342,7 +347,7 @@ Cache-Control: no-store            # en respuestas con datos financieros (BFF y 
 ```
 
 - Nonce por request generado en `middleware.ts` de Next.js; ECharts y shadcn/ui compatibles sin `unsafe-inline` para scripts (validar estilos inline de ECharts — puede requerir `style-src` con hashes; SPIKE-10/frontend).
-- CSP primero en `Report-Only` con endpoint de reportes en staging; enforcement antes de producción.
+- CSP aplicada desde el primer deploy (D458): sin staging ni colector de reportes en N1, la suite E2E con la CSP real (`content-security-policy.spec.ts`) hace de ensayo previo, y `WEB_CSP_REPORT_ONLY=true` es la salida de emergencia. El endpoint de reportes (`report-to`) queda fuera de alcance.
 - La API (`finance-api`) devuelve `Content-Type` estricto, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store` y no sirve HTML.
 
 ---

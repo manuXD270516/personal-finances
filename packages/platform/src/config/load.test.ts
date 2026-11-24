@@ -255,6 +255,32 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(JSON.stringify(badKey.problems)).not.toContain('corta');
   });
 
+  it('[TC-SECURITY-CSP-001] finance-web: OBJECT_STORAGE_PUBLIC_ENDPOINT obligatoria en staging/production y WEB_CSP_REPORT_ONLY false por omisión', () => {
+    const env = {
+      WEB_PUBLIC_URL: 'https://app.example',
+      FINANCE_API_URL: 'http://finance-api:8080',
+      OIDC_ISSUER_URL: 'https://auth.example/realms/pfos',
+      OIDC_CLIENT_SECRET: 'client-secret-0123456789',
+      BFF_DATABASE_URL: 'postgres://pf_bff:s3cr3t-bff@db.internal:5432/pfos',
+      BFF_SESSION_ENC_KEY: `k1:${'a'.repeat(32)}`,
+    };
+    const ci = loadConfig('web', { ...env, PFOS_ENV: 'ci' });
+    expect(ci.OBJECT_STORAGE_PUBLIC_ENDPOINT).toBeUndefined();
+    expect(ci.WEB_CSP_REPORT_ONLY).toBe(false);
+    for (const PFOS_ENV of ['staging', 'production']) {
+      const missing = captureError(() => loadConfig('web', { ...env, PFOS_ENV }));
+      expect(missing.problems.map((p) => p.variable)).toEqual(['OBJECT_STORAGE_PUBLIC_ENDPOINT']);
+    }
+    const prod = loadConfig('web', {
+      ...env,
+      PFOS_ENV: 'production',
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: 'https://files.example',
+      WEB_CSP_REPORT_ONLY: 'true',
+    });
+    expect(prod.OBJECT_STORAGE_PUBLIC_ENDPOINT).toBe('https://files.example');
+    expect(prod.WEB_CSP_REPORT_ONLY).toBe(true);
+  });
+
   it('[TC-IDENTITY-AUTH-001] perfil OIDC: keycloak por defecto, fallback JWKS 24 h y cognito exige client ids', () => {
     const api = loadConfig('api', API_ENV);
     expect(api.OIDC_PROFILE).toBe('keycloak');

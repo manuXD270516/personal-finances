@@ -219,6 +219,7 @@ Dos drills fallidos seguidos (del host o fuera de él) → escalar a N3 (Postgre
 | Parches del SO | automáticos (`unattended-upgrades`, reinicio 04:30 La Paz); Docker reinicia los contenedores (`restart: unless-stopped`) |
 | Imágenes de terceros | fijadas por digest en `compose.yaml`/`compose.prod.yaml`; se actualizan por PR (Renovate) y llegan con el siguiente deploy |
 | Costos | AWS Budgets (80 % real, 100 % pronosticado de USD 20); B2 y Grafana en sus consolas |
+| Pantalla rota por la CSP | Síntoma: pantalla sin estilos o sin datos y mensajes «Refused to …» en la consola del navegador. Salida inmediata (D458): `WEB_CSP_REPORT_ONLY=true` en `/etc/pfos/pfos.env` y redeploy del mismo SHA (`action=deploy`); la web pasa a `Content-Security-Policy-Report-Only` con la misma política y las violaciones siguen visibles en la consola. Luego corregir la causa (un script o `<style>` sin nonce, o un origen faltante) en un PR, y volver a `false` o quitar la variable |
 | Rotación de secretos | editar `/etc/pfos/*.env` y redeploy del release actual (`action=deploy` con el mismo SHA). Contraseñas de roles de BD: `migrate` las realinea al arrancar |
 
 ## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)

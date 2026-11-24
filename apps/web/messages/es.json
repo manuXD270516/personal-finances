@@ -3,6 +3,11 @@
     "title": "PFOS — Finanzas personales",
     "description": "Sistema operativo de finanzas personales"
   },
+  "NotFound": {
+    "title": "Página no encontrada",
+    "body": "La dirección que abriste no existe o ya no está disponible.",
+    "home": "Volver al inicio"
+  },
   "Home": {
     "title": "Inicio",
     "subtitle": "Tu dinero hoy, cómo va el mes y tu patrimonio.",
