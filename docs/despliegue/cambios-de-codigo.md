@@ -1,15 +1,16 @@
 # Cambios de código e IaC que pide el despliegue N1
 
-**Fecha:** 2026-11-14. **Origen:** brechas B1–B14 del [runbook](RUNBOOK-DESPLIEGUE.md#brechas-a-cerrar-antes-del-primer-apply), que salen de las críticas y del disenso del [panel](DECISION-DESPLIEGUE.md). **Nada de esto está aplicado.** Cada tarea va en su propia rama y su PR, con su change de OpenSpec cuando cambia comportamiento, como pide el `CLAUDE.md` del repo.
+**Fecha:** 2026-11-14. **Origen:** brechas B1–B16 del [runbook](RUNBOOK-DESPLIEGUE.md#brechas-a-cerrar-antes-del-primer-apply), que salen de las críticas y del disenso del [panel](DECISION-DESPLIEGUE.md). **Nada de esto está aplicado.** Cada tarea va en su propia rama y su PR, con su change de OpenSpec cuando cambia comportamiento, como pide el `CLAUDE.md` del repo.
 
 Orden recomendado: primero lo que toca el cloud-init y los buckets (C1, C2, C3 y C9), porque después del primer `tofu apply` cambiarlos reemplaza la instancia o deja respaldos con la retención vieja.
 
 ## Antes del primer `tofu apply`
 
-- [ ] **C1. Quinto digest en el comando forzado y en `deploy.yml` (B1).**
-  - **Archivos:** `infra/modules/lightsail-host/cloud-init.yaml.tftpl` (líneas 48–66) y `.github/workflows/deploy.yml` (líneas 43–47).
-  - **Por qué:** el comando forzado hace `read -r action sha api web pg extra` y muere con «argumentos de más» si llega un quinto argumento, aunque `pfos-deploy.sh` ya lo acepta. Además, `deploy.yml` calcula `ml` en el paso `refs` cuando `vars.PFOS_ML_ENABLED=true`, pero el job `resolve` no lo declara en `outputs`, así que `needs.resolve.outputs.ml` llega vacío y el digest nunca sale. Cambiar `user_data` después del apply reemplaza la instancia; `deploy.yml` se puede corregir en cualquier momento.
-  - **Qué:** en `deploy.yml`, agregar `ml: ${{ steps.refs.outputs.ml }}` a los `outputs` de `resolve`. En el cloud-init, aceptar un 5.º argumento opcional validado con `^ghcr\.io/manuxd270516/finance-ml@sha256:[0-9a-f]{64}$`, pasarlo a `pfos-deploy.sh deploy` y seguir rechazando un 6.º. Recomendación: que el comando valide cualquier argumento extra contra una lista cerrada de imágenes del namespace (`finance-ml` y, si se decide C7 con imagen propia, `pfos-keycloak`), para que una imagen nueva no obligue a reemplazar el host. La crítica desaconseja `lifecycle { ignore_changes = [user_data] }`, porque esconde la deriva entre la plantilla y el host, y el `drill_host` arrancaría con otra plantilla.
+- [ ] **C1. Quinto digest en el comando forzado (B1).** Falta solo el cloud-init.
+  - [x] **`deploy.yml` (hecho en #234):** el job `resolve` declara `ml: ${{ steps.refs.outputs.ml }}` en sus `outputs` (`.github/workflows/deploy.yml`, líneas 43–49), así que con `vars.PFOS_ML_ENABLED=true` el digest de `finance-ml` llega al host.
+  - **Archivo pendiente:** `infra/modules/lightsail-host/cloud-init.yaml.tftpl` (líneas 48–66).
+  - **Por qué:** el comando forzado hace `read -r action sha api web pg extra` y muere con «argumentos de más» si llega un quinto argumento, aunque `pfos-deploy.sh` ya lo acepta. Con ML habilitado, el deploy termina en rojo. Cambiar `user_data` después del apply reemplaza la instancia.
+  - **Qué:** en el cloud-init, aceptar un 5.º argumento opcional validado con `^ghcr\.io/manuxd270516/finance-ml@sha256:[0-9a-f]{64}$`, pasarlo a `pfos-deploy.sh deploy` y seguir rechazando un 6.º. Recomendación: que el comando valide cualquier argumento extra contra una lista cerrada de imágenes del namespace (`finance-ml` y, si se decide C7 con imagen propia, `pfos-keycloak`), para que una imagen nueva no obligue a reemplazar el host. La crítica desaconseja `lifecycle { ignore_changes = [user_data] }`, porque esconde la deriva entre la plantilla y el host, y el `drill_host` arrancaría con otra plantilla.
   - **Prueba:** un test de shell (o `bats`) que alimente el script con 4, 5 y 6 argumentos y con refs inválidas, y un deploy con `PFOS_ML_ENABLED=true` cuyo resumen muestre la fila `finance-ml`.
 
 - [ ] **C2. Puerto 22 en `ufw` (B9).**
@@ -82,12 +83,26 @@ Orden recomendado: primero lo que toca el cloud-init y los buckets (C1, C2, C3 y
   - **Por qué:** la web no declara CSP (nota del 2026-10-29 en ADR-0027). Caddy ya agrega HSTS, `nosniff` y `Referrer-Policy`.
   - **Qué:** definir una CSP con `frame-ancestors 'none'` y el origen de `PF_DOMAIN_FILES` en `connect-src`, probarla con la suite E2E (Next puede necesitar nonces para sus scripts) y sumar la comprobación a la fase 6 del runbook. Es comportamiento nuevo: va con su change de OpenSpec.
 
+- [ ] **C14. Regla de corte de CPU y alerta de créditos (B15). Ratificación del 2026-11-24.**
+  - **Archivos:** las secciones «PoC de 48 h: regla de corte» y «Fase 7» del runbook. No hay código en el host: la medición es el timer transitorio de la fase 7 y la alarma es de Lightsail.
+  - **Por qué:** la base sostenida de Lightsail 2 GB es 0,4 vCPU y el import y los reportes son CPU de un hilo. Si los créditos se agotan, el host degrada sin avisar. N2 no suma CPU sostenida, así que un corte por CPU lleva al plan B.
+  - **Qué:** en el PoC, registrar `lscpu`, la CPU promedio del host en reposo durante 6 h con la línea `cpu` de `/proc/stat` cada 5 min (`sysstat` no está en los paquetes del cloud-init, así que no hay `sar`), el tope y el ritmo de acumulación de los créditos (`BurstCapacityTime`) y la persistencia del import de 5 000 filas (`completed_at − approved_at` en `imports.import_job`). Las tendencias de 24 meses se quedan en el nightly `perf` de CI: el Large Seed es solo local y CI. Para la operación, una alarma de Lightsail (`aws lightsail put-alarm`) cuando `BurstCapacityPercentage` baje del 30 %, con aviso por email; no agrega credenciales al host. Revisar `JOB_QUEUE_POLLING_INTERVAL_SECONDS` de pg-boss si la CPU en reposo queda cerca del 20 %.
+  - **Prueba:** el log del PoC muestra las mediciones con su modelo de CPU, y `aws lightsail test-alarm --state ALARM` hace llegar el email de la alarma.
+
 ## Solo si se activa el plan B (Oracle A1)
 
-- [ ] **C12. Preparación de N1-F.** Detalle en la sección «Plan B» del runbook.
-  - `.github/workflows/main.yml`: matriz imagen × plataforma con runners nativos, push por digest e índice con `docker buildx imagetools create`, sin romper `provenance` ni `sbom`, y verify-by-digest sobre el índice.
+Detalle en la sección «Plan B» del runbook. La decisión 2 de la fase 1 dice si C12a y C12b se hacen **antes** del PoC (para tener la salida por CPU lista) o recién si el PoC corta.
+
+- [ ] **C12a. Imágenes multi-arch en CI.**
+  - `.github/workflows/main.yml`: matriz imagen × plataforma con runners nativos (`ubuntu-24.04` y `ubuntu-24.04-arm`), push por digest e índice con `docker buildx imagetools create`, sin romper `provenance` ni `sbom`, y verify-by-digest sobre el digest del índice.
   - `.github/workflows/pr.yml`: build arm64 sin push y Trivy en las dos plataformas. Un check obligatorio nuevo requiere confirmación del owner.
-  - `docker/*.Dockerfile`, `deploy/compose/compose*.yaml` y `deploy/host/pfos-backup.sh` (`RCLONE_IMAGE`): digests de índice multi-arch.
+
+- [ ] **C12b. Digests de terceros y bases como índices multi-arch.**
+  - `docker/*.Dockerfile` (node, python, uv y postgres) y `deploy/compose/compose*.yaml` (Caddy, SeaweedFS y Keycloak): digests de índice multi-arch.
+  - `deploy/host/pfos-backup.sh` (`RCLONE_IMAGE`, hoy `rclone/rclone:1.75.1`): digest de índice multi-arch.
+  - pgBackRest en la imagen `pfos-postgres` para arm64: comprobar que el paquete exista y pase el smoke.
+
+- [ ] **C12c. Host de OCI.**
   - `infra/modules/oci-host/` (nuevo) e `infra/environments/` (entorno o variable de proveedor).
   - Cloud-init para OCI: iptables de la imagen, block volume en `/var/lib/pfos` y sin la excepción del 22.
   - ADR: addendum a ADR-0027 que active N1-F.
