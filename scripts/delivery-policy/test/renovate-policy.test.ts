@@ -56,6 +56,7 @@ describe('renovate.json5: ventana semanal, grupos y fijado (TC-PLATFORM-PIPELINE
       'docker/api.Dockerfile',
       'docker/web.Dockerfile',
       'docker/postgres.Dockerfile',
+      'docker/keycloak.Dockerfile',
       'apps/api/test/support/images.ts',
     ];
     const withoutDigest: string[] = [];

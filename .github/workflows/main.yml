@@ -45,6 +45,10 @@ jobs:
           # promueve por digest como las demás (FINANCE_ML_IMAGE, opcional en el host).
           - image: finance-ml
             dockerfile: docker/finance-ml.Dockerfile
+          # Keycloak con build optimizado (C7): evita rehacer el build de Quarkus en cada arranque del host de 2 GB;
+          # viaja por digest como las demás (PFOS_KEYCLOAK_IMAGE en release.env, extra del comando de deploy).
+          - image: pfos-keycloak
+            dockerfile: docker/keycloak.Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
