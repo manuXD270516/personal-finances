@@ -8,7 +8,7 @@
 
 | Pieza | Dónde | Qué hace |
 |---|---|---|
-| IaC | [`infra/`](../../infra) (OpenTofu ≥ 1.10) | `modules/lightsail-host` (instancia, IP estática, firewall 80/443 + 22 solo consola, snapshots diarios, cloud-init), `modules/b2-backups` (bucket con Object Lock + claves), `environments/prod` (composición, AWS Budgets, VM de drill opcional). State en S3 **cifrado del lado cliente** |
+| IaC | [`infra/`](../../infra) (OpenTofu ≥ 1.10) | `modules/lightsail-host` (instancia, IP estática, firewall 80/443 + 22 solo consola, snapshots diarios, cloud-init), `modules/b2-backups` (dos buckets con Object Lock, principal 21 d y mensuales 395 d, + claves), `environments/prod` (composición, AWS Budgets, VM de drill opcional). State en S3 **cifrado del lado cliente** |
 | Host | cloud-init del módulo | Ubuntu 24.04, Docker + Compose, Tailscale, ufw, `unattended-upgrades` con reinicio 04:30 La Paz, swap 2 GiB, usuario `pfos-deploy` con **comando forzado** (`/usr/local/sbin/pfos-deploy`) |
 | Runtime | [`deploy/compose/compose.prod.yaml`](../../deploy/compose/compose.prod.yaml) sobre `compose.yaml` | Mismas imágenes por digest y mismo contrato de configuración que el modo B local; Caddy (TLS) único con puertos públicos |
 | Secretos | `/etc/pfos/pfos.env`, `/etc/pfos/pgbackrest.env` (root, 0600) | Plantillas sin secretos en [`deploy/host/etc-pfos/`](../../deploy/host/etc-pfos) |
