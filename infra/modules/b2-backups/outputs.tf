@@ -1,6 +1,11 @@
 output "bucket_name" {
-  description = "Bucket B2 (PGBACKREST_REPO{1,2}_S3_BUCKET)."
+  description = "Bucket B2 principal: repo1 y réplica de documentos (PGBACKREST_REPO1_S3_BUCKET)."
   value       = b2_bucket.backups.bucket_name
+}
+
+output "monthly_bucket_name" {
+  description = "Bucket B2 de mensuales con Object Lock de 395 d (PGBACKREST_REPO2_S3_BUCKET)."
+  value       = b2_bucket.monthly.bucket_name
 }
 
 output "host_key_id" {

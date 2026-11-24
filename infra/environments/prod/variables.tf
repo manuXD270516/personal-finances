@@ -27,7 +27,7 @@ variable "deploy_ssh_public_key" {
 }
 
 variable "b2_bucket_name" {
-  description = "Nombre global del bucket B2 de backups."
+  description = "Nombre global del bucket B2 principal de backups (repo1 + documentos). El de mensuales (repo2) se crea como <nombre>-monthly."
   type        = string
 }
 

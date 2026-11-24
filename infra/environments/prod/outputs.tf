@@ -9,8 +9,13 @@ output "host_ipv6_addresses" {
 }
 
 output "b2_bucket_name" {
-  description = "PGBACKREST_REPO{1,2}_S3_BUCKET."
+  description = "PGBACKREST_REPO1_S3_BUCKET (repo1 + réplica de documentos)."
   value       = module.backups.bucket_name
+}
+
+output "b2_monthly_bucket_name" {
+  description = "PGBACKREST_REPO2_S3_BUCKET (mensuales, Object Lock 395 d)."
+  value       = module.backups.monthly_bucket_name
 }
 
 output "b2_host_key_id" {
