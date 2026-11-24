@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/trend-matrix.equivalence.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/transactions/src/infrastructure/nominal-amount.test.ts
+status: automated
 regression_suite: true
 phase: 7
 tags: ["trends", "perf", "pbt", "equivalence", "fix-trends-report-perf"]

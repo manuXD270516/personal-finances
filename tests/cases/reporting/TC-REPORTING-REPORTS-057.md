@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/trend-matrix.equivalence.test.ts
+status: automated
 regression_suite: true
 phase: 7
 tags: ["trends", "perf", "complexity", "fix-trends-report-perf"]

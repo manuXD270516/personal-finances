@@ -1,6 +1,13 @@
 import { dec, DomainError, Instant } from '@pf/shared-kernel';
 import type { ConversionCostRowDto } from '@pf/transactions/contracts';
-import { beforeEach, describe, expect, it } from 'vitest';
+import * as fc from 'fast-check';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  TREND_TOP_SERIES,
+  TrendMatrix,
+  type TrendFact,
+  type TrendSeries,
+} from '../domain/extended-reports.js';
 import { FinancialReportsService } from './financial-reports.exports.js';
 import { InMemoryFinancialReports, type PortionFact } from './testing/in-memory-reports.js';
 
@@ -214,6 +221,166 @@ describe('getTrends (TC-REPORTING-REPORTS-041)', () => {
       'VALIDATION_FAILED',
     );
   });
+});
+
+/**
+ * Oráculo de TC-REPORTING-REPORTS-055: copia LITERAL de `TrendMatrix.build` de `main` 4cdc7689 (la definición funcional
+ * anterior a `fix-trends-report-perf`), solo para este test. El mismo oráculo, con generadores de dominio, vive en
+ * `domain/trend-matrix.equivalence.test.ts`.
+ */
+function oracleTrendBuild(input: Parameters<typeof TrendMatrix.build>[0]): readonly TrendSeries[] {
+  const byAmountThenName = <T extends { amount: { exact: ReturnType<typeof dec> }; name: string }>(
+    items: T[],
+  ) => items.sort((a, b) => b.amount.exact.comparedTo(a.amount.exact) || a.name.localeCompare(b.name, 'es'));
+  const top = new Map(input.categories.map((c) => [c.categoryId, c.topId]));
+  const names = new Map(input.categories.map((c) => [c.categoryId, c.name]));
+  const topOf = (id: string) => top.get(id) ?? id;
+  const topIds = [...new Set(input.facts.map((f) => topOf(f.categoryId)))];
+  const ranked = byAmountThenName(
+    topIds.map((categoryId) => ({
+      categoryId,
+      name: names.get(categoryId) ?? categoryId,
+      amount: input.policy.value(
+        input.facts
+          .filter((f) => topOf(f.categoryId) === categoryId)
+          .map((f) => ({ date: f.date, amount: f.amount })),
+      ),
+    })),
+  );
+  const kept = ranked.slice(0, TREND_TOP_SERIES);
+  const restIds = new Set(ranked.slice(TREND_TOP_SERIES).map((r) => r.categoryId));
+  const cellsOf = (pick: (f: TrendFact) => boolean) =>
+    input.periods.map((period) => ({
+      period,
+      amount: input.policy.value(
+        input.facts
+          .filter((f) => pick(f) && f.date >= period.from && f.date <= period.to)
+          .map((f) => ({ date: f.date, amount: f.amount })),
+        input.perDay ? period.days : undefined,
+      ),
+    }));
+  const totalOf = (pick: (f: TrendFact) => boolean) =>
+    input.policy.value(
+      input.facts.filter(pick).map((f) => ({ date: f.date, amount: f.amount })),
+      input.perDay ? input.periods.reduce((n, p) => n + p.days, 0) : undefined,
+    );
+  const series: TrendSeries[] = kept.map((k) => {
+    const pick = (f: TrendFact) => topOf(f.categoryId) === k.categoryId;
+    return { categoryId: k.categoryId, name: k.name, cells: cellsOf(pick), total: totalOf(pick) };
+  });
+  if (restIds.size > 0) {
+    const pick = (f: TrendFact) => restIds.has(topOf(f.categoryId));
+    series.push({ categoryId: null, name: input.othersName, cells: cellsOf(pick), total: totalOf(pick) });
+  }
+  return series;
+}
+
+describe('getTrends: misma respuesta que la matriz anterior (TC-REPORTING-REPORTS-055)', () => {
+  const CATS = Array.from(
+    { length: 12 },
+    (_, i) => `0190a000-0000-7000-8000-00000000dd${String(i).padStart(2, '0')}`,
+  );
+  const CHILD = '0190a000-0000-7000-8000-00000000ddf1';
+  const money = (cents: number): string => {
+    const abs = Math.abs(cents);
+    return `${cents < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+  };
+
+  const scenarioArb = fc.record({
+    months: fc.constantFrom(6, 12, 24),
+    perDay: fc.boolean(),
+    portions: fc.array(
+      fc.record({
+        offsetDays: fc.integer({ min: 0, max: 24 * 31 }),
+        category: fc.integer({ min: 0, max: 12 }),
+        currency: fc.constantFrom('BOB', 'BOB', 'USD', 'USD', 'EUR'),
+        cents: fc.integer({ min: -2_000, max: 90_000 }),
+      }),
+      { minLength: 0, maxLength: 150, size: 'max' },
+    ),
+    // Tasas USD/BOB y EUR/BOB: algunas presentes (con su día) y otras ausentes.
+    rates: fc.array(
+      fc.record({
+        offsetDays: fc.integer({ min: 0, max: 24 * 31 }),
+        usd: fc.boolean(),
+        value: fc.integer({ min: 600, max: 1_300 }),
+      }),
+      { maxLength: 400, size: 'max' },
+    ),
+  });
+
+  const dayAt = (offsetDays: number): string =>
+    new Date(Date.UTC(2024, 10, 1) + offsetDays * 86_400_000).toISOString().slice(0, 10);
+
+  it('[TC-REPORTING-REPORTS-055] el DTO completo (series, celdas, totales y meta.conversion.ratesUsed en orden) es idéntico al de la matriz anterior', async () => {
+    let withOthers = 0;
+    let withRates = 0;
+    await fc.assert(
+      fc.asyncProperty(scenarioArb, async (s) => {
+        seq = 0;
+        mem = new InMemoryFinancialReports();
+        world();
+        mem.tree = {
+          ...mem.tree,
+          categories: [
+            ...CATS.map((id, i) => ({
+              categoryId: id,
+              name: `Cat ${i % 10}`,
+              kind: 'EXPENSE' as const,
+              groupId: GROUP,
+              parentId: null,
+              systemCode: null,
+              archived: false,
+            })),
+            {
+              categoryId: CHILD,
+              name: 'Hija',
+              kind: 'EXPENSE' as const,
+              groupId: GROUP,
+              parentId: CATS[3] as string,
+              systemCode: null,
+              archived: false,
+            },
+          ],
+        };
+        for (const p of s.portions) {
+          const id = p.category === 12 ? CHILD : (CATS[p.category] as string);
+          portion(dayAt(p.offsetDays), id, { amount: money(p.cents), currency: p.currency });
+        }
+        for (const r of s.rates) {
+          mem.rates.push({
+            base: r.usd ? 'USD' : 'EUR',
+            quote: 'BOB',
+            value: money(r.value),
+            asOf: `${dayAt(r.offsetDays)}T16:00:00Z`,
+          });
+        }
+        // Últimos `months` meses calendario de un horizonte de 24 que termina en 2026-10.
+        const params = {
+          ...base,
+          from: new Date(Date.UTC(2024, 10 + (24 - s.months), 1)).toISOString().slice(0, 10),
+          to: '2026-10-31',
+          grouping: 'CALENDAR_MONTH' as const,
+          ...(s.perDay ? { normalize: 'PER_DAY' as const } : {}),
+        };
+        const actual = await new FinancialReportsService(mem.financialDeps()).getTrends(params);
+        const spy = vi.spyOn(TrendMatrix, 'build').mockImplementation(oracleTrendBuild);
+        let expected;
+        try {
+          expected = await new FinancialReportsService(mem.financialDeps()).getTrends(params);
+        } finally {
+          spy.mockRestore();
+        }
+        expect(actual.report).toEqual(expected.report);
+        if (actual.report.series.some((x) => x.categoryId === null)) withOthers += 1;
+        if (actual.report.meta.conversion.ratesUsed.length > 0) withRates += 1;
+      }),
+      { numRuns: 60, seed: 20_261_125, endOnFailure: false },
+    );
+    // El generador no es vacuo: hay «Otras categorías» y tasas usadas.
+    expect(withOthers).toBeGreaterThan(5);
+    expect(withRates).toBeGreaterThan(5);
+  }, 300_000);
 });
 
 describe('getFees (TC-REPORTING-REPORTS-042)', () => {

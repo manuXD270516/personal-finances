@@ -12,9 +12,10 @@ invariants: ["INV-020", "INV-032"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-resolver.equivalence.test.ts
+status: automated
 regression_suite: true
 phase: 7
 tags: ["fx", "valuation", "pbt", "equivalence", "perf", "fix-trends-report-perf"]

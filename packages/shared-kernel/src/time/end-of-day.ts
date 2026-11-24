@@ -5,10 +5,17 @@ import { LocalDate } from './local-date.js';
 /**
  * Offset (ms) de la zona IANA en un instante: (hora local como si fuera UTC) - instante. Sin librerías: `Intl`.
  */
-function offsetMs(epochMs: number, timeZone: string): number {
-  let parts: Intl.DateTimeFormatPart[];
-  try {
-    parts = new Intl.DateTimeFormat('en-US', {
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Formateador de la zona, construido una sola vez por zona: crear un `Intl.DateTimeFormat` cuesta ~0,05 ms y la
+ * valoración de reportes pide el cierre de ~2 000 días por petición (fix-trends-report-perf). Una zona inválida lanza
+ * al construirse y no se guarda.
+ */
+function formatterOf(timeZone: string): Intl.DateTimeFormat {
+  let formatter = formatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
       timeZone,
       hourCycle: 'h23',
       year: 'numeric',
@@ -17,7 +24,17 @@ function offsetMs(epochMs: number, timeZone: string): number {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-    }).formatToParts(new Date(epochMs));
+    });
+    if (formatters.size >= 64) formatters.clear(); // zonas IANA hay pocas; el tope evita crecer sin límite
+    formatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
+function offsetMs(epochMs: number, timeZone: string): number {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = formatterOf(timeZone).formatToParts(new Date(epochMs));
   } catch (cause) {
     throw new DomainError('INVALID_TIMEZONE', `invalid IANA time zone '${timeZone}'`, { cause });
   }
