@@ -217,6 +217,15 @@ Dependencias que fijan el orden: el núcleo de reportes fija contratos y esquema
 
 Dependencias que fijan el orden: el 64 crea el contexto, el servicio, las corridas y la capability; el 65 agrega los modelos y la descomposición sobre ese camino; el 66 usa la serie por moneda y la proyección de compromisos del 65 y es el primero en que REPORTING lee FORECAST; el 67 necesita las corridas conservadas por periodo y conviene implementarlo con al menos 3 periodos de pronóstico real (pregunta 2). Se archivan en el mismo orden (todos agregan requirements a `forecast/expense-forecasting`). Las anomalías (FR-FORECAST-010) quedan propuestas para Phase 9 (pregunta 33).
 
+**Despliegue N1, fase 0 (redactado el 2026-11-24).** Changes de los cambios de código del despliegue que cambian comportamiento ([cambios-de-codigo.md](despliegue/cambios-de-codigo.md)); preguntas al owner en [73-despliegue-n1-specs-questions.md](73-despliegue-n1-specs-questions.md) (3, ninguna bloquea el orden).
+
+| Orden | Change | Capabilities | Fase |
+|---|---|---|---|
+| 68 | `add-web-content-security-policy` | `security/access-control` (CSP con nonce por petición en `proxy.ts`, orígenes permitidos con el hostname de archivos, anti-clickjacking en todas las respuestas, estilos bajo la CSP, cabeceras complementarias en Caddy) — C13 | 9 |
+| 69 | `add-host-restore-drill` | `platform/delivery-pipeline` (drill de restore mensual con aviso por heartbeat y su aislamiento, RPO y RTO del drill, verificación semanal de los repositorios, drill trimestral fuera del host, limpieza de imágenes, alerta de disco, clave privada de las conexiones solo en el worker) — C5, C6 y C10 | 9 |
+
+Los dos van antes de los datos reales (fase 8 del runbook) y son independientes entre sí. El 69 depende de C3 (D455) solo en que la clave de B2 de solo lectura lea también el bucket de los mensuales.
+
 
 Dependencias que fijan el orden: el throughput va primero porque cambia el perfil de eventos de los imports; la escritura por lote antes del pipeline (NFR-PERF-007); los documentos antes de la etapa de subida del pipeline (sus parsers pueden avanzar con fixtures); el motor de reglas (55, `add-rule-engine`: contexto `@pf/rules` sin consumidores de eventos nuevos) expone `RuleEvaluationQuery` a la etapa de clasificación y puede implementarse antes o en paralelo del pipeline, pero la medición del 70 % de Phase 6 requiere ambos (D334); los proveedores bancarios entran por la normalización del pipeline. El parser de PDF (57, D324) entra por la etapa de lectura del pipeline: requiere aplicados `add-document-attachments` y `add-import-pipeline` y se archiva después de este (su delta modifica un requirement que agrega el 54).
 
