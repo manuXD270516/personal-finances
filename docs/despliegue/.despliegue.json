@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "actualizado": "2026-11-24",
+  "estado": "decidido-sin-desplegar",
+  "modo": "ratificar",
+  "parametros": {
+    "profundidad": "rapida",
+    "presupuestoUsdMes": 20,
+    "tarjeta": "si",
+    "audiencia": "personal",
+    "datos": "sensibles",
+    "ramas": "trunk",
+    "salida": "docs/despliegue"
+  },
+  "decision": {
+    "plataforma": "lightsail-n1",
+    "planB": "oracle-a1",
+    "fecha": "2026-11-24",
+    "regla": "mayoria-de-primeros",
+    "consenso": { "primeros": 3, "jueces": 3 },
+    "arbitro": null,
+    "documento": "docs/despliegue/DECISION-DESPLIEGUE.md"
+  },
+  "condiciones": [
+    {
+      "id": "C1",
+      "texto": "Quinto digest (finance-ml) en el comando forzado del cloud-init; la parte de deploy.yml ya está hecha (#234)",
+      "origen": "B1",
+      "fase": 0,
+      "cerrada": false
+    },
+    { "id": "C2", "texto": "Puerto 22 en ufw con límite de tasa", "origen": "B9", "fase": 0, "cerrada": false },
+    {
+      "id": "C3",
+      "texto": "Retención de los respaldos mensuales protegida frente a un host comprometido",
+      "origen": "B2",
+      "fase": 0,
+      "cerrada": false
+    },
+    {
+      "id": "C4",
+      "texto": "Prefijo de respaldo del PoC cargado antes del primer deploy y quitado en la limpieza",
+      "origen": "runbook, fases 4 y 7 (stanza del PoC)",
+      "fase": 4,
+      "cerrada": false
+    },
+    {
+      "id": "C5",
+      "texto": "Drill de restore programado que avise si falla",
+      "origen": "B4",
+      "fase": 0,
+      "cerrada": false
+    },
+    {
+      "id": "C6",
+      "texto": "Limpieza de imágenes y alerta de disco",
+      "origen": "B7",
+      "fase": 0,
+      "cerrada": false
+    },
+    {
+      "id": "C7",
+      "texto": "Keycloak con build optimizado o techo mayor",
+      "origen": "B6",
+      "fase": 0,
+      "cerrada": false
+    },
+    {
+      "id": "C8",
+      "texto": "pgBackRest dentro del techo de PostgreSQL (condicional a la medición del PoC)",
+      "origen": "B8",
+      "fase": 7,
+      "cerrada": false
+    },
+    { "id": "C9", "texto": "Hora del snapshot de Lightsail fuera de la ventana de respaldos", "origen": "B11", "fase": 0, "cerrada": false },
+    {
+      "id": "C10",
+      "texto": "Volumen 0400 de la clave privada de conexiones en el worker",
+      "origen": "B10",
+      "fase": 0,
+      "cerrada": false
+    },
+    {
+      "id": "C11",
+      "texto": "Documentación desactualizada (runbook vigente, docs/30, ADR-0033 y ADR-0027)",
+      "origen": "B11 y B12",
+      "fase": 0,
+      "cerrada": false
+    },
+    {
+      "id": "C12a",
+      "texto": "Plan B: imágenes multi-arch en main.yml y pr.yml con verify-by-digest sobre el índice",
+      "origen": "ratificación 2026-11-24 (salida del PoC por CPU)",
+      "fase": 1,
+      "cerrada": false
+    },
+    {
+      "id": "C12b",
+      "texto": "Plan B: digests de índice multi-arch de terceros, RCLONE_IMAGE y pgbackrest arm64",
+      "origen": "ratificación 2026-11-24 (salida del PoC por CPU)",
+      "fase": 1,
+      "cerrada": false
+    },
+    {
+      "id": "C12c",
+      "texto": "Plan B: módulo infra/modules/oci-host, cloud-init para OCI y addendum a ADR-0027",
+      "origen": "ratificación 2026-11-24 (salida del PoC por CPU)",
+      "fase": 1,
+      "cerrada": false
+    },
+    {
+      "id": "C13",
+      "texto": "Content-Security-Policy de la web",
+      "origen": "B14",
+      "fase": 0,
+      "cerrada": false
+    },
+    {
+      "id": "C14",
+      "texto": "Regla de corte de CPU en el PoC y alarma de BurstCapacityPercentage < 30 % probada",
+      "origen": "B15",
+      "fase": 7,
+      "cerrada": false
+    },
+    {
+      "id": "B13",
+      "texto": "Primera factura de AWS ≤ USD 20 con impuestos y recargo de la tarjeta; anotar aquí el monto real",
+      "origen": "B13",
+      "fase": 9,
+      "cerrada": false
+    },
+    {
+      "id": "B16",
+      "texto": "Cobro de clase D de B2 confirmado con la primera factura; anotar aquí el monto real",
+      "origen": "B16",
+      "fase": 9,
+      "cerrada": false
+    }
+  ],
+  "runbook": {
+    "documento": "docs/despliegue/RUNBOOK-DESPLIEGUE.md",
+    "fases": [
+      { "n": 0, "nombre": "Cerrar las brechas de código", "quien": "Claude", "terminada": false, "fecha": null },
+      { "n": 1, "nombre": "Decisiones del owner (docs/71)", "quien": "Vos", "terminada": false, "fecha": null },
+      { "n": 2, "nombre": "Cuentas", "quien": "Vos", "terminada": false, "fecha": null },
+      { "n": 3, "nombre": "Infraestructura", "quien": "Vos", "terminada": false, "fecha": null },
+      { "n": 4, "nombre": "Secretos y custodia", "quien": "Vos", "terminada": false, "fecha": null },
+      { "n": 5, "nombre": "Tailscale y GitHub", "quien": "Vos", "terminada": false, "fecha": null },
+      { "n": 6, "nombre": "Primer deploy y verificación sin login", "quien": "Claude y Vos", "terminada": false, "fecha": null },
+      { "n": 7, "nombre": "PoC de 48 h con datos ficticios", "quien": "Vos y Claude", "terminada": false, "fecha": null },
+      { "n": 8, "nombre": "Migrar los datos reales", "quien": "Vos", "terminada": false, "fecha": null },
+      { "n": 9, "nombre": "Dispositivos y uso final", "quien": "Vos", "terminada": false, "fecha": null }
+    ]
+  },
+  "reabrirSi": [
+    "El PoC corta por memoria y el owner no amplía el presupuesto para N2 (pasa al plan B)",
+    "El PoC corta por CPU (C14): N2 no lo resuelve (pasa al plan B)",
+    "Dos drills de restore fallidos seguidos, o pgBackRest no funciona con Object Lock en B2 (pasa a N3)",
+    "La primera factura real supera los USD 20",
+    "AWS cambia el precio de Lightsail en São Paulo, o Backblaze cambia Object Lock",
+    "Varios usuarios reales, HA o un RTO menor a 1 h (pasa a N4)",
+    "Encender ML con memoria del host > 85 %"
+  ]
+}
