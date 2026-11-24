@@ -1,0 +1,12 @@
+# PFOS — `pgbackrest verify` semanal de repo1 y repo2 (miércoles 11:00 UTC = 07:00 La Paz). Instalado y habilitado por deploy/host/pfos-deploy.sh.
+[Unit]
+Description=PFOS verificación semanal de los repositorios de respaldo (repo1 y repo2)
+
+[Timer]
+OnCalendar=Wed *-*-* 11:00:00 UTC
+Unit=pfos-backup@verify.service
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

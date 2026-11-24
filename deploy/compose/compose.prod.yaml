@@ -198,6 +198,11 @@ services:
     build: !reset null
     pull_policy: missing
     read_only: true # la credencial del servicio de pronósticos es un `file` del host (en desarrollo es `content`)
+    # Clave PRIVADA de las conexiones (D342, C10): solo el worker la monta, de solo lectura, 0400 del uid 1000 (pfos-deploy.sh la crea
+    # vacía si falta). `finance-api` solo lleva la clave pública. Con la variable CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE de pfos.env.
+    configs:
+      - source: connection-credentials-keys
+        target: /run/pfos/connection-credentials.keys
     environment:
       <<: *prod-app-env
       # Sin proveedor de email elegido (docs/33 D87, add-alerts): solo notificaciones in-app. Sin mailpit en producción.
@@ -248,3 +253,7 @@ volumes:
 configs:
   ml-service-token: !override
     file: /etc/pfos/ml-service-token
+  # Clave privada de las conexiones con exchanges: archivo del host, solo en `finance-worker` (arriba). Un `file` es un bind mount de
+  # solo lectura que conserva dueño y permisos del host; `pfos-deploy.sh` lo crea vacío (1000:1000, 0400) si falta.
+  connection-credentials-keys:
+    file: /etc/pfos/connection-credentials.keys

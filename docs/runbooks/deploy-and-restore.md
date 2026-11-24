@@ -13,7 +13,7 @@
 | Runtime | [`deploy/compose/compose.prod.yaml`](../../deploy/compose/compose.prod.yaml) sobre `compose.yaml` | Mismas imágenes por digest y mismo contrato de configuración que el modo B local; Caddy (TLS) único con puertos públicos |
 | Secretos | `/etc/pfos/pfos.env`, `/etc/pfos/pgbackrest.env` (root, 0600) | Plantillas sin secretos en [`deploy/host/etc-pfos/`](../../deploy/host/etc-pfos) |
 | Deploy | [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) → [`deploy/host/pfos-deploy.sh`](../../deploy/host/pfos-deploy.sh) | `workflow_dispatch` + environment `production` (aprobación) → SSH por Tailscale → pull por digest, backup pre-migración, `up --wait`, smoke, rollback automático si falla |
-| Backups | [`deploy/host/pfos-backup.sh`](../../deploy/host/pfos-backup.sh) + timers [`deploy/host/systemd/`](../../deploy/host/systemd) | pgBackRest ([`deploy/pgbackrest/pgbackrest.conf`](../../deploy/pgbackrest/pgbackrest.conf)) → B2: full semanal + diff diario + WAL continuo (PITR 14 d), full mensual (12), réplica nocturna de documentos, check horario |
+| Backups | [`deploy/host/pfos-backup.sh`](../../deploy/host/pfos-backup.sh) + timers [`deploy/host/systemd/`](../../deploy/host/systemd) | pgBackRest ([`deploy/pgbackrest/pgbackrest.conf`](../../deploy/pgbackrest/pgbackrest.conf)) → B2: full semanal + diff diario + WAL continuo (PITR 14 d), full mensual (12), réplica nocturna de documentos, check horario con alerta de disco al 80 %, **restore drill mensual** (`drill`, §6.1), `pgbackrest verify` semanal (`verify`) y limpieza semanal de imágenes (`image-prune`) |
 
 Presupuesto de memoria (2 GB + 2 GiB swap; techos en `compose.prod.yaml`): Keycloak ≈ 550 MiB (techo 704m), PostgreSQL 150–250 (384m), api 160–340 (320m), worker ≈ 200 (448m: heap 192 + hilo aislado de lectura de PDF 192 mientras lee un extracto, ADR-0032), web 150–250 (288m), SeaweedFS 60–110 (192m), Caddy ≈ 30 (64m) → **≈ 1.4–1.7 GiB estables** (SPIKE-09 §3 y §17). Sin Grafana Alloy: la app exporta OTLP directo a Grafana Cloud.
 
@@ -71,13 +71,14 @@ sudo -i
 cd /etc/pfos
 cp /opt/pfos/repo/deploy/host/etc-pfos/pfos.env.example pfos.env
 cp /opt/pfos/repo/deploy/host/etc-pfos/pgbackrest.env.example pgbackrest.env
-chmod 600 pfos.env pgbackrest.env
+cp /opt/pfos/repo/deploy/host/etc-pfos/pgbackrest-restore.env.example pgbackrest-restore.env
+chmod 600 pfos.env pgbackrest.env pgbackrest-restore.env
 while grep -q '__generate__' pfos.env; do sed -i "0,/__generate__/s//$(openssl rand -hex 32)/" pfos.env; done
 openssl rand -base64 48   # dos veces: PGBACKREST_REPO1_CIPHER_PASS y PGBACKREST_REPO2_CIPHER_PASS
-editor pfos.env pgbackrest.env   # completar cada __set__ (dominios, email ACME, OTLP, B2: tofu output)
+editor pfos.env pgbackrest.env pgbackrest-restore.env   # completar cada __set__ (dominios, email ACME, OTLP, B2: tofu output; el restore.env lleva la clave de SOLO LECTURA b2_restore_key_*)
 ```
 
-Guardar una copia **cifrada** de ambos archivos (p. ej. `age -p`) en el gestor de contraseñas del owner: sin las passphrases de pgBackRest los backups son irrecuperables, y sin `pfos.env` hay que rotar todas las credenciales.
+Guardar una copia **cifrada** de `pfos.env` y `pgbackrest.env` (`pgbackrest-restore.env` se reconstruye con `tofu output` y las mismas passphrases) (p. ej. `age -p`) en el gestor de contraseñas del owner: sin las passphrases de pgBackRest los backups son irrecuperables, y sin `pfos.env` hay que rotar todas las credenciales.
 
 ### 2.4 Tailscale en el host
 
@@ -154,9 +155,29 @@ Validado localmente el 2026-10-05 con la imagen `pfos-postgres` y esta misma con
    Luego deploy normal (§3) y réplica de documentos inversa (`rclone sync dst:<bucket>/documents/pfos-prod-documents src:pfos-prod-documents`, mismo contenedor que `pfos-backup.sh docs-replica`).
 3. DNS: mismos registros A apuntando a la nueva IP estática.
 
-## 6. Restore drill mensual (primer lunes de cada mes)
+## 6. Restore drill: automático mensual en el host y manual trimestral fuera del host
 
-Objetivo docs/30 §8: integridad OK y **RTO observado < 1 h**, en una VM efímera aislada con clave B2 de **solo lectura**.
+Objetivo docs/30 §8: integridad OK y **RTO observado < 1 h** (NFR-REL-002), siempre con la clave B2 de **solo lectura** (D456).
+
+### 6.1 Drill automático del host (mensual, sin intervención)
+
+`pfos-restore-drill.timer` arranca `pfos-backup@drill.service` el **día 2 de cada mes a las 09:00 UTC** (05:00 La Paz; `pfos-backup.sh drill`). Restaura el último punto de repo1 con `/etc/pfos/pgbackrest-restore.env` (la clave de solo lectura; nunca `pgbackrest.env`) en un volumen (`pfos-drill-pg`) y una red (`pfos-drill`) temporales, arranca la copia **sin archivado de WAL, sin puertos y fuera de la red del stack** (256 MiB y 0,5 CPU) y verifica:
+
+1. INV-004: ningún par (asiento, moneda) con postings que no sumen cero.
+2. INV-005: ningún asiento con menos de dos postings.
+3. Pérdida de datos: el último posting de la copia no puede estar más de **15 min** (RPO, NFR-REL-001) detrás del de producción al empezar el drill.
+4. Duración: restore, recuperación y verificaciones en **menos de 60 min** (RTO, NFR-REL-002); si pasa, el drill falla aunque la copia sea íntegra (decisión del owner del 2026-11-24).
+5. Espacio previo: hace falta 1,25 × el tamaño de la base del último backup + 2 GiB libres en `/var/lib/docker`; si no, falla **sin restaurar**.
+
+Siempre limpia el contenedor, el volumen y la red (también tras un fallo; si la limpieza falla, el drill falla) y toma el lock del deploy (`/var/lib/pfos/deploy.lock`): un deploy que coincide falla con «operación del host en curso: drill». Deja una línea por drill en `/var/lib/pfos/drills.log` (`<utc> ok|fail <etiqueta> restore=<s> recovery=<s> total=<s> size=<bytes> gap=<s> pgbackrest=<versión>` y, si falla, `reason=<motivo>`; sin datos financieros) y avisa al heartbeat `pfos-drill` (`/fail` ante cualquier error) con esa línea como cuerpo.
+
+- Ver el último: `tail -n 3 /var/lib/pfos/drills.log` y `journalctl -u 'pfos-backup@drill' --since '-35 days'`.
+- Dispararlo a mano: `sudo systemctl start pfos-backup@drill.service`.
+- **No cubre un host comprometido** ni la pérdida de la cuenta de AWS: usa el mismo host y su Docker. Eso lo cubre el drill manual trimestral de 6.2.
+
+### 6.2 Drill manual fuera del host (trimestral: primer mes de cada trimestre)
+
+Mismo objetivo, en una VM efímera aislada con la clave de solo lectura. Además de ejercitar otra máquina, es el único que prueba el PITR dirigido y puede restaurar repo2; el drill del host usa siempre el último punto de repo1.
 
 1. `tofu apply -var-file=prod.tfvars -var drill_enabled=true` → VM `pfos-drill-host` (≈ USD 0.02/h). Anotar hora de inicio.
 2. Consola web de Lightsail en la VM de drill: `sudo -i`, crear `/etc/pfos/pgbackrest.env` con `PGBACKREST_REPO{1,2}_S3_KEY{,_SECRET}` = `tofu output b2_restore_key_id` / `-raw b2_restore_key_secret` y las mismas passphrases.
@@ -174,19 +195,26 @@ Objetivo docs/30 §8: integridad OK y **RTO observado < 1 h**, en una VM efímer
 4. Verificar (falla si alguna consulta devuelve > 0):
    ```bash
    docker exec drill-pg psql -U postgres -d pfos -Atc "SELECT count(*) FROM (SELECT journal_entry_id, currency FROM ledger.posting GROUP BY 1, 2 HAVING sum(amount) <> 0) x"
-   docker exec drill-pg psql -U postgres -d pfos -Atc "SELECT count(*) FROM ledger.journal_entry j WHERE NOT EXISTS (SELECT 1 FROM ledger.posting p WHERE p.journal_entry_id = j.id)"
+   docker exec drill-pg psql -U postgres -d pfos -Atc "SELECT count(*) FROM (SELECT j.id FROM ledger.journal_entry j LEFT JOIN ledger.posting p ON p.journal_entry_id = j.id GROUP BY j.id HAVING count(p.id) < 2) x"
    docker exec drill-pg psql -U postgres -d pfos -Atc "SELECT max(created_at) FROM ledger.posting"   # ≈ ahora − RPO
    ```
-5. Registrar en el issue mensual: hora de inicio/fin (RTO observado), tamaño restaurado, resultado de las consultas, versión de pgBackRest.
+5. Registrar en el issue trimestral: hora de inicio y fin (**RTO observado**), tamaño restaurado, resultado de las consultas de integridad y versión de pgBackRest.
 6. `tofu apply -var-file=prod.tfvars -var drill_enabled=false` (destruye la VM y su volumen con los datos restaurados).
 
-Dos drills fallidos seguidos → escalar a N3 (PostgreSQL gestionado) según ADR-0027.
+Dos drills fallidos seguidos (del host o fuera de él) → escalar a N3 (PostgreSQL gestionado) según ADR-0027.
 
 ## 7. Operación diaria
 
 | Qué | Cómo |
 |---|---|
 | Estado de backups | `systemctl list-timers 'pfos-*'`, `journalctl -u 'pfos-backup@*' --since today`; heartbeat (si se configuró) |
+| Estado del drill | `tail -n 3 /var/lib/pfos/drills.log`, `journalctl -u 'pfos-backup@drill' --since '-35 days'`; heartbeat `pfos-drill` (periodo de 31 días) |
+| `/fail` del drill | Leer el `reason=` de la línea de `drills.log`. `restore`, `recuperacion(...)`: B2, la clave de solo lectura o `pgbackrest-restore.env` (¿falta el prefijo del PoC?). `integridad(...)`: la copia tiene asientos descuadrados o incompletos, **es grave**: no tocar producción, restaurar en la VM de 6.2 y comparar. `rpo(...)`: archivado de WAL atrasado (ver el check horario). `duracion(...)`: RTO mayor de 60 min; medir en 6.2 y evaluar el plan (§1). `espacio(...)`: liberar disco (imágenes, abajo). `limpieza`: borrar a mano el contenedor y el volumen `pfos-drill-pg` y la red `pfos-drill`. Dos seguidos → escalar a N3 |
+| `/fail` de `pfos-verify` | El log nombra el repositorio (`journalctl -u 'pfos-backup@verify'`). Un archivo inválido en repo2 no se repara con la clave del host (Object Lock): hacer un full mensual nuevo (`systemctl start pfos-backup@monthly`) y revisar B2 |
+| `/fail` de `pfos-image-prune` | `journalctl -u pfos-image-prune`; si no tomó el lock en 60 min hay un deploy o un drill colgado (`cat /var/lib/pfos/deploy.lock`) |
+| Disco por encima del 80 % | El check horario nombra el punto de montaje y el porcentaje. `docker system df`, `systemctl start pfos-image-prune.service`, `du -sh /var/lib/docker/volumes/*`; con la cola de WAL llena, ver la fila siguiente |
+| Deploy rechazado con «operación del host en curso» | `cat /var/lib/pfos/deploy.lock` dice si es `drill`, `verify` o `image-prune`; esperar a que termine y reintentar |
+| Apagar el drill, la verificación o la limpieza (un rollback del release no los deshabilita) | `sudo systemctl disable --now pfos-restore-drill.timer pfos-backup-verify.timer pfos-image-prune.timer` |
 | WAL atrasado | `pfos-backup@check` falla → heartbeat `/fail`. Causa típica: credenciales B2 o red. Con la cola de 2 GiB llena pgBackRest descarta WAL para no llenar el disco: hacer un full inmediatamente después de corregir |
 | Parches del SO | automáticos (`unattended-upgrades`, reinicio 04:30 La Paz); Docker reinicia los contenedores (`restart: unless-stopped`) |
 | Imágenes de terceros | fijadas por digest en `compose.yaml`/`compose.prod.yaml`; se actualizan por PR (Renovate) y llegan con el siguiente deploy |

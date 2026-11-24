@@ -24,9 +24,9 @@
 | Comando forzado del host | Escrito; **rechaza el 5.º digest** | `infra/modules/lightsail-host/cloud-init.yaml.tftpl:48-50` |
 | Workflow de deploy (`workflow_dispatch`, environment `production`, Tailscale OIDC) | Escrito; **envía el 5.º digest** con `PFOS_ML_ENABLED=true`: el job `resolve` declara `outputs.ml` desde #234 | `.github/workflows/deploy.yml:43-49` |
 | Timers de respaldo (full semanal, diff diario, mensual, check horario, réplica de documentos) con heartbeat opcional | Escritos | `deploy/host/systemd/`, `deploy/host/pfos-backup.sh` |
-| Drill de restore programado | **No existe.** Solo el procedimiento manual de §6 | — |
-| Limpieza de imágenes | **No existe** (sin `prune` en `deploy/` ni `infra/`) | — |
-| Volumen de la clave privada de conexiones en el worker | **No existe** (pendiente en docs/38) | — |
+| Drill de restore mensual con aviso por heartbeat y verificación semanal de repo1 y repo2 (C5) | Escrito en el change `add-host-restore-drill`; nunca ejecutado en un host | `deploy/host/pfos-backup.sh` (`drill`, `verify`), `pfos-restore-drill.timer`, `pfos-backup-verify.timer` |
+| Limpieza semanal de imágenes y alerta de disco al 80 % (C6) | Escrita en el mismo change; nunca ejecutada en un host | `pfos-backup.sh` (`image-prune`, `check`), `pfos-image-prune.timer` |
+| Clave privada de conexiones montada solo en el worker (C10) | Escrita en el mismo change | `deploy/compose/compose.prod.yaml`, `pfos-deploy.sh` (`ensure_connection_keys_file`) |
 | Plantillas de secretos (solo nombres) | Escritas | `deploy/host/etc-pfos/*.env.example` |
 | Imágenes multi-arch para el plan B | **No.** `platforms: linux/amd64` | `.github/workflows/main.yml:64` |
 | Tags, changelog y releases | No se usan (0 etiquetas). El registro de versiones es `releases.log` del host y el historial del environment `production` | — |
@@ -258,6 +258,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 
 1. Seguí §2.3 en la consola web de Lightsail.
    - **Prefijo del PoC (C4), antes del primer deploy:** agregá al final de `/etc/pfos/pgbackrest.env` `PGBACKREST_REPO1_PATH=/pgbackrest/poc/pitr` y `PGBACKREST_REPO2_PATH=/pgbackrest/poc/monthly`. Tiene que estar antes de la fase 6: el primer deploy crea la stanza y el primer full, y si caen en el prefijo de producción, la stanza queda atada al cluster ficticio (otro `system-id`) y `stanza-create` falla después de borrar los datos del PoC, con esos objetos bloqueados (21 días en repo1; 395 en repo2, el bucket de mensuales). `pgbackrest.env` también lleva `PGBACKREST_REPO2_S3_BUCKET` = `b2_monthly_bucket_name`, distinto de `b2_bucket_name`. pgBackRest da precedencia a las variables `PGBACKREST_*` sobre `pgbackrest.conf` (la línea de comandos manda sobre el entorno y este sobre el archivo).
+   - **Clave de solo lectura para el drill y la verificación (C5):** creá `/etc/pfos/pgbackrest-restore.env` (root, `0600`) desde [`pgbackrest-restore.env.example`](../../deploy/host/etc-pfos/pgbackrest-restore.env.example) con `tofu output b2_restore_key_id` y `tofu output -raw b2_restore_key_secret` en las claves de repo1 y repo2, y los mismos bucket, endpoint, región y passphrases que `pgbackrest.env`. En el PoC agregale al final las mismas dos líneas `PGBACKREST_REPO{1,2}_PATH` del prefijo. Esa clave tiene que leer **los dos buckets** (D455): si la creaste antes del bucket de mensuales, `tofu apply` la actualiza. Sin este archivo, el primer drill y la primera verificación fallan avisando el motivo.
 2. Generá el par X25519 y el token de ML según [conectar-un-exchange-y-revocar-una-clave.md](../runbooks/conectar-un-exchange-y-revocar-una-clave.md) y la nota as-built del final del runbook vigente, aunque todavía no los uses.
 3. **Custodia (B5):** cifrá `pfos.env`, `pgbackrest.env` y el archivo de la clave privada X25519 con `age -p` y guardalos en tu gestor de contraseñas, **fuera del host y fuera de AWS**. Los archivos en claro nunca salen del host:
    - En el host (`sudo -i`), instalá `age` y cifrá en una carpeta que `ubuntu` pueda leer. `age -p` pide la passphrase por la terminal; usá una del gestor, distinta de las de pgBackRest:
@@ -292,8 +293,18 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 5. Comprobá que no quede ningún marcador sin completar:
 
    ```bash
-   grep -cE '__set__|__generate__' /etc/pfos/pfos.env /etc/pfos/pgbackrest.env
+   grep -cE '__set__|__generate__' /etc/pfos/pfos.env /etc/pfos/pgbackrest.env /etc/pfos/pgbackrest-restore.env
    ```
+
+6. **Checks del heartbeat (healthchecks.io), uno por trabajo nuevo.** Si no existen, un drill que no corre no avisa. El nombre es el slug de la URL (`<PF_BACKUP_HEARTBEAT_URL>/<slug>`) y el periodo y la gracia dejan pasar un solo atraso:
+
+   | Slug | Periodo | Gracia | Avisa |
+   |---|---|---|---|
+   | `pfos-drill` | 31 días | 1 día | Restore mensual (día 2, 09:00 UTC); el cuerpo trae la línea de `drills.log` |
+   | `pfos-verify` | 7 días | 1 día | `pgbackrest verify` de repo1 y repo2 (miércoles 11:00 UTC) |
+   | `pfos-image-prune` | 7 días | 1 día | Limpieza de imágenes (sábado 11:00 UTC) |
+
+   Los de respaldo (`pfos-full`, `pfos-diff`, `pfos-monthly`, `pfos-docs-replica` y `pfos-check`) ya existen desde antes.
 
 **Terminada cuando** (comandos en el host, como root):
 
@@ -304,7 +315,9 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
   ```
 
 - `grep -c '^PGBACKREST_REPO[12]_PATH=/pgbackrest/poc/' /etc/pfos/pgbackrest.env` da `2`;
-- el paso 5 da `0` en ambos archivos;
+- `stat -c '%a' /etc/pfos/pgbackrest-restore.env` da `600`;
+- el paso 5 da `0` en los tres archivos;
+- los tres checks del paso 6 existen en healthchecks.io;
 - y el paso 3 imprimió `0` para cada `.age`, que ya están en el gestor.
 
 ## Fase 5: Tailscale y GitHub (Vos)
@@ -409,7 +422,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
    ```
 
    El `rm` debe fallar por el lock. La sintaxis es la del CLI `b2` 4.x; si tenés otra versión, confirmala con `b2 rm --help`.
-5. **Restore PITR real desde B2 (B4):** anotá la hora T0, creá una transacción ficticia, esperá 6 minutos (más que `archive_timeout`), anotá T1 y creá otra. Seguí §6 en la VM de drill con la clave de solo lectura, sumando a su `pgbackrest.env` las dos líneas `PGBACKREST_REPO{1,2}_PATH` del PoC y restaurando con `--type=time --target='<T entre T0 y T1>' --target-action=promote`. Debe aparecer la primera y no la segunda, y las consultas de integridad de §6.4 deben dar 0. Medí el tiempo total.
+5. **Restore PITR real desde B2 (B4) y primer drill automático (C5):** primero dispará el drill del host y anotá su resultado: `systemctl start pfos-backup@drill.service` (la unidad es `oneshot`: bloquea hasta terminar), `tail -n 1 /var/lib/pfos/drills.log` (debe decir `ok` con `restore=`, `recovery=` y `total=`) y, mientras corre, `docker stats --no-stream` en otra terminal para anotar la **memoria pico** (techo de 256 MiB del drill: si no entra, subilo en `pfos-backup.sh` y anotalo). Después `systemctl start pfos-backup@verify.service` (verifica repo1 y repo2) y comprobá que con la clave de solo lectura un `PUT` falla con acceso denegado (contenedor efímero de rclone con las variables de `pgbackrest-restore.env`; TC-PLATFORM-DRILL-004). Luego el restore PITR dirigido: anotá la hora T0, creá una transacción ficticia, esperá 6 minutos (más que `archive_timeout`), anotá T1 y creá otra. Seguí §6 en la VM de drill con la clave de solo lectura, sumando a su `pgbackrest.env` las dos líneas `PGBACKREST_REPO{1,2}_PATH` del PoC y restaurando con `--type=time --target='<T entre T0 y T1>' --target-action=promote`. Debe aparecer la primera y no la segunda, y las consultas de integridad de §6.4 deben dar 0. Medí el tiempo total.
 6. **Otra cuenta no entra:** creá en el realm un segundo usuario ficticio y comprobá en el navegador que no ve el workspace del primero y que la API le responde `403` o `404`.
 7. **Memoria de PostgreSQL durante el full (B8):** `docker stats --no-stream postgres` mientras corre el paso 4 con carga.
 8. **Limpieza de imágenes y alerta de disco (B7):** `systemctl start pfos-image-prune.service` y `df -h /`.
@@ -483,10 +496,13 @@ Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock (21 
 | Full mensual (repo2) | Día 1, 07:00 UTC | 12 meses | Bucket aparte con Object Lock de 395 días: el host puede ocultar versiones (`expire`), no destruirlas hasta que venza el lock |
 | Réplica de documentos | 07:30 UTC | Bucket de documentos cifrados | Hasta 24 h de documentos sin réplica |
 | Snapshot de Lightsail | Diario, 7 retenidos | Host completo | Vive en AWS, igual que los datos. Pierde hasta 24 h |
-| Check horario | Cada hora | Archivado y antigüedad del último backup | Avisa solo si configuraste el heartbeat |
+| Check horario | Cada hora | Archivado, antigüedad del último backup y disco por encima del 80 % (`/`, `/var/lib/docker`, `/var/lib/pfos`); evalúa todo y lista las causas | Avisa solo si configuraste el heartbeat |
+| Drill de restore (C5) | Día 2 de cada mes, 09:00 UTC (05:00 La Paz) | Restaura el último punto de repo1 con la clave de solo lectura en una base temporal sin archivado, verifica INV-004 e INV-005, la pérdida frente al RPO de 15 min y que dure menos de 60 min; deja una línea en `/var/lib/pfos/drills.log` | Usa el mismo host (no cubre un host comprometido: lo cubre el drill trimestral de §6); suma ≈ 256 MiB de memoria una hora |
+| Verificación de repositorios (C5) | Miércoles 11:00 UTC | `pgbackrest verify` de repo1 y repo2 en un contenedor efímero | Lee todo el repositorio: centavos de descarga en B2 con menos de 10 GB |
+| Limpieza de imágenes (C6) | Sábado 11:00 UTC | Borra las imágenes sin contenedor salvo las del release actual y el anterior de `releases.log` y la de rclone | Sin `releases.log` solo borra las colgantes |
 | Copia cifrada de los secretos | Al crearlos y en cada rotación | Claves maestras | En tu gestor, fuera del host |
 
-B2 es el respaldo que no vive en la misma plataforma que los datos. Una vez por mes, el drill (C5) restaura y comprueba la integridad; cada trimestre, el drill fuera del host de §6. Un respaldo que nunca se probó no cuenta.
+B2 es el respaldo que no vive en la misma plataforma que los datos. Una vez por mes, el drill (C5) restaura y comprueba la integridad; cada trimestre, el drill fuera del host de §6 del [runbook de restauración](../runbooks/deploy-and-restore.md). Un respaldo que nunca se probó no cuenta.
 
 ## Límites del plan
 
@@ -496,7 +512,7 @@ Al superar un límite, Lightsail **no bloquea**: limita la CPU a la línea base,
 |---|---|---|---|
 | RAM | 2 GB más 2 GiB de swap | OOM de un contenedor | Mensual y tras cada change que agregue servicios |
 | CPU | 2 vCPU con base del 20 % por vCPU | Se limita a la base al agotar los créditos | Alarma de `BurstCapacityPercentage` |
-| Disco | 60 GB SSD | PostgreSQL y el archivado se detienen | Alerta de disco (C6), semanal |
+| Disco | 60 GB SSD | PostgreSQL y el archivado se detienen | Alerta de disco al 80 % en el check horario y limpieza semanal de imágenes (C6) |
 | Transferencia | 1,5 TB por mes en São Paulo | Cobra el excedente | Trimestral |
 | Conexiones a PostgreSQL | 64 de 67 útiles (`max_connections=70`) | Errores de conexión | Antes de agregar consumidores |
 | B2 | 10 GB gratis, después USD 6,95 por TB-mes | Cobra | Trimestral |
