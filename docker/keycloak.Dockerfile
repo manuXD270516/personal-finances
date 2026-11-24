@@ -4,8 +4,9 @@
 # `start` sobre la imagen oficial rehace el build de Quarkus en cada arranque (pico de CPU y memoria ≈ 900 MiB, con
 # riesgo de OOM bajo el techo de 704m). Aquí el build se hace UNA vez, al construir la imagen, con las opciones de
 # build-time fijas; en runtime solo se aplican las opciones de runtime (hostname, proxy, DB, secretos) que pone
-# compose.prod.yaml. Misma base que el stack local (deploy/compose/compose.yaml): versión y digest fijados.
-ARG KEYCLOAK_IMAGE=quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc
+# compose.prod.yaml. Base fijada por versión y digest (26.8.2: la 26.8.0 del compose de desarrollo trae OpenJDK y
+# ca-certificates con CRITICAL corregibles que bloquean el gate de Trivy; el compose de desarrollo se alinea por Renovate).
+ARG KEYCLOAK_IMAGE=quay.io/keycloak/keycloak:26.8.2@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3
 
 FROM ${KEYCLOAK_IMAGE} AS builder
 # Opciones de BUILD-TIME (no se pueden cambiar en runtime sin volver a construir): proveedor de base de datos,
@@ -22,7 +23,7 @@ ARG VERSION=0.0.0-local
 ARG BUILD_DATE=unknown
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
 LABEL org.opencontainers.image.title="pfos-keycloak" \
-      org.opencontainers.image.description="Keycloak 26.8 con build optimizado (postgres, health, cache local) para PFOS" \
+      org.opencontainers.image.description="Keycloak 26.8.2 con build optimizado (postgres, health, cache local) para PFOS" \
       org.opencontainers.image.revision="${GIT_SHA}" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
