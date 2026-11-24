@@ -6,7 +6,7 @@ Registra todo hecho económico del workspace como asientos de doble entrada mult
 ## Requirements
 
 ### Requirement: Asientos balanceados por moneda
-El sistema DEBE (MUST) aceptar un asiento solo si, para cada moneda presente en sus postings, la suma de los montos es exactamente cero, sin conversión implícita entre monedas; un asiento desbalanceado DEBE (MUST) rechazarse con `LEDGER_UNBALANCED_ENTRY` sin persistir ningún posting, tanto en el dominio como al confirmar la transacción de base de datos.
+El sistema DEBE (MUST) aceptar un asiento solo si, para cada moneda presente en sus postings, la suma de los montos es exactamente cero, sin conversión implícita entre monedas; un asiento desbalanceado DEBE (MUST) rechazarse con `LEDGER_UNBALANCED_ENTRY` sin persistir ningún posting, tanto en el dominio como al confirmar la transacción de base de datos, sea la escritura asiento a asiento o por conjunto; un asiento desbalanceado en una escritura por conjunto DEBE (MUST) revertir todas las filas de esa transacción.
 Trace: FR-LEDGER-001, NFR-DATA-004 · Priority: Must
 
 #### Scenario: Asiento entre monedas balanceado solo por valor
@@ -32,6 +32,11 @@ Trace: FR-LEDGER-001, NFR-DATA-004 · Priority: Must
 - **ENTONCES** la confirmación falla y no queda ninguna fila del asiento
 - **Y** un asiento con +50.00 BOB y -50.00 BOB insertado posting a posting en la misma transacción se confirma con éxito
 
+#### Scenario: Barrera de base de datos en una escritura por conjunto
+- **CUANDO** una escritura por conjunto con el rol de aplicación inserta en una transacción 200 asientos de +18.00 BOB y -18.00 BOB, salvo el asiento 137, que lleva +18.00 BOB y -17.00 BOB, y confirma la transacción
+- **ENTONCES** la confirmación falla con `LEDGER_UNBALANCED_ENTRY`
+- **Y** no queda ninguna fila de los 200 asientos ni de sus postings
+
 ### Requirement: Asiento con al menos dos postings distintos de cero
 El sistema DEBE (MUST) rechazar un asiento con menos de dos postings con `LEDGER_ENTRY_TOO_FEW_POSTINGS` y un asiento con algún posting de monto cero con `LEDGER_ZERO_AMOUNT_POSTING`.
 Trace: FR-LEDGER-001 · Priority: Must
@@ -39,6 +44,11 @@ Trace: FR-LEDGER-001 · Priority: Must
 #### Scenario: Asiento con un solo posting
 - **CUANDO** se registra un asiento con un único posting de +150.00 BOB en `EXPENSE:BOB`
 - **ENTONCES** se rechaza con `LEDGER_ENTRY_TOO_FEW_POSTINGS`
+
+#### Scenario: Barrera de base de datos para un asiento sin postings suficientes
+- **CUANDO** una escritura por conjunto con el rol de aplicación inserta en una transacción 3 asientos, dos con +18.00 BOB y -18.00 BOB y uno solo con +18.00 BOB, y confirma la transacción
+- **ENTONCES** la confirmación falla con `LEDGER_ENTRY_TOO_FEW_POSTINGS` y no queda ninguna fila de los 3 asientos
+- **Y** con las mismas filas, `SET CONSTRAINTS ALL IMMEDIATE` falla en ese momento con el mismo código antes de confirmar
 
 #### Scenario: Posting de monto cero
 - **CUANDO** se registra un asiento con +150.00 BOB en `EXPENSE:BOB`, -150.00 BOB en "Efectivo BOB" y 0.00 BOB en `EQUITY:ADJUSTMENTS:BOB`
