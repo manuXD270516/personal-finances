@@ -3,8 +3,10 @@
 # Lo ejecuta como root /usr/local/sbin/pfos-deploy (comando forzado SSH instalado por cloud-init), que ya validó los
 # argumentos y dejó /opt/pfos/repo en el commit de main que se despliega. Nunca recibe secretos: solo digests.
 #
-#   pfos-deploy.sh deploy <sha> <finance-api@sha256> <finance-web@sha256> <pfos-postgres@sha256> [<finance-ml@sha256>]
-#     (finance-ml es OPCIONAL: servicio de pronósticos del perfil `ml`; sin él el despliegue y el producto funcionan igual)
+#   pfos-deploy.sh deploy <sha> <finance-api@sha256> <finance-web@sha256> <pfos-postgres@sha256> [<extra>...]
+#     Extras OPCIONALES, identificados por el nombre de la imagen (en cualquier orden, sin repetir):
+#       <finance-ml@sha256>      servicio de pronósticos del perfil `ml`; sin él el producto funciona igual
+#       <pfos-keycloak@sha256>   Keycloak con build optimizado (docker/keycloak.Dockerfile); sin él se usa la imagen oficial
 #   pfos-deploy.sh rollback      # vuelve al release exitoso anterior (mismos digests de entonces)
 #   pfos-deploy.sh status
 set -euo pipefail
@@ -16,7 +18,7 @@ readonly ENV_FILE=/etc/pfos/pfos.env
 readonly PGBR_ENV_FILE=/etc/pfos/pgbackrest.env
 readonly STATE_DIR=/var/lib/pfos
 readonly RELEASE_ENV="${STATE_DIR}/release.env"
-# Una línea por release exitoso: <utc> <sha> <api-ref> <web-ref> <pg-ref> [<ml-ref>]
+# Una línea por release exitoso: <utc> <sha> <api-ref> <web-ref> <pg-ref> [<extra-ref>...] (los extras se reconocen por nombre)
 readonly RELEASES_LOG="${STATE_DIR}/releases.log"
 
 log() { printf '%s pfos-deploy: %s\n' "$(date -u +%FT%TZ)" "$*"; }
@@ -35,12 +37,34 @@ compose() {
     --env-file "${ENV_FILE}" --env-file "${release_env}" --profile core "$@"
 }
 
+# Reparte los extras opcionales por NOMBRE de imagen (no por posición): deja ML y KC en las variables del llamador.
+# Una referencia desconocida o repetida aborta, aunque el comando forzado del host ya filtra la lista cerrada.
+classify_extras() {
+  ML="" KC=""
+  local ref
+  for ref in "$@"; do
+    case "${ref}" in
+      ghcr.io/manuxd270516/finance-ml@sha256:*)
+        [ -z "${ML}" ] || die "finance-ml repetida"
+        ML="${ref}"
+        ;;
+      ghcr.io/manuxd270516/pfos-keycloak@sha256:*)
+        [ -z "${KC}" ] || die "pfos-keycloak repetida"
+        KC="${ref}"
+        ;;
+      *) die "imagen extra no reconocida: ${ref}" ;;
+    esac
+  done
+}
+
 write_release_env() {
-  local file="$1" sha="$2" api="$3" web="$4" pg="$5" ml="${6:-}"
+  local file="$1" sha="$2" api="$3" web="$4" pg="$5" ml="${6:-}" kc="${7:-}"
   printf 'PFOS_RELEASE_SHA=%s\nFINANCE_API_IMAGE=%s\nFINANCE_WEB_IMAGE=%s\nPFOS_POSTGRES_IMAGE=%s\n' \
     "${sha}" "${api}" "${web}" "${pg}" >"${file}"
   # Servicio de pronósticos (opcional, perfil `ml`): solo si el despliegue trae su digest.
   [ -z "${ml}" ] || printf 'FINANCE_ML_IMAGE=%s\n' "${ml}" >>"${file}"
+  # Keycloak con build optimizado (opcional): sin él compose.prod.yaml usa la imagen oficial fijada por digest.
+  [ -z "${kc}" ] || printf 'PFOS_KEYCLOAK_IMAGE=%s\n' "${kc}" >>"${file}"
 }
 
 # La credencial de servicio del servicio de pronósticos es un secreto de archivo montado en el worker y en `ml-forecasting`
@@ -108,27 +132,26 @@ up_release() {
 previous_release() { tail -n 2 "${RELEASES_LOG}" 2>/dev/null | head -n 1; }
 
 cmd_deploy() {
-  local sha="$1" api="$2" web="$3" pg="$4" ml="${5:-}" candidate
+  local sha="$1" api="$2" web="$3" pg="$4" candidate ML KC
+  shift 4
+  classify_extras "$@"
   [ -r "${ENV_FILE}" ] && [ -r "${PGBR_ENV_FILE}" ] || die "faltan ${ENV_FILE} o ${PGBR_ENV_FILE} (runbook §2.3)"
   grep -q '__generate__\|__set__' "${ENV_FILE}" "${PGBR_ENV_FILE}" && die "quedan placeholders sin completar en /etc/pfos"
 
   log "release ${sha}: pull por digest"
-  if [ -n "${ml}" ]; then
-    pull_and_verify "${sha}" "${api}" "${web}" "${pg}" "${ml}"
-  else
-    pull_and_verify "${sha}" "${api}" "${web}" "${pg}"
-  fi
+  pull_and_verify "${sha}" "${api}" "${web}" "${pg}" ${ML:+"${ML}"} ${KC:+"${KC}"}
   ensure_ml_token_file
   install_host_units
 
   candidate="$(mktemp "${STATE_DIR}/release.env.XXXXXX")"
-  write_release_env "${candidate}" "${sha}" "${api}" "${web}" "${pg}" "${ml}"
+  write_release_env "${candidate}" "${sha}" "${api}" "${web}" "${pg}" "${ML}" "${KC}"
   pre_migrate_backup "${sha}"
 
   log "compose up (migrate → api/worker → web → caddy)"
   if up_release "${candidate}" && mv -f "${candidate}" "${RELEASE_ENV}" && smoke; then
     ensure_stanza
-    printf '%s %s %s %s %s %s\n' "$(date -u +%FT%TZ)" "${sha}" "${api}" "${web}" "${pg}" "${ml}" >>"${RELEASES_LOG}"
+    printf '%s %s %s %s %s%s%s\n' "$(date -u +%FT%TZ)" "${sha}" "${api}" "${web}" "${pg}" \
+      "${ML:+ ${ML}}" "${KC:+ ${KC}}" >>"${RELEASES_LOG}"
     log "OK release ${sha}"
     return 0
   fi
@@ -145,10 +168,13 @@ cmd_deploy() {
 }
 
 redeploy_line() {
-  local _ts sha api web pg ml
-  read -r _ts sha api web pg ml <<<"$1"
+  local _ts sha api web pg rest ML KC
+  local -a extras=()
+  read -r _ts sha api web pg rest <<<"$1"
+  read -ra extras <<<"${rest}"
+  classify_extras "${extras[@]}"
   git -C "${REPO}" -c advice.detachedHead=false checkout --quiet --detach "${sha}"
-  write_release_env "${RELEASE_ENV}" "${sha}" "${api}" "${web}" "${pg}" "${ml:-}"
+  write_release_env "${RELEASE_ENV}" "${sha}" "${api}" "${web}" "${pg}" "${ML}" "${KC}"
   ensure_ml_token_file
   up_release "${RELEASE_ENV}"
   smoke
@@ -178,7 +204,11 @@ exec 9>"${STATE_DIR}/deploy.lock"
 flock -n 9 || die "hay otro deploy en curso"
 
 case "${1:-}" in
-  deploy) cmd_deploy "$2" "$3" "$4" "$5" "${6:-}" ;;
+  deploy)
+    [ "$#" -ge 5 ] || die "uso: pfos-deploy.sh deploy <sha> <api> <web> <pg> [<extra>...]"
+    shift
+    cmd_deploy "$@"
+    ;;
   rollback) cmd_rollback ;;
   status) cmd_status ;;
   *) die "uso: pfos-deploy.sh deploy|rollback|status" ;;

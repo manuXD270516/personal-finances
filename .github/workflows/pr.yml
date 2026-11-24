@@ -236,6 +236,9 @@ jobs:
           # Servicio interno de pronósticos (ADR-0033): imagen opcional en N1, escaneada con el mismo criterio.
           - image: finance-ml
             dockerfile: docker/finance-ml.Dockerfile
+          # Keycloak con build optimizado (C7): mismo criterio (no-root + Trivy) que las demás imágenes propias.
+          - image: pfos-keycloak
+            dockerfile: docker/keycloak.Dockerfile
     env:
       IMAGE_REF: pfos/${{ matrix.image }}:ci
     steps:

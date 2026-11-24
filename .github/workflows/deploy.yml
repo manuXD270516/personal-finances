@@ -47,6 +47,8 @@ jobs:
       pg: ${{ steps.refs.outputs.pg }}
       # Opcional: vacío salvo con vars.PFOS_ML_ENABLED=true. Sin declararlo aquí, needs.resolve.outputs.ml llega vacío.
       ml: ${{ steps.refs.outputs.ml }}
+      # Opcional: vacío salvo con vars.PFOS_KEYCLOAK_OPTIMIZED=true (Keycloak con build optimizado; si no, imagen oficial).
+      kc: ${{ steps.refs.outputs.kc }}
     steps:
       - name: Validar commit y localizar la corrida de main.yml
         id: run
@@ -73,6 +75,7 @@ jobs:
         env:
           SHA: ${{ inputs.commit_sha }}
           ML_ENABLED: ${{ vars.PFOS_ML_ENABLED }}
+          KC_ENABLED: ${{ vars.PFOS_KEYCLOAK_OPTIMIZED }}
         run: |
           ref() {
             local f="$RUNNER_TEMP/digests/$1.json"
@@ -89,6 +92,9 @@ jobs:
             echo "pg=$(ref pfos-postgres)"
             # Servicio de pronósticos (opcional): solo si el host lo habilitó (vars.PFOS_ML_ENABLED) y existe su digest.
             if [ "${ML_ENABLED}" = "true" ]; then echo "ml=$(ref finance-ml)"; fi
+            # Keycloak optimizado (opcional): solo con vars.PFOS_KEYCLOAK_OPTIMIZED=true, es decir, cuando el comando forzado
+            # del host (cloud-init) ya acepta `pfos-keycloak@sha256:…` como argumento extra. Antes, el host rechazaría el deploy.
+            if [ "${KC_ENABLED}" = "true" ]; then echo "kc=$(ref pfos-keycloak)"; fi
           } | tee -a "$GITHUB_OUTPUT"
 
   run:
@@ -130,9 +136,10 @@ jobs:
           WEB: ${{ needs.resolve.outputs.web }}
           PG: ${{ needs.resolve.outputs.pg }}
           ML: ${{ needs.resolve.outputs.ml }}
+          KC: ${{ needs.resolve.outputs.kc }}
         run: |
           case "$ACTION" in
-            deploy) remote="deploy ${SHA} ${API} ${WEB} ${PG}${ML:+ ${ML}}" ;;
+            deploy) remote="deploy ${SHA} ${API} ${WEB} ${PG}${ML:+ ${ML}}${KC:+ ${KC}}" ;;
             *) remote="$ACTION" ;;
           esac
           ssh -i "$RUNNER_TEMP/deploy_key" -o IdentitiesOnly=yes -o BatchMode=yes \
@@ -149,6 +156,7 @@ jobs:
               echo "| finance-web | \`${WEB}\` |"
               echo "| pfos-postgres | \`${PG}\` |"
               if [ -n "${ML}" ]; then echo "| finance-ml | \`${ML}\` |"; fi
+              if [ -n "${KC}" ]; then echo "| pfos-keycloak | \`${KC}\` |"; fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Borrar la clave SSH
