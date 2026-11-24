@@ -13,6 +13,7 @@ import type {
   NominalPortionPageDto,
   NominalPortionQuery,
 } from '../contracts/index.js';
+import { normalizeFlowAmount } from './nominal-amount.js';
 
 interface FlowRow {
   business_date: string;
@@ -181,14 +182,17 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
            ${filterSql(input)}
          GROUP BY ${sql.raw(groupPositions)}
          ORDER BY 1, 2, 4, 3, 5${sql.raw(orderExtra)}`.execute(unitOfWorkKysely());
+      // Escalas de las monedas distintas resueltas antes del bucle (una por moneda, sin `await` por fila).
       const scaleOf = scaleResolver(this.currencies);
+      const scales = new Map<string, number>();
+      for (const code of new Set(rows.map((r) => r.currency))) scales.set(code, await scaleOf(code));
       const out: NominalFlowRowDto[] = [];
       for (const r of rows) {
         out.push({
           businessDate: r.business_date,
           nature: r.nature,
           categoryId: r.category_id,
-          amount: Money.parse(r.amount, makeCurrency(r.currency, await scaleOf(r.currency))).toJSON(),
+          amount: normalizeFlowAmount(r.amount, r.currency, scales.get(r.currency) as number),
           ...(withTags ? { tagIds: r.tag_ids ?? [] } : {}),
           ...(byAccount && r.account_id !== undefined ? { accountId: r.account_id } : {}),
           ...(byCounterparty ? { counterpartyId: r.counterparty_id ?? null } : {}),

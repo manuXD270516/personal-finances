@@ -14,7 +14,7 @@ type: platform
 level: performance
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 7
 tags: ["perf", "nightly", "large-seed", "trends", "fix-trends-report-perf"]
