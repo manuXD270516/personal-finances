@@ -1,10 +1,10 @@
 # Runbook: consolidación previa al primer despliegue de PFOS en Lightsail N1
 
-**Destino:** una instancia AWS Lightsail Linux 2 GB en `sa-east-1` (São Paulo) con el stack de `compose.yaml` más `compose.prod.yaml`, respaldos de pgBackRest y réplica de documentos a Backblaze B2, y tres hostnames (`app`, `auth` y `files`) detrás de Caddy. Costo: ≈ USD 14,5 por mes (≈ 16 con impuestos estimados).
+**Destino:** una instancia AWS Lightsail Linux 2 GB en `sa-east-1` (São Paulo) con el stack de `compose.yaml` más `compose.prod.yaml`, respaldos de pgBackRest y réplica de documentos a Backblaze B2, y tres hostnames (`app`, `auth` y `files`) detrás de Caddy. Costo: ≈ USD 16,5 por mes con el recargo de la tarjeta (≈ 15 sin él).
 
 **Variante:** este runbook **no reemplaza** a [deploy-and-restore.md](../runbooks/deploy-and-restore.md), que sigue siendo el procedimiento vigente para el primer despliegue, los deploys, el rollback y la restauración. Acá está lo que le falta: el estado real, las brechas que el panel encontró, el PoC con regla de corte, el plan B y el orden de las fases con su «Terminada cuando». Cuando una fase dice «§2.2», se refiere a ese runbook.
 
-**Estado al 2026-11-14:** sin desplegar. No existe la cuenta de AWS, ni el bucket de B2, ni el dominio. La decisión de plataforma está en [DECISION-DESPLIEGUE.md](DECISION-DESPLIEGUE.md) y ratifica [ADR-0027](../adr/0027-destino-de-despliegue-inicial-vps-compose.md).
+**Estado al 2026-11-24:** sin desplegar. No existe la cuenta de AWS, ni el bucket de B2, ni el dominio. La decisión de plataforma está en [DECISION-DESPLIEGUE.md](DECISION-DESPLIEGUE.md) y ratifica [ADR-0027](../adr/0027-destino-de-despliegue-inicial-vps-compose.md).
 
 | Símbolo | Quién lo hace |
 |---|---|
@@ -22,7 +22,7 @@
 | Caddy con HSTS, `nosniff`, `Referrer-Policy`, `/admin` de Keycloak en 404 y `files` limitado a `PUT` firmado | Escrito | `deploy/compose/caddy/Caddyfile` |
 | Deploy por digest con backup previo, smoke y rollback automático | Escrito; acepta el 5.º digest | `deploy/host/pfos-deploy.sh` |
 | Comando forzado del host | Escrito; **rechaza el 5.º digest** | `infra/modules/lightsail-host/cloud-init.yaml.tftpl:48-50` |
-| Workflow de deploy (`workflow_dispatch`, environment `production`, Tailscale OIDC) | Escrito; **nunca manda el 5.º digest**: el paso `refs` calcula `ml` con `PFOS_ML_ENABLED=true`, pero el job `resolve` no lo declara en `outputs` (solo `sha`, `api`, `web` y `pg`), así que `needs.resolve.outputs.ml` llega vacío | `.github/workflows/deploy.yml:43-47` y `:130` |
+| Workflow de deploy (`workflow_dispatch`, environment `production`, Tailscale OIDC) | Escrito; **envía el 5.º digest** con `PFOS_ML_ENABLED=true`: el job `resolve` declara `outputs.ml` desde #234 | `.github/workflows/deploy.yml:43-49` |
 | Timers de respaldo (full semanal, diff diario, mensual, check horario, réplica de documentos) con heartbeat opcional | Escritos | `deploy/host/systemd/`, `deploy/host/pfos-backup.sh` |
 | Drill de restore programado | **No existe.** Solo el procedimiento manual de §6 | — |
 | Limpieza de imágenes | **No existe** (sin `prune` en `deploy/` ni `infra/`) | — |
@@ -37,7 +37,7 @@ Ordenadas por riesgo. «Cuándo» indica el último momento en que se puede cerr
 
 | # | Brecha | Riesgo | Cuándo | Cómo se cierra |
 |---|---|---|---|---|
-| B1 | El comando forzado rechaza el 5.º digest (`finance-ml`) con «argumentos de más», aunque `pfos-deploy.sh` ya lo acepta. Además, `deploy.yml` nunca lo envía: el job `resolve` no expone la salida `ml`. Hoy ML no se puede desplegar por ningún camino, en silencio. ADR-0033 dice que `deploy.yml` y el host lo aceptan, y no es así | **Alto.** Cambiar `user_data` después del apply **reemplaza la instancia**. Conviene dejar el comando preparado también para una imagen propia de Keycloak (B6) | **Antes del primer apply** | C1 |
+| B1 | El comando forzado del cloud-init (`cloud-init.yaml.tftpl:48-50`) rechaza el 5.º digest (`finance-ml`) con «argumentos de más», aunque `pfos-deploy.sh` ya lo acepta y `deploy.yml` ya lo envía (#234). Con `PFOS_ML_ENABLED=true`, el deploy termina **en rojo** con ese mensaje; no falla en silencio. ADR-0033 dice que el host lo acepta, y no es así | **Alto.** Cambiar `user_data` después del apply **reemplaza la instancia**. Conviene dejar el comando preparado también para una imagen propia de Keycloak (B6) | **Antes del primer apply** | C1 |
 | B2 | Object Lock de 21 días para todo el bucket, clave del host con `deleteFiles` y lifecycle que borra lo oculto al día siguiente: un host comprometido puede destruir los 12 respaldos mensuales y las versiones de documentos con más de 21 días | **Alto.** Datos sensibles; la protección contra ransomware cubre 21 días, no un año | Antes del primer respaldo, es decir, del primer deploy. Los objetos ya escritos conservan su lock | C3 |
 | B3 | pgBackRest nunca se probó contra un bucket B2 con Object Lock (PUT con checksum y `expire` sobre versiones bloqueadas) | **Alto.** Si falla, cae el PITR, requisito duro (RPO ≤ 15 min). La alternativa, N3, rompe el tope | En el PoC (fase 7), antes de los datos reales | Prueba 7.4 |
 | B4 | El drill de restore «automatizado» de ADR-0027 no existe. El de §6 es manual, y para un solo operador eso significa que no se hace | **Alto.** Un respaldo nunca probado no cuenta | Antes de los datos reales | C5 y prueba 7.5 |
@@ -49,8 +49,10 @@ Ordenadas por riesgo. «Cuándo» indica el último momento en que se puede cerr
 | B10 | `compose.prod.yaml` no monta el archivo 0400 de la clave privada de conexiones en el worker (`CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE`) | **Medio-bajo.** Sin él no funcionan las conexiones con exchanges. Si se monta un origen inexistente, se crea un directorio | Antes de habilitar conexiones | C10 |
 | B11 | El snapshot diario de Lightsail sale a las 06:00 UTC, el mismo minuto que el full o el diff. Además, levantar PostgreSQL desde un snapshot reanuda el archivado en la misma stanza y rompe la continuidad del PITR | **Medio-bajo.** Vuelta atrás que parece segura y no lo es | Antes del primer apply (horario); la advertencia, en el runbook | C9 y C11 |
 | B12 | La documentación no coincide con el repo: §2.1.5 pide dos hostnames y son tres (`files`, D316); §2.1.6 no nombra `finance-ml`; §5.2 no advierte lo de B11; docs/30 §8 y §12 describen el drill y las alarmas de la era RDS | **Bajo.** Confunde durante el primer despliegue | Antes de la fase 2 | C11 |
-| B13 | El margen de USD 4–5 depende de los impuestos de AWS a Bolivia y del recargo de la tarjeta, que son supuestos. AWS Budgets solo avisa | **Bajo** en monto, **alto** en consecuencia: puede romper el tope | Con la primera factura | Regla de corte 5 |
+| B13 | El margen de ≈ USD 3,5 depende de los impuestos de AWS a Bolivia y del recargo de la tarjeta, que son supuestos. AWS Budgets solo avisa | **Bajo** en monto, **alto** en consecuencia: puede romper el tope | Con la primera factura | Regla de corte 5 |
 | B14 | La web no declara Content-Security-Policy (nota del 2026-10-29 en ADR-0027). Caddy agrega HSTS, `nosniff` y `Referrer-Policy`, pero no CSP ni `frame-ancestors` | **Bajo.** Defensa en profundidad para una app con datos sensibles; si se define, tiene que incluir el origen `files` en `connect-src` | Antes de los datos reales | C13 |
+| B15 | **CPU con ráfagas sin medir ni vigilar (ratificación 2026-11-24).** El plan de 2 GB tiene una base sostenida del 20 % por vCPU (0,4 vCPU en total). El import y los reportes largos son CPU de un hilo y variaron 1,65–1,9× entre CPUs de CI; el stack en reposo (28 consumidores de pg-boss que sondean, la JVM de Keycloak, Next y el archivado de WAL) nunca se midió contra esa base, y nada avisa si se agotan los créditos | **Medio-alto.** Si los créditos se agotan, la plataforma no cobra de más: degrada en silencio (imports de 30–90 s, reportes lentos, timeouts de Keycloak y rollbacks en cadena) | PoC (fase 7) y antes de los datos reales | C14: regla de corte de CPU en el PoC y alerta de créditos bajos en el heartbeat o en Grafana. N2 no la cierra; si falla, plan B |
+| B16 | El cobro de las llamadas de clase D de B2, nuevo en la página de precios, no está claro para el patrón de pgBackRest (muchos PUT de WAL cada 5 min) | **Bajo.** Monto chico, pero sin medir | Primera factura de B2 | Revisar la primera factura de B2 y anotar el costo real en [`.despliegue.json`](.despliegue.json) (fase 9) |
 
 ## PoC de 48 h: regla de corte
 
@@ -61,23 +63,71 @@ ADR-0027 ya pedía un PoC de 48 h. El panel lo endureció: hay que medir **la me
 | `MemAvailable` del host | Menos del 15 % de `MemTotal` durante más de 30 min seguidos (memoria > 85 %) |
 | Swap-in | `pswpin` del log crece en todas las muestras de 30 min seguidos |
 | OOM | Cualquier `OOMKilled` o línea `Out of memory` en `journalctl -k` |
-| Arranque de Keycloak | Más de 300 s, o cualquier rollback automático disparado por el arranque |
-| Primer login | Más de 10 s de forma habitual |
-| Latencia desde Bolivia (supuesto de 112 ms, medido en 2026-10) | `curl -s -o /dev/null -w "%{time_connect}\n" $BASE/api/health/live` por encima de 0,3 s de forma habitual: no corta, pero reabre la comparación con Oracle A1 (63 ms) |
+| Arranque de Keycloak | Más de 300 s, o cualquier rollback automático disparado por el arranque. Es una señal mixta: se clasifica por causa (abajo) |
+| Primer login | Mediana (p50) de 5 logins > 10 s, cronometrados desde que enviás el formulario de Keycloak hasta que se ve Inicio. Señal mixta: se clasifica por causa |
+| Latencia desde Bolivia (supuesto de 112 ms, medido en 2026-10) | Mediana de 20 muestras de `time_connect` > 0,3 s (comando en la medición 4): no corta, pero reabre la comparación con Oracle A1 (63 ms) |
 | Restore PITR desde B2 | Falla, o tarda más de 1 h (RTO observado) |
 | pgBackRest con Object Lock | `expire` falla, o una versión bloqueada se puede borrar con la clave del host |
+| **CPU en reposo (C14, ratificación 2026-11-24)** | Promedio de CPU del host ≥ 20 % (100 % = 2 vCPU) en una ventana de 6 h sin carga (la base sostenida del plan es 20 % por vCPU, 0,4 vCPU en total), o `BurstCapacityPercentage` < 50 % al final de esa ventana (mediciones 1 y 2) |
+| **Import de 5 000 filas en el host (C14)** | Persistencia > 20 s con créditos disponibles, o > 60 s con créditos agotados (`BurstCapacityPercentage` en 0 durante el import). La persistencia es `completed_at − approved_at` del job (medición 3). Anotar `lscpu` junto a la medición |
 
-**Si se corta por memoria o CPU:**
+El reporte de tendencias a 24 meses **no se mide en el host**: el Large Seed es solo local y CI (`scripts/stack/src/db.ts:4`), y en el host llenaría la base y dejaría respaldos bloqueados 21 días. Lo cubre la fila `report-trends-24m` del nightly `perf` (NFR-PERF-006, p95 ≤ 800 ms). La CPU del host frente a la de CI la mide el import.
 
-1. Primero, confirmá que ML esté apagado y que los techos no se hayan subido sin medir.
-2. **Hacia N2** (`lightsail_bundle_id = "medium_3_0"`, ≈ USD 27–30 por mes): solo si ampliás el presupuesto por escrito. Cambiar el plan reemplaza la VM: restaurar según §5.2.
-3. **Hacia el plan B** (Oracle A1): si el presupuesto no sube. Antes hay que hacer la preparación de la sección siguiente.
+### Cómo se mide cada señal de CPU y de latencia
+
+1. **CPU promedio del host** (en el host, al terminar 6 h sin carga). El timer de la fase 7 deja la línea `cpu` de `/proc/stat` cada 5 min; los contadores son acumulados, así que el promedio de la ventana sale de la primera y la última muestra. Las 6 h son 73 muestras:
+
+   ```bash
+   grep '^cpu ' /var/log/pfos-poc-mem.log | tail -n 73 | awk 'NR==1{for(i=2;i<=9;i++)t0+=$i; b0=$2+$3+$4+$7+$8; s0=$9} {t=0; for(i=2;i<=9;i++)t+=$i; b=$2+$3+$4+$7+$8; s=$9} END{printf "CPU %.1f %% del host (100 %% = 2 vCPU), steal %.1f %%\n", 100*(b-b0)/(t-t0), 100*(s-s0)/(t-t0)}'
+   ```
+
+   Fórmula: CPU % = 100 × Δ(user + nice + system + irq + softirq) / Δ(user + nice + system + idle + iowait + irq + softirq + steal). El `steal` aparte es la señal de que el hipervisor está limitando la CPU (créditos agotados).
+
+2. **Créditos de CPU** (Git Bash en tu máquina, con el perfil SSO de la fase 2; el nombre de la instancia sale de `infra/environments/prod/main.tf`):
+
+   ```bash
+   aws lightsail get-instance-metric-data --profile pfos-admin --region sa-east-1 --instance-name pfos-prod-host --metric-name BurstCapacityPercentage --period 300 --start-time "$(date -u -d '-6 hours' +%Y-%m-%dT%H:%M:%SZ)" --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --unit Percent --statistics Minimum Average --query 'sort_by(metricData,&timestamp)[].[timestamp,minimum,average]' --output table
+   ```
+
+   Para el tope y el ritmo de acumulación, corré el mismo comando con `--metric-name BurstCapacityTime` (minutos de ráfaga disponibles, `--unit Seconds`) al empezar y al terminar la ventana de 6 h: la diferencia dividida por 6 es lo que el host acumula por hora en reposo.
+
+3. **Persistencia del import** (en el host, con el alias `$C` de [Valores que vas a necesitar](#valores-que-vas-a-necesitar), después de aprobar el import y ver `COMPLETED`). El dominio fija `approved_at` al aprobar y `completed_at` al terminar la persistencia (`packages/contexts/imports/src/domain/import-job.ts`), y los dos quedan en `imports.import_job`:
+
+   ```bash
+   $C exec -T postgres psql -U postgres -d pfos -Atc "SELECT id, status, row_count, round(extract(epoch FROM completed_at - approved_at)::numeric, 1) AS segundos FROM imports.import_job WHERE approved_at IS NOT NULL ORDER BY approved_at DESC LIMIT 3"
+   ```
+
+   El `id` es el `importJobId` que aparece en los logs de la API y del worker. Corré la medición 2 con la ventana del import para saber si había créditos.
+
+4. **Latencia** (Git Bash en tu máquina, desde Bolivia). Imprime las muestras 10 y 11 de 20 ordenadas; la mediana es su promedio:
+
+   ```bash
+   for i in $(seq 20); do curl -s -o /dev/null -w "%{time_connect}\n" $BASE/api/health/live; done | sort -n | sed -n '10,11p'
+   ```
+
+### Cómo se clasifica una señal mixta
+
+El arranque lento de Keycloak y el primer login lento pueden venir de la memoria o de la CPU. En el momento en que aparecen, juntá en el host `free -m`, `grep -E '^pswpin ' /proc/vmstat`, `head -1 /proc/stat` y `docker stats --no-stream --format "{{.Name}} {{.CPUPerc}} {{.MemUsage}}"`, y en tu máquina la medición 2 con la ventana del evento:
+
+| Qué se ve | Causa | Salida |
+|---|---|---|
+| `MemAvailable` < 15 %, `pswpin` creciendo, un contenedor pegado a su techo de memoria u `OOMKilled` | Memoria | N2 o plan B |
+| Memoria normal, `BurstCapacityPercentage` en 0 o cerca, `steal` alto y `CPUPerc` de Keycloak (o de la API) limitado | CPU | Plan B |
+| Las dos cosas a la vez | CPU (N2 no la resuelve) | Plan B |
+| Memoria normal y créditos disponibles | No es la plataforma | Diagnosticar (C7, configuración) antes de cortar |
+
+**Si se corta, la salida depende de la causa** (ratificación del 2026-11-24): N2 tiene las mismas 2 vCPU con la misma base del 20 %, así que **solo resuelve la memoria**. Las señales mixtas se clasifican con la tabla de arriba.
+
+1. Primero, confirmá que ML esté apagado, que Keycloak arranque con `--optimized` (C7) y que los techos no se hayan subido sin medir.
+2. **Corte por memoria → N2** (`lightsail_bundle_id = "medium_3_0"`, ≈ USD 27–30 por mes): solo si ampliás el presupuesto por escrito. Cambiar el plan reemplaza la VM: restaurar según §5.2.
+3. **Corte por CPU → plan B** (Oracle A1, 2 OCPU sin créditos): N2 no lo arregla. Antes hay que hacer la preparación de la sección siguiente.
+4. **Corte por memoria sin ampliación del presupuesto → plan B.**
 
 **Si se corta por pgBackRest con Object Lock o por el restore:** no se cargan datos reales. Se diagnostica. Si el drill falla dos veces, ADR-0027 dice N3 (Neon), que rompe el tope y requiere tu decisión.
 
 ## Plan B: Oracle Cloud A1 (N1-F)
 
-Hoy **no está listo**. Para no empezar de cero si el PoC falla, conviene decidir en la fase 1 si se prepara de antemano o si se acepta el N2 como salida. Lo que hay que preparar (detalle en [cambios-de-codigo.md](cambios-de-codigo.md), C12):
+Hoy **no está listo**. Para no empezar de cero si el PoC falla, conviene decidir en la fase 1 si se prepara de antemano o si se acepta el N2 como salida. Lo que hay que preparar (detalle en [cambios-de-codigo.md](cambios-de-codigo.md): C12a para los puntos 1 y 2, C12b para el 3 y C12c para el 4 y el 5):
 
 1. **Imágenes multi-arch** en `.github/workflows/main.yml`: matriz imagen × plataforma con runners nativos `ubuntu-24.04` y `ubuntu-24.04-arm`, push por digest y un job que arma el índice con `docker buildx imagetools create`. Hay que cuidar las attestations (`provenance mode=max`, `sbom: true`) y que verify-by-digest registre el digest del índice.
 2. **Verificar la variante arm64**: smoke del stack y verify-by-digest en el runner arm. Si se agrega un check obligatorio, cambia la protección de `main` y eso requiere tu confirmación.
@@ -142,7 +192,7 @@ C="docker compose -f /opt/pfos/repo/deploy/compose/compose.yaml -f /opt/pfos/rep
 
 ## Fase 0: cerrar las brechas de código (Claude)
 
-1. Implementar C1 a C11 y C13 (C12 solo si se activa el plan B) de [cambios-de-codigo.md](cambios-de-codigo.md) en una rama por cambio, con su change de OpenSpec cuando toque comportamiento (el CLAUDE.md del repo lo exige), y fusionar con los 17 checks en verde.
+1. Implementar C1 a C11, C13 y C14 (C12a a C12c solo según la decisión 2 de la fase 1) de [cambios-de-codigo.md](cambios-de-codigo.md) en una rama por cambio, con su change de OpenSpec cuando toque comportamiento (el CLAUDE.md del repo lo exige), y fusionar con los 18 checks en verde.
 2. Ensayar en local el cambio de Keycloak (C7), siempre con un proyecto propio y prefijo 3 o 4:
 
    ```bash
@@ -152,18 +202,20 @@ C="docker compose -f /opt/pfos/repo/deploy/compose/compose.yaml -f /opt/pfos/rep
 3. Correr los gates del repo: `pnpm format:check`, `pnpm turbo typecheck lint test build`, `pnpm arch:check`, `pnpm spec:validate` y `pnpm config:docs:check`.
 4. Comprobar que no haya secretos en el historial: lo cubre el check `secrets` de CI (gitleaks); en un worktree, gitleaks local escanea 0 commits.
 
-**Terminada cuando:** `git grep -n 'finance-ml' -- infra/modules/lightsail-host/cloud-init.yaml.tftpl` devuelve la validación del 5.º argumento, `git grep -n 'outputs.ml' -- .github/workflows/deploy.yml` devuelve también la línea de `outputs` del job `resolve`, `ls deploy/host/systemd/` lista los timers de drill y de limpieza, y `gh run list --workflow main.yml --branch main --limit 1` muestra `completed` y `success`.
+**Terminada cuando:** `git grep -n 'finance-ml' -- infra/modules/lightsail-host/cloud-init.yaml.tftpl` devuelve la validación del 5.º argumento; `ls deploy/host/systemd/` lista `pfos-restore-drill.timer` (C5) y `pfos-image-prune.timer` con su `.service` (C6); C14 está reflejado en este runbook (mediciones de la regla de corte y alarma de la fase 7), sin código en el host; y `gh run list --workflow main.yml --branch main --limit 1` muestra `completed` y `success`. La salida `ml` del job `resolve` de `deploy.yml` ya está (#234): `git grep -n 'steps.refs.outputs.ml' -- .github/workflows/deploy.yml` la devuelve hoy.
 
 ## Fase 1: decisiones del owner (Vos)
 
-Antes de abrir cuentas, decidí y anotá en docs/38:
+Antes de abrir cuentas, respondé las preguntas de [docs/71](../71-despliegue-n1-questions.md) (opciones y recomendación en cada una) y anotá las respuestas en docs/38:
 
 1. **Dominio** definitivo (pendiente del perfil).
-2. **Salida si el PoC falla:** ampliar a N2 (≈ USD 27–30) o preparar el plan B Oracle A1. Recomendación del panel: decidirlo ahora, no con el host ya caído.
+2. **Salida si el PoC falla, separada por causa** (ratificación del 2026-11-24): por memoria, ampliar a N2 (≈ USD 27–30) o ir al plan B; por CPU, solo el plan B, porque N2 no suma CPU sostenida. Decidí además si la preparación del plan B (C12a y C12b, multi-arch en una rama) se hace **antes** del PoC o se acepta hacerla con el PoC caído. Recomendación del panel: decidirlo ahora, no con el host ya caído.
 3. **Retención de los mensuales** (C3): bucket aparte con lock de 13 meses (recomendado) o quitar `deleteFiles` de la clave del host para el prefijo mensual.
 4. **Drill programado** (C5): drill local mensual en el host con la clave de solo lectura, más el drill fuera del host (§6) cada trimestre (recomendado).
+5. **Datos demo durante el PoC:** habilitar `DEMO_DATA_ENABLED=true` solo durante la fase 7 y volverlo a `false` en la limpieza (recomendado), o no usar la demo. Si no la habilitás, la [guía de pruebas](GUIA-PRUEBAS-FUNCIONALES.md#04-si-la-demo-no-se-habilita) dice qué casos dejan de ser bloqueantes.
+6. **Lectura de un PDF que cuadra** en la guía: dejarla para tus extractos reales (recomendado) o pedir un PDF sintético en disco.
 
-**Terminada cuando:** docs/38 tiene las cuatro respuestas con fecha.
+**Terminada cuando:** docs/38 tiene las seis respuestas con fecha.
 
 ## Fase 2: cuentas (Vos)
 
@@ -172,6 +224,15 @@ Seguí §2.1 de [deploy-and-restore.md](../runbooks/deploy-and-restore.md) con e
 - En §2.1.5, son **tres** hostnames: `app`, `auth` y `files` (D316), todos en modo solo DNS.
 - En §2.1.6, los paquetes de GHCR son **cuatro**: `finance-api`, `finance-web`, `pfos-postgres` y `finance-ml`.
 - En AWS, activá **MFA en root**, creá el usuario de IAM Identity Center y suscribite a las alertas de Budgets.
+- En Git Bash, configurá el perfil SSO del CLI (región `sa-east-1`, perfil `pfos-admin`) e iniciá sesión:
+
+  ```bash
+  aws configure sso --profile pfos-admin
+  ```
+
+  ```bash
+  aws sso login --profile pfos-admin
+  ```
 
 **Terminada cuando:** `aws sts get-caller-identity --profile pfos-admin` devuelve tu cuenta, la consola de B2 muestra la cuenta sin buckets todavía y `nslookup -type=NS <dominio>` responde con los nameservers de Cloudflare.
 
@@ -198,7 +259,30 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 1. Seguí §2.3 en la consola web de Lightsail.
    - **Prefijo del PoC (C4), antes del primer deploy:** agregá al final de `/etc/pfos/pgbackrest.env` `PGBACKREST_REPO1_PATH=/pgbackrest/poc/pitr` y `PGBACKREST_REPO2_PATH=/pgbackrest/poc/monthly`. Tiene que estar antes de la fase 6: el primer deploy crea la stanza y el primer full, y si caen en el prefijo de producción, la stanza queda atada al cluster ficticio (otro `system-id`) y `stanza-create` falla después de borrar los datos del PoC, con esos objetos bloqueados 21 días.
 2. Generá el par X25519 y el token de ML según [conectar-un-exchange-y-revocar-una-clave.md](../runbooks/conectar-un-exchange-y-revocar-una-clave.md) y la nota as-built del final del runbook vigente, aunque todavía no los uses.
-3. **Custodia (B5):** cifrá `pfos.env`, `pgbackrest.env` y el archivo de la clave privada X25519 (por ejemplo con `age -p`) y guardalos en tu gestor de contraseñas, **fuera del host y fuera de AWS**. Comprobá que se pueden descifrar en tu máquina antes de seguir.
+3. **Custodia (B5):** cifrá `pfos.env`, `pgbackrest.env` y el archivo de la clave privada X25519 con `age -p` y guardalos en tu gestor de contraseñas, **fuera del host y fuera de AWS**. Los archivos en claro nunca salen del host:
+   - En el host (`sudo -i`), instalá `age` y cifrá en una carpeta que `ubuntu` pueda leer. `age -p` pide la passphrase por la terminal; usá una del gestor, distinta de las de pgBackRest:
+
+     ```bash
+     apt-get install -y age && install -d -o ubuntu -m 0700 /home/ubuntu/custodia
+     ```
+
+     ```bash
+     for f in /etc/pfos/pfos.env /etc/pfos/pgbackrest.env /etc/pfos/<archivo-x25519>; do age -p -o "/home/ubuntu/custodia/$(basename "$f").age" "$f"; done; chown ubuntu /home/ubuntu/custodia/*.age
+     ```
+
+   - En tu máquina, en Git Bash y por la tailnet, copiá solo los `.age` y borrá la carpeta del host:
+
+     ```bash
+     mkdir -p ~/custodia-pfos && scp 'ubuntu@pfos-prod:custodia/*.age' ~/custodia-pfos/ && ssh ubuntu@pfos-prod 'rm -r ~/custodia'
+     ```
+
+   - En PowerShell (con `age.exe` instalado, por ejemplo con `winget install FiloSottile.age`), comprobá que cada uno se descifra sin escribir el contenido en disco. Cada línea debe imprimir `0`:
+
+     ```powershell
+     Get-ChildItem "$env:USERPROFILE\custodia-pfos\*.age" | ForEach-Object { age.exe -d $_.FullName > $null; $LASTEXITCODE }
+     ```
+
+   - Subí los `.age` al gestor de contraseñas y borralos de `custodia-pfos`.
 4. Listá los nombres cargados, sin valores:
 
    ```bash
@@ -211,14 +295,24 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
    grep -cE '__set__|__generate__' /etc/pfos/pfos.env /etc/pfos/pgbackrest.env
    ```
 
-**Terminada cuando:** el paso 4 muestra todos los nombres de los `.example`, el paso 5 da `0` en ambos archivos y tenés en el gestor una copia cifrada que abriste en tu máquina.
+**Terminada cuando** (comandos en el host, como root):
+
+- la diferencia entre los nombres de las plantillas y los cargados muestra solo `> PGBACKREST_REPO1_PATH=` y `> PGBACKREST_REPO2_PATH=` (los del prefijo del PoC):
+
+  ```bash
+  diff <(grep -ohE '^[A-Z0-9_]+=' /opt/pfos/repo/deploy/host/etc-pfos/pfos.env.example /opt/pfos/repo/deploy/host/etc-pfos/pgbackrest.env.example | sort -u) <(grep -ohE '^[A-Z0-9_]+=' /etc/pfos/pfos.env /etc/pfos/pgbackrest.env | sort -u)
+  ```
+
+- `grep -c '^PGBACKREST_REPO[12]_PATH=/pgbackrest/poc/' /etc/pfos/pgbackrest.env` da `2`;
+- el paso 5 da `0` en ambos archivos;
+- y el paso 3 imprimió `0` para cada `.age`, que ya están en el gestor.
 
 ## Fase 5: Tailscale y GitHub (Vos)
 
 1. Seguí §2.4 y §2.5.
 2. En el environment `production`, dejá `PFOS_ML_ENABLED` **sin definir** (ML apagado durante el PoC).
 
-**Terminada cuando:** `ssh ubuntu@pfos-prod hostname` responde por la tailnet, y `gh secret list --env production` y `gh variable list --env production` muestran `DEPLOY_SSH_KEY`, `DEPLOY_SSH_KNOWN_HOSTS`, `DEPLOY_HOST`, `PFOS_APP_URL`, `TS_OIDC_CLIENT_ID` y `TS_OIDC_AUDIENCE`.
+**Terminada cuando:** `ssh ubuntu@pfos-prod hostname` responde por la tailnet, y `gh secret list --env production` y `gh variable list --env production` muestran `DEPLOY_SSH_KEY`, `DEPLOY_SSH_KNOWN_HOSTS`, `DEPLOY_HOST`, `PFOS_APP_URL`, `TS_OIDC_CLIENT_ID` y `TS_OIDC_AUDIENCE`, y `PFOS_ML_ENABLED` no aparece en `gh variable list --env production`.
 
 ## Fase 6: primer deploy y verificación sin login (Claude, con tu confirmación)
 
@@ -230,7 +324,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 
 2. Vos aprobás el environment en GitHub.
 3. Vos, en el host: `pfos-bootstrap-storage.sh` y el primer full, según §2.6.2.
-4. Claude corre las comprobaciones desde afuera:
+4. Claude corre desde afuera las comprobaciones 1 a 6. Las 7 y 8 las hacés Vos: la 7 en el navegador y la 8 en el host.
 
 | # | Comprobación | Resultado esperado |
 |---|---|---|
@@ -240,8 +334,8 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 | 4 | `curl -s -o /dev/null -w "%{http_code}\n" $FILES/` y un `GET` a cualquier objeto | `404` |
 | 5 | En PowerShell, con Tailscale desconectado: `22, 5432, 8080, 8333 \| ForEach-Object { Test-NetConnection -ComputerName <IP> -Port $_ -WarningAction SilentlyContinue \| Select-Object RemotePort, TcpTestSucceeded }` | `TcpTestSucceeded` en `False` para los cuatro |
 | 6 | `curl -sI $BASE/ \| grep -iE 'strict-transport-security\|x-content-type-options\|referrer-policy'` | Las tres cabeceras |
-| 7 | Atajos de desarrollo: login en `$BASE` con uno de los usuarios demo de `realm-pfos-dev.json` (los dos realms se llaman `pfos`; el de producción no trae usuarios) | El login falla con credenciales inválidas |
-| 8 | En el host: `grep -E '^(DEMO_DATA_ENABLED\|IMPORTS_PROVIDER_FAKE_ENABLED)=' /etc/pfos/pfos.env` | Ninguno en `true` |
+| 7 | (Vos) Atajos de desarrollo: login en `$BASE` con uno de los usuarios demo de `realm-pfos-dev.json` (los dos realms se llaman `pfos`; el de producción no trae usuarios) | El login falla con credenciales inválidas |
+| 8 | (Vos) En el host: `grep -E '^(DEMO_DATA_ENABLED\|IMPORTS_PROVIDER_FAKE_ENABLED)=' /etc/pfos/pfos.env` | Ninguno en `true` |
 
 **Regla de corte:** si 2, 3, 4, 5 o 7 no coinciden, parate.
 
@@ -252,13 +346,36 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 **Esta fase decide si se puede confiar en el despliegue.** Solo datos inventados.
 
 1. **Repositorio de respaldo del PoC.** Comprobá que `pgbackrest.env` apunte al prefijo del PoC desde la fase 4 (C4): `grep -E '^PGBACKREST_REPO[12]_PATH=' /etc/pfos/pgbackrest.env` muestra las dos rutas `/pgbackrest/poc/…`. La réplica de documentos no tiene prefijo de PoC: los documentos ficticios quedan como versiones ocultas en `documents/` hasta que el lifecycle los purgue.
-2. **Medición del host completo** (Vos, en el host). Deja una muestra cada 5 minutos en un timer transitorio:
+
+   **Datos demo** (si en la decisión 5 de la fase 1 elegiste habilitarlos): en el host, poné `DEMO_DATA_ENABLED=true` en `/etc/pfos/pfos.env` y redeploy del mismo SHA (fase 6, paso 1). La comprobación 8 de la fase 6 da distinto mientras dure el PoC; la limpieza lo vuelve a `false`.
+
+2. **Medición del host completo** (Vos, en el host). Deja una muestra cada 5 minutos en un timer transitorio, con memoria y la línea `cpu` de `/proc/stat` (sin `sysstat`, que no está en los paquetes del cloud-init):
 
    ```bash
-   systemd-run --unit=pfos-poc-mem --on-calendar='*:0/5' /bin/sh -c 'date -u -Iseconds >> /var/log/pfos-poc-mem.log; grep -E "MemTotal|MemAvailable|SwapFree" /proc/meminfo >> /var/log/pfos-poc-mem.log; grep -E "^pswpin " /proc/vmstat >> /var/log/pfos-poc-mem.log; ps -o rss=,comm= -C dockerd,containerd,tailscaled,systemd-journald >> /var/log/pfos-poc-mem.log; docker stats --no-stream --format "{{.Name}} {{.MemUsage}}" >> /var/log/pfos-poc-mem.log'
+   systemd-run --unit=pfos-poc-mem --on-calendar='*:0/5' /bin/sh -c 'date -u -Iseconds >> /var/log/pfos-poc-mem.log; grep -E "MemTotal|MemAvailable|SwapFree" /proc/meminfo >> /var/log/pfos-poc-mem.log; grep -E "^pswpin " /proc/vmstat >> /var/log/pfos-poc-mem.log; head -1 /proc/stat >> /var/log/pfos-poc-mem.log; ps -o rss=,comm= -C dockerd,containerd,tailscaled,systemd-journald >> /var/log/pfos-poc-mem.log; docker stats --no-stream --format "{{.Name}} {{.CPUPerc}} {{.MemUsage}}" >> /var/log/pfos-poc-mem.log'
    ```
 
-3. **Carga:** datos demo por la acción de la aplicación, un import de 5000 filas, la lectura de un PDF de prueba, varios logins y un deploy del mismo SHA (arranque de Keycloak en frío). Claude puede generar la carga desde afuera con la suite E2E apuntada a `$BASE` si la configurás para eso.
+   - Anotá el modelo de CPU del host junto a la medición: `lscpu | grep -E 'Model name|^CPU\(s\)'`.
+   - Dejá **6 h sin carga** al principio (sin logins ni imports) y medí la CPU en reposo y los créditos (mediciones 1 y 2 de la [regla de corte](#cómo-se-mide-cada-señal-de-cpu-y-de-latencia), incluido el tope y el ritmo de acumulación con `BurstCapacityTime`).
+   - **Alarma de créditos (C14, Vos, en Git Bash):** creá el contacto por email y confirmalo desde el correo que te llega; después, la alarma del 30 % y una prueba forzada. Tiene que llegar el email de `ALARM` y, al volver, el de `OK`:
+
+     ```bash
+     aws lightsail create-contact-method --profile pfos-admin --region sa-east-1 --protocol Email --contact-endpoint <tu-email>
+     ```
+
+     ```bash
+     aws lightsail put-alarm --profile pfos-admin --region sa-east-1 --alarm-name pfos-creditos-cpu --monitored-resource-name pfos-prod-host --metric-name BurstCapacityPercentage --comparison-operator LessThanThreshold --threshold 30 --evaluation-periods 1 --datapoints-to-alarm 1 --treat-missing-data breaching --contact-protocols Email --notification-triggers ALARM OK
+     ```
+
+     ```bash
+     aws lightsail test-alarm --profile pfos-admin --region sa-east-1 --alarm-name pfos-creditos-cpu --state ALARM
+     ```
+
+     ```bash
+     aws lightsail test-alarm --profile pfos-admin --region sa-east-1 --alarm-name pfos-creditos-cpu --state OK
+     ```
+
+3. **Carga:** datos demo por la acción de la aplicación (si los habilitaste), el import de 5 000 filas de la [guía](GUIA-PRUEBAS-FUNCIONALES.md#19-pruebas-de-operación) con su persistencia medida (medición 3 de la regla de corte), la lectura de un PDF de prueba, 5 logins cronometrados y un deploy del mismo SHA (arranque de Keycloak en frío). Claude puede generar la carga desde afuera con la suite E2E apuntada a `$BASE` si la configurás para eso.
 4. **pgBackRest con Object Lock (B3):** forzá un segundo full (el primero es el de la fase 6) y un `expire` por cantidad que intente quitar el primero, todavía bloqueado, y comprobá que los dos terminen en 0. Con la retención por tiempo de `pgbackrest.conf` (14 días) el `expire` no tocaría nada:
 
    ```bash
@@ -269,7 +386,25 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
    $C exec -T postgres pgbackrest --stanza=pfos --repo=1 --repo1-retention-full-type=count --repo1-retention-full=1 expire
    ```
 
-   Después, con la **clave del host** y el CLI de B2 en tu máquina, intentá borrar una versión bloqueada del prefijo `pgbackrest/poc/`: debe fallar. Verificá la sintaxis exacta con `b2 --help`.
+   Después, con la **clave del host** y el CLI de B2 en tu máquina, intentá borrar una versión bloqueada del prefijo `pgbackrest/poc/`: debe fallar. En Git Bash, la clave se lee sin eco y viaja por variables de entorno, nunca en los argumentos ni en el historial (`<bucket>` es `b2_bucket_name` de `prod.tfvars`):
+
+   ```bash
+   read -rs -p 'keyID del host: ' B2_APPLICATION_KEY_ID; echo; read -rs -p 'applicationKey del host: ' B2_APPLICATION_KEY; echo; export B2_APPLICATION_KEY_ID B2_APPLICATION_KEY
+   ```
+
+   ```bash
+   b2 ls --versions --recursive b2://<bucket>/pgbackrest/poc/pitr/ | head -3
+   ```
+
+   ```bash
+   b2 rm --versions "b2://<bucket>/<una ruta de la lista anterior>"
+   ```
+
+   ```bash
+   b2 account clear; unset B2_APPLICATION_KEY_ID B2_APPLICATION_KEY
+   ```
+
+   El `rm` debe fallar por el lock. La sintaxis es la del CLI `b2` 4.x; si tenés otra versión, confirmala con `b2 rm --help`.
 5. **Restore PITR real desde B2 (B4):** anotá la hora T0, creá una transacción ficticia, esperá 6 minutos (más que `archive_timeout`), anotá T1 y creá otra. Seguí §6 en la VM de drill con la clave de solo lectura, sumando a su `pgbackrest.env` las dos líneas `PGBACKREST_REPO{1,2}_PATH` del PoC y restaurando con `--type=time --target='<T entre T0 y T1>' --target-action=promote`. Debe aparecer la primera y no la segunda, y las consultas de integridad de §6.4 deben dar 0. Medí el tiempo total.
 6. **Otra cuenta no entra:** creá en el realm un segundo usuario ficticio y comprobá en el navegador que no ve el workspace del primero y que la API le responde `403` o `404`.
 7. **Memoria de PostgreSQL durante el full (B8):** `docker stats --no-stream postgres` mientras corre el paso 4 con carga.
@@ -286,30 +421,34 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 | 6 | Otra cuenta | Sin acceso |
 | 7 | PostgreSQL durante el full | Pico < 85 % de su techo |
 | 8 | Recargar y reiniciar el host (`sudo reboot`) | Todo vuelve solo y los datos siguen |
+| 9 | CPU (C14): 6 h en reposo, créditos (tope y acumulación) e import de 5 000 filas, con `lscpu` anotado; alarma de créditos probada | Dentro de los umbrales de CPU de la regla de corte; llegaron los emails de `ALARM` y `OK` |
+| 10 | Casos bloqueantes de la [guía de pruebas funcionales](GUIA-PRUEBAS-FUNCIONALES.md) | Todos pasan |
 
 **Borrar los datos ficticios antes de seguir** (Vos, en el host):
 
 1. `$C down` y borrar los volúmenes de PostgreSQL y SeaweedFS: `docker volume rm pfos_pg-data pfos_object-storage-data` (confirmá los nombres con `docker volume ls`). La base de Keycloak vive en el mismo PostgreSQL: se borran también el usuario ficticio, tu admin permanente y tu usuario.
-2. Quitá las dos líneas `PGBACKREST_REPO{1,2}_PATH` de `/etc/pfos/pgbackrest.env` para volver a los prefijos de `pgbackrest.conf`.
+2. Quitá las dos líneas `PGBACKREST_REPO{1,2}_PATH` de `/etc/pfos/pgbackrest.env` para volver a los prefijos de `pgbackrest.conf`. Si habilitaste los datos demo, volvé `DEMO_DATA_ENABLED` a `false` en `/etc/pfos/pfos.env`.
 3. Deploy del mismo SHA (fase 6, paso 1): `migrate` crea el esquema vacío, Keycloak reimporta el realm y `ensure_stanza` crea la stanza limpia en el prefijo de producción, que está vacío.
 4. Repetí §2.6.2 (`pfos-bootstrap-storage.sh` y el primer full) y §2.6.3 (admin permanente con OTP y tu usuario).
 
 Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock; después el lifecycle los purga.
 
-**Terminada cuando:** las ocho pruebas pasan, `/var/log/pfos-poc-mem.log` muestra 48 h sin cruzar umbrales y, después de la limpieza, `$C exec -T postgres pgbackrest --stanza=pfos info` muestra solo el full nuevo en el prefijo de producción.
+**Terminada cuando:** las diez pruebas pasan, `/var/log/pfos-poc-mem.log` muestra 48 h sin cruzar ningún umbral de la regla de corte (memoria y CPU), y, después de la limpieza, `$C exec -T postgres pgbackrest --stanza=pfos info` muestra solo el full nuevo en el prefijo de producción y la comprobación 8 de la fase 6 vuelve a dar ninguno en `true`.
 
 ## Fase 8: migrar los datos reales (Vos)
 
 1. Sin datos reales en ningún sistema anterior, no hay migración: el owner empieza a cargar en producción. Si tenés un export de workspace de otro entorno, restauralo con [restaurar-workspace-desde-export.md](../runbooks/restaurar-workspace-desde-export.md).
-2. Forzá un full inmediato: `systemctl start pfos-backup@full.service`.
+2. Antes de cargar nada, repetí la comprobación 8 de la fase 6 en el host: ninguno de `DEMO_DATA_ENABLED` e `IMPORTS_PROVIDER_FAKE_ENABLED` en `true`.
+3. Forzá un full inmediato: `systemctl start pfos-backup@full.service`.
 
-**Terminada cuando:** los saldos de tus cuentas en PFOS coinciden con tus extractos del día, o con el export de origen (mismo número de transacciones por cuenta), y `journalctl -u pfos-backup@full -n 20` termina sin error.
+**Terminada cuando:** la comprobación 8 de la fase 6 dio ninguno en `true`, los saldos de tus cuentas en PFOS coinciden con tus extractos del día, o con el export de origen (mismo número de transacciones por cuenta), y `journalctl -u pfos-backup@full -n 20` termina sin error.
 
 ## Fase 9: dispositivos y uso final (Vos)
 
 1. Grafana Cloud: checks sintéticos según §2.6.4, más una alerta por el heartbeat de respaldos.
-2. Alarma de Lightsail sobre `BurstCapacityPercentage` (consola), y alertas de Budgets confirmadas.
-3. Si querés ML (requiere C1 fusionado y aplicado): seguí la nota as-built del runbook vigente y repetí la medición de memoria de la fase 7 durante 48 h.
+2. Alertas de Budgets confirmadas. La alarma de `BurstCapacityPercentage` (< 30 %) ya quedó creada y probada en la fase 7.
+3. **Con la primera factura** (supuestos de la ratificación): anotá el recargo y los impuestos reales de la tarjeta en la de AWS (regla de corte 5) y el cobro de clase D en la de B2 (B16), y pasá los dos montos a [`.despliegue.json`](.despliegue.json).
+4. Si querés ML (requiere C1 fusionado y aplicado): seguí la nota as-built del runbook vigente y repetí la medición de memoria de la fase 7 durante 48 h.
 
 **Terminada cuando:** el check sintético está en verde y llegó un email de prueba de cada alerta.
 
@@ -378,7 +517,6 @@ Al superar un límite, Lightsail **no bloquea**: limita la CPU a la línea base,
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
 | El deploy termina en rojo con «argumentos de más» | `deploy.yml` ya manda el digest de ML, pero el cloud-init aplicado no tiene C1 | Apagar ML (`PFOS_ML_ENABLED` sin definir) y desplegar; corregir el cloud-init exige reemplazar la instancia (§5.2) |
-| ML habilitado, deploy en verde, pero `ml-forecasting` no arranca | `deploy.yml` sin la salida `ml` del job `resolve` (C1): el digest no llega al host | Aplicar C1 y volver a desplegar |
 | El deploy hace rollback solo y Keycloak aparece `unhealthy` | OOM o timeout en el arranque de Keycloak | `docker inspect -f '{{.State.OOMKilled}}'` del contenedor; aplicar C7 |
 | `pfos-backup@check` falla | Credenciales de B2, red o cola de WAL llena | §7 del runbook vigente; hacer un full apenas se corrija |
 | La web tarda más de 10 s en el primer login | Swap o créditos de CPU agotados | `vmstat 5`, `free -m` y la métrica de ráfaga; regla de corte |
@@ -400,7 +538,7 @@ cd /opt/pfos/repo/deploy/compose && $C logs --since 1h finance-api finance-worke
 
 ## Cierre del despliegue
 
-- [ ] Fase 0: brechas de código C1–C11 y C13 fusionadas.
+- [ ] Fase 0: brechas de código C1–C11, C13 y C14 fusionadas.
 - [ ] Fase 1: decisiones del owner anotadas en docs/38.
 - [ ] Fases 2 a 5: cuentas, infraestructura, secretos con custodia verificada, Tailscale y GitHub.
 - [ ] Fase 6: primer deploy y verificación sin login.
@@ -410,4 +548,4 @@ cd /opt/pfos/repo/deploy/compose && $C logs --since 1h finance-api finance-worke
 - [ ] Primer drill automático en verde.
 - [ ] Primera factura real ≤ USD 20.
 - [ ] Recordatorio trimestral del drill fuera del host creado.
-- [ ] docs/38 y `.despliegue.json` actualizados con el estado.
+- [ ] docs/38 y [`.despliegue.json`](.despliegue.json) actualizados con el estado.

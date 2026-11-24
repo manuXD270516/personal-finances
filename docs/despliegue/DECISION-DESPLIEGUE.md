@@ -4,9 +4,49 @@
 
 **Esta decisión ratifica [ADR-0027](../adr/0027-destino-de-despliegue-inicial-vps-compose.md) y no lo reemplaza.** El panel tomó el N1 de ADR-0027 como candidato obligado y lo enfrentó con dos alternativas distintas de verdad: el fallback N1-F del mismo ADR (Oracle A1) y una PaaS (Fly.io). El resultado confirma N1 y agrega condiciones que hay que cumplir antes del primer `tofu apply` y antes de cargar datos reales. Están en el [runbook](RUNBOOK-DESPLIEGUE.md).
 
+## Ratificación del 2026-11-24
+
+**Se ratifica `lightsail-n1`.** Fue un panel `rapida` de 5 agentes: dos proponentes que verificaron precios y límites en la documentación oficial, y tres jueces con lentes de costo, seguridad y operación. Sin crítico aparte; criticaron los jueces. Enfrentó el destino vigente con el plan B, usando el perfil actualizado con las mediciones de noviembre. Consenso **3 de 3**, sin árbitro y con los mismos pesos.
+
+| Criterio | Peso | lightsail-n1 (vigente) | oracle-a1 (plan B) |
+|---|---:|---:|---:|
+| Costo | 20 | 4,00 | 3,00 |
+| Ajuste al stack | 20 | 3,00 | 2,00 |
+| Seguridad | 25 | 4,00 | 3,00 |
+| Operación | 15 | 3,33 | 2,00 |
+| Reversibilidad | 15 | 3,67 | 2,00 |
+| Esfuerzo | 5 | 3,33 | 2,00 |
+| **Puntaje sobre 5** | | **3,62** | 2,45 |
+| **Primeros puestos** | | **3 de 3** | 0 |
+| Costo estimado por mes | | ≈ USD 16,5 con el recargo de la tarjeta (≈ 15 sin él) | ≈ USD 2,5 con la forma 2 OCPU / 8 GB |
+| Veto | | no | no |
+
+Los puntajes por criterio son el promedio de los tres jueces. Fly sigue vetado por costo; no se reevaluó. El costo de Oracle supone la forma 2 OCPU / 8 GB y no los 12 GB del Always Free: con menos RAM, la memoria usada queda por encima del umbral del reclamo de instancias ociosas.
+
+**Qué cambió desde el 14-11 y cómo lo absorbe la decisión:**
+
+- **La CPU es el riesgo nuevo.** El import de 5 000 filas y los reportes largos son CPU de Node en un solo hilo y variaron 1,65–1,9× según la CPU de CI. La documentación oficial fija para el plan de 2 GB una base sostenida del 20 % por vCPU (0,4 vCPU en total). Con créditos, un import cabe de sobra en una ráfaga. Sin créditos, la plataforma no cobra de más pero degrada en silencio. Nadie midió el stack en reposo contra esa base. Se agrega la brecha **B15** y la condición **C14**: regla de corte de CPU en el PoC y alerta de créditos bajos.
+- **N2 no es una salida por CPU.** El plan de 4 GB tiene las mismas 2 vCPU con la misma base: solo suma memoria. La salida del PoC queda separada por causa: memoria → N2 (con ampliación del presupuesto) o plan B; CPU → plan B. Por eso el owner decide en la fase 1 si la parte multi-arch del plan B (C12a y C12b de [cambios-de-codigo.md](cambios-de-codigo.md)) se prepara antes del PoC ([docs/71](../71-despliegue-n1-questions.md), pregunta 2).
+- **ADR-0034 no afecta el PITR.** Las 4 tablas `UNLOGGED` de colas no generan WAL y quedan vacías tras un restore o una caída, que es su estado correcto, porque se vacían en cada COMMIT. Solo hay que excluirlas de las consultas de integridad del drill (C5).
+- **C1 está a medias.** `deploy.yml` ya envía el digest de `finance-ml` (#234), pero el cloud-init del comando forzado lo sigue rechazando. Todo el resto de C1–C14 sigue abierto.
+- **Oracle A1 sigue de plan B, sin estar listo.** Le faltan multi-arch, el módulo `oci-host` y un cloud-init propio. Lo agravan tres factores: el reclamo de instancias ociosas (con 12 GB, la memoria quedaría en ≈ 15 %, por eso se propone la forma 2 OCPU / 8 GB, a ≈ USD 2,5 por mes), la capacidad escasa en Santiago (un solo AD) y que el Always Free se recortó sin aviso el 2026-06-15. Además, un restore físico entre amd64 y arm64 no está soportado: migrar entre los dos destinos es siempre lógico (`pg_dump` o export firmado).
+- **Lo que cada juez dejó como preocupación:**
+  - El de costo: la salida barata solo existe si el plan B se prepara de antemano.
+  - El de seguridad: C2 (el puerto 22, evaluar si hace falta, ya que todo el acceso va por Tailscale), C3 (los mensuales borrables) y C10 (la clave de conexiones) no se pueden dejar para después de los datos reales.
+  - El de operación: vigilar `BurstCapacityPercentage` tiene que ser una alerta, no una tarea manual.
+
+Supuestos que solo se verifican con la cuenta abierta, y dónde se verifica cada uno en el runbook:
+- el modelo de CPU del host en São Paulo: fase 7, paso 2 (`lscpu`);
+- el tope y el ritmo de acumulación de los créditos: fase 7, paso 2 (`BurstCapacityTime` al empezar y al terminar las 6 h en reposo);
+- la CPU del stack en reposo: fase 7, paso 2 (`/proc/stat` en una ventana de 6 h sin carga);
+- el recargo e impuestos de la tarjeta boliviana: fase 9, con la primera factura de AWS (regla de corte 5);
+- el cobro de las llamadas de clase D de B2 (brecha B16): fase 9, con la primera factura de B2.
+
+La decisión original de abajo sigue vigente con estos agregados.
+
 ## Resultado
 
-Gana **AWS Lightsail 2 GB en São Paulo con Docker Compose (`lightsail-n1`, N1 de ADR-0027)**: es el único candidato con IaC, cloud-init, timers de respaldo, `deploy.yml` y runbook ya escritos, tiene el mejor modelo de acceso del panel y entra en el tope de costo. Costo: **≈ USD 14,5 por mes** (≈ 16 con impuestos estimados). Plan B: **Oracle Cloud A1 en Santiago (`oracle-a1`, N1-F)**, si el PoC de 48 h muestra que 2 GB no alcanza y el owner no amplía el presupuesto para N2.
+Gana **AWS Lightsail 2 GB en São Paulo con Docker Compose (`lightsail-n1`, N1 de ADR-0027)**: es el único candidato con IaC, cloud-init, timers de respaldo, `deploy.yml` y runbook ya escritos, tiene el mejor modelo de acceso del panel y entra en el tope de costo. Costo: **≈ USD 16,5 por mes** con el recargo de la tarjeta (≈ 15 sin él). Plan B: **Oracle Cloud A1 en Santiago (`oracle-a1`, N1-F)**, si el PoC de 48 h muestra que 2 GB no alcanza y el owner no amplía el presupuesto para N2, o si corta por CPU (C14), que N2 no resuelve.
 
 | Criterio | Peso | Por qué pesa | lightsail-n1 | oracle-a1 | fly |
 |---|---:|---|---:|---:|---:|
@@ -55,7 +95,7 @@ Los puntajes por criterio son el promedio de los tres jueces. Fly quedó vetado 
 
 ## Por qué no los otros
 
-- **Oracle A1 (2,68, segundo):** cuesta ≈ USD 1,5, tiene 6 veces la RAM y la mejor latencia (63 ms). Pero exige imágenes multi-arch en `main.yml` (hoy `platforms: linux/amd64`, línea 64), un módulo `oci-host` nuevo y un cloud-init adaptado a las iptables de Oracle. La variante arm64 no pasaría por verify-by-digest ni por el smoke. Corre además el riesgo de reclamo de instancias ociosas: la memoria residente ronda el umbral del 20 %. Queda como **plan B**.
+- **Oracle A1 (2,68, segundo):** cuesta ≈ USD 2,5 por mes con la forma 2 OCPU / 8 GB (elegida para no caer en el reclamo de instancias ociosas), tiene 4 veces la RAM y la mejor latencia (63 ms). Pero exige imágenes multi-arch en `main.yml` (hoy `platforms: linux/amd64`, línea 64), un módulo `oci-host` nuevo y un cloud-init adaptado a las iptables de Oracle. La variante arm64 no pasaría por verify-by-digest ni por el smoke. Corre además el riesgo de reclamo de instancias ociosas: la memoria residente ronda el umbral del 20 %. Queda como **plan B**.
 - **Fly.io (1,90, vetado):** cumple lo técnico con una Machine propia para PG 18, pero cuesta USD 37–42 por mes en `gru`. Además, la crítica encontró una afirmación de seguridad falsa (el token de deploy sí expone los secretos), omisión de la réplica de documentos, red `.internal` solo IPv6 con binds en 0.0.0.0 y respaldos que dependen de crons de Actions que GitHub desactiva tras 60 días.
 
 ## Hallazgos que condicionan el diseño
@@ -77,7 +117,7 @@ Las demás objeciones (Object Lock de 21 días contra la clave con `deleteFiles`
 | El owner opera los parches del SO, Docker, PITR y la custodia de claves | `unattended-upgrades` con reinicio a las 04:30 La Paz, timers de respaldo con heartbeat, tareas de mantenimiento con frecuencia |
 | Memoria justa: 2 GB con techos que suman más que la RAM | PoC de 48 h con regla de corte. ML apagado por omisión y primero en apagarse |
 | CPU con ráfagas: base de 0,4 vCPU sostenida | Uso casi nulo. Vigilar `BurstCapacityPercentage`. Pronósticos de madrugada |
-| Margen de costo de USD 4–5 sin verificar (impuestos y recargo de la tarjeta boliviana). AWS Budgets solo avisa, no corta | Regla de corte con la primera factura real |
+| Margen de costo de ≈ USD 3,5 sin verificar (impuestos y recargo de la tarjeta boliviana). AWS Budgets solo avisa, no corta | Regla de corte con la primera factura real |
 | Si 2 GB no alcanza, no hay escalón vertical dentro del tope: N2 cuesta ≈ USD 27–30 | El owner decide de antemano entre ampliar el presupuesto o preparar el plan B |
 | Repositorio público | Sin secretos ni datos en el repo, gitleaks en CI y secretos solo en `/etc/pfos` |
 
@@ -93,7 +133,7 @@ Los tres jueces votaron igual. No hubo disenso sobre el ganador, pero cada uno d
 
 La lista completa, con archivo, motivo y cuándo, está en [cambios-de-codigo.md](cambios-de-codigo.md). Resumen:
 
-- [ ] Comando forzado del cloud-init con el quinto digest (`finance-ml`), **antes del primer apply**, y la salida `ml` del job `resolve` de `deploy.yml`, que hoy falta y deja el digest sin enviar.
+- [ ] Comando forzado del cloud-init con el quinto digest (`finance-ml`), **antes del primer apply**. La otra mitad, la salida `ml` del job `resolve` de `deploy.yml`, ya está hecha (#234).
 - [ ] Retención de los respaldos mensuales protegida contra un host comprometido (bucket o lock aparte), antes del primer respaldo.
 - [ ] Hora del snapshot de Lightsail fuera de la ventana de respaldos.
 - [ ] Timer de drill de restore que avise si falla.
@@ -103,10 +143,11 @@ La lista completa, con archivo, motivo y cuándo, está en [cambios-de-codigo.md
 - [ ] `ufw` del puerto 22 con límite de tasa.
 - [ ] Documentación desactualizada (runbook §2.1, §5.2 y §6, docs/30 §8, ADR-0033).
 - [ ] Content-Security-Policy de la web (hoy no se declara).
+- [ ] Regla de corte de CPU en el PoC y alarma de créditos de CPU (`BurstCapacityPercentage` < 30 %), C14.
 
 ## Qué reabriría esta decisión
 
-- El PoC mide más de 85 % de memoria del host sostenida, swap-in continuo u `OOMKilled`, y el owner no amplía el presupuesto. Se pasa a N1-F (plan B), según ADR-0027.
+- El PoC mide más de 85 % de memoria del host sostenida, swap-in continuo u `OOMKilled`, y el owner no amplía el presupuesto; o corta por CPU (C14), que N2 no resuelve. Se pasa a N1-F (plan B), según ADR-0027.
 - Dos drills de restore fallidos seguidos, o que pgBackRest no funcione con Object Lock en B2. Se pasa a N3 (Neon), fuera del tope actual.
 - La primera factura real supera los USD 20.
 - AWS cambia el precio de Lightsail en São Paulo, o Backblaze cambia Object Lock.
