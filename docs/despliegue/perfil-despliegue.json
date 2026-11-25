@@ -613,7 +613,7 @@
     },
     {
       "pregunta": 13,
-      "hecho": "18 checks obligatorios en main (unit, integración con Testcontainers, e2e Playwright, stack-smoke, Trivy por imagen, gitleaks, contrato, ml); nightly con Large Seed y benchmarks",
+      "hecho": "19 checks obligatorios en main (unit, integración con Testcontainers, e2e Playwright, stack-smoke, Trivy por imagen, gitleaks, contrato, ml); nightly con Large Seed y benchmarks",
       "evidencia": ".github/workflows/pr.yml, nightly.yml; protección de main"
     },
     {
@@ -749,7 +749,7 @@
       }
     ],
     "congelaciones": [
-      "Ninguna congelación de main; trunk con PR, auto-merge squash y 18 checks"
+      "Ninguna congelación de main; trunk con PR, auto-merge squash y 19 checks"
     ],
     "enCurso": [
       "Change 63 stabilize-import-persist-perf: solo espera el 5.º nightly programado",

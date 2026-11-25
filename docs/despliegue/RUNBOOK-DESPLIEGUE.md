@@ -192,7 +192,7 @@ C="docker compose -f /opt/pfos/repo/deploy/compose/compose.yaml -f /opt/pfos/rep
 
 ## Fase 0: cerrar las brechas de código (Claude)
 
-1. Implementar C1 a C11, C13 y C14 (C12a a C12c solo según la decisión 2 de la fase 1) de [cambios-de-codigo.md](cambios-de-codigo.md) en una rama por cambio, con su change de OpenSpec cuando toque comportamiento (el CLAUDE.md del repo lo exige), y fusionar con los 18 checks en verde.
+1. Implementar C1 a C11, C13 y C14 (C12a a C12c solo según la decisión 2 de la fase 1) de [cambios-de-codigo.md](cambios-de-codigo.md) en una rama por cambio, con su change de OpenSpec cuando toque comportamiento (el CLAUDE.md del repo lo exige), y fusionar con los 19 checks en verde.
 2. Ensayar en local el cambio de Keycloak (C7), siempre con un proyecto propio y prefijo 3 o 4:
 
    ```bash
@@ -214,10 +214,10 @@ Antes de abrir cuentas, respondé las preguntas de [docs/71](../71-despliegue-n1
 2. **Salida si el PoC falla, separada por causa** (ratificación del 2026-11-24): por memoria, ampliar a N2 (≈ USD 27–30) o ir al plan B; por CPU, solo el plan B, porque N2 no suma CPU sostenida. Decidí además si la preparación del plan B (C12a y C12b, multi-arch en una rama) se hace **antes** del PoC o se acepta hacerla con el PoC caído. Recomendación del panel: decidirlo ahora, no con el host ya caído.
 3. **Retención de los mensuales** (C3): bucket aparte con lock de 13 meses (recomendado) o quitar `deleteFiles` de la clave del host para el prefijo mensual.
 4. **Drill programado** (C5): drill local mensual en el host con la clave de solo lectura, más el drill fuera del host (§6) cada trimestre (recomendado).
-5. **Datos demo durante el PoC:** habilitar `DEMO_DATA_ENABLED=true` solo durante la fase 7 y volverlo a `false` en la limpieza (recomendado), o no usar la demo. Si no la habilitás, la [guía de pruebas](GUIA-PRUEBAS-FUNCIONALES.md#04-si-la-demo-no-se-habilita) dice qué casos dejan de ser bloqueantes.
-6. **Lectura de un PDF que cuadra** en la guía: dejarla para tus extractos reales (recomendado) o pedir un PDF sintético en disco.
+5. **Datos demo durante el PoC (D460, decidido 2026-11-25, [docs/75](../75-despliegue-n1-pendientes-decisions.md)):** `DEMO_DATA_ENABLED=true` y redeploy **solo durante la fase 7**, `false` en la limpieza y la comprobación 8 de la fase 6 repetida en la fase 8. Los casos con demo de la [guía de pruebas](GUIA-PRUEBAS-FUNCIONALES.md) siguen siendo bloqueantes.
+6. **Lectura de un PDF que cuadra** (D461, decidido 2026-11-25): un comando que escribe en disco el PDF sintético de Ganadero, `pnpm imports:pdf:sample <ruta>`, para probarla en la guía (GF-IMP-15) antes de los datos reales; los extractos reales siguen siendo del owner (tarea 9.1 del change 57).
 
-**Terminada cuando:** docs/38 tiene las seis respuestas con fecha.
+**Terminada cuando:** docs/38 tiene las seis respuestas con fecha (D452–D456 el 2026-11-24 y D460–D461 el 2026-11-25; falta solo el nombre del dominio de D452). Además, **antes de la fase 8** (D462): volver a preguntar al owner si quiere un tercer bucket para `documents/`.
 
 ## Fase 2: cuentas (Vos)
 
@@ -361,7 +361,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 
 1. **Repositorio de respaldo del PoC.** Comprobá que `pgbackrest.env` apunte al prefijo del PoC desde la fase 4 (C4): `grep -E '^PGBACKREST_REPO[12]_PATH=' /etc/pfos/pgbackrest.env` muestra las dos rutas `/pgbackrest/poc/…`. La réplica de documentos no tiene prefijo de PoC: los documentos ficticios quedan como versiones ocultas en `documents/` hasta que el lifecycle los purgue.
 
-   **Datos demo** (si en la decisión 5 de la fase 1 elegiste habilitarlos): en el host, poné `DEMO_DATA_ENABLED=true` en `/etc/pfos/pfos.env` y redeploy del mismo SHA (fase 6, paso 1). La comprobación 8 de la fase 6 da distinto mientras dure el PoC; la limpieza lo vuelve a `false`.
+   **Datos demo** (D460, decidido): en el host, poné `DEMO_DATA_ENABLED=true` en `/etc/pfos/pfos.env` y redeploy del mismo SHA (fase 6, paso 1). La comprobación 8 de la fase 6 da distinto mientras dure el PoC; la limpieza lo vuelve a `false`.
 
 2. **Medición del host completo** (Vos, en el host). Deja una muestra cada 5 minutos en un timer transitorio, con memoria y la línea `cpu` de `/proc/stat` (sin `sysstat`, que no está en los paquetes del cloud-init):
 
@@ -389,7 +389,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
      aws lightsail test-alarm --profile pfos-admin --region sa-east-1 --alarm-name pfos-creditos-cpu --state OK
      ```
 
-3. **Carga:** datos demo por la acción de la aplicación (si los habilitaste), el import de 5 000 filas de la [guía](GUIA-PRUEBAS-FUNCIONALES.md#19-pruebas-de-operación) con su persistencia medida (medición 3 de la regla de corte), la lectura de un PDF de prueba, 5 logins cronometrados y un deploy del mismo SHA (arranque de Keycloak en frío). Claude puede generar la carga desde afuera con la suite E2E apuntada a `$BASE` si la configurás para eso.
+3. **Carga:** datos demo por la acción de la aplicación (D460), el import de 5 000 filas de la [guía](GUIA-PRUEBAS-FUNCIONALES.md#19-pruebas-de-operación) con su persistencia medida (medición 3 de la regla de corte), la lectura del PDF sintético de `pnpm imports:pdf:sample` (GF-IMP-15), 5 logins cronometrados y un deploy del mismo SHA (arranque de Keycloak en frío). Claude puede generar la carga desde afuera con la suite E2E apuntada a `$BASE` si la configurás para eso.
 4. **pgBackRest con Object Lock (B3):** forzá un segundo full (el primero es el de la fase 6) y un `expire` por cantidad que intente quitar el primero, todavía bloqueado, y comprobá que los dos terminen en 0. Con la retención por tiempo de `pgbackrest.conf` (14 días) el `expire` no tocaría nada:
 
    ```bash
@@ -445,7 +445,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 **Borrar los datos ficticios antes de seguir** (Vos, en el host):
 
 1. `$C down` y borrar los volúmenes de PostgreSQL y SeaweedFS: `docker volume rm pfos_pg-data pfos_object-storage-data` (confirmá los nombres con `docker volume ls`). La base de Keycloak vive en el mismo PostgreSQL: se borran también el usuario ficticio, tu admin permanente y tu usuario.
-2. Quitá las dos líneas `PGBACKREST_REPO{1,2}_PATH` de `/etc/pfos/pgbackrest.env` para volver a los prefijos de `pgbackrest.conf`. Si habilitaste los datos demo, volvé `DEMO_DATA_ENABLED` a `false` en `/etc/pfos/pfos.env`.
+2. Quitá las dos líneas `PGBACKREST_REPO{1,2}_PATH` de `/etc/pfos/pgbackrest.env` para volver a los prefijos de `pgbackrest.conf`. Volvé `DEMO_DATA_ENABLED` a `false` (D460) en `/etc/pfos/pfos.env`.
 3. Deploy del mismo SHA (fase 6, paso 1): `migrate` crea el esquema vacío, Keycloak reimporta el realm y `ensure_stanza` crea la stanza limpia en el prefijo de producción, que está vacío.
 4. Repetí §2.6.2 (`pfos-bootstrap-storage.sh` y el primer full) y §2.6.3 (admin permanente con OTP y tu usuario).
 
@@ -472,7 +472,7 @@ Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock (21 
 
 ## Publicar una actualización
 
-1. PR contra `main` con los 18 checks en verde (auto-merge squash, trunk).
+1. PR contra `main` con los 19 checks en verde (auto-merge squash, trunk).
 2. Las migraciones son solo expand y las aplica `migrate` **antes** de que arranquen api y worker (dependencia de `up --wait`). Antes de migrar, `pfos-deploy.sh` hace un backup incremental anotado con el SHA.
 3. `main.yml` construye una vez y registra los digests. Despliegue: `gh workflow run deploy.yml -f action=deploy -f commit_sha=<SHA>` y aprobación en el environment `production`.
 4. Repetir las comprobaciones 1 a 6 de la fase 6.

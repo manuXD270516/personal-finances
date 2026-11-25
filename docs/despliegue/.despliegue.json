@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "actualizado": "2026-11-24",
+  "actualizado": "2026-11-25",
   "estado": "fase-0-cerrada-sin-desplegar",
   "modo": "ratificar",
   "parametros": {
@@ -22,6 +22,12 @@
     "documento": "docs/despliegue/DECISION-DESPLIEGUE.md"
   },
   "notaFase0": "Fase 0 cerrada en el código (PRs #263 a #270). Abiertos: C8 y C14 (se miden en el PoC) y C12c (condicional al plan B). Antes del primer apply: dominio D452, cuentas, tofu fmt y validate, pgbackrest-restore.env y checks pfos-drill, pfos-verify y pfos-image-prune; PFOS_KEYCLOAK_OPTIMIZED solo después del primer apply.",
+  "decisionesOwner": {
+    "fecha": "2026-11-25",
+    "documento": "docs/75-despliegue-n1-pendientes-decisions.md",
+    "ids": ["D460", "D461", "D462", "D463", "D464"],
+    "resumen": "Demo solo durante el PoC (D460); comando pnpm imports:pdf:sample (D461); tercer bucket de documents/: no por ahora, re-preguntar antes de la fase 8 (D462); image (pfos-keycloak) obligatorio, 19 checks (D463); tarea 6.3 del change 68 aceptada (D464)"
+  },
   "condiciones": [
     {
       "id": "C1",
