@@ -41,6 +41,7 @@ Estas reglas aplican a cualquier sesión, local o en la nube. Complementan los a
 - Migraciones solo expand, con timestamp posterior a la última de `main`; nunca edites una fusionada.
 - Contratos aditivos: oasdiff limpio (`pnpm contract:breaking`), Spectral y Redocly sin errores. En el YAML, las descripciones con comas dentro de un flow mapping van entre comillas.
 - Presupuesto de conexiones: la plantilla del host suma API 22 + worker 34 = 56 sobre `max_connections=70` de Postgres (`deploy/compose/compose.prod.yaml`; con las dos colas pg-boss, 64 de 67 útiles). No agregues consumidores sin justificarlo y validar el test de arranque del worker.
+- **Soporte de navegadores:** Baseline Widely available como piso. Una función Newly available se usa si su ausencia no impide completar la tarea (mejora progresiva) o con un respaldo propio de ≤ 20 líneas sin dependencias. Sin polyfills. Limited availability solo como mejora opcional que no cambia la tarea (D500, [docs/79](docs/79-ui-ux-modern-web-decisions.md)).
 - Tests: TC-id en el nombre (`it('[TC-…] …')`). Los PBT y los de muchos datos llevan timeout explícito (CI es más lento). No busques números sueltos con `toContain` (aparecen dentro de ids y marcas de tiempo): usa regex con límites. Los consumidores asíncronos (Planning provisiona periodos tras cada asiento) generan filas en segundo plano; las comparaciones de estado deben tenerlo en cuenta.
 
 ## Gates antes de entregar
