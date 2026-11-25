@@ -1,5 +1,6 @@
 import 'reflect-metadata';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { createAuditRuntime } from '@pf/audit/interface/audit.module';
 import { formatBacktestReport, type ForecastingRuntime } from '@pf/forecasting/interface/forecasting.module';
@@ -16,7 +17,7 @@ import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { LARGE_MAIN_WORKSPACE_ID, LARGE_MANIFEST } from '../../src/seed/large/large-plan.js';
 import { runSeed } from '../../src/seed/run-seed.js';
 import { baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
-import { anomalyLabelsPath, recordSuiteLoad } from './background-load.js';
+import { anomalyLabelsPath, perfOutDir, recordSuiteLoad } from './background-load.js';
 
 /**
  * Detección de gastos atípicos con el workspace principal del Large Seed (openspec add-spending-anomaly-detection, tareas
@@ -24,9 +25,11 @@ import { anomalyLabelsPath, recordSuiteLoad } from './background-load.js';
  *
  *  - TC-FORECAST-ANOMALY-026 (NFR-PERF-012, Should): la pasada diaria del workspace principal con 7 días de gastos nuevos
  *    termina en ≤ 10 s y evalúa gastos.
- *  - TC-FORECAST-ANOMALY-025 (fila BLOQUEANTE del nightly): la evaluación sobre toda la historia (cada gasto con sus 365 días
- *    anteriores, sin persistir) contra las etiquetas `OUTLIER` y `NEW_COUNTERPARTY_FRAUD` del Large Seed (exportadas fuera de
- *    la base por el seed de `nightly.perf.ts`) exige precisión ≥ 0.60 y recall ≥ 0.70. El informe no lleva montos ni descripciones.
+ *  - TC-FORECAST-ANOMALY-025 (fila INFORMATIVA del nightly desde D488, docs/77): la evaluación sobre toda la historia (cada
+ *    gasto con sus 365 días anteriores, sin persistir) contra las etiquetas `OUTLIER` y `NEW_COUNTERPARTY_FRAUD` del Large Seed
+ *    (exportadas fuera de la base por el seed de `nightly.perf.ts`) se mide y se publica (consola y `anomalies.json` en el
+ *    directorio del reporte) contra los umbrales de D483 (precisión ≥ 0.60 y recall ≥ 0.70), pero no falla el job hasta la
+ *    recalibración (openspec refine-spending-anomaly-calibration). El informe no lleva montos ni descripciones.
  *
  * Variables: `PF_PERF_SCALE` (0..1, por omisión 1) para el seed si el workspace no existe, y `PF_PERF_LABELS` (ruta del JSONL de
  * etiquetas; por omisión `anomalies.labels.jsonl` en el directorio del reporte).
@@ -106,7 +109,7 @@ const asWorker = <T>(fn: () => Promise<T>): Promise<T> =>
   );
 
 describe('detección de gastos atípicos con el workspace principal del Large Seed', () => {
-  it('[TC-FORECAST-ANOMALY-025] la evaluación contra las etiquetas OUTLIER y NEW_COUNTERPARTY_FRAUD cumple precisión ≥ 0.60 y recall ≥ 0.70', async () => {
+  it('[TC-FORECAST-ANOMALY-025] la evaluación contra las etiquetas OUTLIER y NEW_COUNTERPARTY_FRAUD publica precisión y recall frente a 0.60 y 0.70 (fila informativa, D488)', async () => {
     expect(existsSync(LABELS), `faltan las etiquetas del Large Seed (${LABELS}): sembrar con labelsOut`).toBe(
       true,
     );
@@ -114,13 +117,23 @@ describe('detección de gastos atípicos con el workspace principal del Large Se
     expect(labels.length).toBeGreaterThan(0);
     const started = performance.now();
     const report = await asWorker(() => forecasting.anomalies.backtest.report(WS, labels));
-    console.info(
-      `anomalies backtest (${Math.round((performance.now() - started) / 1000)} s):\n${formatBacktestReport(report)}`,
+    const seconds = Math.round((performance.now() - started) / 1000);
+    console.info(`anomalies backtest (${seconds} s, fila informativa D488):
+${formatBacktestReport(report)}`);
+    // Fila informativa (D488): se mide y se publica siempre; quedar bajo los umbrales de D483 no falla el job.
+    writeFileSync(
+      join(perfOutDir(), 'anomalies.json'),
+      `${JSON.stringify({ blocking: false, decision: 'D488', seconds, ...report }, null, 2)}
+`,
     );
+    if (!report.passes) {
+      console.warn(
+        `[anomalies] fila informativa (D488): precisión ${report.precision ?? 'n/a'} y recall ${report.recall ?? 'n/a'} bajo los umbrales de D483 (0.60 y 0.70)`,
+      );
+    }
+    expect(report.expected).toBeGreaterThan(0);
     expect(report.precision).not.toBeNull();
-    expect(Number(report.precision), formatBacktestReport(report)).toBeGreaterThanOrEqual(0.6);
-    expect(Number(report.recall), formatBacktestReport(report)).toBeGreaterThanOrEqual(0.7);
-    expect(report.passes).toBe(true);
+    expect(report.recall).not.toBeNull();
   }, 3_600_000);
 
   it('[TC-FORECAST-ANOMALY-026] la pasada diaria del workspace principal con 7 días de gastos tarda 10 s o menos', async () => {

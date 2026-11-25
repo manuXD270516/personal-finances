@@ -18,3 +18,15 @@ Trace: FR-IMPORTS-003, FR-IMPORTS-001 · Priority: Should
 #### Scenario: Importación ya mapeada
 - **CUANDO** la misma importación ya está en revisión
 - **ENTONCES** la consulta no devuelve filas de muestra
+
+### Requirement: Mapeo sugerido al retomar una importación
+La consulta de una importación que está "esperando mapeo" DEBE (MUST) devolver también el mapeo sugerido, el de la última importación de la misma cuenta, igual que al crearla, para que la pantalla de mapeo se precargue al retomar. Si la cuenta no tiene importaciones anteriores, o en cualquier otro estado, la consulta NO DEBE (MUST NOT) devolver un mapeo sugerido.
+Trace: FR-IMPORTS-003 · Priority: Could
+
+#### Scenario: Retomar con el mapeo de la importación anterior
+- **CUANDO** "Banco BOB" tiene una importación anterior aprobada con las columnas "Fecha", "Descripción" y "Monto" mapeadas a fecha, descripción y monto, y un EDITOR retoma una importación nueva de esa cuenta que sigue esperando mapeo
+- **ENTONCES** la consulta devuelve ese mapeo como sugerido y la pantalla de mapeo lo muestra precargado
+
+#### Scenario: Cuenta sin importaciones anteriores
+- **CUANDO** el EDITOR retoma la primera importación de "Banco USD", que sigue esperando mapeo
+- **ENTONCES** la consulta no devuelve un mapeo sugerido y la pantalla de mapeo empieza vacía
