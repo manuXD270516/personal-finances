@@ -136,3 +136,15 @@ Migración expand. Deploy sin pasos manuales. Rollback: `RULES_CATEGORY_SUGGEST_
 ## Preguntas abiertas
 
 Ninguna bloqueante. D476 y D477 fijan el enfoque y el umbral. Los parámetros no decididos por el owner (apoyo mínimo 2, nivel «alta» desde 0.9000 con 5, ventana de 365 días, reemplazo de «la última usada») son decisiones de diseño configurables o reversibles y se revisan con la tasa de aceptación al cerrar el criterio de salida.
+
+## As-built (2026-11-25)
+
+Diferencias menores con lo diseñado, todas aditivas y sin cambiar ningún scenario:
+
+- **Esquema `HistoryCategorySuggestion`.** El contrato ya tenía un `CategorySuggestion` (la respuesta de `getCounterpartyCategorySuggestion`, con `source` `DEFAULT`/`LAST_USED`/`NONE`); la sugerencia por historial se llama `HistoryCategorySuggestion` para no romperlo. La forma es la del diseño.
+- **`VALIDATION_FAILED` es 400.** El catálogo de errores de la API responde 400 para `VALIDATION_FAILED` (como en las demás operaciones de RULES); el 422 queda para `IDEMPOTENCY_KEY_REUSED` del registro de resultados.
+- **Filtro `hasSuggestion` en `getImportPreview`** (aditivo): la vista previa filtra por las filas con sugerencia vigente, del lado del servidor, para que el filtro «con sugerencia» sirva con la paginación.
+- **Resultado de una fila del import.** Se registra `ACCEPTED` cuando la categoría final es la sugerida (aceptada con la marca o elegida a mano igual), `CORRECTED` si es otra e `IGNORED` si queda sin categoría; solo cuentan las filas con decisión `CREATE` y tipo gasto o ingreso.
+- **Consulta del alta manual y reglas.** La evaluación de las reglas `MANUAL_CREATE` sobre el borrador usa monto cero (la consulta no lleva monto): una regla con una condición sobre el monto se evalúa con ese valor.
+- **Una sugerencia aceptada en una fila se conserva al reevaluar las reglas** (la tasa de aceptación necesita su nivel); las no aceptadas se recalculan.
+- **Runner.** `pnpm rules:category-suggestions:backtest -- --workspace <id> --months <n> [--as-of YYYY-MM] [--min-precision 0.8500]` es el comando `category-suggestions-backtest` de la imagen `finance-api` (`apps/api/src/main.category-backtest.ts`); por omisión el último mes incluido es el último mes completo. La fila bloqueante del nightly es `apps/api/test/perf/category-suggestions.perf.ts` (Large Seed, `--months 3`, `--as-of 2026-09`).

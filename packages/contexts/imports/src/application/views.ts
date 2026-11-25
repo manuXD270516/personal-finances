@@ -21,6 +21,7 @@ import type {
   RowKind,
   StatementFormat,
 } from '../domain/index.js';
+import type { CategorySuggestionEntry } from './ports/pipeline.js';
 
 /** `ImportJob` del contrato (sin celdas del archivo ni nada que no deba viajar). */
 export interface ImportJobView {
@@ -320,4 +321,6 @@ export interface RowPhase6View {
   readonly conversion: NonNullable<RowEdits['conversion']> | null;
   /** Cuenta de la fila en un import de una conexión (varias cuentas); `null` = la cuenta del import. */
   readonly accountId?: string | null;
+  /** Sugerencia de categoría por historial de la fila que sigue sin categoría (add-category-suggestions); `null` si no hay. */
+  readonly suggestedCategory?: CategorySuggestionEntry | null;
 }

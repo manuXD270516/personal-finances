@@ -5,16 +5,18 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Las reglas y la elección del usuario siempre ganan"
 scenario: "Una regla clasifica el gasto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014","FR-RULES-006","FR-RULES-009"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/category-suggestions.test.ts
+  - apps/api/test/api/category-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

@@ -15,6 +15,7 @@
     "migrate": "node dist/entrypoint.js migrate",
     "seed": "node dist/entrypoint.js seed",
     "forecast:report": "node dist/entrypoint.js forecast-report",
+    "category-suggestions:backtest": "node dist/entrypoint.js category-suggestions-backtest",
     "perf:bench": "vitest run --config vitest.perf.config.ts"
   },
   "dependencies": {

@@ -5,16 +5,18 @@ spec: classification/counterparties
 related_specs: []
 requirement: "Sugerencia de categoría por counterparty"
 scenario: "La sugerencia por historial reemplaza a la última usada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-011","FR-CLASSIFICATION-014"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/category-suggestions.test.ts
+  - apps/web/src/ui/category-suggestions/category-suggestions.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

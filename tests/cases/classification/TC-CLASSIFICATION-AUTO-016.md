@@ -5,16 +5,17 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Sugerencia en la vista previa del import"
 scenario: "Sugerencias no disponibles"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014","FR-IMPORTS-009"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.suggestions.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

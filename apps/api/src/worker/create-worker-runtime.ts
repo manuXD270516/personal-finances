@@ -680,6 +680,10 @@ export async function createWorkerRuntime(
       commitments: finance.commitments,
       classification: finance.classification.validator,
       rules: finance.rules.evaluation,
+      // add-category-suggestions: la etapa de clasificación del import calcula las sugerencias en el worker.
+      categorySuggestions: finance.rules.suggestionQuery,
+      suggestionFeedback: finance.rules.suggestionFeedback,
+      counters: otelCounters('@pf/rules'),
       accountCatalog: finance.accounts.catalog,
     }),
     settings: importsSettingsFrom(config),

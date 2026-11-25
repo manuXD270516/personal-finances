@@ -5,16 +5,17 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Permisos y aislamiento de las sugerencias"
 scenario: "Historial de otro workspace"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014","FR-IDENTITY-006"]
 nfr: ["NFR-SEC-003","NFR-SEC-004"]
 invariants: []
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions","rls"]

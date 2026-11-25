@@ -5,16 +5,17 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Sugerencias sin el servicio de pronósticos ni procesos nuevos"
 scenario: "Servicio de pronósticos apagado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014","FR-FORECAST-006"]
 nfr: ["NFR-REL-010"]
 invariants: []
 priority: medium
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

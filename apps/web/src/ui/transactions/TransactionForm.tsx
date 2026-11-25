@@ -16,6 +16,14 @@ import { errorStyle, Field, formStyle, inputStyle, mutedStyle, rowStyle, warning
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
 import { buildFieldsPayload, type CustomFieldError } from '../custom-fields/logic';
+import { SuggestionChip } from '../category-suggestions/SuggestionChip';
+import { useCategorySuggestion } from '../category-suggestions/useCategorySuggestion';
+import {
+  chipCategoryId,
+  feedbackPath,
+  type ChipSuggestion,
+  type SuggestionKind,
+} from '../category-suggestions/logic';
 import { categoryOptions, type Catalogs } from './catalogs';
 import { CounterpartyPicker } from './CounterpartyPicker';
 import { newSplitRow, summarizeSplits, type SplitRow } from './splits';
@@ -102,6 +110,7 @@ export function TransactionForm({
 }) {
   const f = useFormat('Transactions', ctx);
   const cf = useFormat('CustomFields', ctx);
+  const sf = useFormat('CategorySuggestions', ctx);
   const customFields = useCustomFields(ctx);
   const txFields = customFields.active('TRANSACTION');
   const [fieldErrors, setFieldErrors] = useState<Record<number, Record<string, CustomFieldError>>>({});
@@ -145,6 +154,10 @@ export function TransactionForm({
   const [refundCandidates, setRefundCandidates] = useState<readonly Transaction[]>([]);
   const attemptKey = useRef(uuidv7());
   const inFlight = useRef(false);
+  // add-category-suggestions: la sugerencia aceptada o descartada y la última por historial mostrada (para la tasa).
+  const [acceptedChip, setAcceptedChip] = useState<ChipSuggestion | null>(null);
+  const [dismissedChip, setDismissedChip] = useState(false);
+  const lastHistoryChip = useRef<Extract<ChipSuggestion, { source: 'HISTORY' }> | null>(null);
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
 
   const accounts = catalogs.activeAccounts.length || !original ? catalogs.activeAccounts : catalogs.accounts;
@@ -160,6 +173,29 @@ export function TransactionForm({
     [catalogs.categories, catalogs.groups, categoryKind],
   );
   const usesSplits = s.kind !== 'ADJUSTMENT';
+  // Sugerencia de categoría (add-category-suggestions): solo mientras la categoría está vacía y nunca se asigna sola.
+  const categoryEmpty = usesSplits && !editing && s.splits.length === 1 && !s.splits[0]?.categoryId;
+  const chip = useCategorySuggestion(ctx, {
+    enabled: categoryEmpty && ctx.canEdit,
+    kind: (s.kind === 'ADJUSTMENT' ? 'EXPENSE' : s.kind) as SuggestionKind,
+    description: s.description,
+    counterpartyId: s.counterpartyId,
+    accountId: s.accountId,
+    date: s.transactionDate,
+  });
+  useEffect(() => {
+    if (chip?.source === 'HISTORY') lastHistoryChip.current = chip;
+    // Sin sugerencia vigente y con la categoría aún vacía no hay nada que medir (con la categoría ya elegida se conserva
+    // la última mostrada: aceptada o corregida).
+    else if (chip === null && categoryEmpty) lastHistoryChip.current = null;
+  }, [chip, categoryEmpty]);
+  // Un texto o una contraparte nuevos pueden traer otra sugerencia: se vuelve a ofrecer.
+  useEffect(() => {
+    setDismissedChip(false);
+  }, [s.description, s.counterpartyId, s.kind]);
+  const categoryNameOf = (id: string) => catalogs.categories.find((c) => c.id === id)?.name ?? id;
+  const counterpartyNameOf = (id: string | null) =>
+    id === null ? undefined : catalogs.counterparties.find((c) => c.id === id)?.name;
 
   // Aviso de posibles duplicados (no bloqueante): misma cuenta, mismo monto, fecha ±3 días.
   useEffect(() => {
@@ -305,6 +341,7 @@ export function TransactionForm({
           idempotencyKey: attemptKey.current,
         });
         attemptKey.current = uuidv7();
+        recordSuggestionOutcome(r.data!);
         onSaved(r.data!);
       } else {
         const patch: Record<string, unknown> = {};
@@ -350,6 +387,28 @@ export function TransactionForm({
       inFlight.current = false;
       setBusy(false);
     }
+  }
+
+  /**
+   * Tasa de aceptación (add-category-suggestions): si se mostró una sugerencia por historial, informa con qué categoría se
+   * guardó el movimiento (aceptada, corregida o sin categoría). Sin descripciones ni montos; si la llamada se pierde, solo
+   * se pierde un dato de la métrica, nunca uno financiero.
+   */
+  function recordSuggestionOutcome(tx: Transaction) {
+    const shown = lastHistoryChip.current;
+    if (!shown) return;
+    const saved = tx.splits[0]?.categoryId ?? null;
+    const system = catalogs.categories.find((c) => c.id === saved)?.systemCode ?? '';
+    void ctx.api
+      .command('POST', feedbackPath(ctx.base), {
+        surface: 'MANUAL_ENTRY',
+        level: shown.suggestion.level,
+        suggestedCategoryId: shown.suggestion.categoryId,
+        chosenCategoryId: saved === null || system.startsWith('UNCATEGORIZED') ? null : saved,
+        transactionId: tx.id,
+      })
+      .catch(() => undefined);
+    lastHistoryChip.current = null;
   }
 
   const accountLabel = (id: string) => catalogs.accounts.find((a) => a.id === id)?.name ?? id;
@@ -553,6 +612,34 @@ export function TransactionForm({
             )}
           </Field>
         </div>
+      ) : null}
+      {acceptedChip && s.splits[0]?.categoryId === chipCategoryId(acceptedChip) ? (
+        <SuggestionChip
+          f={sf}
+          chip={acceptedChip}
+          kind={s.kind as SuggestionKind}
+          categoryName={categoryNameOf}
+          counterpartyName={counterpartyNameOf}
+          accepted
+          onAccept={() => undefined}
+          onOther={() => undefined}
+        />
+      ) : chip && categoryEmpty && !dismissedChip && !(chip.source === 'RULE_APPLIES' && !applyRules) ? (
+        <SuggestionChip
+          f={sf}
+          chip={chip}
+          kind={s.kind as SuggestionKind}
+          categoryName={categoryNameOf}
+          counterpartyName={counterpartyNameOf}
+          accepted={false}
+          onAccept={() => {
+            const id = chipCategoryId(chip);
+            if (id === null) return;
+            setAcceptedChip(chip);
+            set({ splits: [{ ...s.splits[0]!, categoryId: id }] });
+          }}
+          onOther={() => setDismissedChip(true)}
+        />
       ) : null}
       {usesSplits ? (
         <SplitsEditor

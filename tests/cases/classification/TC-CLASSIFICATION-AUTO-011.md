@@ -5,16 +5,18 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Ninguna sugerencia se aplica sin confirmación"
 scenario: "Aprobar un import sin aceptar las sugerencias"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.suggestions.test.ts
+  - apps/api/test/api/category-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

@@ -43,6 +43,8 @@ export interface RowPatch {
   readonly transfer?: { counterAccountId: string } | null;
   readonly conversion?: ImportRowConversion | null;
   readonly occurrenceLink?: { occurrenceId: string } | null;
+  /** Con `categoryId` igual a la sugerencia de la fila: marca de aceptación (add-category-suggestions). */
+  readonly acceptedSuggestion?: boolean;
 }
 
 /** ¿La fila trae datos del pipeline de documentos (propuesta, candidatos con puntaje, compromisos…)? */

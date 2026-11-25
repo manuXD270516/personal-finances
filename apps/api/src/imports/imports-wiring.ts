@@ -4,7 +4,12 @@ import type { OccurrenceLinkPort, OccurrenceMatchCandidatesQuery } from '@pf/com
 import type { DocumentsRuntime } from '@pf/documents/interface/documents.module';
 import type { ImportsRuntimeOptions } from '@pf/imports/interface/imports.module';
 import { currentRequestContext } from '@pf/platform/api';
-import type { RuleEvaluationQuery } from '@pf/rules/contracts';
+import type {
+  CategorySuggestionFeedbackPort,
+  CategorySuggestionQuery,
+  RuleEvaluationQuery,
+} from '@pf/rules/contracts';
+import type { CounterMetrics } from '@pf/platform/otel';
 import { DomainError } from '@pf/shared-kernel';
 
 /**
@@ -15,7 +20,15 @@ import { DomainError } from '@pf/shared-kernel';
 
 type ImportsPorts = Pick<
   ImportsRuntimeOptions,
-  'documents' | 'rules' | 'counterparties' | 'matching' | 'occurrenceLinks' | 'institutions' | 'refs'
+  | 'documents'
+  | 'rules'
+  | 'suggestions'
+  | 'suggestionFeedback'
+  | 'counterparties'
+  | 'matching'
+  | 'occurrenceLinks'
+  | 'institutions'
+  | 'refs'
 >;
 
 /** Referencia mutable al runtime de DOCUMENTS (se crea después que IMPORTS; undefined = documentos deshabilitados). */
@@ -55,6 +68,11 @@ export function importsPortsFor(input: {
   };
   readonly classification: ClassificationValidator;
   readonly rules: RuleEvaluationQuery;
+  /** Sugerencias de categoría por historial (add-category-suggestions): consulta y registro de resultados de RULES. */
+  readonly categorySuggestions?: CategorySuggestionQuery;
+  readonly suggestionFeedback?: CategorySuggestionFeedbackPort;
+  /** Contadores `rules_category_suggestion_*` (la etapa del import cuenta sus fallas sin descripciones ni montos). */
+  readonly counters?: CounterMetrics;
   readonly accountCatalog: Pick<AccountCatalogQuery, 'listAccounts'>;
 }): ImportsPorts {
   const documents: ImportsPorts['documents'] = {
@@ -99,6 +117,23 @@ export function importsPortsFor(input: {
       evaluate: ({ workspaceId, subjects }) =>
         input.rules.evaluate({ workspaceId, trigger: 'IMPORT', mode: 'FILL_EMPTY', subjects }),
     },
+    // Sugerencias de categoría por historial (add-category-suggestions, D476): un índice por etapa; una falla deja las
+    // filas sin sugerencia (la etapa la absorbe) y se cuenta en la métrica.
+    ...(input.categorySuggestions
+      ? {
+          suggestions: {
+            suggestMany: async ({ workspaceId, subjects }) => {
+              try {
+                return await input.categorySuggestions!.suggestMany({ workspaceId, subjects });
+              } catch (error) {
+                input.counters?.increment('rules_category_suggestion_stage_failures_total', {});
+                throw error;
+              }
+            },
+          },
+        }
+      : {}),
+    ...(input.suggestionFeedback ? { suggestionFeedback: input.suggestionFeedback } : {}),
     // Pendiente: CLASSIFICATION sigue sin un contrato para resolver alias de contraparte ni la categoría por defecto
     // de una contraparte por lote (add-rule-engine no lo agregó): el adaptador devuelve vacío y ninguna fila trae esa propuesta.
     counterparties: {

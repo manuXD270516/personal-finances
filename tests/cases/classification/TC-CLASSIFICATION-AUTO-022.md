@@ -5,16 +5,19 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Sugerencias sin el servicio de pronósticos ni procesos nuevos"
 scenario: "Función deshabilitada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/category-suggestions.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.suggestions.test.ts
+  - apps/api/test/api/category-suggestions-disabled.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

@@ -5,16 +5,18 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Backtesting temporal de las sugerencias"
 scenario: "Menos de 3 meses"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014"]
 nfr: []
 invariants: []
 priority: medium
 type: unit
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/category-suggester.test.ts
+  - packages/contexts/rules/src/application/category-suggestions.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

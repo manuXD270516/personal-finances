@@ -8,6 +8,7 @@ import type { Clock } from '@pf/shared-kernel';
 import type {
   Action,
   ActionCatalog,
+  CategorySuggestionThresholds,
   EvaluableRule,
   ProposalPatternType,
   ProposalThresholds,
@@ -126,6 +127,65 @@ export interface WorkspaceToday {
   today(workspaceId: string): Promise<string>;
 }
 
+/** Resultado de una sugerencia de categoría mostrada (`rules.category_suggestion_outcome`, sin textos ni montos). */
+export type CategorySuggestionSurface = 'MANUAL_ENTRY' | 'IMPORT';
+export type CategorySuggestionOutcomeKind = 'ACCEPTED' | 'CORRECTED' | 'IGNORED';
+
+export interface CategorySuggestionOutcomeRecord {
+  readonly id: string;
+  readonly surface: CategorySuggestionSurface;
+  readonly level: 'HIGH' | 'MEDIUM';
+  readonly outcome: CategorySuggestionOutcomeKind;
+  /** `YYYY-MM-DD` en la zona del workspace. */
+  readonly occurredOn: string;
+  readonly importJobId: string | null;
+  readonly transactionId: string | null;
+}
+
+export interface CategorySuggestionOutcomeRepository {
+  insertMany(workspaceId: string, records: readonly CategorySuggestionOutcomeRecord[]): Promise<void>;
+  /** Conteos por canal, nivel y resultado del rango `[from, to]` (fechas `occurred_on`). */
+  aggregate(
+    workspaceId: string,
+    from: string,
+    to: string,
+  ): Promise<
+    readonly {
+      readonly surface: CategorySuggestionSurface;
+      readonly level: 'HIGH' | 'MEDIUM';
+      readonly outcome: CategorySuggestionOutcomeKind;
+      readonly count: number;
+    }[]
+  >;
+}
+
+/** Métricas del contexto (nombres `rules_category_suggestion_*`; sin descripciones ni montos). */
+export interface RulesMetricsPort {
+  increment(name: string, labels: Readonly<Record<string, string>>, value?: number): void;
+}
+
+/** Sugerencias de categoría por historial (add-category-suggestions, `RULES_CATEGORY_SUGGEST_*`). */
+export interface CategorySuggestSettings extends CategorySuggestionThresholds {
+  readonly enabled: boolean;
+  readonly windowDays: number;
+  readonly maxEvidence: number;
+  readonly cacheTtlSeconds: number;
+  /** Tope de workspaces en la caché en proceso (LRU). */
+  readonly cacheMaxWorkspaces: number;
+}
+
+export const DEFAULT_CATEGORY_SUGGEST_SETTINGS: CategorySuggestSettings = {
+  enabled: true,
+  windowDays: 365,
+  maxEvidence: 5000,
+  minSupport: 2,
+  minConfidence: '0.7000',
+  highConfidence: '0.9000',
+  highMinSupport: 5,
+  cacheTtlSeconds: 300,
+  cacheMaxWorkspaces: 200,
+};
+
 export interface RulesSettings {
   /** Reglas no archivadas por workspace (D339). */
   readonly maxRules: number;
@@ -137,6 +197,8 @@ export interface RulesSettings {
   readonly applyMaxItems: number;
   /** Sugerencias de reglas (add-rule-suggestions, decisión 8). */
   readonly suggest: RuleSuggestSettings;
+  /** Sugerencias de categoría por historial (add-category-suggestions). */
+  readonly categorySuggest: CategorySuggestSettings;
 }
 
 export interface RuleSuggestSettings extends ProposalThresholds {
@@ -163,6 +225,7 @@ export const DEFAULT_RULES_SETTINGS: RulesSettings = {
   dryRunMaxTransactions: 5000,
   applyMaxItems: 500,
   suggest: DEFAULT_SUGGEST_SETTINGS,
+  categorySuggest: DEFAULT_CATEGORY_SUGGEST_SETTINGS,
 };
 
 export interface IdGenerator {
@@ -173,6 +236,7 @@ export interface RulesDeps {
   readonly uow: UnitOfWork;
   readonly rules: RuleRepository;
   readonly decisions: RuleProposalDecisionRepository;
+  readonly outcomes: CategorySuggestionOutcomeRepository;
   readonly calendar: WorkspaceToday;
   readonly catalog: ReferenceCatalog;
   readonly subjects: ClassificationSubjectsQuery;
@@ -182,6 +246,7 @@ export interface RulesDeps {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly settings: RulesSettings;
+  readonly metrics?: RulesMetricsPort;
 }
 
 export type { AuditPort };

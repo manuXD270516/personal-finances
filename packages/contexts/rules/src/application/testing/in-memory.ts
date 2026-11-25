@@ -17,6 +17,8 @@ import {
 } from '../../domain/index.js';
 import {
   DEFAULT_RULES_SETTINGS,
+  type CategorySuggestionOutcomeRecord,
+  type CategorySuggestionOutcomeRepository,
   type ReferenceCatalog,
   type ReferenceDescriptions,
   type RuleProposalDecisionRecord,
@@ -214,6 +216,35 @@ export class InMemoryDecisions implements RuleProposalDecisionRepository {
   }
 }
 
+/** Resultados de sugerencias de categoría en memoria. */
+export class InMemoryOutcomes implements CategorySuggestionOutcomeRepository {
+  readonly records: CategorySuggestionOutcomeRecord[] = [];
+
+  async insertMany(_workspaceId: string, records: readonly CategorySuggestionOutcomeRecord[]): Promise<void> {
+    this.records.push(...records);
+  }
+
+  async aggregate(_workspaceId: string, from: string, to: string) {
+    const cells = new Map<
+      string,
+      {
+        surface: CategorySuggestionOutcomeRecord['surface'];
+        level: CategorySuggestionOutcomeRecord['level'];
+        outcome: CategorySuggestionOutcomeRecord['outcome'];
+        count: number;
+      }
+    >();
+    for (const r of this.records) {
+      if (r.occurredOn < from || r.occurredOn > to) continue;
+      const key = `${r.surface}|${r.level}|${r.outcome}`;
+      const cell = cells.get(key) ?? { surface: r.surface, level: r.level, outcome: r.outcome, count: 0 };
+      cell.count += 1;
+      cells.set(key, cell);
+    }
+    return [...cells.values()];
+  }
+}
+
 /** Transacciones sintéticas para el dry-run, la vista previa y la aplicación. */
 export class InMemorySubjects {
   readonly byId = new Map<string, ClassificationSubjectDto>();
@@ -355,6 +386,7 @@ export function createRulesWorld(now = '2026-10-20T14:00:00.000Z') {
   const audit = new InMemoryAudit();
   const subjects = new InMemorySubjects();
   const decisions = new InMemoryDecisions();
+  const outcomes = new InMemoryOutcomes();
   const calendar = { current: '2026-11-04', today: async () => calendar.current };
   const classifier = new InMemoryClassifier(subjects);
   const coverage = new InMemoryCoverage();
@@ -364,6 +396,7 @@ export function createRulesWorld(now = '2026-10-20T14:00:00.000Z') {
     uow: { run: (_ws, fn) => fn() },
     rules,
     decisions,
+    outcomes,
     calendar,
     catalog,
     subjects: subjects as unknown as RulesDeps['subjects'],
@@ -379,5 +412,17 @@ export function createRulesWorld(now = '2026-10-20T14:00:00.000Z') {
   catalog.categories.set('cat-reembolsos', { kind: 'INCOME', archived: false });
   catalog.tags.set('tag-hogar', { archived: false });
   catalog.counterparties.set('cp-hipermaxi', { archived: false });
-  return { deps, rules, catalog, audit, subjects, classifier, coverage, clock, decisions, calendar };
+  return {
+    deps,
+    rules,
+    catalog,
+    audit,
+    subjects,
+    classifier,
+    coverage,
+    clock,
+    decisions,
+    outcomes,
+    calendar,
+  };
 }

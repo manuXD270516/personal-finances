@@ -134,6 +134,8 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 31 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Lectura (as-built `add-credit-cards`): `AccountMovementsQuery` (movimientos de la cuenta de tarjeta por fecha y clase), `PendingFlowQuery` (compras pendientes) y `TransactionLinkQuery` (validar la compra de un plan de cuotas). Debt no crea transacciones de tarjeta: el pago es la transferencia del usuario o la del plan de pago que materializa el motor. |
 | 32 | COMMITMENTS | GOALS | C/S | SYNC-TX | `RecurringDefinitionPort` (`createManaged`, `reviseManaged`, `pauseManaged`, `resumeManaged`, `end`): el aporte programado de una meta es una definición `TRANSFER` administrada (`managedBy = GOAL`) que Goals crea y mantiene en su UoW; las acciones de usuario sobre la definición devuelven `RECURRING_MANAGED_EXTERNALLY` y las acciones sobre sus ocurrencias siguen permitidas. COMMITMENTS no depende de GOALS. |
 
+> **Phase 9 (`add-category-suggestions`):** IMPORTS → RULES por `@pf/rules/contracts` (`CategorySuggestionQuery.suggestMany`, `CategorySuggestionFeedbackPort.recordBatch`), síncrono y en la unidad de trabajo del llamador; RULES lee la evidencia por `ClassificationSubjectsQuery.listEvidence` (TRANSACTIONS). Sin relaciones asíncronas nuevas.
+
 ### 3.1 Composición "abrir cuenta con saldo inicial"
 
 Accounts no depende de Transactions (evita ciclo). El endpoint `POST /accounts` con `openingBalance` se implementa en la **capa de composición** (`apps/api`) dentro de una unidad de trabajo: `Accounts.OpenAccount` → `Transactions.RecordOpeningBalance` (que crea el `LedgerAccount` vía get-or-create). Es orquestación de aplicación, no una relación de dominio.

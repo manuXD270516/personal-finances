@@ -343,6 +343,8 @@ export class ImportsController {
     const needsCategory =
       query['needsCategory'] === undefined ? undefined : String(query['needsCategory']) === 'true';
     const ruleId = str(query, 'ruleId');
+    const hasSuggestion =
+      query['hasSuggestion'] === undefined ? undefined : String(query['hasSuggestion']) === 'true';
     const scope = {
       resource: 'import-preview',
       workspaceId,
@@ -352,6 +354,7 @@ export class ImportsController {
         needsCategory: needsCategory ?? null,
         ruleId: ruleId ?? null,
         candidateConfidence: confidence ?? null,
+        hasSuggestion: hasSuggestion ?? null,
       },
     };
     const cursor = str(query, 'cursor');
@@ -368,6 +371,7 @@ export class ImportsController {
       needsCategory,
       ruleId,
       candidateConfidence: confidence,
+      hasSuggestion,
       afterRowNumber,
       limit: query['limit'] === undefined ? PREVIEW_PAGE_SIZE : limitOf(query),
     });
@@ -418,7 +422,11 @@ export class ImportsController {
       ...('occurrenceLink' in body
         ? { occurrenceLink: body['occurrenceLink'] as NonNullable<RowPatch['occurrenceLink']> | null }
         : {}),
+      ...(body['acceptedSuggestion'] === true ? { acceptedSuggestion: true } : {}),
     };
+    if ('acceptedSuggestion' in body && typeof body['acceptedSuggestion'] !== 'boolean') {
+      throw new ApiProblem('VALIDATION_FAILED', 'acceptedSuggestion must be a boolean');
+    }
     const decided = await this.service.decideRow({
       workspaceId,
       userId: userIdOf(req),
@@ -543,6 +551,39 @@ export class ImportsController {
     @ExpectedVersion() expectedVersion: number,
   ) {
     return this.service.reevaluateRules({ workspaceId, userId: userIdOf(req), importId, expectedVersion });
+  }
+
+  /** Acepta, con una acción explícita, las sugerencias de categoría de un nivel (add-category-suggestions, D476). */
+  @Post('workspaces/:workspaceId/imports/:importId/rows/accept-suggestions')
+  @HttpCode(200)
+  acceptImportCategorySuggestions(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('importId') importId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+  ) {
+    const minLevel = body['minLevel'];
+    if (minLevel !== 'HIGH' && minLevel !== 'MEDIUM') {
+      throw new ApiProblem('VALIDATION_FAILED', 'minLevel must be HIGH or MEDIUM');
+    }
+    const rowIds = body['rowIds'];
+    if (
+      rowIds !== undefined &&
+      (!Array.isArray(rowIds) ||
+        rowIds.length > 5000 ||
+        rowIds.some((id) => typeof id !== 'string' || !/^[0-9a-f-]{36}$/iu.test(id)))
+    ) {
+      throw new ApiProblem('VALIDATION_FAILED', 'rowIds must be a list of at most 5000 row ids');
+    }
+    return this.service.acceptCategorySuggestions({
+      workspaceId,
+      userId: userIdOf(req),
+      importId,
+      expectedVersion,
+      minLevel,
+      ...(rowIds !== undefined ? { rowIds: rowIds as string[] } : {}),
+    });
   }
 
   @Post('workspaces/:workspaceId/imports/:importId/occurrence-matches/confirm')
