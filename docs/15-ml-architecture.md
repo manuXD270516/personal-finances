@@ -257,7 +257,7 @@ para cada scope:
 | Feature | Enfoque | Integración |
 |---|---|---|
 | **Anomaly detection** | Robust z-score / MAD por categoría y counterparty; Isolation Forest con suficientes datos; reglas para "cargo duplicado de suscripción", "monto inusual", "nueva counterparty con monto alto" | `forecasting.AnomalyDetected.v1` → Notifications ("posible cargo inusual"); nunca bloquea ni modifica transacciones |
-| **Auto-classification** | Clasificador (TF-IDF de descripción normalizada + monto + cuenta + día → categoría) entrenado por workspace; complementa Rules (las reglas explícitas siempre ganan) | Se expone como sugerencia en el preview de imports (13-import-architecture.md §4, etapa Rules) y en quick-add; precisión mínima 85 % top-1 en validación para activarse; el usuario confirma |
+| **Auto-classification** | Clasificador (TF-IDF de descripción normalizada + monto + cuenta + día → categoría) entrenado por workspace; complementa Rules (las reglas explícitas siempre ganan) | Se expone como sugerencia en el preview de imports (13-import-architecture.md §4, etapa Rules) y en quick-add; precisión mínima 85 % top-1 en validación para activarse; el usuario confirma | **As-built (Phase 9, change 73, D476):** el primer enfoque es por historial en TypeScript (contraparte y clave de descripción normalizada, sin ML ni servicio Python), con confianza y motivo por plantilla; el clasificador de este renglón queda como mejora si el backtesting temporal no alcanza el 85 % top-1 (D477).
 | **Predictive insights** | "Con la tendencia actual excederás *Restaurantes* el día 22", "tu meta *Viaje* se retrasa 2 meses" | Combina budgets (Planning) + forecasts; textos generados por plantillas, no por LLM |
 
 ## 13. API (resumen)

@@ -5,16 +5,17 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Permisos y aislamiento de las sugerencias"
 scenario: "VIEWER acepta en lote"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014","FR-IDENTITY-006"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions","rbac"]

@@ -7188,5 +7188,57 @@
       "link": "See the transactions",
       "gap": "A gap of periods without activity shortened the history used."
     }
+  },
+  "CategorySuggestions": {
+    "level": {
+      "HIGH": "high",
+      "MEDIUM": "medium"
+    },
+    "chip": {
+      "suggestedLevel": "Suggested: {category} · {level} confidence",
+      "default": "Default category of the counterparty: {category}",
+      "lastUsed": "Last category used with this counterparty: {category}",
+      "accepted": "Suggested category accepted: {category}",
+      "accept": "Accept",
+      "other": "Other",
+      "acceptAria": "Accept the suggested category {category}",
+      "otherAria": "Choose another category",
+      "ruleApplies": "A rule will classify this transaction when it is saved, so no category is suggested."
+    },
+    "reason": {
+      "kind": {
+        "EXPENSE": "expenses",
+        "INCOME": "incomes",
+        "REFUND": "refunds"
+      },
+      "description": "You chose \"{category}\" for {matches} of {support} {kind} similar to \"{key}\"",
+      "counterparty": "You chose \"{category}\" for {matches} of {support} {kind} with \"{counterparty}\"",
+      "both": "You chose \"{category}\" for {matches} of {support} {kind} similar to \"{key}\" and with the same counterparty"
+    },
+    "import": {
+      "column": "Suggestion",
+      "suggestedLevel": "Suggested: {category} · {level} confidence",
+      "accept": "Accept",
+      "acceptAria": "Accept the suggested category {category} on line {line}",
+      "acceptHigh": "Accept high confidence suggestions",
+      "acceptMedium": "Accept high and medium confidence suggestions",
+      "hint": "Suggestions come from your own history and are never applied on their own: the rows you do not accept are created without a category.",
+      "done": "{count} category suggestions accepted.",
+      "filter": "With suggestion"
+    },
+    "rate": {
+      "title": "Category suggestions",
+      "intro": "What you did with the category suggestions this month.",
+      "loading": "Loading…",
+      "rate": "Acceptance rate",
+      "empty": "No suggestions resolved this month yet.",
+      "summary": "{shown} shown · {accepted} accepted · {corrected} corrected · {ignored} ignored",
+      "surface": {
+        "MANUAL_ENTRY": "Manual entry",
+        "IMPORT": "Import"
+      },
+      "bySurface": "By channel",
+      "failed": "The acceptance rate could not be read."
+    }
   }
 }

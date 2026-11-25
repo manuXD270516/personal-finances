@@ -5,6 +5,7 @@
  * o fórmula.
  */
 import type { Money } from '../common/types';
+import type { HistorySuggestion } from '../category-suggestions/logic';
 
 export type ImportJobStatus =
   | 'UPLOADED'
@@ -371,6 +372,8 @@ export interface ImportPreviewRow {
   readonly occurrenceLink?: { readonly occurrenceId: string } | null;
   readonly transfer?: { readonly counterAccountId: string } | null;
   readonly conversion?: ImportRowConversion | null;
+  /** Sugerencia de categoría por historial de una fila sin categoría (add-category-suggestions); nunca se aplica sola. */
+  readonly suggestedCategory?: HistorySuggestion | null;
 }
 
 export interface ImportPreview {

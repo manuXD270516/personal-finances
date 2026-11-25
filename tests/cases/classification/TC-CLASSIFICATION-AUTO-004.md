@@ -5,16 +5,17 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Sugerencia de categoría por historial"
 scenario: "Empate o una sola transacción"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/domain/category-suggester.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

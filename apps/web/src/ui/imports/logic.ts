@@ -482,6 +482,7 @@ export function previewPath(
     needsCategory?: boolean;
     ruleId?: string;
     candidateConfidence?: 'HIGH' | 'MEDIUM' | 'LOW';
+    hasSuggestion?: boolean;
     cursor?: string | null;
     limit?: number;
   } = {},
@@ -489,6 +490,7 @@ export function previewPath(
   const q = new URLSearchParams();
   if (opts.classification) q.set('classification', opts.classification);
   if (opts.needsCategory) q.set('needsCategory', 'true');
+  if (opts.hasSuggestion) q.set('hasSuggestion', 'true');
   if (opts.ruleId) q.set('ruleId', opts.ruleId);
   if (opts.candidateConfidence) q.set('candidateConfidence', opts.candidateConfidence);
   if (opts.cursor) q.set('cursor', opts.cursor);

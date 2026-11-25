@@ -41,6 +41,7 @@
     "test:stack": "pnpm --filter @pf/stack run test:stack",
     "contract:breaking": "pnpm --filter @pf/contract-checks run breaking",
     "forecast:backtest:report": "pnpm --filter @pf/api run forecast:report",
+    "rules:category-suggestions:backtest": "pnpm --filter @pf/api run category-suggestions:backtest",
     "traceability:check": "pnpm --filter @pf/traceability run check",
     "traceability:matrix": "pnpm --filter @pf/traceability run matrix",
     "traceability:regression": "pnpm --filter @pf/traceability run regression"

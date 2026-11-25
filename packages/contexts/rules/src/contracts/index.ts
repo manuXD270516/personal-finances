@@ -3,7 +3,7 @@
  * `RuleEvaluationQuery` es el puerto que consume `add-import-pipeline` en la vista previa del import.
  */
 import type { AuditFieldPoliciesDto } from '@pf/audit/contracts';
-import type { PortabilitySection } from '@pf/shared-kernel';
+import type { PortabilityExclusion, PortabilitySection } from '@pf/shared-kernel';
 
 export const RULES_CONTEXT = 'rules' as const;
 
@@ -82,6 +82,68 @@ export interface RuleEvaluationQuery {
 
 export const RULE_EVALUATION_QUERY = Symbol.for('pf.rules.RuleEvaluationQuery');
 
+// ───────────────────────────────────────────── add-category-suggestions (classification/auto-classification)
+
+export type CategorySuggestionLevelDto = 'HIGH' | 'MEDIUM';
+export type CategorySuggestionBasisDto = 'COUNTERPARTY' | 'DESCRIPTION' | 'BOTH';
+
+/** Sugerencia de categoría por historial (nunca se aplica sin una acción explícita del usuario, D476). */
+export interface CategorySuggestionDto {
+  readonly categoryId: string;
+  /** `matches ÷ support`, texto decimal de 4 decimales (`0.9000`). */
+  readonly confidence: string;
+  readonly level: CategorySuggestionLevelDto;
+  readonly support: number;
+  readonly matches: number;
+  readonly basis: CategorySuggestionBasisDto;
+  readonly descriptionKey: string | null;
+  readonly counterpartyId: string | null;
+}
+
+export interface CategorySuggestionSubjectDto {
+  /** Id de la fila de staging. */
+  readonly ref: string;
+  readonly kind: 'INCOME' | 'EXPENSE' | 'REFUND';
+  readonly description: string | null;
+  readonly counterpartyId: string | null;
+}
+
+/**
+ * Sugerencias para varias filas de un import: el índice de evidencia se construye UNA vez por llamada (en la unidad de
+ * trabajo del llamador) y devuelve solo las filas con sugerencia. Deshabilitada la función, el mapa va vacío.
+ */
+export interface CategorySuggestionQuery {
+  suggestMany(input: {
+    readonly workspaceId: string;
+    readonly subjects: readonly CategorySuggestionSubjectDto[];
+  }): Promise<ReadonlyMap<string, CategorySuggestionDto>>;
+}
+
+export const CATEGORY_SUGGESTION_QUERY = Symbol.for('pf.rules.CategorySuggestionQuery');
+
+export type CategorySuggestionSurfaceDto = 'MANUAL_ENTRY' | 'IMPORT';
+
+/**
+ * Registro del resultado de las sugerencias mostradas (aceptada, corregida o ignorada) por canal y nivel, sin
+ * descripciones ni montos. Corre en la unidad de trabajo del llamador (IMPORTS lo llama al aprobar).
+ */
+export interface CategorySuggestionFeedbackPort {
+  recordBatch(input: {
+    readonly workspaceId: string;
+    readonly surface: CategorySuggestionSurfaceDto;
+    readonly importJobId: string | null;
+    readonly outcomes: readonly {
+      readonly level: CategorySuggestionLevelDto;
+      readonly outcome: 'ACCEPTED' | 'CORRECTED' | 'IGNORED';
+      /** `YYYY-MM-DD` en la zona del workspace. */
+      readonly occurredOn: string;
+      readonly transactionId: string | null;
+    }[];
+  }): Promise<void>;
+}
+
+export const CATEGORY_SUGGESTION_FEEDBACK_PORT = Symbol.for('pf.rules.CategorySuggestionFeedbackPort');
+
 /** Allow-list de auditoría de RULES (NFR-SEC-015): `conditions` y `actions` viajan como texto JSON. */
 export const RULES_AUDIT_POLICY = {
   Rule: {
@@ -151,5 +213,14 @@ export const RULES_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     idColumns: [],
     textRefs: ['pattern_value'],
     importHook: RULES_SUGGESTION_FINGERPRINT_HOOK,
+  },
+];
+
+/** Los resultados de las sugerencias de categoría son telemetría de producto: no viajan en la exportación. */
+export const RULES_PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
+  {
+    table: 'rules.category_suggestion_outcome',
+    reason:
+      'Telemetría de producto (tasa de aceptación de las sugerencias de categoría, sin descripciones ni montos): no es un dato del usuario y empieza de cero en un workspace importado.',
   },
 ];

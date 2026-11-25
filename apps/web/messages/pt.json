@@ -7188,5 +7188,57 @@
       "link": "Ver as transações",
       "gap": "Uma lacuna de períodos sem movimentos encurtou o histórico usado."
     }
+  },
+  "CategorySuggestions": {
+    "level": {
+      "HIGH": "alta",
+      "MEDIUM": "média"
+    },
+    "chip": {
+      "suggestedLevel": "Sugerida: {category} · confiança {level}",
+      "default": "Categoria padrão da contraparte: {category}",
+      "lastUsed": "Última categoria usada com esta contraparte: {category}",
+      "accepted": "Categoria sugerida aceita: {category}",
+      "accept": "Aceitar",
+      "other": "Outra",
+      "acceptAria": "Aceitar a categoria sugerida {category}",
+      "otherAria": "Escolher outra categoria",
+      "ruleApplies": "Uma regra vai classificar este lançamento ao salvar; por isso nenhuma categoria é sugerida."
+    },
+    "reason": {
+      "kind": {
+        "EXPENSE": "despesas",
+        "INCOME": "receitas",
+        "REFUND": "reembolsos"
+      },
+      "description": "Você escolheu \"{category}\" em {matches} de {support} {kind} parecidos com \"{key}\"",
+      "counterparty": "Você escolheu \"{category}\" em {matches} de {support} {kind} com \"{counterparty}\"",
+      "both": "Você escolheu \"{category}\" em {matches} de {support} {kind} parecidos com \"{key}\" e da mesma contraparte"
+    },
+    "import": {
+      "column": "Sugestão",
+      "suggestedLevel": "Sugerida: {category} · confiança {level}",
+      "accept": "Aceitar",
+      "acceptAria": "Aceitar a categoria sugerida {category} na linha {line}",
+      "acceptHigh": "Aceitar sugestões de confiança alta",
+      "acceptMedium": "Aceitar sugestões de confiança alta e média",
+      "hint": "As sugestões vêm do seu histórico e nunca são aplicadas sozinhas: as linhas que você não aceitar são criadas sem categoria.",
+      "done": "{count} sugestões de categoria aceitas.",
+      "filter": "Com sugestão"
+    },
+    "rate": {
+      "title": "Sugestões de categoria",
+      "intro": "O que você fez com as sugestões de categoria neste mês.",
+      "loading": "Carregando…",
+      "rate": "Taxa de aceitação",
+      "empty": "Ainda não há sugestões resolvidas neste mês.",
+      "summary": "{shown} mostradas · {accepted} aceitas · {corrected} corrigidas · {ignored} ignoradas",
+      "surface": {
+        "MANUAL_ENTRY": "Lançamento manual",
+        "IMPORT": "Importação"
+      },
+      "bySurface": "Por canal",
+      "failed": "Não foi possível ler a taxa de aceitação."
+    }
   }
 }

@@ -91,6 +91,8 @@ export interface ReviewFilter {
   readonly needsCategory: boolean;
   readonly ruleId: string;
   readonly confidence: '' | DuplicateConfidence;
+  /** Solo las filas con una sugerencia de categoría por historial (add-category-suggestions). */
+  readonly hasSuggestion?: boolean;
 }
 
 export const EMPTY_FILTER: ReviewFilter = {
@@ -101,7 +103,11 @@ export const EMPTY_FILTER: ReviewFilter = {
 };
 
 export const filterIsEmpty = (f: ReviewFilter): boolean =>
-  f.classification === '' && !f.needsCategory && f.ruleId === '' && f.confidence === '';
+  f.classification === '' &&
+  !f.needsCategory &&
+  f.ruleId === '' &&
+  f.confidence === '' &&
+  f.hasSuggestion !== true;
 
 /** Parámetros del `GET .../preview` para un filtro (los vacíos no se envían). */
 export function filterQuery(f: ReviewFilter): {
@@ -109,12 +115,14 @@ export function filterQuery(f: ReviewFilter): {
   needsCategory?: boolean;
   ruleId?: string;
   candidateConfidence?: DuplicateConfidence;
+  hasSuggestion?: boolean;
 } {
   return {
     ...(f.classification ? { classification: f.classification } : {}),
     ...(f.needsCategory ? { needsCategory: true } : {}),
     ...(f.ruleId ? { ruleId: f.ruleId } : {}),
     ...(f.confidence ? { candidateConfidence: f.confidence } : {}),
+    ...(f.hasSuggestion ? { hasSuggestion: true } : {}),
   };
 }
 
@@ -132,7 +140,8 @@ export function bulkFilterBody(f: ReviewFilter): {
 }
 
 /** El filtro de confianza no existe en la edición en lote: avisar en vez de aplicarla a más filas de las que se ven. */
-export const bulkSupportsFilter = (f: ReviewFilter): boolean => f.confidence === '';
+export const bulkSupportsFilter = (f: ReviewFilter): boolean =>
+  f.confidence === '' && f.hasSuggestion !== true;
 
 /** Reglas que aparecen en las filas cargadas (opciones del filtro «por regla»), sin repetir. */
 export function ruleOptionsOf(

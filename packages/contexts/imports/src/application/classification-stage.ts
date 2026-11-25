@@ -5,7 +5,7 @@ import {
   type Originated,
   type RowEdits,
 } from '../domain/index.js';
-import type { ImportsDeps, RuleOutcome, RuleSubject } from './ports/index.js';
+import type { CategorySuggestionEntry, ImportsDeps, RuleOutcome, RuleSubject } from './ports/index.js';
 
 /** Sujetos por llamada de `RuleEvaluationQuery.evaluate` (D339). */
 export const RULES_BLOCK = 5000;
@@ -31,6 +31,11 @@ export interface ProposalOutput {
   readonly effectiveCounterpartyId: string | null;
   /** La evaluación de reglas falló para esta fila. */
   readonly rulesUnavailable: boolean;
+  /**
+   * Sugerencia de categoría por historial (add-category-suggestions): solo para la fila que sigue sin categoría después de
+   * las reglas y de la categoría por defecto de la contraparte. Es una propuesta: nunca se aplica sola.
+   */
+  readonly suggestion: CategorySuggestionEntry | null;
 }
 
 const RULE_ORIGIN = (o: { ruleId: string; ruleVersion: number }): FieldOrigin => ({
@@ -42,7 +47,8 @@ const RULE_ORIGIN = (o: { ruleId: string; ruleVersion: number }): FieldOrigin =>
 /**
  * Etapa de clasificación (decisión 8, orden de `add-rule-engine` D333): (1) contraparte por alias, (2) reglas con
  * `trigger = IMPORT` y `mode = FILL_EMPTY` por bloques de 5 000, (3) categoría por defecto de la contraparte,
- * (4) «sin categoría». Una excepción de RULES deja la propuesta sin reglas con `rulesUnavailable` (no bloquea la
+ * (4) «sin categoría» y, para esas filas, (5) la sugerencia por historial de RULES (add-category-suggestions: una sola
+ * llamada por etapa; si falla, las filas quedan sin sugerencia y la revisión sigue). Una excepción de RULES deja la propuesta sin reglas con `rulesUnavailable` (no bloquea la
  * revisión ni la aprobación). Lo editado por el usuario no se pisa: «reevaluar» recalcula solo la propuesta.
  */
 export async function buildProposals(
@@ -114,6 +120,12 @@ export async function buildProposals(
       : new Map();
 
   const out = new Map<string, ProposalOutput>();
+  const suggestionSubjects: {
+    ref: string;
+    kind: 'INCOME' | 'EXPENSE';
+    description: string | null;
+    counterpartyId: string | null;
+  }[] = [];
   for (const row of input.rows) {
     const outcome = outcomes.get(row.id);
     const alias = row.edits.counterpartyId === undefined ? counterpartyOf(row) : null;
@@ -154,6 +166,26 @@ export async function buildProposals(
         ? { value: outcome.appendNotes.map((n) => n.text).join('\n'), origin: RULE_ORIGIN(first.origin) }
         : null;
 
+    // Después de las reglas, del default de la contraparte y de lo que editó el usuario (nunca sobre una elección).
+    const rowKind = row.edits.kind ?? row.kind;
+    if (
+      deps.suggestions &&
+      !rulesUnavailable &&
+      category === null &&
+      row.edits.categoryId === undefined &&
+      (rowKind === 'INCOME' || rowKind === 'EXPENSE')
+    ) {
+      suggestionSubjects.push({
+        ref: row.id,
+        kind: rowKind,
+        description:
+          row.edits.description !== undefined
+            ? row.edits.description
+            : (outcome?.description?.text ?? row.description),
+        counterpartyId: effectiveCounterpartyId,
+      });
+    }
+
     out.set(row.id, {
       proposal: {
         ...EMPTY_PROPOSAL,
@@ -168,7 +200,20 @@ export async function buildProposals(
       },
       effectiveCounterpartyId,
       rulesUnavailable,
+      suggestion: null,
     });
+  }
+
+  if (deps.suggestions && suggestionSubjects.length > 0) {
+    try {
+      const suggestions = await deps.suggestions.suggestMany({ workspaceId, subjects: suggestionSubjects });
+      for (const [ref, suggestion] of suggestions) {
+        const current = out.get(ref);
+        if (current) out.set(ref, { ...current, suggestion });
+      }
+    } catch {
+      // Una falla de las sugerencias no impide la revisión ni la aprobación: las filas quedan sin sugerencia.
+    }
   }
   return out;
 }
