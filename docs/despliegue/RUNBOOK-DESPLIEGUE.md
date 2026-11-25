@@ -4,7 +4,7 @@
 
 **Variante:** este runbook **no reemplaza** a [deploy-and-restore.md](../runbooks/deploy-and-restore.md), que sigue siendo el procedimiento vigente para el primer despliegue, los deploys, el rollback y la restauración. Acá está lo que le falta: el estado real, las brechas que el panel encontró, el PoC con regla de corte, el plan B y el orden de las fases con su «Terminada cuando». Cuando una fase dice «§2.2», se refiere a ese runbook.
 
-**Estado al 2026-11-24:** sin desplegar. No existe la cuenta de AWS, ni el bucket de B2, ni el dominio. La decisión de plataforma está en [DECISION-DESPLIEGUE.md](DECISION-DESPLIEGUE.md) y ratifica [ADR-0027](../adr/0027-destino-de-despliegue-inicial-vps-compose.md).
+**Estado al 2026-11-24:** sin desplegar, con la **fase 0 cerrada en el código** (C1 a C7 y C9 a C13; PRs #263 a #270). No existe la cuenta de AWS, ni el bucket de B2, ni el dominio. La decisión de plataforma está en [DECISION-DESPLIEGUE.md](DECISION-DESPLIEGUE.md) y ratifica [ADR-0027](../adr/0027-destino-de-despliegue-inicial-vps-compose.md).
 
 | Símbolo | Quién lo hace |
 |---|---|
@@ -21,14 +21,14 @@
 | Override de producción con techos de memoria | Escrito | `deploy/compose/compose.prod.yaml` |
 | Caddy con HSTS, `nosniff`, `Referrer-Policy`, `/admin` de Keycloak en 404 y `files` limitado a `PUT` firmado | Escrito | `deploy/compose/caddy/Caddyfile` |
 | Deploy por digest con backup previo, smoke y rollback automático | Escrito; acepta el 5.º digest | `deploy/host/pfos-deploy.sh` |
-| Comando forzado del host | Escrito; **rechaza el 5.º digest** | `infra/modules/lightsail-host/cloud-init.yaml.tftpl:48-50` |
-| Workflow de deploy (`workflow_dispatch`, environment `production`, Tailscale OIDC) | Escrito; **envía el 5.º digest** con `PFOS_ML_ENABLED=true`: el job `resolve` declara `outputs.ml` desde #234 | `.github/workflows/deploy.yml:43-49` |
+| Comando forzado del host | Escrito; acepta un 5.º argumento de una lista cerrada (`finance-ml`, `pfos-keycloak`; #264) | `infra/modules/lightsail-host/cloud-init.yaml.tftpl:48-50` |
+| Workflow de deploy (`workflow_dispatch`, environment `production`, Tailscale OIDC) | Escrito; envía el digest de ML con `PFOS_ML_ENABLED=true` (#234) y el de Keycloak optimizado con `PFOS_KEYCLOAK_OPTIMIZED=true` (#265) | `.github/workflows/deploy.yml:43-49` |
 | Timers de respaldo (full semanal, diff diario, mensual, check horario, réplica de documentos) con heartbeat opcional | Escritos | `deploy/host/systemd/`, `deploy/host/pfos-backup.sh` |
 | Drill de restore mensual con aviso por heartbeat y verificación semanal de repo1 y repo2 (C5) | Escrito en el change `add-host-restore-drill`; nunca ejecutado en un host | `deploy/host/pfos-backup.sh` (`drill`, `verify`), `pfos-restore-drill.timer`, `pfos-backup-verify.timer` |
 | Limpieza semanal de imágenes y alerta de disco al 80 % (C6) | Escrita en el mismo change; nunca ejecutada en un host | `pfos-backup.sh` (`image-prune`, `check`), `pfos-image-prune.timer` |
 | Clave privada de conexiones montada solo en el worker (C10) | Escrita en el mismo change | `deploy/compose/compose.prod.yaml`, `pfos-deploy.sh` (`ensure_connection_keys_file`) |
 | Plantillas de secretos (solo nombres) | Escritas | `deploy/host/etc-pfos/*.env.example` |
-| Imágenes multi-arch para el plan B | **No.** `platforms: linux/amd64` | `.github/workflows/main.yml:64` |
+| Imágenes multi-arch para el plan B (amd64 y arm64, runners nativos, índice con digest) | Escritas (#267, #269); falta el smoke de pgBackRest en un host arm64 | `.github/workflows/main.yml` |
 | Tags, changelog y releases | No se usan (0 etiquetas). El registro de versiones es `releases.log` del host y el historial del environment `production` | — |
 
 ## Brechas a cerrar antes del primer apply
@@ -37,7 +37,7 @@ Ordenadas por riesgo. «Cuándo» indica el último momento en que se puede cerr
 
 | # | Brecha | Riesgo | Cuándo | Cómo se cierra |
 |---|---|---|---|---|
-| B1 | El comando forzado del cloud-init (`cloud-init.yaml.tftpl:48-50`) rechaza el 5.º digest (`finance-ml`) con «argumentos de más», aunque `pfos-deploy.sh` ya lo acepta y `deploy.yml` ya lo envía (#234). Con `PFOS_ML_ENABLED=true`, el deploy termina **en rojo** con ese mensaje; no falla en silencio. ADR-0033 dice que el host lo acepta, y no es así | **Alto.** Cambiar `user_data` después del apply **reemplaza la instancia**. Conviene dejar el comando preparado también para una imagen propia de Keycloak (B6) | **Antes del primer apply** | C1 |
+| B1 | El comando forzado del cloud-init (`cloud-init.yaml.tftpl:48-50`) rechaza el 5.º digest (`finance-ml`) con «argumentos de más», aunque `pfos-deploy.sh` ya lo acepta y `deploy.yml` ya lo envía (#234). Con `PFOS_ML_ENABLED=true`, el deploy termina **en rojo** con ese mensaje; no falla en silencio. ADR-0033 dice que el host lo acepta, y no es así | **Alto.** Cambiar `user_data` después del apply **reemplaza la instancia**. Conviene dejar el comando preparado también para una imagen propia de Keycloak (B6) | **Antes del primer apply.** Cerrada en #264 | C1 |
 | B2 | Object Lock de 21 días para todo el bucket, clave del host con `deleteFiles` y lifecycle que borra lo oculto al día siguiente: un host comprometido puede destruir los 12 respaldos mensuales y las versiones de documentos con más de 21 días | **Alto.** Datos sensibles; la protección contra ransomware cubre 21 días, no un año | Antes del primer respaldo, es decir, del primer deploy. Los objetos ya escritos conservan su lock | C3 |
 | B3 | pgBackRest nunca se probó contra un bucket B2 con Object Lock (PUT con checksum y `expire` sobre versiones bloqueadas) | **Alto.** Si falla, cae el PITR, requisito duro (RPO ≤ 15 min). La alternativa, N3, rompe el tope | En el PoC (fase 7), antes de los datos reales | Prueba 7.4 |
 | B4 | El drill de restore «automatizado» de ADR-0027 no existe. El de §6 es manual, y para un solo operador eso significa que no se hace | **Alto.** Un respaldo nunca probado no cuenta | Antes de los datos reales | C5 y prueba 7.5 |
@@ -202,6 +202,8 @@ C="docker compose -f /opt/pfos/repo/deploy/compose/compose.yaml -f /opt/pfos/rep
 3. Correr los gates del repo: `pnpm format:check`, `pnpm turbo typecheck lint test build`, `pnpm arch:check`, `pnpm spec:validate` y `pnpm config:docs:check`.
 4. Comprobar que no haya secretos en el historial: lo cubre el check `secrets` de CI (gitleaks); en un worktree, gitleaks local escanea 0 commits.
 
+**Estado (2026-11-24): fase 0 cerrada en el código.** Hecho: C1 a C7, C9 a C13 (PRs #263 a #270, detalle en [cambios-de-codigo.md](cambios-de-codigo.md)). Siguen abiertos C8 y C14 (se miden en el PoC) y C12c (solo si se activa el plan B). **Antes del primer apply faltan acciones tuyas:** el dominio dedicado (D452); las cuentas (fase 2); correr `tofu fmt -check` y `tofu validate` en `infra/environments/prod`, que nadie corrió porque CI no valida OpenTofu; crear `/etc/pfos/pgbackrest-restore.env` y los tres checks de healthchecks `pfos-drill`, `pfos-verify` y `pfos-image-prune` (fase 4); y activar `PFOS_KEYCLOAK_OPTIMIZED=true` **solo después** del primer apply (fase 6).
+
 **Terminada cuando:** `git grep -n 'finance-ml' -- infra/modules/lightsail-host/cloud-init.yaml.tftpl` devuelve la validación del 5.º argumento; `ls deploy/host/systemd/` lista `pfos-restore-drill.timer` (C5) y `pfos-image-prune.timer` con su `.service` (C6); C14 está reflejado en este runbook (mediciones de la regla de corte y alarma de la fase 7), sin código en el host; y `gh run list --workflow main.yml --branch main --limit 1` muestra `completed` y `success`. La salida `ml` del job `resolve` de `deploy.yml` ya está (#234): `git grep -n 'steps.refs.outputs.ml' -- .github/workflows/deploy.yml` la devuelve hoy.
 
 ## Fase 1: decisiones del owner (Vos)
@@ -219,10 +221,7 @@ Antes de abrir cuentas, respondé las preguntas de [docs/71](../71-despliegue-n1
 
 ## Fase 2: cuentas (Vos)
 
-Seguí §2.1 de [deploy-and-restore.md](../runbooks/deploy-and-restore.md) con estas correcciones (B12):
-
-- En §2.1.5, son **tres** hostnames: `app`, `auth` y `files` (D316), todos en modo solo DNS.
-- En §2.1.6, los paquetes de GHCR son **cuatro**: `finance-api`, `finance-web`, `pfos-postgres` y `finance-ml`.
+Seguí §2.1 de [deploy-and-restore.md](../runbooks/deploy-and-restore.md), ya corregido (B12, C11): §2.1.5 pide los **tres** hostnames `app`, `auth` y `files` (D316), todos en modo solo DNS, y §2.1.6 los **cinco** paquetes de GHCR (`finance-api`, `finance-web`, `pfos-postgres`, `finance-ml` y `pfos-keycloak`). Además:
 - En AWS, activá **MFA en root**, creá el usuario de IAM Identity Center y suscribite a las alertas de Budgets.
 - En Git Bash, configurá el perfil SSO del CLI (región `sa-east-1`, perfil `pfos-admin`) e iniciá sesión:
 
@@ -323,9 +322,9 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 ## Fase 5: Tailscale y GitHub (Vos)
 
 1. Seguí §2.4 y §2.5.
-2. En el environment `production`, dejá `PFOS_ML_ENABLED` **sin definir** (ML apagado durante el PoC).
+2. En el environment `production`, dejá `PFOS_ML_ENABLED` **sin definir** (ML apagado durante el PoC) y `PFOS_KEYCLOAK_OPTIMIZED` **sin definir** hasta después del primer apply (la fase 6 lo activa).
 
-**Terminada cuando:** `ssh ubuntu@pfos-prod hostname` responde por la tailnet, y `gh secret list --env production` y `gh variable list --env production` muestran `DEPLOY_SSH_KEY`, `DEPLOY_SSH_KNOWN_HOSTS`, `DEPLOY_HOST`, `PFOS_APP_URL`, `TS_OIDC_CLIENT_ID` y `TS_OIDC_AUDIENCE`, y `PFOS_ML_ENABLED` no aparece en `gh variable list --env production`.
+**Terminada cuando:** `ssh ubuntu@pfos-prod hostname` responde por la tailnet, y `gh secret list --env production` y `gh variable list --env production` muestran `DEPLOY_SSH_KEY`, `DEPLOY_SSH_KNOWN_HOSTS`, `DEPLOY_HOST`, `PFOS_APP_URL`, `TS_OIDC_CLIENT_ID` y `TS_OIDC_AUDIENCE`, y ni `PFOS_ML_ENABLED` ni `PFOS_KEYCLOAK_OPTIMIZED` aparecen en `gh variable list --env production`.
 
 ## Fase 6: primer deploy y verificación sin login (Claude, con tu confirmación)
 
@@ -337,6 +336,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 
 2. Vos aprobás el environment en GitHub.
 3. Vos, en el host: `pfos-bootstrap-storage.sh` y el primer full, según §2.6.2.
+   Con el host creado con el cloud-init nuevo y el primer deploy en verde, activá Keycloak optimizado: `gh variable set PFOS_KEYCLOAK_OPTIMIZED --env production --body true` y hacé un segundo deploy. Comprobá que `keycloak` corra con la imagen `pfos-keycloak@sha256:…` y que sus logs no digan «Updating the configuration». Mientras la variable no exista, Keycloak usa la imagen oficial.
 4. Claude corre desde afuera las comprobaciones 1 a 6 y la 9. Las 7 y 8 las hacés Vos: la 7 en el navegador y la 8 en el host.
 
 | # | Comprobación | Resultado esperado |
@@ -559,7 +559,7 @@ cd /opt/pfos/repo/deploy/compose && $C logs --since 1h finance-api finance-worke
 
 ## Cierre del despliegue
 
-- [ ] Fase 0: brechas de código C1–C11, C13 y C14 fusionadas.
+- [x] Fase 0: brechas de código C1 a C7 y C9 a C13 fusionadas (2026-11-24, #263 a #270). C8 y C14 se miden en el PoC; C12c es condicional.
 - [ ] Fase 1: decisiones del owner anotadas en docs/38.
 - [ ] Fases 2 a 5: cuentas, infraestructura, secretos con custodia verificada, Tailscale y GitHub.
 - [ ] Fase 6: primer deploy y verificación sin login.

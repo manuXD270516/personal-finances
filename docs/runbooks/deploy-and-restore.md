@@ -42,8 +42,8 @@ Acción: `lightsail_bundle_id = "medium_3_0"` (4 GB, USD 24 → total ≈ USD 27
    ```
    Y una credencial de **federación OIDC** para GitHub Actions (consola de Tailscale, credenciales de identidad federada; verificar el nombre exacto del menú; issuer `https://token.actions.githubusercontent.com`, subject `repo:manuXD270516/personal-finances:environment:production`, tag `tag:pfos-ci`). Anotar client id y audience.
 4. **Grafana Cloud Free**: stack (región `sa-east-1` si está disponible), token de **solo escritura** OTLP → `PF_OTLP_ENDPOINT` y `OTEL_EXPORTER_OTLP_HEADERS`.
-5. **Dominio + DNS** (p. ej. Cloudflare, DNS gratis): dos nombres, `app.<dominio>` y `auth.<dominio>`. Registros **solo DNS** (sin proxy) para que Caddy obtenga los certificados.
-6. **GHCR**: marcar públicos los paquetes `finance-api`, `finance-web` y `pfos-postgres` (el repo ya es público; las imágenes no contienen secretos) **o** dejar en el host un `docker login ghcr.io` con un token `read:packages` de vida limitada.
+5. **Dominio + DNS** (p. ej. Cloudflare, DNS gratis): tres nombres, `app.<dominio>`, `auth.<dominio>` y `files.<dominio>` (D316; `files` recibe las subidas firmadas de documentos). Registros **solo DNS** (sin proxy) para que Caddy obtenga los certificados.
+6. **GHCR**: marcar públicos los paquetes `finance-api`, `finance-web`, `pfos-postgres`, `finance-ml` y `pfos-keycloak` (el repo ya es público; las imágenes no contienen secretos) **o** dejar en el host un `docker login ghcr.io` con un token `read:packages` de vida limitada.
 7. Opcional: cuenta en healthchecks.io (gratis) → URL de ping para `PF_BACKUP_HEARTBEAT_URL`.
 
 ### 2.2 Infraestructura (OpenTofu, desde la máquina del owner)
@@ -146,7 +146,7 @@ Validado localmente el 2026-10-05 con la imagen `pfos-postgres` y esta misma con
 
 ### 5.2 Pérdida del host (o cambio de plan/proveedor)
 
-1. Rápido (RPO ≤ 24 h): crear una instancia desde el último **snapshot automático** de Lightsail y luego aplicar PITR hasta el último WAL (§5.1 con `--type=default`).
+1. Rápido (RPO ≤ 24 h): crear una instancia desde el último **snapshot automático** de Lightsail y luego aplicar PITR hasta el último WAL (§5.1 con `--type=default`). **Advertencia:** PostgreSQL no debe arrancar desde el snapshot con el archivado activo: reanudaría el archivado en la misma stanza con un historial divergente y rompería la continuidad del PITR. Antes de levantar el stack, dejá el archivado apagado (no levantes `postgres` con `archive_mode=on`) y restaurá encima desde B2 (`pgbackrest --stanza=pfos --repo=1 restore --delta`, como en el punto 2).
 2. Desde cero (RPO ≤ 5 min): `tofu apply -replace=module.host.aws_lightsail_instance.host …` (o el host nuevo del fallback), §2.3–§2.4 restaurando `pfos.env`/`pgbackrest.env` desde la copia cifrada del gestor, y **antes del primer deploy**:
    ```bash
    docker volume create pfos_pg-data
@@ -224,4 +224,5 @@ Dos drills fallidos seguidos (del host o fuera de él) → escalar a N3 (Postgre
 
 ## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
 
+- Keycloak optimizado (opcional, C7): con el cloud-init que acepta `pfos-keycloak@sha256:…` ya aplicado, `PFOS_KEYCLOAK_OPTIMIZED=true` en el entorno `production` de GitHub hace que `deploy.yml` envíe el digest de la imagen `pfos-keycloak` (build con `kc.sh build`: arranque más corto y menos memoria). Sin la variable, Keycloak usa la imagen oficial. No se activa antes del primer apply: un host con el comando forzado viejo rechazaría el argumento.
 - Servicio de pronósticos (opcional): 1) en el host, `openssl rand -hex 32 > /etc/pfos/ml-service-token && chmod 0444 /etc/pfos/ml-service-token`; 2) en `/etc/pfos/pfos.env`, `COMPOSE_PROFILES=ml` y `FORECASTING_ENABLED=true`; 3) en el entorno `production` de GitHub, `PFOS_ML_ENABLED=true` para que `deploy.yml` envíe el digest de `finance-ml`; 4) desplegar. Para apagarlo: quitar `COMPOSE_PROFILES=ml` y `FORECASTING_ENABLED` y desplegar (el núcleo no cambia; el pronóstico vigente se sigue mostrando con su instante de generación).
