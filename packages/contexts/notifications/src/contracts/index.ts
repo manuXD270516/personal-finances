@@ -73,7 +73,8 @@ export type NotificationIntakeType =
   | 'FX_RATE_FEED_STALE'
   | 'FX_RATE_FEED_RECOVERED'
   | 'FX_RATE_ANOMALY_RETAINED'
-  | 'CASH_FLOW_SHORTFALL_RISK';
+  | 'CASH_FLOW_SHORTFALL_RISK'
+  | 'SPENDING_ANOMALY';
 
 /**
  * `CASH_FLOW_SHORTFALL_RISK` (add-cash-flow-forecast, D381/D382): se abrió un episodio de riesgo de déficit (`HIGH`) en una
@@ -93,6 +94,27 @@ export interface CashFlowShortfallRiskFact {
   readonly threshold: { readonly amount: string; readonly currency: string };
   readonly belowZero: boolean;
   readonly detectedAt: string;
+  readonly timeZone: string;
+}
+
+/**
+ * `SPENDING_ANOMALY` (add-spending-anomaly-detection, D474): la pasada diaria de FORECAST marcó gastos atípicos nuevos en el
+ * workspace. `factKey` = `spending-anomalies:<fecha de la pasada>`: una notificación por pasada y destinatario (OWNER y
+ * EDITOR que activaron el tipo, apagado por omisión). El email sin opt-in solo lleva la cantidad y la fecha.
+ */
+export interface SpendingAnomaliesDetectedFact {
+  readonly workspaceId: string;
+  /** Fecha de la pasada (`YYYY-MM-DD`, zona del workspace). */
+  readonly passDate: string;
+  /** Gastos atípicos nuevos de la pasada (≥ 1). */
+  readonly count: number;
+  /** El de mayor monto en la moneda de reporte. */
+  readonly top: {
+    readonly anomalyId: string;
+    readonly transactionDate: string;
+    readonly reportingAmount: { readonly amount: string; readonly currency: string };
+    readonly reasons: readonly ('CATEGORY_OUTLIER' | 'COUNTERPARTY_OUTLIER' | 'NEW_COUNTERPARTY_HIGH_AMOUNT')[];
+  };
   readonly timeZone: string;
 }
 
@@ -183,6 +205,10 @@ export type NotificationIntakeFact =
   | (IntakeFactBase & {
       readonly type: 'CASH_FLOW_SHORTFALL_RISK';
       readonly payload: CashFlowShortfallRiskFact;
+    })
+  | (IntakeFactBase & {
+      readonly type: 'SPENDING_ANOMALY';
+      readonly payload: SpendingAnomaliesDetectedFact;
     });
 
 export interface NotificationIntakeOutcome {

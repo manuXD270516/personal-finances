@@ -5,7 +5,19 @@ import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
+import type {
+  AnomalyDeps,
+  AnomalyMetrics,
+  AnomalyNotifier,
+  AnomalySettings,
+  ExpenseLinesPort,
+  ResolvedTransactionsPort,
+  TransactionStatesPort,
+} from '../application/anomaly-ports.js';
+import { BacktestSpendingAnomalies } from '../application/backtest-spending-anomalies.js';
+import { DetectSpendingAnomalies } from '../application/detect-spending-anomalies.js';
 import { ExecuteForecastRun } from '../application/execute-forecast-run.js';
+import { SpendingAnomalyQueries } from '../application/spending-anomaly-queries.js';
 import { ForecastQueries } from '../application/forecast-queries.js';
 import type {
   CategoriesPort,
@@ -24,7 +36,17 @@ import type {
 import { RequestForecastRun } from '../application/request-forecast-run.js';
 import { ScheduleForecastRuns } from '../application/schedule-forecast-runs.js';
 import { FORECAST_RUNNER_JOB, FORECAST_SCHEDULE_JOB } from '../contracts/index.js';
-import { DEFAULT_RETRY_POLICY, DEFAULT_THRESHOLDS, FORECAST_RUN_LIFECYCLE } from '../domain/index.js';
+import {
+  DEFAULT_ANOMALY_THRESHOLDS,
+  DEFAULT_RETRY_POLICY,
+  DEFAULT_THRESHOLDS,
+  FORECAST_RUN_LIFECYCLE,
+} from '../domain/index.js';
+import {
+  PgAnomalyMaintenance,
+  PgAnomalyRepository,
+  PgAnomalyScanRepository,
+} from '../infrastructure/pg-anomalies.js';
 import {
   PgForecastOperations,
   PgForecastingUnitOfWork,
@@ -34,6 +56,7 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-forecasting.js';
 import { FORECASTING_QUERIES, FORECASTING_REQUEST, ForecastingController } from './forecasting-http.js';
+import { SPENDING_ANOMALY_QUERIES, SpendingAnomaliesController } from './spending-anomalies-http.js';
 
 export const DEFAULT_FORECASTING_SETTINGS: ForecastingSettings = {
   enabled: false,
@@ -44,6 +67,39 @@ export const DEFAULT_FORECASTING_SETTINGS: ForecastingSettings = {
   staleDays: 35,
   rateValidityWindowDays: 7,
   coherenceGapRatio: '0.05',
+};
+
+/** Ajustes por omisión de la detección de gastos atípicos (D473, D474): habilitada, 7 días, 3.5, 3.0, 8 y percentil 95. */
+export const DEFAULT_ANOMALY_SETTINGS: AnomalySettings = {
+  enabled: true,
+  lookbackDays: 7,
+  thresholds: DEFAULT_ANOMALY_THRESHOLDS,
+  rateValidityWindowDays: 7,
+};
+
+/** Puertos de la detección de gastos atípicos (add-spending-anomaly-detection); sin ellos la función queda deshabilitada. */
+export interface AnomalyRuntimeOptions {
+  readonly expenses: ExpenseLinesPort;
+  readonly resolved: ResolvedTransactionsPort;
+  readonly transactions: TransactionStatesPort;
+  /** Aviso a NOTIFICATIONS (hecho de la pasada); solo el worker lo cablea. */
+  readonly notifier?: AnomalyNotifier;
+  readonly settings?: Partial<AnomalySettings>;
+  readonly metrics?: AnomalyMetrics;
+}
+
+const NO_ANOMALY_PORTS: Pick<AnomalyRuntimeOptions, 'expenses' | 'resolved' | 'transactions'> = {
+  expenses: { listExpenseLines: async () => [] },
+  resolved: { transactionIds: async () => new Set() },
+  transactions: { statesOf: async () => [] },
+};
+
+const NO_ANOMALY_METRICS: AnomalyMetrics = {
+  evaluated: () => undefined,
+  notRated: () => undefined,
+  flagged: () => undefined,
+  decided: () => undefined,
+  passDuration: () => undefined,
 };
 
 export interface ForecastingRuntimeOptions {
@@ -68,6 +124,8 @@ export interface ForecastingRuntimeOptions {
   readonly service: ForecastServicePort;
   readonly settings?: Partial<ForecastingSettings>;
   readonly metrics?: ForecastMetrics;
+  /** Detección de gastos atípicos (add-spending-anomaly-detection); ausente ⇒ deshabilitada. */
+  readonly anomalies?: AnomalyRuntimeOptions;
 }
 
 export interface ForecastingRuntime {
@@ -75,6 +133,13 @@ export interface ForecastingRuntime {
   readonly queries: ForecastQueries;
   readonly schedule: ScheduleForecastRuns;
   readonly execute: ExecuteForecastRun;
+  /** Gastos atípicos: paso diario de `forecasting.schedule`, lista, descarte y restauración. */
+  readonly anomalies: {
+    readonly detect: DetectSpendingAnomalies;
+    readonly queries: SpendingAnomalyQueries;
+    /** Evaluación contra las etiquetas del Large Seed (`pnpm forecast:anomalies:backtest`, nightly): no persiste nada. */
+    readonly backtest: BacktestSpendingAnomalies;
+  };
 }
 
 const NO_METRICS: ForecastMetrics = {
@@ -109,24 +174,76 @@ export function createForecastingRuntime(options: ForecastingRuntimeOptions): Fo
     settings: { ...DEFAULT_FORECASTING_SETTINGS, ...options.settings },
     metrics: options.metrics ?? NO_METRICS,
   };
+  const anomalyOptions = options.anomalies;
+  const anomalyRepo = new PgAnomalyRepository();
+  const anomalyScans = new PgAnomalyScanRepository();
+  const anomalyDeps: AnomalyDeps = {
+    uow,
+    workspaces: options.workspaces,
+    settingsOf: options.settingsOf,
+    categories: options.categories,
+    rates: options.rates,
+    expenses: anomalyOptions?.expenses ?? NO_ANOMALY_PORTS.expenses,
+    resolved: anomalyOptions?.resolved ?? NO_ANOMALY_PORTS.resolved,
+    transactions: anomalyOptions?.transactions ?? NO_ANOMALY_PORTS.transactions,
+    anomalies: anomalyRepo,
+    scans: anomalyScans,
+    maintenance: new PgAnomalyMaintenance(uow),
+    ...(anomalyOptions?.notifier ? { notifier: anomalyOptions.notifier } : {}),
+    audit: options.audit,
+    ids: uuidV7Ids,
+    clock: options.clock,
+    settings: {
+      ...DEFAULT_ANOMALY_SETTINGS,
+      rateValidityWindowDays: deps.settings.rateValidityWindowDays,
+      ...anomalyOptions?.settings,
+      // Sin los puertos de lectura la función no puede evaluar nada: queda deshabilitada.
+      ...(anomalyOptions ? {} : { enabled: false }),
+    },
+    metrics: anomalyOptions?.metrics ?? NO_ANOMALY_METRICS,
+  };
   return {
     request: new RequestForecastRun(deps),
     queries: new ForecastQueries(deps),
     schedule: new ScheduleForecastRuns(deps),
     execute: new ExecuteForecastRun(deps),
+    anomalies: {
+      detect: new DetectSpendingAnomalies(anomalyDeps),
+      queries: new SpendingAnomalyQueries(anomalyDeps),
+      backtest: new BacktestSpendingAnomalies(anomalyDeps),
+    },
   };
 }
 
-/** Job `forecasting.schedule` (diario): corridas programadas y retención, con el actor de proceso. */
+/**
+ * Job `forecasting.schedule` (diario), con el actor de proceso: dos pasos INDEPENDIENTES (add-spending-anomaly-detection,
+ * decisión 6). Primero las corridas programadas y su retención (solo con `FORECASTING_ENABLED`; deshabilitado, el paso no
+ * hace nada) y después la detección de gastos atípicos (solo con `FORECASTING_ANOMALIES_ENABLED`). La falla de un paso se
+ * registra y no impide el otro.
+ */
 export function runForecastSchedule(
-  runtime: Pick<ForecastingRuntime, 'schedule'>,
+  runtime: Pick<ForecastingRuntime, 'schedule'> & Partial<Pick<ForecastingRuntime, 'anomalies'>>,
   logger: Pick<Logger, 'info' | 'warn'>,
   trigger: 'cron' | 'startup' | 'manual',
 ) {
   return runWithRequestContext(
     { actor: { type: 'WORKER', process: FORECAST_SCHEDULE_JOB }, origin: 'recurring' },
     async () => {
-      const summary = await runtime.schedule.run();
+      let summary: Awaited<ReturnType<ScheduleForecastRuns['run']>> = {
+        workspaces: 0,
+        created: 0,
+        purged: 0,
+        failed: 0,
+        errors: [],
+      };
+      try {
+        summary = await runtime.schedule.run();
+      } catch (err) {
+        logger.warn(
+          { trigger, error: err instanceof Error ? err.name : typeof err },
+          'forecast schedule: the run scheduling step failed',
+        );
+      }
       if (summary.failed > 0) {
         logger.warn(
           { trigger, failed: summary.failed, errors: summary.errors },
@@ -143,7 +260,35 @@ export function runForecastSchedule(
         },
         'forecast runs scheduled',
       );
-      return summary;
+      let anomalies: Awaited<ReturnType<DetectSpendingAnomalies['run']>> | null = null;
+      if (runtime.anomalies) {
+        try {
+          anomalies = await runtime.anomalies.detect.run();
+          if (anomalies.failed > 0) {
+            logger.warn(
+              { trigger, failed: anomalies.failed, errors: anomalies.errors },
+              'spending anomalies: some workspaces failed',
+            );
+          }
+          logger.info(
+            {
+              job: FORECAST_SCHEDULE_JOB,
+              trigger,
+              workspaces: anomalies.workspaces,
+              evaluated: anomalies.evaluated,
+              flagged: anomalies.flagged,
+              purged: anomalies.purged,
+            },
+            'spending anomalies detected',
+          );
+        } catch (err) {
+          logger.warn(
+            { trigger, error: err instanceof Error ? err.name : typeof err },
+            'spending anomalies: the detection step failed',
+          );
+        }
+      }
+      return { ...summary, anomalies };
     },
   );
 }
@@ -165,21 +310,22 @@ export function runForecastRunner(
 }
 
 export interface ForecastingModuleOptions {
-  readonly runtime: Pick<ForecastingRuntime, 'request' | 'queries'>;
+  readonly runtime: Pick<ForecastingRuntime, 'request' | 'queries' | 'anomalies'>;
   readonly conventions: ApiConventionsOptions;
 }
 
-/** Módulo HTTP de FORECAST (`/forecasts*`). */
+/** Módulo HTTP de FORECAST (`/forecasts*` y `/spending-anomalies*`). */
 @Module({})
 export class ForecastingModule {
   static register(options: ForecastingModuleOptions): DynamicModule {
     return {
       module: ForecastingModule,
-      controllers: [ForecastingController],
+      controllers: [ForecastingController, SpendingAnomaliesController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: FORECASTING_REQUEST, useValue: options.runtime.request },
         { provide: FORECASTING_QUERIES, useValue: options.runtime.queries },
+        { provide: SPENDING_ANOMALY_QUERIES, useValue: options.runtime.anomalies.queries },
       ],
     };
   }
@@ -189,7 +335,9 @@ export class ForecastingModule {
 export const FORECAST_RUN_LIFECYCLE_MACHINE = FORECAST_RUN_LIFECYCLE.definition;
 
 export {
+  ANOMALY_METRICS,
   FORECASTING_AUDIT_POLICY,
+  FORECAST_ANOMALY_BACKTEST,
   FORECAST_GENERATED_EVENT,
   FORECAST_RUNNER_JOB,
   FORECAST_SCHEDULE_JOB,
@@ -199,3 +347,11 @@ export {
 export { MlForecastingServiceClient } from '../infrastructure/ml-service-client.js';
 export type { OutboxPort } from '../application/ports.js';
 export { BacktestReport, collectBacktestReport } from './backtest-report-runner.js';
+export {
+  MIN_PRECISION,
+  MIN_RECALL,
+  buildBacktestReport,
+  formatBacktestReport,
+  type AnomalyBacktestReport,
+  type AnomalyLabel,
+} from '../application/backtest-spending-anomalies.js';

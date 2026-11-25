@@ -15389,6 +15389,133 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Forecasts: gastos atípicos (openspec add-spending-anomaly-detection) ──
+  /workspaces/{workspaceId}/spending-anomalies:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Forecasts]
+      operationId: listSpendingAnomalies
+      summary: List the unusual expenses of the workspace
+      description: |
+        Unusual expenses (median and MAD, computed by the daily job without the forecast service), most recent transaction date first.
+        `status` is `OPEN` (default), `DISMISSED` or `ALL` (never the ones superseded by a newer version of the transaction). With
+        `transactionId` (up to 100 ids; used by the transaction list and detail to show the mark) the other filters are ignored and every
+        non-superseded state is returned. Anomalies of voided transactions are never returned; `transactionChanged` is true when the
+        transaction was edited after the detection. `featureStatus` is `DISABLED` when the detection is off in the installation
+        (what was already detected is still listed). The mark is not an error or a confirmed fraud: it only says the amount is unusual.
+      x-openspec-capability: [forecast/anomaly-detection]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, DISMISSED, ALL], default: OPEN }
+        - name: from
+          in: query
+          description: First transaction date (inclusive).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          description: Last transaction date (inclusive).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: transactionId
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 100
+            items: { $ref: '#/components/schemas/Uuid' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Page of unusual expenses
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpendingAnomalyPage' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'INVALID_FILTER or INVALID_CURSOR.'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/spending-anomalies/{anomalyId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SpendingAnomalyId'
+    post:
+      tags: [Forecasts]
+      operationId: dismissSpendingAnomaly
+      summary: Mark an unusual expense as not unusual
+      description: |
+        "It is not unusual": the expense leaves the open list and is not marked again for the same version of the transaction. Repeating the
+        dismissal is harmless (204, no new audit entry). An anomaly of another workspace, unknown or superseded answers 404. Audited
+        (entity `SpendingAnomaly`, previous and new value). It never changes the transaction.
+      x-openspec-capability: [forecast/anomaly-detection]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SpendingAnomalyDismissInput' }
+      responses:
+        '204':
+          description: Unusual expense dismissed
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/spending-anomalies/{anomalyId}/restore:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SpendingAnomalyId'
+    post:
+      tags: [Forecasts]
+      operationId: restoreSpendingAnomaly
+      summary: Restore a dismissed unusual expense
+      description: |
+        The expense is listed again among the open ones with its mark. Repeating the restoration is harmless (204, no new audit entry).
+        Audited (entity `SpendingAnomaly`).
+      x-openspec-capability: [forecast/anomaly-detection]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Unusual expense restored
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -15818,6 +15945,12 @@ components:
       in: path
       required: true
       description: Forecast run UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    SpendingAnomalyId:
+      name: anomalyId
+      in: path
+      required: true
+      description: Unusual expense UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
     DocumentId:
       name: documentId
@@ -23821,7 +23954,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED, CASH_FLOW_SHORTFALL_RISK, HOME_DIGEST]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED, CASH_FLOW_SHORTFALL_RISK, HOME_DIGEST, SPENDING_ANOMALY]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -23846,7 +23979,7 @@ components:
       properties:
         kind:
           type: string
-          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS, FX_FEED_STATUS, FX_RATE, CASH_FLOW_CALENDAR, HOME_DIGEST]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS, FX_FEED_STATUS, FX_RATE, CASH_FLOW_CALENDAR, HOME_DIGEST, SPENDING_ANOMALIES]
         currency:
           description: >-
             Currency of the shortfall (only `CASH_FLOW_CALENDAR`, add-cash-flow-forecast): the app opens the cash flow
@@ -23856,7 +23989,10 @@ components:
           type: string
           pattern: '^[A-Z0-9]{2,16}$'
         horizonDays:
-          description: Horizon of the cash flow calendar that raised the notice (only `CASH_FLOW_CALENDAR`).
+          description: >-
+            Horizon of the cash flow calendar that raised the notice (only `CASH_FLOW_CALENDAR`). `SPENDING_ANOMALIES`
+            (add-spending-anomaly-detection) opens the list of unusual expenses (`/gastos-atipicos`); there `periodId` is the
+            workspace id and `periodLabel` the month of the daily check.
           type: integer
           enum: [7, 30, 60, 90]
         fxRateId:
@@ -29230,6 +29366,99 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/ForecastRunSummary' }
+        nextCursor: { type: [string, 'null'] }
+    SpendingAnomalyReason:
+      type: object
+      required: [kind, categoryId, counterpartyId, reference, ratio, robustScore, sampleSize]
+      properties:
+        kind:
+          type: string
+          description: 'Open set. CATEGORY_OUTLIER and COUNTERPARTY_OUTLIER: robust score of at least 3.5 and at least 3 times the median of the previous 365 days (with at least 8 expenses); NEW_COUNTERPARTY_HIGH_AMOUNT: a counterparty without expenses in the previous 365 days and an amount at or above the 95th percentile of the workspace.'
+          x-extensible-enum: [CATEGORY_OUTLIER, COUNTERPARTY_OUTLIER, NEW_COUNTERPARTY_HIGH_AMOUNT]
+        categoryId:
+          description: Category compared (only CATEGORY_OUTLIER).
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        counterpartyId:
+          description: Counterparty compared (COUNTERPARTY_OUTLIER and NEW_COUNTERPARTY_HIGH_AMOUNT).
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        reference:
+          description: Median (category and counterparty) or 95th percentile (new counterparty) in the reporting currency.
+          $ref: '#/components/schemas/Money'
+        ratio:
+          description: Amount divided by the median with 1 decimal (HALF_EVEN); null for a new counterparty.
+          type: [string, 'null']
+          pattern: '^[0-9]+\.[0-9]$'
+        robustScore:
+          description: Robust score with 2 decimals; null when the MAD is zero and for a new counterparty.
+          type: [string, 'null']
+          pattern: '^[0-9]+\.[0-9]{2}$'
+        sampleSize: { type: integer, minimum: 0 }
+    SpendingAnomaly:
+      type: object
+      required:
+        - id
+        - transactionId
+        - transactionVersion
+        - transactionDate
+        - transactionChanged
+        - amount
+        - reportingAmount
+        - categoryIds
+        - counterpartyId
+        - reasons
+        - status
+        - detectedAt
+        - decidedAt
+        - decidedBy
+        - dismissReason
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        transactionVersion: { type: integer, minimum: 1 }
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        transactionChanged:
+          type: boolean
+          description: True when the transaction was edited outside the evaluation window after the detection.
+        amount: { $ref: '#/components/schemas/Money' }
+        reportingAmount: { $ref: '#/components/schemas/Money' }
+        categoryIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        counterpartyId:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        reasons:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/SpendingAnomalyReason' }
+        status: { type: string, enum: [OPEN, DISMISSED] }
+        detectedAt: { $ref: '#/components/schemas/Instant' }
+        decidedAt:
+          oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }]
+        decidedBy:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        dismissReason:
+          oneOf: [{ $ref: '#/components/schemas/SpendingAnomalyDismissReason' }, { type: 'null' }]
+    SpendingAnomalyDismissReason:
+      type: string
+      description: Open set.
+      x-extensible-enum: [EXPECTED_ONE_OFF, NOT_UNUSUAL, OTHER]
+    SpendingAnomalyDismissInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { $ref: '#/components/schemas/SpendingAnomalyDismissReason' }
+        note: { type: string, maxLength: 200 }
+    SpendingAnomalyPage:
+      type: object
+      required: [featureStatus, items, nextCursor]
+      properties:
+        featureStatus:
+          type: string
+          description: DISABLED when the detection is off in the installation (the list keeps what was already detected).
+          enum: [ENABLED, DISABLED]
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SpendingAnomaly' }
         nextCursor: { type: [string, 'null'] }
     ForecastReadinessReason:
       type: object

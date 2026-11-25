@@ -14,6 +14,7 @@ export type NavKey =
   | 'recurring'
   | 'cashFlow'
   | 'forecasts'
+  | 'spendingAnomalies'
   | 'goals'
   | 'debt'
   | 'reports'
@@ -46,6 +47,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'cashFlow', path: '/flujo-de-caja' },
   // Phase 8 (add-expense-forecasts): pronósticos de gasto e ingreso con rango probable, conocidos y motivos.
   { key: 'forecasts', path: '/pronosticos' },
+  // Phase 9 (add-spending-anomaly-detection): gastos atípicos con el motivo, descarte y restauración (OWNER y EDITOR).
+  { key: 'spendingAnomalies', path: '/gastos-atipicos' },
   // Phase 4 (add-savings-goals): Metas de ahorro (listado, alta, detalle y reservas por cuenta).
   { key: 'goals', path: '/goals' },
   // Phase 4 (add-loans): Deudas → préstamos (lista, alta, detalle y comparación con la tabla del banco).

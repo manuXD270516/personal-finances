@@ -5,16 +5,19 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Cambios de la transacción después de la detección"
 scenario: "Monto corregido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/spending-anomalies.api.test.ts
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

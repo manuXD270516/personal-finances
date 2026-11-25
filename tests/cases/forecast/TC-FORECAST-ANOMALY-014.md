@@ -5,16 +5,18 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Motivo explicable de cada gasto atípico"
 scenario: "Texto del motivo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-FORECAST-004"]
 nfr: ["NFR-USAB-002"]
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spending-anomalies/spending-anomalies.test.tsx
+  - packages/contexts/notifications/src/domain/spending-anomaly-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

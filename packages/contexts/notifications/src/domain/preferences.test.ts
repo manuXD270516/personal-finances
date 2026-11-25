@@ -26,6 +26,8 @@ describe('NotificationPreferences', () => {
         { type: 'FX_RATE_ANOMALY_RETAINED', inApp: true, email: true },
         { type: 'CASH_FLOW_SHORTFALL_RISK', inApp: true, email: true },
         { type: 'HOME_DIGEST', inApp: true, email: true },
+        // Primer tipo apagado por omisión (add-spending-anomaly-detection, D474).
+        { type: 'SPENDING_ANOMALY', inApp: false, email: false },
       ],
       quietHours: null,
       includeDetailsInEmail: false,

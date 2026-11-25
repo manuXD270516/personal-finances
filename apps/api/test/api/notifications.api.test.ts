@@ -340,6 +340,7 @@ describe('Preferencias de notificaciones', () => {
           { type: 'FX_RATE_ANOMALY_RETAINED', inApp: true, email: true },
           { type: 'CASH_FLOW_SHORTFALL_RISK', inApp: true, email: true },
           { type: 'HOME_DIGEST', inApp: true, email: true },
+          { type: 'SPENDING_ANOMALY', inApp: false, email: false },
         ],
         quietHours: null,
         includeDetailsInEmail: false,

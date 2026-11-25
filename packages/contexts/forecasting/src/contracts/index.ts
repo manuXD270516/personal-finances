@@ -204,8 +204,71 @@ export const FORECASTING_AUDIT_POLICY = {
     failureReason: 'plain',
     asOfPeriod: 'plain',
   },
+  // add-spending-anomaly-detection: descarte y restauración de un gasto atípico (sin montos).
+  SpendingAnomaly: {
+    status: 'plain',
+    dismissReason: 'plain',
+  },
 } as const;
 
 export const FORECAST_DISCLAIMER_KEY = 'forecast.disclaimer';
+
+// ───────────────────────────────────────────── add-spending-anomaly-detection
+
+/** Nombre del comando de evaluación contra las etiquetas del Large Seed (`pnpm forecast:anomalies:backtest`). */
+export const FORECAST_ANOMALY_BACKTEST = 'forecast:anomalies:backtest';
+
+/** Métricas de la detección (docs/18): sin montos ni identificadores de transacciones en las etiquetas. */
+export const ANOMALY_METRICS = {
+  evaluated: 'forecast_anomaly_evaluated_total',
+  notRated: 'forecast_anomaly_not_rated_total',
+  flagged: 'forecast_anomaly_flagged_total',
+  decided: 'forecast_anomaly_decided_total',
+  passDuration: 'forecast_anomaly_pass_duration_seconds',
+} as const;
+
+export type SpendingAnomalyReasonKindDto =
+  'CATEGORY_OUTLIER' | 'COUNTERPARTY_OUTLIER' | 'NEW_COUNTERPARTY_HIGH_AMOUNT';
+export type SpendingAnomalyStatusDto = 'OPEN' | 'DISMISSED';
+export type SpendingAnomalyDismissReasonDto = 'EXPECTED_ONE_OFF' | 'NOT_UNUSUAL' | 'OTHER';
+
+export interface SpendingAnomalyReasonDto {
+  readonly kind: SpendingAnomalyReasonKindDto;
+  readonly categoryId: string | null;
+  readonly counterpartyId: string | null;
+  /** Mediana (categoría y contraparte) o percentil (contraparte nueva) en la moneda de reporte. */
+  readonly reference: MoneyDto;
+  /** Monto ÷ mediana con 1 decimal HALF_EVEN; `null` en la contraparte nueva. */
+  readonly ratio: string | null;
+  /** Puntaje robusto con 2 decimales; `null` con MAD igual a cero y en la contraparte nueva. */
+  readonly robustScore: string | null;
+  readonly sampleSize: number;
+}
+
+export interface SpendingAnomalyDto {
+  readonly id: string;
+  readonly transactionId: string;
+  readonly transactionVersion: number;
+  readonly transactionDate: string;
+  /** `true` si la transacción se editó fuera de la ventana de evaluación desde la detección. */
+  readonly transactionChanged: boolean;
+  readonly amount: MoneyDto;
+  readonly reportingAmount: MoneyDto;
+  readonly categoryIds: readonly string[];
+  readonly counterpartyId: string | null;
+  readonly reasons: readonly SpendingAnomalyReasonDto[];
+  readonly status: SpendingAnomalyStatusDto;
+  readonly detectedAt: string;
+  readonly decidedAt: string | null;
+  readonly decidedBy: string | null;
+  readonly dismissReason: SpendingAnomalyDismissReasonDto | null;
+}
+
+export interface SpendingAnomalyPageDto {
+  /** `DISABLED` si la detección está deshabilitada en la instalación (la lista conserva lo ya detectado). */
+  readonly featureStatus: 'ENABLED' | 'DISABLED';
+  readonly items: readonly SpendingAnomalyDto[];
+  readonly nextCursor: string | null;
+}
 
 export * from './portability.js';

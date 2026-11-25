@@ -15,10 +15,23 @@ export interface TypePreference {
   readonly email: boolean;
 }
 
+/**
+ * Valor por omisión de cada tipo mientras no hay fila explícita (add-spending-anomaly-detection, D474): los tipos
+ * existentes siguen activos en los dos canales; el aviso de gastos atípicos nace APAGADO en los dos (el usuario lo activa).
+ */
+export const TYPES_OFF_BY_DEFAULT: ReadonlySet<NotificationType> = new Set<NotificationType>([
+  'SPENDING_ANOMALY',
+]);
+
+export function defaultTypePreference(type: NotificationType): TypePreference {
+  const on = !TYPES_OFF_BY_DEFAULT.has(type);
+  return { inApp: on, email: on };
+}
+
 export interface PreferencesState {
   readonly userId: string;
   readonly workspaceId: string;
-  /** Solo los tipos con fila explícita; la ausencia equivale a "activado" (docs/33 D88). */
+  /** Solo los tipos con fila explícita; la ausencia equivale al valor por omisión del tipo (activado, salvo `TYPES_OFF_BY_DEFAULT`; docs/33 D88). */
   readonly byType: Readonly<Partial<Record<NotificationType, TypePreference>>>;
   readonly quietHours: { readonly start: string; readonly end: string } | null;
   readonly includeDetailsInEmail: boolean;
@@ -45,7 +58,7 @@ export interface PreferencesInput {
 
 /**
  * AR `NotificationPreferences` (una por usuario y workspace; design decisión 10). Por defecto ambos canales activos
- * en todos los tipos, sin horario de silencio y sin detalles en el email (docs/33 D88, FR-NOTIFY-006).
+ * en todos los tipos (salvo el aviso de gastos atípicos, apagado), sin horario de silencio y sin detalles en el email (docs/33 D88, FR-NOTIFY-006).
  */
 export class NotificationPreferences {
   private constructor(
@@ -90,10 +103,9 @@ export class NotificationPreferences {
     return q ? QuietHours.of(q.start, q.end) : null;
   }
 
-  /** Estado efectivo de un tipo en un canal (ausencia = activado). */
+  /** Estado efectivo de un tipo en un canal (ausencia = valor por omisión del tipo). */
   isEnabled(type: NotificationType, channel: NotificationChannel): boolean {
-    const pref = this.state.byType[type];
-    if (!pref) return true;
+    const pref = this.state.byType[type] ?? defaultTypePreference(type);
     return channel === 'IN_APP' ? pref.inApp : pref.email;
   }
 

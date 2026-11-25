@@ -5,16 +5,17 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "La detección nunca bloquea ni modifica transacciones"
 scenario: "Gasto atípico registrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-FORECAST-006"]
 nfr: []
 invariants: ["INV-004"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/spending-anomalies.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

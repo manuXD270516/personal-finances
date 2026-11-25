@@ -6,3 +6,7 @@ export * from './forecast-composer.js';
 export * from './known-future.js';
 export * from './variable-history.js';
 export * from './variable-liquid-outflow.js';
+export * from './robust-stats.js';
+export * from './spending-anomaly-detector.js';
+export * from './expense-history-index.js';
+export * from './spending-anomaly.js';

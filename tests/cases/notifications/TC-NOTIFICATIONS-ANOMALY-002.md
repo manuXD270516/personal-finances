@@ -5,16 +5,19 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Aviso de gastos atípicos desactivado por omisión"
 scenario: "Tipo activado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-NOTIFY-004"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+  - packages/contexts/notifications/src/application/spending-anomaly-notifications.test.ts
+  - packages/contexts/notifications/src/domain/spending-anomaly-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["notifications","anomalies"]
