@@ -157,30 +157,30 @@ Ninguna sesión puede cerrarlos por su cuenta.
 
 **Préstamos y amortización**
 - Adoptar una tabla del banco cuyas fechas difieren de las del sistema en una cuota pendiente no está probado (la clave de la ocurrencia es el número de cuota).
-- El simulador de pago anticipado no tiene benchmark del p95 < 300 ms; el test usa 3 s.
+- ~~El simulador de pago anticipado no tiene benchmark del p95 < 300 ms~~: ya existe (`apps/api/test/perf/loan-simulator.perf.ts`, TC-DEBT-AMORT-045, de `fix-phase-4-gaps`, nightly; verificado 2026-11-25). El test funcional de 3 s se mantiene a propósito.
 - ~~La lista de préstamos hace 2 consultas a BD por préstamo~~: resuelto por `fix-debt-cards-loans-gaps` (2026-11-25; lectura en lote de cuotas y pagos).
 - UI: ~~la lista de préstamos consulta cada detalle por separado~~ (resuelto por D222: una sola llamada a `GET W/loans`); un borrador no se edita desde la pantalla (sí por `PATCH`); notas y etiquetas de transacciones `LOAN_*` no se editan desde la UI.
 
 **Tarjetas**
 - ~~El ciclo que contiene un saldo inicial queda `consistent = false`~~: resuelto por `fix-phase-4-gaps` (TC-DEBT-CARD-040; verificado 2026-11-25).
-- `nextDueDate` puede apuntar a un vencimiento pasado en un ciclo calculado y no emitido, recién registrada una tarjeta con deuda previa.
-- Las cuotas no se rotulan como tales en Q8 (el contrato de próximos pagos no lo expone).
+- ~~`nextDueDate` puede apuntar a un vencimiento pasado en un ciclo calculado y no emitido~~: resuelto por `fix-phase-4-gaps` (`NextDueResolver`, TC-DEBT-CARD-038/039; verificado 2026-11-25).
+- Las cuotas no se rotulan como tales en Q8 (el contrato de próximos pagos no lo expone). La spec lo pide (`reporting/cash-flow-calendar`, «Cuotas de tarjeta futuras», prioridad Could), pero hace falta un camino de datos que no está diseñado: la ocurrencia de Commitments no guarda de dónde sale la estimación y Reporting no depende de `@pf/debt/contracts`. Pregunta abierta al owner (opciones en el informe del 2026-11-25).
 
 **Metas**
-- Anular un aporte del que ya se retiró una parte deja el fondo real en negativo; no se bloquea.
+- ~~Anular un aporte del que ya se retiró una parte deja el fondo real en negativo; no se bloquea~~: es el comportamiento decidido (D222: se avisa, no se bloquea). `GET W/goals/void-impact` avisa antes de anular y `Goal.negativeFunds[]` informa el faltante a regularizar (`fix-phase-4-gaps`; verificado 2026-11-25).
 - El job diario corre cada hora (`GOALS_DAILY_CRON`); es idempotente.
 
 **Deuda de Phase 4 fuera de D222** (sigue abierta): notas `LOAN_*`, rótulo de cuotas en Q8, supuestos de Q5, job horario de metas y la decisión «Phase 7».
 
 **Disponible para gastar (Q5)**
-- Sin un periodo financiero que cubra hoy (workspace sin actividad en el ledger) Q5 usa el mes calendario y no consulta el plan; la spec no define ese caso (supuesto a confirmar).
+- Sin un periodo financiero que cubra hoy (workspace sin actividad en el ledger) Q5 usa el mes calendario y no consulta el plan; la spec no define ese caso (supuesto a confirmar). Está documentado en docs/10 (`period.id = null`); sigue como pregunta abierta al owner.
 - "N tarjetas sin pago programado" cuenta las tarjetas con saldo adeudado a las que no llega ninguna transferencia ni pago de tarjeta (ocurrencia o pendiente) hasta el fin del periodo; no distingue pagos mínimos de totales.
 - Un aporte manual pendiente hacia una cuenta no líquida de una meta con plan puede contar dos veces hasta postearse (riesgo aceptado en el diseño).
 - Fuera de Phase 4: horizonte "hasta el próximo ingreso", categorías esenciales y alertas de déficit (Phase 7, D218).
 
 **Importación CSV**
 - La persistencia por conjunto (change 52) serializa los lotes de una misma cuenta con un candado transaccional: dos imports simultáneos a la misma cuenta se procesan uno tras otro (≤ ~650 ms por lote). Los campos nuevos de la fila (clasificación, tipo de movimiento) los agrega quien los implemente también en el camino por lote y en el test de equivalencia (decisión 6 del design).
-- `getImport` no devuelve las filas de muestra: al retomar una importación no se ve la muestra.
+- `getImport` no devuelve las filas de muestra: al retomar una importación no se ve la muestra (la spec las exige solo al crear y la UI lo avisa con `mapping-no-sample`; devolverlas al retomar requiere decisión del owner).
 - Las huellas incluyen workspace y cuenta: reimportar tras restaurar un export muestra "probables duplicados" (documentado en docs/13 §7.3).
 
 **Otros reportados en Phases 1–2** (verificar antes de trabajarlos)
