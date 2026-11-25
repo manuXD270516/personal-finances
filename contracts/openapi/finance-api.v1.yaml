@@ -25203,17 +25203,55 @@ components:
     ImportRowFieldOrigin:
       type: string
       x-extensible-enum: [ALIAS, RULE, DEFAULT, MANUAL]
-    ImportProposedField:
+    ImportProposedIdField:
       type: object
       additionalProperties: false
       required: [value, origin]
       properties:
         value:
-          description: The proposed value (an id, a list of ids or a text).
+          description: The proposed id.
           oneOf:
             - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        origin: { $ref: '#/components/schemas/ImportRowFieldOrigin' }
+        ruleId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        ruleVersion:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+    ImportProposedIdListField:
+      type: object
+      additionalProperties: false
+      required: [value, origin]
+      properties:
+        value:
+          description: The proposed list of ids.
+          oneOf:
             - type: array
               items: { $ref: '#/components/schemas/Uuid' }
+            - type: 'null'
+        origin: { $ref: '#/components/schemas/ImportRowFieldOrigin' }
+        ruleId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        ruleVersion:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+    ImportProposedTextField:
+      type: object
+      additionalProperties: false
+      required: [value, origin]
+      properties:
+        value:
+          description: The proposed text.
+          oneOf:
             - type: string
             - type: 'null'
         origin: { $ref: '#/components/schemas/ImportRowFieldOrigin' }
@@ -25234,10 +25272,10 @@ components:
         The classification proposed by the pipeline (alias, rules, default category) with the origin of each field. What
         applies is `edits` over `proposal`.
       properties:
-        categoryId: { $ref: '#/components/schemas/ImportProposedField' }
-        counterpartyId: { $ref: '#/components/schemas/ImportProposedField' }
-        tagIds: { $ref: '#/components/schemas/ImportProposedField' }
-        description: { $ref: '#/components/schemas/ImportProposedField' }
+        categoryId: { $ref: '#/components/schemas/ImportProposedIdField' }
+        counterpartyId: { $ref: '#/components/schemas/ImportProposedIdField' }
+        tagIds: { $ref: '#/components/schemas/ImportProposedIdListField' }
+        description: { $ref: '#/components/schemas/ImportProposedTextField' }
         excluded:
           type: boolean
           description: A rule proposed to exclude the row from the import (the user can revert it).
