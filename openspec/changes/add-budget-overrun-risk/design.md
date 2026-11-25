@@ -7,7 +7,7 @@ Change 74 de Phase 9 (docs/03 §7, D472). Lo que ya existe:
 - REPORTING ya lee PLANNING, COMMITMENTS y FORECAST para el calendario de flujo de caja y el Home (changes 60 y 66), y tiene el trabajo horario `reporting.cash-flow-watch` (a los :25) que abre episodios de déficit y avisa por el puerto de notificaciones en proceso.
 - FORECAST publica series por categoría con el esperado y el intervalo del 80 % cuando está habilitado (deshabilitado en N1).
 
-Decisiones ([docs/77](../../../docs/77-phase-9-and-card-interest-decisions.md)): D478 (un change solo para el riesgo de exceder un presupuesto, en el plan y el Home, aviso apagado por omisión, textos por plantilla), D471 (FR-REPORTING-020), D472 (alcance), D249 (sin consumidores ni conexiones nuevas). D478 y D471 son recomendaciones aplicadas por omisión según la convención de docs/76; el owner puede revertirlas antes del grupo de tareas que las usa.
+Decisiones ([docs/77](../../../docs/77-phase-9-and-card-interest-decisions.md)): D484 (el riesgo «posible» no avisa) y D485 (la proyección lineal del plan no cambia), contestadas por el owner; D478 (un change solo para el riesgo de exceder un presupuesto, en el plan y el Home, aviso apagado por omisión, textos por plantilla), D471 (FR-REPORTING-020), D472 (alcance), D249 (sin consumidores ni conexiones nuevas). D478 y D471 son recomendaciones aplicadas por omisión según la convención de docs/76; el owner puede revertirlas antes del grupo de tareas que las usa.
 
 ## Objetivos / No objetivos
 
@@ -133,4 +133,8 @@ Migración expand sin datos. Rollback: `REPORTING_BUDGET_RISK_ENABLED=false`; la
 
 ## Preguntas abiertas
 
-Ninguna bloqueante. D478 (recomendación aplicada por omisión) fija el alcance. Los parámetros de diseño (7 días mínimos, avisar solo «probable», destinatarios iguales a los del umbral, no tocar la proyección lineal del plan) son configurables o reversibles; si el owner prefiere que el riesgo «posible» también avise, o que la proyección lineal del plan pase a usar este cálculo, se decide antes del grupo 3 de tareas.
+Ninguna. D478 (recomendación aplicada por omisión) fija el alcance y el owner cerró el 2026-11-25 las dos que quedaban, las dos con lo que este design proponía ([docs/77](../../../docs/77-phase-9-and-card-interest-decisions.md) § «Respuestas posteriores»):
+- **D484:** el riesgo «posible» solo se muestra en el plan y su tooltip, sin notificación; solo avisa el paso a «probable» (decisión 7).
+- **D485:** la proyección lineal de PLANNING (FR-PLANNING-024) se deja lineal; no se unifica con este cálculo (decisión 1).
+
+Los demás parámetros (7 días mínimos, destinatarios iguales a los del umbral) son configurables o reversibles.
