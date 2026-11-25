@@ -268,6 +268,11 @@ describe('pagos', () => {
     const { loan, items } = await activeLoan(w1);
     const p1 = payment(loan.id, await inWs(w1, () => payments.nextPaymentNo(loan.id)));
     await inWs(w1, () => payments.insert(w1, p1, [allocation(p1, items[0]!)]));
+    // [TC-DEBT-LOAN-055] la lectura en lote coincide con la de cada préstamo (y uno sin pagos queda vacío).
+    const noPayments = await activeLoan(w1);
+    const batchPaid = await inWs(w1, () => payments.paidByInstallmentForLoans([loan.id, noPayments.loan.id]));
+    expect(batchPaid.get(loan.id)).toEqual(await inWs(w1, () => payments.paidByInstallment(loan.id)));
+    expect(batchPaid.get(noPayments.loan.id)?.size).toBe(0);
     const paid = await inWs(w1, () => payments.paidByInstallment(loan.id));
     expect(paid.get(items[0]!.id)).toEqual({
       taxes: '0.00',
@@ -476,6 +481,17 @@ describe('versiones del cronograma, prepagos y tasas (add-loan-amortization-adva
       [2, 3],
     ]);
     expect((await inWs(w1, () => schedules.ownInstallments(loan.id, 2))).map((i) => i.n)).toEqual([2, 3]);
+    // [TC-DEBT-LOAN-055] la lectura en lote entrega lo mismo que la lectura por préstamo, cada uno a su versión.
+    const other = await activeLoan(w1);
+    const batch = await inWs(w1, () =>
+      schedules.installmentsForLoans([
+        { loanId: loan.id, version: 3 },
+        { loanId: other.loan.id, version: 1 },
+      ]),
+    );
+    expect(batch.get(loan.id)).toEqual(await inWs(w1, () => schedules.installments(loan.id, 3)));
+    expect(batch.get(other.loan.id)).toEqual(await inWs(w1, () => schedules.installments(other.loan.id, 1)));
+    expect((await inWs(w1, () => schedules.installmentsForLoans([]))).size).toBe(0);
 
     const versions = await inWs(w1, () => schedules.versions(loan.id));
     expect(

@@ -128,8 +128,8 @@ Ninguna sesión puede cerrarlos por su cuenta.
 ## 4. Deuda técnica y mejoras conocidas
 
 **Plataforma**
-- `overdueStatements[]` del listado de tarjetas puede quedar incompleto; el detalle de la tarjeta sí es completo (change 37).
-- La métrica `debt_card_cycle_mismatch_total` no existe en el código (solo `consistent`).
+- ~~`overdueStatements[]` del listado de tarjetas puede quedar incompleto~~: resuelto por `fix-debt-cards-loans-gaps` (2026-11-25): el listado usa la misma ventana de ciclos que el detalle.
+- ~~La métrica `debt_card_cycle_mismatch_total` no existe en el código~~: resuelta por `fix-debt-cards-loans-gaps` (2026-11-25).
 - Conexiones: la plantilla del host (`deploy/compose/compose.prod.yaml`, D249) fija `max_connections=70` con API 22 + worker 34 = 56, más las dos colas pg-boss (4 cada una) = 64 de 67 útiles (3 reservadas). Antes del despliegue, vigilar la memoria del contenedor de Postgres (las conexiones se abren bajo demanda) y revisar consumidores de concurrencia 1 que podrían agruparse. (Corregido 2026-10-28 con la medición del change 48b: el benchmark del import usa un pool de API de 22 y declara 85 conexiones de 97; el uso real medido es de 30–40 sobre 100. CLAUDE.md todavía cita «22 + 33 = 55 de 60».)
 - Limitador de tasa en memoria: con más de una réplica de la API hace falta un adaptador sobre Valkey.
 - **Relay del outbox: plan cuadrático con estadísticas viejas (hallado 2026-11-17; corregido por `fix-outbox-relay-head-query`, fusionado en #237 y archivado; confirmado en el nightly 44441471740 del 2026-11-19: drenado del import 1,1 s y fase A completa. Ese nightly sigue en rojo por la persistencia del import, 22,9 s de 20 s, tema de `stabilize-import-persist-perf`; el issue #147 queda abierto).** Las cabezas pendientes ahora se calculan una vez por lote con `DISTINCT ON` (7 ms con 8 000 pendientes y estadísticas viejas, contra 367 ms del `NOT EXISTS`); la subconsulta correlacionada de abajo resultó insuficiente en la implementación porque el planner tampoco usa `outbox_pending_aggregate_idx` (TC-PLATFORM-EVENTS-020..022). Diagnóstico original: Es la causa de los fallos crónicos del job `perf` desde el 2026-11-13 (issue #147): el drenado del import de 5 000 filas no termina en 180 s en ninguna de las dos configuraciones y la ráfaga de throughput (fase A) no publica en 600 s. En ambos casos el outbox avanza un lote de 200 eventos cada ~10 s con 0 intentos fallidos. La consulta del relay (`packages/platform/src/events/relay.ts`, `NOT EXISTS` sobre `outbox_pending_aggregate_idx`) elige un `Nested Loop Anti Join` con las columnas del agregado en el *Join Filter* (recorre todo el índice de pendientes por cada fila) cuando las estadísticas dicen que casi no hay pendientes (`rows=1`): el aislamiento corre `VACUUM (ANALYZE)` con el outbox vacío y la ráfaga de ~13 000 eventos no alcanza el umbral de autoanalyze (10 % de una tabla de ~500 000 filas). Reproducido en un Postgres 18.6 aislado: con estadísticas tomadas tras la purga y entradas muertas en el índice, un solo lote de 200 no termina en 120 s; la cabeza por agregado con una subconsulta correlacionada (`o.sequence = (SELECT p.sequence … ORDER BY p.sequence LIMIT 1)`, mismas filas) tarda 86 ms con las mismas estadísticas. **Riesgo en producción:** tras un periodo tranquilo, un import grande tardaría minutos en llegar a los consumidores.
@@ -158,11 +158,11 @@ Ninguna sesión puede cerrarlos por su cuenta.
 **Préstamos y amortización**
 - Adoptar una tabla del banco cuyas fechas difieren de las del sistema en una cuota pendiente no está probado (la clave de la ocurrencia es el número de cuota).
 - El simulador de pago anticipado no tiene benchmark del p95 < 300 ms; el test usa 3 s.
-- La lista de préstamos hace 2 consultas a BD por préstamo (change 37).
-- UI: la lista de préstamos consulta cada detalle por separado (máx. 50); un borrador no se edita desde la pantalla (sí por `PATCH`); notas y etiquetas de transacciones `LOAN_*` no se editan desde la UI.
+- ~~La lista de préstamos hace 2 consultas a BD por préstamo~~: resuelto por `fix-debt-cards-loans-gaps` (2026-11-25; lectura en lote de cuotas y pagos).
+- UI: ~~la lista de préstamos consulta cada detalle por separado~~ (resuelto por D222: una sola llamada a `GET W/loans`); un borrador no se edita desde la pantalla (sí por `PATCH`); notas y etiquetas de transacciones `LOAN_*` no se editan desde la UI.
 
 **Tarjetas**
-- El ciclo que contiene un saldo inicial queda `consistent = false` (el asiento de apertura no tiene transacción); las cifras son correctas.
+- ~~El ciclo que contiene un saldo inicial queda `consistent = false`~~: resuelto por `fix-phase-4-gaps` (TC-DEBT-CARD-040; verificado 2026-11-25).
 - `nextDueDate` puede apuntar a un vencimiento pasado en un ciclo calculado y no emitido, recién registrada una tarjeta con deuda previa.
 - Las cuotas no se rotulan como tales en Q8 (el contrato de próximos pagos no lo expone).
 
@@ -184,10 +184,10 @@ Ninguna sesión puede cerrarlos por su cuenta.
 - Las huellas incluyen workspace y cuenta: reimportar tras restaurar un export muestra "probables duplicados" (documentado en docs/13 §7.3).
 
 **Otros reportados en Phases 1–2** (verificar antes de trabajarlos)
-- `GET /me` con un locale guardado no soportado (p. ej. `fr-FR`).
-- El bucket de rate limit de edición masiva (10/min) no existe.
-- El CSV de la auditoría global muestra el id del actor, no su nombre.
-- `/patrimonio` no aparece en la navegación lateral.
+- ~~`GET /me` con un locale guardado no soportado (p. ej. `fr-FR`)~~: resuelto por `fix-phase-2-gaps` (`LocaleTag.fromStored` cae al locale por defecto; TC-IDENTITY-AUTH-009; verificado 2026-11-25).
+- ~~El bucket de rate limit de edición masiva (10/min) no existe~~: existe (`x-rate-limit: costly` en `bulkEditTransactions`, `RATE_LIMIT_COSTLY_PER_MIN=10`; verificado 2026-11-25).
+- ~~El CSV de la auditoría global muestra el id del actor, no su nombre~~: incluye `actorName` (`audit-export.ts`; verificado 2026-11-25).
+- `/patrimonio` no aparece en la navegación lateral: es deliberado en el código (cuelga del Home, `activeNav`) y ninguna spec exige una entrada propia; pendiente de una decisión del owner (verificado 2026-11-25).
 
 ## 5. Tests intermitentes vistos
 
