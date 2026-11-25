@@ -9,16 +9,21 @@ import type {
 import type { CustomFieldValueInputDto } from '@pf/classification/contracts';
 import { currency as makeCurrency, DomainError, Money, type FieldViolation } from '@pf/shared-kernel';
 import {
+  CARD_CHARGE_NAMESPACE,
   LOAN_DISBURSEMENT_NAMESPACE,
   LOAN_PAYMENT_NAMESPACE,
   TRANSACTION_EVENTS,
+  type CardChargeAmountsDto,
   type LoanPaymentBreakdownDto,
 } from '../contracts/index.js';
 import {
+  assertCardChargeAmounts,
+  CARD_CHARGE_COMPONENTS,
   assertRefundAllowed,
   DUPLICATE_WINDOW_DAYS,
   assertManagedEditAllowed,
   findDuplicates,
+  isManaged,
   isManagedKind,
   LOAN_EXPENSE_COMPONENTS,
   LoanPaymentBreakdown,
@@ -38,6 +43,7 @@ import {
   type Split,
   type LegRole,
   type LoanExpenseComponent,
+  type CardChargeAmounts,
   type ExternalRef,
   type PaymentMethod,
   type SplitClassificationChange,
@@ -180,6 +186,26 @@ export interface LoanPaymentCommand {
   readonly paymentMethod?: PaymentMethod | null;
   readonly counterpartyId?: string | null;
   readonly description: string;
+}
+
+/** Cargo de tarjeta administrado por DEBT (add-card-interest-ledger-portions). */
+export interface CardChargeCommand {
+  readonly workspaceId: string;
+  readonly chargeId: string;
+  readonly cardId: string;
+  readonly accountId: string;
+  readonly businessDate: string;
+  readonly currency: string;
+  readonly amounts: CardChargeAmountsDto;
+  readonly description: string;
+}
+
+export interface AdoptCardChargeCommand {
+  readonly workspaceId: string;
+  readonly cardId: string;
+  readonly cardAccountIds: readonly string[];
+  readonly transactionId: string;
+  readonly amounts: CardChargeAmountsDto;
 }
 
 export interface UpdateTransactionCommand {
@@ -717,6 +743,217 @@ export class TransactionsService {
     });
   }
 
+  /** Componentes de un cargo parseados a la escala de la moneda (`AMOUNT_SCALE_EXCEEDED`) y validados. */
+  private async cardChargeAmounts(
+    amounts: CardChargeAmountsDto,
+    currency: string,
+  ): Promise<{ readonly parsed: CardChargeAmounts; readonly total: Money }> {
+    const parsed: Partial<Record<(typeof CARD_CHARGE_COMPONENTS)[number]['key'], Money>> = {};
+    // Secuencial: la unidad de trabajo comparte un solo cliente pg.
+    for (const { key } of CARD_CHARGE_COMPONENTS) {
+      parsed[key] = await this.parseMoney({ amount: amounts[key], currency }, `/${key}`);
+    }
+    const complete = parsed as CardChargeAmounts;
+    return { parsed: complete, total: assertCardChargeAmounts(complete, currency) };
+  }
+
+  /** Una porción por componente positivo, con la categoría de sistema que le corresponde. */
+  private async cardChargeSplits(workspaceId: string, parsed: CardChargeAmounts): Promise<SplitInput[]> {
+    const splits: SplitInput[] = [];
+    for (const { key, systemCode } of CARD_CHARGE_COMPONENTS) {
+      if (!parsed[key].isPositive()) continue;
+      const categoryId = await this.deps.categories.loanExpense(workspaceId, systemCode);
+      if (!categoryId) {
+        throw new DomainError('REFERENCE_NOT_FOUND', `system category ${systemCode} is not provisioned`);
+      }
+      splits.push({
+        id: this.deps.ids.next(),
+        amount: parsed[key],
+        categoryId,
+        categoryOrigin: 'SYSTEM_DEFAULT',
+      });
+    }
+    return splits;
+  }
+
+  /**
+   * Cargo de tarjeta registrado por DEBT (add-card-interest-ledger-portions, decisión 4): un `EXPENSE` POSTED
+   * `source = DEBT` en la cuenta de la tarjeta, con una porción por componente positivo y `debtRole = CARD_CHARGE`.
+   * Idempotente por `externalRef = {debt.card-charge, chargeId}`.
+   */
+  recordCardCharge(cmd: CardChargeCommand): Promise<TransactionState> {
+    const { uow, ids } = this.deps;
+    return uow.run(cmd.workspaceId, async () => {
+      const externalRef = { namespace: CARD_CHARGE_NAMESPACE, id: cmd.chargeId };
+      const existing = await this.deps.transactions.findByExternalRef(cmd.workspaceId, externalRef, {
+        forUpdate: true,
+      });
+      if (existing) return existing.snapshot;
+      const { parsed, total } = await this.cardChargeAmounts(cmd.amounts, cmd.currency);
+      const [account] = await this.deps.accounts.assertCanPost({
+        workspaceId: cmd.workspaceId,
+        accounts: [{ accountId: cmd.accountId, currency: cmd.currency }],
+      });
+      if (!account) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/accountId');
+      const splits = await this.cardChargeSplits(cmd.workspaceId, parsed);
+      const tx = Transaction.record({
+        id: ids.next(),
+        workspaceId: cmd.workspaceId,
+        kind: 'EXPENSE',
+        status: 'POSTED',
+        businessDate: cmd.businessDate,
+        accountId: account.accountId,
+        accountNature: account.nature,
+        accountCurrency: account.currency,
+        amount: total,
+        description: cmd.description,
+        source: 'DEBT',
+        externalRef,
+        splits,
+        debtRole: 'CARD_CHARGE',
+        debtCardId: cmd.cardId,
+      });
+      return this.persistManaged(tx, 'transactions.transaction.created', [
+        { field: 'debtRole', before: null, after: 'CARD_CHARGE' },
+        { field: 'debtCardId', before: null, after: cmd.cardId },
+      ]);
+    });
+  }
+
+  /**
+   * Adopta un gasto posteado de la tarjeta como cargo (decisión 5): revisión que reemplaza sus porciones por una por
+   * componente y fija `debtRole`, sin cambiar monto, cuenta, fecha ni moneda.
+   */
+  adoptCardCharge(cmd: AdoptCardChargeCommand): Promise<TransactionState> {
+    return this.deps.uow.run(cmd.workspaceId, async () => {
+      const tx = await this.deps.transactions.findById(cmd.workspaceId, cmd.transactionId, {
+        forUpdate: true,
+      });
+      if (!tx) throw notFound(cmd.transactionId);
+      const before = tx.snapshot;
+      const invalid = (detail: string) => new DomainError('CARD_CHARGE_INVALID', detail);
+      if (before.kind !== 'EXPENSE') throw invalid('only an expense can be adopted as a card charge');
+      if (isManaged(before) || before.source === 'DEBT' || before.source === 'GOAL') {
+        throw invalid('the transaction is already a card charge or is managed by another module');
+      }
+      if (!cmd.cardAccountIds.includes(before.accountId)) {
+        throw invalid('the expense is not charged to an account of the card');
+      }
+      if (before.status === 'PENDING' || before.status === 'VOIDED') {
+        throw invalid('only a posted expense can be adopted as a card charge');
+      }
+      const { parsed, total } = await this.cardChargeAmounts(cmd.amounts, before.amount.currency.code);
+      if (!total.equals(before.amount)) {
+        throw invalid(
+          `the components add up to ${total.toFixed()} but the expense is ${before.amount.toFixed()}`,
+        );
+      }
+      const splits = await this.cardChargeSplits(cmd.workspaceId, parsed);
+      // Con la misma forma se conservan los ids de los splits vigentes (reclasificación: sin ledger).
+      const next =
+        splits.length === before.splits.length
+          ? splits.map((x, i) => ({ ...x, id: (before.splits[i] as Split).id }))
+          : splits;
+      await this.assertAccounts(cmd.workspaceId, [before.accountId]);
+      const result = tx.adoptAsCardCharge({ cardId: cmd.cardId, splits: next });
+      // INV-015: recategorizar no genera asiento pero cambia lo reportado del mes; los cambios con asiento los rechaza
+      // el ledger (PERIOD_CLOSED).
+      if (result.classificationChanges.some((c) => c.previousCategoryId !== c.newCategoryId)) {
+        await this.deps.ledger.assertPeriodOpen({ workspaceId: cmd.workspaceId, date: before.businessDate });
+      }
+      let newEntryId: string | null = null;
+      let revision: RevisionPosting | null = null;
+      if (result.ledgerImpact && result.previousEntryId) {
+        const reversal = await this.deps.ledger.reverseJournalEntry({
+          workspaceId: cmd.workspaceId,
+          journalEntryId: result.previousEntryId,
+          reverseDate: before.businessDate,
+          reason: `transaction ${before.id} adopted as a card charge, revision ${tx.revision}`,
+        });
+        await this.deps.transactions.linkEntry({
+          workspaceId: cmd.workspaceId,
+          transactionId: before.id,
+          revision: before.revision,
+          journalEntryId: reversal.journalEntryId,
+          linkType: 'REVERSAL',
+        });
+        revision = {
+          revisionFrom: before.revision,
+          reversedJournalEntryId: result.previousEntryId,
+          reversalJournalEntryId: reversal.journalEntryId,
+        };
+        newEntryId = await this.postEntry(tx);
+        tx.attachEntry(newEntryId);
+      }
+      await this.save(tx);
+      if (newEntryId) await this.link(tx, newEntryId, 'POSTED');
+      const after = tx.snapshot;
+      const events: LifecycleEventRefDto[] = [];
+      // Solo si cambió algo que el hecho describe (el rol de DEBT no es uno de sus campos): `changedFields` no puede ir vacío.
+      const eventFields = [...new Set(result.changedFields.filter((f) => UPDATED_EVENT_FIELDS.has(f)))];
+      if (eventFields.length > 0) {
+        events.push(
+          await this.publish(tx, TRANSACTION_EVENTS.updated, {
+            transactionId: after.id,
+            revision: after.revision,
+            status: after.status,
+            previousStatus: null,
+            changedFields: eventFields,
+            ledgerImpact: result.ledgerImpact,
+            reason: null,
+            paymentMethod: after.paymentMethod,
+          }),
+        );
+      }
+      if (newEntryId) {
+        events.push(
+          ...(await this.publishPosted(
+            tx,
+            newEntryId,
+            result.previousStatus,
+            result.previousEntryId,
+            revision,
+          )),
+        );
+      }
+      if (result.classificationChanges.length > 0) {
+        events.push(await this.publishCategorized(tx, result.classificationChanges));
+      }
+      await this.record(
+        tx,
+        {
+          workspaceId: cmd.workspaceId,
+          action: 'transactions.transaction.updated',
+          aggregateType: 'Transaction',
+          aggregateId: after.id,
+          aggregateVersion: after.version,
+          changes: [
+            ...diff(
+              before,
+              after,
+              result.changedFields.filter((f) => f !== 'debtRole'),
+              newEntryId,
+              result.customFieldChanges,
+            ),
+            { field: 'debtRole', before: null, after: 'CARD_CHARGE' },
+            { field: 'debtCardId', before: null, after: cmd.cardId },
+          ],
+        },
+        {
+          events,
+          journalEntries: {
+            reversed: revision?.reversedJournalEntryId ?? null,
+            reversal: revision?.reversalJournalEntryId ?? null,
+            posted: newEntryId,
+          },
+          changedFields: result.changedFields.map(changedFieldName),
+          revisionBefore: before.revision,
+        },
+      );
+      return after;
+    });
+  }
+
   /**
    * Anula una transacción administrada (reversa del asiento) por el camino interno que sí lo permite: solo DEBT la
    * invoca (`LoanTransactionsPort.voidManaged`), nunca la API de transacciones. Idempotente si ya está anulada.
@@ -725,7 +962,7 @@ export class TransactionsService {
     return this.deps.uow.run(workspaceId, async () => {
       const tx = await this.deps.transactions.findById(workspaceId, transactionId, { forUpdate: true });
       if (!tx) throw notFound(transactionId);
-      if (!isManagedKind(tx.snapshot.kind)) {
+      if (!isManaged(tx.snapshot)) {
         throw new DomainError(
           'VALIDATION_FAILED',
           `transaction ${transactionId} is not a managed transaction`,
@@ -1074,7 +1311,7 @@ export class TransactionsService {
     return this.deps.uow.run(workspaceId, async () => {
       const tx = await this.load(workspaceId, transactionId, expectedVersion);
       // Administradas (préstamos): se anulan desde su contexto (`voidManagedTransaction`), no desde aquí.
-      if (isManagedKind(tx.snapshot.kind)) throw managedExternally(tx.snapshot);
+      if (isManaged(tx.snapshot)) throw managedExternally(tx.snapshot);
       return this.voidLoaded(tx, workspaceId, reason, options);
     });
   }

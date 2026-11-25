@@ -5,16 +5,17 @@ spec: debt/credit-cards
 related_specs: ["identity/workspace-portability"]
 requirement: "Cargos de la tarjeta en la exportación del workspace"
 scenario: "Ida y vuelta con un cargo vigente y uno anulado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-010","FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/workspace-import.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

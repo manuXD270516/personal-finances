@@ -220,4 +220,13 @@ export const DEBT_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     orderBy: ['card_account_id', 'closing_date'],
     idColumns: [],
   },
+  {
+    // add-card-interest-ledger-portions: cargos de tarjeta (interés, comisiones, seguro, impuestos) con su transacción.
+    name: 'card-charges',
+    context: 'debt',
+    table: 'debt.card_charge',
+    order: 798,
+    orderBy: ['card_account_id', 'business_date', 'id'],
+    money: { interest: 't.currency', fees: 't.currency', insurance: 't.currency', taxes: 't.currency' },
+  },
 ];

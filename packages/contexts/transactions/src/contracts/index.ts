@@ -124,6 +124,8 @@ export interface NominalFlowRowDto {
     readonly transactionKind: string;
     readonly portionRole: 'NOMINAL' | 'FEE';
     readonly loanComponent?: 'INTEREST' | 'CHARGES' | 'INSURANCE' | 'TAXES' | null;
+    /** Rol de DEBT de la transacción (`CARD_CHARGE`: interés y cargos de una tarjeta); `null` si no lo tiene. */
+    readonly debtRole?: 'CARD_CHARGE' | null;
   };
 }
 
@@ -797,6 +799,71 @@ export interface LoanTransactionsPort {
 
 export const LOAN_TRANSACTIONS_PORT = Symbol.for('pf.transactions.LoanTransactionsPort');
 
+// ───────────────────────────────────────────── add-card-interest-ledger-portions (DEBT → TRANSACTIONS)
+
+/** `externalRef` de un cargo registrado: el id del cargo (`debt.card_charge`). */
+export const CARD_CHARGE_NAMESPACE = 'debt.card-charge' as const;
+
+/** Componentes de un cargo de tarjeta: decimales a la escala de la moneda de la cuenta; al menos uno positivo. */
+export interface CardChargeAmountsDto {
+  readonly interest: string;
+  readonly fees: string;
+  readonly insurance: string;
+  readonly taxes: string;
+}
+
+/**
+ * Puerto de escritura de DEBT sobre TRANSACTIONS para los cargos de tarjeta (openspec
+ * add-card-interest-ledger-portions, decisiones 4 y 5). Corre en la unidad de trabajo del llamador (transacción,
+ * asiento, auditoría y outbox de TRANSACTIONS se confirman junto con el cargo de DEBT). Los errores de dominio
+ * (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`, `CURRENCY_MISMATCH`, `CARD_CHARGE_INVALID`…) se propagan sin traducir.
+ */
+export interface CardChargeTransactionsPort {
+  /**
+   * Gasto `EXPENSE` POSTED `source = DEBT` en `accountId` por la suma de los componentes, con una porción por cada
+   * componente positivo en su categoría de sistema (`INTEREST`, `FEES`, `INSURANCE`, `TAXES`) y `debtRole = CARD_CHARGE`.
+   * `externalRef = {debt.card-charge, chargeId}`; idempotente por esa referencia.
+   */
+  recordCharge(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly chargeId: string;
+    readonly cardId: string;
+    readonly accountId: string;
+    readonly businessDate: string;
+    readonly currency: string;
+    readonly amounts: CardChargeAmountsDto;
+    readonly description: string;
+  }): Promise<{ readonly transactionId: string; readonly businessDate: string }>;
+  /**
+   * Adopta un gasto posteado de una de `cardAccountIds` como cargo: una revisión que reemplaza sus porciones por una
+   * por componente y fija `debtRole`. Sin transacción nueva ni cambio de saldo. Rechaza con `CARD_CHARGE_INVALID`
+   * lo que no es un gasto posteado de esas cuentas, ya es un cargo, lo administra otro contexto o no suma.
+   */
+  adoptCharge(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly cardId: string;
+    readonly cardAccountIds: readonly string[];
+    readonly transactionId: string;
+    readonly amounts: CardChargeAmountsDto;
+  }): Promise<{
+    readonly transactionId: string;
+    readonly accountId: string;
+    readonly businessDate: string;
+    readonly currency: string;
+  }>;
+  /** Anula la transacción del cargo (reversa del asiento); idempotente si ya está anulada. */
+  voidCharge(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly transactionId: string;
+    readonly reason: string;
+  }): Promise<void>;
+}
+
+export const CARD_CHARGE_TRANSACTIONS_PORT = Symbol.for('pf.transactions.CardChargeTransactionsPort');
+
 // ───────────────────────────────────────────── add-savings-goals (GOALS)
 
 /** `externalRef` de las transferencias creadas por una meta: el id del movimiento de la meta (`goals.goal_movement`). */
@@ -1085,6 +1152,9 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     // Préstamos (add-loans): préstamo que administra la transacción y principal del pago.
     loanId: 'plain',
     principal: 'money',
+    // Cargos de tarjeta (add-card-interest-ledger-portions): rol de DEBT y tarjeta que administra la transacción.
+    debtRole: 'plain',
+    debtCardId: 'plain',
     // Custom fields de los splits (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
     'customFields.*': 'plain',
     // Origen de la clasificación y marca de revisión (add-rule-engine): `ruleRefs` viaja como texto JSON.

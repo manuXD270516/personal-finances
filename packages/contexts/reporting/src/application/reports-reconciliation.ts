@@ -210,8 +210,11 @@ export class ReportsReconciliation {
           mismatches.push(...ReportReconciler.accountSum(label, money(c, total), [money(c, sum)]));
         }
       }
+      let feesReport: Awaited<ReturnType<NonNullable<ReconciliationReports['getFees']>>>['report'] | null =
+        null;
       if (this.reports.getFees) {
         const fees = (await this.reports.getFees(params)).report;
+        feesReport = fees;
         for (const [c, total] of spent) {
           const sum = fees.months
             .flatMap((m) => m.byType)
@@ -226,6 +229,36 @@ export class ReportsReconciliation {
       }
       if (this.reports.getDebts) {
         const debts = (await this.reports.getDebts(params)).report;
+        // Cargos de tarjeta: Σ del reporte de deudas = tipo `CARD` del de comisiones, por mes y moneda nativa.
+        if (feesReport) {
+          for (const month of feesReport.months) {
+            const currencies = new Set<string>([
+              ...debts.debts.filter((d) => d.kind === 'CARD').map((d) => d.currency),
+              ...(month.byType.find((t) => t.type === 'CARD')?.amount.byCurrency.map((m) => m.currency) ??
+                []),
+            ]);
+            for (const c of currencies) {
+              const charged = debts.debts
+                .filter((d) => d.kind === 'CARD' && d.currency === c)
+                .flatMap((d) => d.months.filter((m) => m.period.to === month.period.to))
+                .reduce(
+                  (a, m) => a.plus(m.interestCharged?.amount ?? '0').plus(m.chargesCharged?.amount ?? '0'),
+                  dec('0'),
+                );
+              const card = dec(
+                month.byType.find((t) => t.type === 'CARD')?.amount.byCurrency.find((m) => m.currency === c)
+                  ?.amount ?? '0',
+              );
+              mismatches.push(
+                ...ReportReconciler.cardCharges(
+                  `${month.period.label} ${c}`,
+                  money(c, charged),
+                  money(c, card),
+                ),
+              );
+            }
+          }
+        }
         for (const d of debts.debts) {
           for (const m of d.months) {
             const ledger = await this.userBalance(ws, m.period.to, d.accountId);

@@ -955,6 +955,7 @@
       "remaining": "Restante por asignar: {amount}"
     },
     "list": {
+      "cardCharge": "Cargo de tarjeta",
       "title": "Transacciones",
       "newActions": "Registrar",
       "new": "Nuevo movimiento",
@@ -5079,6 +5080,66 @@
       "done": "Tarjeta archivada.",
       "archivedNotice": "Esta tarjeta está archivada: solo puedes consultarla."
     },
+    "charges": {
+      "title": "Intereses y cargos",
+      "caption": "Intereses y cargos del ciclo que cierra el {closing}",
+      "empty": "No hay intereses ni cargos registrados en este ciclo.",
+      "register": "Registrar intereses y cargos",
+      "hint": "Registra lo que cobró el banco: crea un gasto de la tarjeta con una porción por componente y aumenta lo que debes.",
+      "fields": {
+        "date": "Fecha del cargo",
+        "interest": "Intereses ({currency})",
+        "fees": "Comisiones ({currency})",
+        "insurance": "Seguro ({currency})",
+        "taxes": "Impuestos ({currency})"
+      },
+      "components": {
+        "interest": "Intereses",
+        "fees": "Comisiones",
+        "insurance": "Seguro",
+        "taxes": "Impuestos"
+      },
+      "totalShort": "Total",
+      "originShort": "Origen",
+      "actions": "Acciones",
+      "origin": {
+        "RECORDED": "Registrado",
+        "ADOPTED": "Adoptado de un gasto"
+      },
+      "total": "Total del cargo: {amount}",
+      "totalPending": "Total del cargo: completa los montos con un formato válido.",
+      "save": "Registrar cargo",
+      "saved": "Cargo registrado.",
+      "cancel": "Cancelar",
+      "void": "Anular",
+      "voidTitle": "Anular el cargo de {amount}",
+      "voidDescription": "Se anula su transacción con la reversa del asiento y la deuda vuelve a su valor anterior.",
+      "voidReason": "Motivo de la anulación",
+      "voidConfirm": "Anular cargo",
+      "voided": "Cargo anulado.",
+      "proposal": "El banco informó {amount} más que el cálculo del sistema. Si son intereses o cargos, regístralos.",
+      "useProposal": "Registrar la diferencia como cargo",
+      "duplicateWarning": "Hay {count} gasto(s) del ciclo en «Intereses pagados» o «Comisiones» que no son cargos. Si es el mismo cobro, adóptalo desde su detalle para no registrarlo dos veces:",
+      "errors": {
+        "INVALID": "Escribe un monto válido.",
+        "SCALE": "El monto tiene más decimales de los que admite la moneda.",
+        "NEGATIVE": "El monto no puede ser negativo.",
+        "NO_COMPONENT": "Indica al menos un componente mayor que cero.",
+        "REQUIRED_DATE": "Indica la fecha del cargo."
+      },
+      "adopt": {
+        "title": "Es un cargo de la tarjeta",
+        "hint": "Reparte el monto del gasto en componentes (deben sumar su monto). No crea otra transacción ni cambia el saldo.",
+        "prompt": "Este gasto es de una cuenta de {card}. Si es un interés o cargo del banco, márcalo como cargo para que cuente en los reportes de comisiones y deudas.",
+        "action": "Es un cargo de la tarjeta",
+        "save": "Adoptar como cargo",
+        "done": "El gasto ahora es un cargo de la tarjeta."
+      }
+    },
+    "transaction": {
+      "badge": "Cargo de la tarjeta",
+      "viewCard": "Ver la tarjeta"
+    },
     "statements": {
       "accountTitle": "Estados de cuenta en {currency}",
       "empty": "Aún no hay estados de cuenta.",
@@ -6582,10 +6643,11 @@
       "CONVERSION": "Comisión de conversión",
       "TRANSFER": "Comisión de transferencia",
       "LOAN": "Intereses y cargos de préstamos",
+      "CARD": "Intereses y cargos de tarjetas",
       "FEE_CATEGORY": "Categorías de comisiones",
       "total": "Total",
       "last12": "Últimos 12 periodos completos: {amount}",
-      "cardNote": "Los intereses de tarjeta no se registran como gasto y no figuran aquí; el saldo de la tarjeta está en la evolución de deudas.",
+      "cardNote": "Las tarjetas cuentan aquí solo los intereses y cargos registrados como cargo de la tarjeta (o adoptados desde un gasto); un gasto común en «Intereses pagados» no se infiere.",
       "chartTitle": "Total de comisiones por periodo",
       "chartDesc": "Barras de {n} periodos en {currency}; la tabla siguiente separa cada tipo."
     },
@@ -6617,6 +6679,8 @@
       "principalPaid": "Principal pagado",
       "interestPaid": "Interés pagado",
       "chargesPaid": "Cargos pagados",
+      "interestCharged": "Interés cargado",
+      "chargesCharged": "Otros cargos cargados",
       "kind": {
         "LOAN": "Préstamo",
         "CARD": "Tarjeta"
@@ -6624,7 +6688,7 @@
       "consolidated": "Consolidado en {currency}",
       "chartTitle": "Saldo pendiente de {name}",
       "chartDesc": "Línea de {n} meses en {currency}; la tabla siguiente tiene los pagos.",
-      "cardNote": "Las tarjetas muestran solo el saldo pendiente."
+      "cardNote": "Las tarjetas muestran el saldo pendiente y los intereses y cargos registrados en la tarjeta; lo pagado no se informa."
     },
     "recurring": {
       "caption": "Costo mensual y anual de los compromisos recurrentes activos",

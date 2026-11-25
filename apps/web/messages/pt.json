@@ -955,6 +955,7 @@
       "remaining": "Restante a distribuir: {amount}"
     },
     "list": {
+      "cardCharge": "Encargo do cartão",
       "title": "Transações",
       "newActions": "Registrar",
       "new": "Novo movimento",
@@ -5079,6 +5080,66 @@
       "done": "Cartão arquivado.",
       "archivedNotice": "Este cartão está arquivado: você só pode consultá-lo."
     },
+    "charges": {
+      "title": "Juros e encargos",
+      "caption": "Juros e encargos do ciclo que fecha em {closing}",
+      "empty": "Não há juros nem encargos registrados neste ciclo.",
+      "register": "Registrar juros e encargos",
+      "hint": "Registre o que o banco cobrou: cria uma despesa do cartão com uma parcela por componente e aumenta o que você deve.",
+      "fields": {
+        "date": "Data do encargo",
+        "interest": "Juros ({currency})",
+        "fees": "Tarifas ({currency})",
+        "insurance": "Seguro ({currency})",
+        "taxes": "Impostos ({currency})"
+      },
+      "components": {
+        "interest": "Juros",
+        "fees": "Tarifas",
+        "insurance": "Seguro",
+        "taxes": "Impostos"
+      },
+      "totalShort": "Total",
+      "originShort": "Origem",
+      "actions": "Ações",
+      "origin": {
+        "RECORDED": "Registrado",
+        "ADOPTED": "Adotado de uma despesa"
+      },
+      "total": "Total do encargo: {amount}",
+      "totalPending": "Total do encargo: complete os valores em um formato válido.",
+      "save": "Registrar encargo",
+      "saved": "Encargo registrado.",
+      "cancel": "Cancelar",
+      "void": "Anular",
+      "voidTitle": "Anular o encargo de {amount}",
+      "voidDescription": "Sua transação é anulada com o estorno do lançamento e a dívida volta ao valor anterior.",
+      "voidReason": "Motivo da anulação",
+      "voidConfirm": "Anular encargo",
+      "voided": "Encargo anulado.",
+      "proposal": "O banco informou {amount} a mais que o cálculo do sistema. Se forem juros ou encargos, registre-os.",
+      "useProposal": "Registrar a diferença como encargo",
+      "duplicateWarning": "Há {count} despesa(s) do ciclo em «Juros pagos» ou «Tarifas» que não são encargos. Se for a mesma cobrança, adote-a pelo detalhe para não registrá-la duas vezes:",
+      "errors": {
+        "INVALID": "Informe um valor válido.",
+        "SCALE": "O valor tem mais casas decimais do que a moeda admite.",
+        "NEGATIVE": "O valor não pode ser negativo.",
+        "NO_COMPONENT": "Informe pelo menos um componente maior que zero.",
+        "REQUIRED_DATE": "Informe a data do encargo."
+      },
+      "adopt": {
+        "title": "É um encargo do cartão",
+        "hint": "Divida o valor da despesa em componentes (devem somar o seu valor). Não cria outra transação nem altera o saldo.",
+        "prompt": "Esta despesa é de uma conta de {card}. Se for juros ou encargo do banco, marque-a como encargo para que conte nos relatórios de tarifas e dívidas.",
+        "action": "É um encargo do cartão",
+        "save": "Adotar como encargo",
+        "done": "A despesa agora é um encargo do cartão."
+      }
+    },
+    "transaction": {
+      "badge": "Encargo do cartão",
+      "viewCard": "Ver o cartão"
+    },
     "statements": {
       "accountTitle": "Faturas em {currency}",
       "empty": "Ainda não há faturas.",
@@ -6582,10 +6643,11 @@
       "CONVERSION": "Tarifa de conversão",
       "TRANSFER": "Tarifa de transferência",
       "LOAN": "Juros e encargos de empréstimos",
+      "CARD": "Juros e encargos de cartões",
       "FEE_CATEGORY": "Categorias de tarifas",
       "total": "Total",
       "last12": "Últimos 12 períodos completos: {amount}",
-      "cardNote": "Os juros do cartão não são registrados como gasto e não aparecem aqui; o saldo do cartão está na evolução de dívidas.",
+      "cardNote": "Os cartões contam aqui apenas os juros e encargos registrados como encargo do cartão (ou adotados de uma despesa); uma despesa comum em «Juros pagos» não é inferida.",
       "chartTitle": "Total de tarifas por período",
       "chartDesc": "Barras de {n} períodos em {currency}; a tabela a seguir separa cada tipo."
     },
@@ -6617,6 +6679,8 @@
       "principalPaid": "Principal pago",
       "interestPaid": "Juros pagos",
       "chargesPaid": "Encargos pagos",
+      "interestCharged": "Juros cobrados",
+      "chargesCharged": "Outros encargos cobrados",
       "kind": {
         "LOAN": "Empréstimo",
         "CARD": "Cartão"
@@ -6624,7 +6688,7 @@
       "consolidated": "Consolidado em {currency}",
       "chartTitle": "Saldo devedor de {name}",
       "chartDesc": "Linha de {n} meses em {currency}; a tabela a seguir tem os pagamentos.",
-      "cardNote": "Os cartões mostram apenas o saldo devedor."
+      "cardNote": "Os cartões mostram o saldo pendente e os juros e encargos registrados no cartão; o valor pago não é informado."
     },
     "recurring": {
       "caption": "Custo mensal e anual dos compromissos recorrentes ativos",

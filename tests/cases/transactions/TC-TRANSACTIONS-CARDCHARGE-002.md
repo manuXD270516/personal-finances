@@ -5,16 +5,18 @@ spec: transactions/transaction-recording
 related_specs: ["debt/credit-cards"]
 requirement: "Transacciones de cargos de tarjeta administradas por la tarjeta"
 scenario: "Cambiar el monto del cargo desde transacciones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013","FR-TRANSACTIONS-009"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+  - packages/contexts/transactions/src/application/card-charge-transactions.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

@@ -5,16 +5,17 @@ spec: transactions/transaction-recording
 related_specs: ["debt/credit-cards","ledger/journal-posting"]
 requirement: "Transacciones de cargos de tarjeta administradas por la tarjeta"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: ["INV-004","INV-020","INV-021"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/card-charge-transactions.test.ts
+status: automated
 regression_suite: true
 phase: 9
 tags: ["credit-cards","card-charges"]

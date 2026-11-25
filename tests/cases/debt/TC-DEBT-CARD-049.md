@@ -5,16 +5,21 @@ spec: debt/credit-cards
 related_specs: []
 requirement: "Anular un cargo de la tarjeta"
 scenario: "Cargo registrado por error"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: ["INV-007","INV-008"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+  - packages/contexts/debt/src/application/card-charges.service.test.ts
+  - packages/contexts/debt/src/domain/card-charge.test.ts
+  - packages/contexts/transactions/src/application/card-charge-transactions.test.ts
+  - tests/e2e/specs/card-charges.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

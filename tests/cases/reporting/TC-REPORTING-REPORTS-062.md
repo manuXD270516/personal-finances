@@ -5,16 +5,17 @@ spec: reporting/financial-reports
 related_specs: ["debt/credit-cards"]
 requirement: "Reporte de comisiones"
 scenario: "Cargo anulado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008","FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["reports","fees","card-charges"]

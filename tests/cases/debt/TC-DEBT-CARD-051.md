@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: "Adoptar un gasto existente como cargo de la tarjeta"
 scenario: "Interés cargado a mano antes del change"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013","FR-REPORTING-008"]
 nfr: []
 invariants: ["INV-021"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+  - apps/web/src/ui/debt/cards/charges.test.tsx
+  - packages/contexts/debt/src/application/card-charges.service.test.ts
+  - packages/contexts/transactions/src/application/card-charge-transactions.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

@@ -136,6 +136,28 @@ export function limitOf(q: Json): number {
   return Number.isInteger(raw) ? Math.min(Math.max(raw, 1), MAX_PAGE_LIMIT) : DEFAULT_PAGE_LIMIT;
 }
 
+/**
+ * `TRANSACTION_MANAGED_EXTERNALLY` publica quién administra la transacción como extensión `details`
+ * (`managedBy` y `loanId`, o `managedBy = CREDIT_CARD` y `cardId` en un cargo de tarjeta).
+ */
+async function withManagedDetails<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (
+      isDomainError(err) &&
+      err.code === 'TRANSACTION_MANAGED_EXTERNALLY' &&
+      Object.keys(err.details).length > 0
+    ) {
+      throw new ApiProblem('TRANSACTION_MANAGED_EXTERNALLY', err.message, {
+        extensions: { details: err.details },
+        cause: err,
+      });
+    }
+    throw err;
+  }
+}
+
 export function userIdOf(req: ApiRequest): string {
   const principal = principalOf(req);
   if (!principal) throw new ApiProblem('UNAUTHENTICATED', 'an authenticated user is required');
@@ -212,6 +234,9 @@ export function toTransactionDto(
         }
       : null,
     loanId: loanIdOf(s),
+    // Cargos de tarjeta (add-card-interest-ledger-portions): rol de DEBT y tarjeta que administra la transacción.
+    debtRole: s.debtRole ?? null,
+    debtCardId: s.debtCardId ?? null,
     source: s.source,
     externalRef: s.externalRef,
     revision: s.revision,
@@ -462,7 +487,7 @@ export class TransactionsController {
       ...(typeof body['needsReview'] === 'boolean' ? { needsReview: body['needsReview'] } : {}),
       ...pickNullable(body, ['postingDate', 'description', 'notes', 'counterpartyId', 'paymentMethod']),
     };
-    const updated = await this.service.updateTransaction(cmd);
+    const updated = await withManagedDetails(() => this.service.updateTransaction(cmd));
     return toTransactionDto(updated, undefined, await this.namesOf(workspaceId, [updated]));
   }
 
@@ -552,9 +577,11 @@ export class TransactionsController {
     @Body() body: Json,
   ) {
     return toTransactionDto(
-      await this.service.voidTransaction(workspaceId, transactionId, expected, str(body, 'reason') ?? '', {
-        correctInCurrentPeriod: body['correctInCurrentPeriod'] === true,
-      }),
+      await withManagedDetails(() =>
+        this.service.voidTransaction(workspaceId, transactionId, expected, str(body, 'reason') ?? '', {
+          correctInCurrentPeriod: body['correctInCurrentPeriod'] === true,
+        }),
+      ),
     );
   }
 

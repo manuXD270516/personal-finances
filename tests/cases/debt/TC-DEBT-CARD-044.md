@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: "Registro de los intereses y cargos de una tarjeta"
 scenario: "Cargo en dólares"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: ["INV-002"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/application/card-charges.service.test.ts
+  - packages/contexts/debt/src/domain/card-charge.test.ts
+  - packages/contexts/transactions/src/application/card-charge-transactions.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

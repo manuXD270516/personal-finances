@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: "Propuesta de cargos desde la diferencia con el banco"
 scenario: "Propuesta de 4.80 BOB"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+  - packages/contexts/debt/src/application/card-charges.service.test.ts
+  - packages/contexts/debt/src/domain/card-charge.test.ts
+  - tests/e2e/specs/card-charges.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

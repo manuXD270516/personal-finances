@@ -24,6 +24,8 @@ import {
   normalizeText,
   Transaction,
   type LoanPaymentBreakdownJson,
+  type CardChargeSystemCode,
+  type DebtRole,
   type LoanSystemCategoryCode,
   type CustomFieldValue,
   type AccountNature,
@@ -71,6 +73,9 @@ interface TxnDb {
     external_ref_id: string | null;
     /** `jsonb`: el driver lo devuelve parseado; se escribe como texto JSON. */
     loan_payment_breakdown: LoanPaymentBreakdownJson | string | null;
+    /** Rol de DEBT (`CARD_CHARGE`) y tarjeta que administra la transacción (add-card-interest-ledger-portions). */
+    debt_role: DebtRole | null;
+    debt_card_id: string | null;
     refund_of_transaction_id: string | null;
     adjustment_reason: string | null;
     confirmed_refund_excess: boolean;
@@ -180,6 +185,8 @@ const TX_COLUMN_TYPES: Record<keyof ReturnType<typeof txRow>, string> = {
   external_ref_namespace: 'text',
   external_ref_id: 'text',
   loan_payment_breakdown: 'jsonb',
+  debt_role: 'text',
+  debt_card_id: 'uuid',
   refund_of_transaction_id: 'uuid',
   adjustment_reason: 'text',
   confirmed_refund_excess: 'boolean',
@@ -274,6 +281,8 @@ const txColumns = [
   't.review_rule_id',
   't.review_rule_version',
   't.loan_payment_breakdown',
+  't.debt_role',
+  't.debt_card_id',
   't.revision',
   't.active_entry_id',
   't.void_reason',
@@ -340,6 +349,8 @@ function txRow(s: TransactionState): Omit<TxnDb['txn.transaction'], 'created_at'
     review_rule_version: s.review?.ruleVersion ?? null,
     review_marked_at: s.review?.markedAt ?? null,
     loan_payment_breakdown: s.loanPaymentBreakdown ? JSON.stringify(s.loanPaymentBreakdown.toJson()) : null,
+    debt_role: s.debtRole ?? null,
+    debt_card_id: s.debtCardId ?? null,
     revision: s.revision,
     active_entry_id: s.activeEntryId,
     voided_at: s.voidedAt,
@@ -1299,6 +1310,8 @@ export class PgTransactionRepository implements TransactionRepository {
         updatedAt: r.updated_at,
         conversion: conversions.get(r.id)?.at(-1)?.detail ?? null,
         loanPaymentBreakdown: breakdownOf(r.loan_payment_breakdown, ccy),
+        debtRole: r.debt_role,
+        debtCardId: r.debt_card_id,
       });
     });
   }
@@ -1336,7 +1349,10 @@ export class ClassificationCategoryLookup implements CategoryLookupPort {
     return this.lookup.systemCategoryId({ userId: actorUserId(), workspaceId, systemCode: 'FEES' });
   }
 
-  loanExpense(workspaceId: string, systemCode: LoanSystemCategoryCode): Promise<string | null> {
+  loanExpense(
+    workspaceId: string,
+    systemCode: LoanSystemCategoryCode | CardChargeSystemCode,
+  ): Promise<string | null> {
     return this.lookup.systemCategoryId({ userId: actorUserId(), workspaceId, systemCode });
   }
 

@@ -3,15 +3,16 @@ import type {
   RecurringDefinitionPort,
   RecurringDefinitionQuery,
 } from '@pf/commitments/contracts';
-import { FixedClock, Instant, LocalDate, WeekendAdjustment, dec } from '@pf/shared-kernel';
+import { DomainError, FixedClock, Instant, LocalDate, WeekendAdjustment, dec } from '@pf/shared-kernel';
 import type {
   AccountMovementRowDto,
   PendingFlowRowDto,
   TransactionLinkDto,
 } from '@pf/transactions/contracts';
-import { CardInstallmentPlan, CreditCard, type ThresholdState } from '../../domain/index.js';
+import { CardCharge, CardInstallmentPlan, CreditCard, type ThresholdState } from '../../domain/index.js';
 import type {
   CardBalancePort,
+  CardChargeRepository,
   CardDeps,
   CardRepository,
   InstallmentPlanRepository,
@@ -20,6 +21,7 @@ import type {
   StatementRepository,
   UtilizationRepository,
 } from '../card-ports.js';
+import type { CardChargeTransactionsPort } from '@pf/transactions/contracts';
 import type { AccountInfo } from '../ports/index.js';
 
 export interface Entry {
@@ -85,6 +87,11 @@ export class CardWorld {
   readonly planStore = new Map<string, CardInstallmentPlan>();
   readonly stateStore: (ThresholdState & { scopeKey: string; cardId: string })[] = [];
   readonly reminderStore = new Set<string>();
+  readonly chargeStore = new Map<string, CardCharge>();
+  /** Transacciones adoptadas o registradas como cargo (id de transacción → cuenta, fecha y total). */
+  readonly chargeTxs = new Map<string, { accountId: string; date: string; total: string; voided: boolean }>();
+  /** Meses `YYYY-MM` cerrados: anular un cargo de ese mes se rechaza con `PERIOD_CLOSED`. */
+  readonly closedMonths = new Set<string>();
   readonly calls: { method: string; input: unknown }[] = [];
   readonly deps: CardDeps;
 
@@ -225,6 +232,103 @@ export class CardWorld {
       },
     };
 
+    const charges: CardChargeRepository = {
+      insert: async (charge) => {
+        world.chargeStore.set(charge.id, CardCharge.rehydrate(charge.snapshot));
+      },
+      findById: async (_ws, id) => {
+        const found = world.chargeStore.get(id);
+        return found ? CardCharge.rehydrate(found.snapshot) : null;
+      },
+      findActiveByTransaction: async (_ws, transactionId) => {
+        const found = [...world.chargeStore.values()].find(
+          (c) => c.snapshot.transactionId === transactionId && c.snapshot.status === 'ACTIVE',
+        );
+        return found ? CardCharge.rehydrate(found.snapshot) : null;
+      },
+      saveVoid: async (charge) => {
+        const current = world.chargeStore.get(charge.id);
+        if (!current || current.snapshot.version !== charge.snapshot.version - 1) return false;
+        world.chargeStore.set(charge.id, CardCharge.rehydrate(charge.snapshot));
+        return true;
+      },
+      list: async (_ws, filter) => {
+        const items = [...world.chargeStore.values()]
+          .filter(
+            (c) =>
+              c.snapshot.cardId === filter.cardId &&
+              (!filter.cardAccountIds || filter.cardAccountIds.includes(c.snapshot.cardAccountId)) &&
+              (!filter.from || c.snapshot.businessDate >= filter.from) &&
+              (!filter.to || c.snapshot.businessDate <= filter.to) &&
+              (!filter.status || c.snapshot.status === filter.status),
+          )
+          .sort((a, b) => (a.snapshot.businessDate < b.snapshot.businessDate ? 1 : -1));
+        return { items: items.slice(0, filter.limit), nextCursor: null };
+      },
+      activeForAccounts: async (_ws, ids, from, to) =>
+        [...world.chargeStore.values()].filter(
+          (c) =>
+            ids.includes(c.snapshot.cardAccountId) &&
+            c.snapshot.status === 'ACTIVE' &&
+            c.snapshot.businessDate >= from &&
+            c.snapshot.businessDate <= to,
+        ),
+    };
+
+    /** Doble de TRANSACTIONS: un cargo es una compra de la cuenta (cuenta en «compras» del ciclo de su fecha). */
+    const chargeTransactions: CardChargeTransactionsPort = {
+      recordCharge: async (input) => {
+        const sum = Object.values(input.amounts).reduce((acc, v) => acc.plus(v), dec('0'));
+        const transactionId = ids.next();
+        world.entries.push({
+          accountId: input.accountId,
+          date: input.businessDate,
+          cls: 'PURCHASE',
+          amount: sum.toFixed(SCALES[input.currency] ?? 2),
+          transactionId,
+        });
+        world.chargeTxs.set(transactionId, {
+          accountId: input.accountId,
+          date: input.businessDate,
+          total: sum.toFixed(SCALES[input.currency] ?? 2),
+          voided: false,
+        });
+        return { transactionId, businessDate: input.businessDate };
+      },
+      adoptCharge: async (input) => {
+        const entry = world.entries.find((e) => e.transactionId === input.transactionId);
+        const invalid = (detail: string) => new DomainError('CARD_CHARGE_INVALID', detail);
+        if (!entry || entry.cls !== 'PURCHASE' || !input.cardAccountIds.includes(entry.accountId)) {
+          throw invalid('not an expense of the card');
+        }
+        if (world.chargeTxs.get(input.transactionId)) throw invalid('already a card charge');
+        const sum = Object.values(input.amounts).reduce((acc, v) => acc.plus(v), dec('0'));
+        if (!sum.equals(dec(entry.amount))) throw invalid('the components do not add up');
+        world.chargeTxs.set(input.transactionId, {
+          accountId: entry.accountId,
+          date: entry.date,
+          total: entry.amount,
+          voided: false,
+        });
+        return {
+          transactionId: input.transactionId,
+          accountId: entry.accountId,
+          businessDate: entry.date,
+          currency: world.currencyOf(entry.accountId),
+        };
+      },
+      voidCharge: async (input) => {
+        const tx = world.chargeTxs.get(input.transactionId);
+        if (!tx || tx.voided) return;
+        if (world.closedMonths.has(tx.date.slice(0, 7))) {
+          throw new DomainError('PERIOD_CLOSED', `the period ${tx.date.slice(0, 7)} is closed`);
+        }
+        tx.voided = true;
+        const i = world.entries.findIndex((e) => e.transactionId === input.transactionId);
+        if (i >= 0) world.entries.splice(i, 1);
+      },
+    };
+
     const balances: CardBalancePort = {
       at: async (_ws, accountId, dates) =>
         new Map(
@@ -342,6 +446,8 @@ export class CardWorld {
       plans,
       utilization,
       reminders,
+      charges,
+      chargeTransactions,
       accounts: {
         find: async (_ws, ids2) => world.accounts.filter((a) => ids2.includes(a.accountId)),
         assertCanPost: async () => undefined,

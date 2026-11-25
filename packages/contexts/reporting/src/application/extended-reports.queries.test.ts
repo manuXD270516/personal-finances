@@ -19,6 +19,8 @@ const CREDITO = '0190a000-0000-7000-8000-0000000000b6';
 const SUPER = '0190a000-0000-7000-8000-0000000000c1';
 const REST = '0190a000-0000-7000-8000-0000000000c3';
 const FEES = '0190a000-0000-7000-8000-0000000000c5';
+const INTERES = '0190a000-0000-7000-8000-0000000000c7';
+const SEGURO = '0190a000-0000-7000-8000-0000000000c8';
 const ALOJA = '0190a000-0000-7000-8000-0000000000c6';
 const GROUP = '0190a000-0000-7000-8000-0000000000d1';
 const VIAJE = '0190a000-0000-7000-8000-0000000000e1';
@@ -76,6 +78,8 @@ function world() {
       cat(REST, 'Restaurantes'),
       cat(ALOJA, 'Alojamiento'),
       cat(FEES, 'Comisiones bancarias', { systemCode: 'FEES' }),
+      cat(INTERES, 'Intereses pagados', { systemCode: 'INTEREST' }),
+      cat(SEGURO, 'Seguros', { systemCode: 'INSURANCE' }),
     ],
     tags: [
       { tagId: VIAJE, name: 'Viaje Cusco', archived: false },
@@ -403,9 +407,41 @@ describe('getFees (TC-REPORTING-REPORTS-042)', () => {
       ['CONVERSION', '2.00'],
       ['TRANSFER', '5.00'],
       ['LOAN', '400.00'],
+      ['CARD', '0.00'],
       ['FEE_CATEGORY', '15.00'],
     ]);
     expect(report.months[0]?.total.consolidated).toEqual(bob('422.00'));
+  });
+
+  it('[TC-REPORTING-REPORTS-058] los cargos de tarjeta de octubre suman 4.80 en tarjetas y entran al total', async () => {
+    portion('2026-10-05', SUPER, bob('320.00'), {
+      origin: { transactionKind: 'LOAN_PAYMENT', portionRole: 'NOMINAL' },
+    });
+    portion('2026-10-05', REST, bob('80.00'), {
+      origin: { transactionKind: 'LOAN_PAYMENT', portionRole: 'NOMINAL' },
+    });
+    portion('2026-10-06', FEES, bob('15.00'));
+    portion('2026-10-25', INTERES, bob('4.00'), {
+      accountId: TARJETA,
+      origin: { transactionKind: 'EXPENSE', portionRole: 'NOMINAL', debtRole: 'CARD_CHARGE' },
+    });
+    portion('2026-10-25', SEGURO, bob('0.80'), {
+      accountId: TARJETA,
+      origin: { transactionKind: 'EXPENSE', portionRole: 'NOMINAL', debtRole: 'CARD_CHARGE' },
+    });
+    const { report } = await q.getFees({ ...base, ...OCT });
+    const byType = Object.fromEntries(
+      (report.months[0]?.byType ?? []).map((b) => [b.type, b.amount.consolidated.amount]),
+    );
+    expect(byType).toMatchObject({ LOAN: '400.00', CARD: '4.80', FEE_CATEGORY: '15.00' });
+    expect(report.months[0]?.total.consolidated).toEqual(bob('419.80'));
+  });
+
+  it('[TC-REPORTING-REPORTS-061] un interés de tarjeta cargado a mano sin adoptar no cuenta como tarjetas', async () => {
+    portion('2026-10-25', INTERES, bob('4.80'), { accountId: TARJETA });
+    const { report } = await q.getFees({ ...base, ...OCT });
+    expect(report.months[0]?.byType.find((b) => b.type === 'CARD')?.amount.consolidated.amount).toBe('0.00');
+    expect(report.months[0]?.total.consolidated).toEqual(bob('0.00'));
   });
 
   it('[TC-REPORTING-REPORTS-042] el total de 12 meses cubre los 12 periodos completos anteriores al actual', async () => {
@@ -550,10 +586,78 @@ describe('getDebts (TC-REPORTING-REPORTS-044)', () => {
       outstanding: bob('500.00'),
       principalPaid: null,
       interestPaid: null,
+      interestCharged: bob('0.00'),
+      chargesCharged: bob('0.00'),
     });
     expect(
       await code(() => q.getDebts({ ...base, from: '2026-10-01', to: '2026-10-31', debtKind: 'X' as never })),
     ).toBe('VALIDATION_FAILED');
+  });
+
+  it('[TC-REPORTING-REPORTS-060] Visa Oro con un cargo de 4.00 de interés y 0.80 de seguro en octubre: lo cargado por mes', async () => {
+    mem.fakes.cards = [
+      { cardId: 'c1', cardName: 'Visa Oro', cardAccountId: 'ca1', accountId: TARJETA, currency: 'BOB' },
+    ];
+    mem.fakes.loans = [{ loanId: 'loan-auto', name: 'Crédito auto', accountId: CREDITO, currency: 'BOB' }];
+    const origin = {
+      transactionKind: 'EXPENSE',
+      portionRole: 'NOMINAL' as const,
+      debtRole: 'CARD_CHARGE' as const,
+    };
+    portion('2026-10-25', INTERES, bob('4.00'), { accountId: TARJETA, origin });
+    portion('2026-10-25', SEGURO, bob('0.80'), { accountId: TARJETA, origin });
+    // Un interés manual sin adoptar y el gasto de otra cuenta no cuentan.
+    portion('2026-10-26', INTERES, bob('9.99'), { accountId: TARJETA });
+    portion('2026-10-26', SUPER, bob('50.00'), { accountId: BANCO });
+    const { report } = await q.getDebts({ ...base, from: '2026-09-01', to: '2026-10-31' });
+    const card = report.debts.find((d) => d.kind === 'CARD')!;
+    expect(card.months.map((m) => [m.interestCharged?.amount, m.chargesCharged?.amount])).toEqual([
+      ['0.00', '0.00'],
+      ['4.00', '0.80'],
+    ]);
+    expect(card.months.map((m) => m.principalPaid)).toEqual([null, null]);
+    expect(report.consolidated.map((c) => c.interestCharged.consolidated.amount)).toEqual(['0.00', '4.00']);
+    const loan = report.debts.find((d) => d.kind === 'LOAN')!;
+    expect(loan.months.map((m) => [m.interestCharged, m.chargesCharged])).toEqual([
+      [null, null],
+      [null, null],
+    ]);
+  });
+
+  it('[TC-REPORTING-REPORTS-063] los cargos del reporte de deudas suman lo mismo que el tipo tarjetas de comisiones, por moneda', async () => {
+    mem.addAccount(
+      { accountId: 'visa-usd', name: 'Visa Oro USD', type: 'CREDIT_CARD', currency: 'USD' },
+      null,
+    );
+    mem.fakes.cards = [
+      { cardId: 'c1', cardName: 'Visa Oro', cardAccountId: 'ca1', accountId: TARJETA, currency: 'BOB' },
+      { cardId: 'c1', cardName: 'Visa Oro', cardAccountId: 'ca2', accountId: 'visa-usd', currency: 'USD' },
+    ];
+    const origin = {
+      transactionKind: 'EXPENSE',
+      portionRole: 'NOMINAL' as const,
+      debtRole: 'CARD_CHARGE' as const,
+    };
+    portion('2026-10-25', INTERES, bob('4.00'), { accountId: TARJETA, origin });
+    portion('2026-10-25', SEGURO, bob('0.80'), { accountId: TARJETA, origin });
+    portion('2026-10-25', INTERES, usd('1.25'), { accountId: 'visa-usd', origin });
+    const debts = (await q.getDebts({ ...base, ...OCT })).report;
+    const fees = (await q.getFees({ ...base, ...OCT })).report;
+    const sumOf = (currency: string) =>
+      debts.debts
+        .filter((d) => d.kind === 'CARD' && d.currency === currency)
+        .flatMap((d) => d.months)
+        .reduce(
+          (a, m) => a.plus(m.interestCharged?.amount ?? '0').plus(m.chargesCharged?.amount ?? '0'),
+          dec('0'),
+        );
+    const cardType = fees.months[0]?.byType.find((b) => b.type === 'CARD')?.amount.byCurrency ?? [];
+    expect(sumOf('BOB').toFixed(2)).toBe('4.80');
+    expect(sumOf('USD').toFixed(2)).toBe('1.25');
+    expect(cardType.map((m) => [m.currency, m.amount]).sort()).toEqual([
+      ['BOB', '4.80'],
+      ['USD', '1.25'],
+    ]);
   });
 });
 

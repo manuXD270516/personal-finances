@@ -14,6 +14,7 @@ import {
   type LoanExpenseComponent,
   type LoanPaymentBreakdown,
 } from './loan-payment-breakdown.js';
+import type { DebtRole } from './card-charge.js';
 import {
   TRANSACTION_LIFECYCLE,
   type TransactionTransition,
@@ -42,6 +43,14 @@ export const MANAGED_TRANSACTION_KINDS = ['LOAN_DISBURSEMENT', 'LOAN_PAYMENT'] a
 const LOAN_DISBURSEMENT_REF_NAMESPACE = 'debt.loan';
 export const isManagedKind = (kind: TransactionKind): boolean =>
   (MANAGED_TRANSACTION_KINDS as readonly string[]).includes(kind);
+/**
+ * ¿La transacción la administra otro contexto? Un `kind` administrado (préstamos) o un rol de DEBT sobre un gasto
+ * (`debtRole`, cargos de tarjeta: add-card-interest-ledger-portions, decisión 8).
+ */
+export const isManaged = (s: {
+  readonly kind: TransactionKind;
+  readonly debtRole?: DebtRole | null;
+}): boolean => isManagedKind(s.kind) || (s.debtRole !== undefined && s.debtRole !== null);
 export type AdjustmentDirection = 'INCREASE' | 'DECREASE';
 export type AccountNature = 'ASSET' | 'LIABILITY';
 export const PAYMENT_METHODS = [
@@ -244,6 +253,10 @@ export interface TransactionState {
   readonly conversion?: ConversionDetail | null;
   /** Solo `LOAN_PAYMENT`: desglose del pago (docs/04 §3.6, INV-016). */
   readonly loanPaymentBreakdown?: LoanPaymentBreakdown | null;
+  /** Rol que DEBT le da a un gasto (`CARD_CHARGE`); `null`/ausente si no lo administra la tarjeta. */
+  readonly debtRole?: DebtRole | null;
+  /** Tarjeta que administra la transacción cuando hay `debtRole`; `null` en el resto. */
+  readonly debtCardId?: string | null;
 }
 
 /**
@@ -260,15 +273,24 @@ export function loanIdOf(
   return null;
 }
 
-/** `TRANSACTION_MANAGED_EXTERNALLY` (409) con el préstamo que administra la transacción. */
+/** `TRANSACTION_MANAGED_EXTERNALLY` (409) con el administrador: el préstamo o la tarjeta de un cargo. */
 export const managedExternally = (
-  s: Pick<TransactionState, 'id' | 'kind' | 'externalRef' | 'loanPaymentBreakdown'>,
+  s: Pick<
+    TransactionState,
+    'id' | 'kind' | 'externalRef' | 'loanPaymentBreakdown' | 'debtRole' | 'debtCardId'
+  >,
 ) =>
-  new DomainError(
-    'TRANSACTION_MANAGED_EXTERNALLY',
-    `transaction ${s.id} (${s.kind}) is managed by DEBT; operate it from the loan`,
-    { details: { managedBy: 'DEBT', loanId: loanIdOf(s) } },
-  );
+  s.debtRole
+    ? new DomainError(
+        'TRANSACTION_MANAGED_EXTERNALLY',
+        `transaction ${s.id} (${s.debtRole}) is managed by a credit card; operate it from the card`,
+        { details: { managedBy: 'CREDIT_CARD', cardId: s.debtCardId ?? null } },
+      )
+    : new DomainError(
+        'TRANSACTION_MANAGED_EXTERNALLY',
+        `transaction ${s.id} (${s.kind}) is managed by DEBT; operate it from the loan`,
+        { details: { managedBy: 'DEBT', loanId: loanIdOf(s) } },
+      );
 
 export interface RecordTransactionInput {
   readonly id: string;
@@ -296,6 +318,9 @@ export interface RecordTransactionInput {
   readonly reconciliationId?: string | null;
   /** Solo las transacciones importadas (add-basic-csv-import). */
   readonly importJobId?: string | null;
+  /** Solo los cargos de tarjeta que registra DEBT (`debtRole = CARD_CHARGE`, con la tarjeta que lo administra). */
+  readonly debtRole?: DebtRole | null;
+  readonly debtCardId?: string | null;
   /** `undefined` ⇒ un split por el total con `defaultCategoryId` (*Uncategorized*); `[]` ⇒ VALIDATION_FAILED. */
   readonly splits?: readonly SplitInput[];
   readonly defaultCategoryId?: string | null;
@@ -352,7 +377,9 @@ export type ChangedField =
   // add-rule-engine: origen de la clasificación, referencias de reglas y marca de revisión (sin efecto en el ledger).
   | 'categoryOrigin'
   | 'ruleRefs'
-  | 'needsReview';
+  | 'needsReview'
+  // add-card-interest-ledger-portions: rol de DEBT que fija la adopción de un gasto como cargo de la tarjeta.
+  | 'debtRole';
 
 /** Cambio de clasificación de un split (payload de `TransactionCategorized.v1`). */
 export interface SplitClassificationChange {
@@ -728,6 +755,8 @@ export function assertManagedEditAllowed(
     | 'kind'
     | 'externalRef'
     | 'loanPaymentBreakdown'
+    | 'debtRole'
+    | 'debtCardId'
     | 'businessDate'
     | 'accountId'
     | 'amount'
@@ -741,7 +770,7 @@ export function assertManagedEditAllowed(
     readonly splits?: readonly { readonly amount: MoneyLike; readonly categoryId: string }[];
   },
 ): void {
-  if (!isManagedKind(s.kind)) return;
+  if (!isManaged(s)) return;
   const same =
     (changes.businessDate === undefined || changes.businessDate === s.businessDate) &&
     (changes.accountId === undefined || changes.accountId === s.accountId) &&
@@ -994,6 +1023,7 @@ export class Transaction {
         externalRef: input.externalRef ?? null,
         refundOfTransactionId: input.refundOfTransactionId ?? null,
         adjustmentReason: reason,
+        ...(input.debtRole ? { debtRole: input.debtRole, debtCardId: input.debtCardId ?? null } : {}),
         confirmedRefundExcess: input.confirmedRefundExcess ?? false,
         reconciliationMode: null,
         reconciliationId: input.reconciliationId ?? null,
@@ -1748,6 +1778,31 @@ export class Transaction {
       classificationChanges,
       previousStatus,
       previousEntryId,
+    };
+  }
+
+  /**
+   * Adopta un gasto como cargo de la tarjeta (add-card-interest-ledger-portions, decisión 5): reemplaza sus splits por
+   * uno por componente y fija `debtRole = CARD_CHARGE` en la MISMA versión. Monto, cuenta, fecha y moneda no cambian:
+   * si los splits conservan la forma solo se reclasifican (sin ledger); si no, es una revisión (reversa + asiento
+   * nuevo con el mismo neto). El gasto no puede ser ya un cargo ni estar administrado.
+   */
+  adoptAsCardCharge(input: { readonly cardId: string; readonly splits: readonly SplitInput[] }): AmendResult {
+    const s = this.state;
+    if (isManaged(s)) throw managedExternally(s);
+    if (s.kind !== 'EXPENSE') {
+      throw new DomainError('CARD_CHARGE_INVALID', 'only an expense can be adopted as a card charge');
+    }
+    const result = this.amend({ splits: input.splits });
+    this.state = {
+      ...this.state,
+      debtRole: 'CARD_CHARGE',
+      debtCardId: input.cardId,
+      version: result.changedFields.length === 0 ? this.state.version + 1 : this.state.version,
+    };
+    return {
+      ...result,
+      changedFields: [...result.changedFields, 'debtRole'],
     };
   }
 

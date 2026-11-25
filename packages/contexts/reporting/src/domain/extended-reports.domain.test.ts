@@ -201,9 +201,59 @@ describe('FeeBreakdown', () => {
       ['CONVERSION', '2.00'],
       ['TRANSFER', '5.00'],
       ['LOAN', '400.00'],
+      ['CARD', '0.00'],
       ['FEE_CATEGORY', '15.00'],
     ]);
     expect(month?.total.consolidated.toFixed()).toBe('422.00');
+  });
+
+  it('[TC-REPORTING-REPORTS-058] los cargos de tarjeta suman 4.80 en el tipo tarjetas y el total pasa a 426.80 BOB', () => {
+    const facts = [
+      fee('2.00', 'CONVERSION', 'FEE', 'fx'),
+      fee('5.00', 'TRANSFER', 'FEE', 'fees'),
+      fee('320.00', 'LOAN_PAYMENT', 'NOMINAL', 'interes'),
+      fee('80.00', 'LOAN_PAYMENT', 'NOMINAL', 'cargos'),
+      fee('15.00', 'EXPENSE', 'NOMINAL', 'fees'),
+      { ...fee('4.00', 'EXPENSE', 'NOMINAL', 'interes'), debtRole: 'CARD_CHARGE' as const },
+      { ...fee('0.80', 'EXPENSE', 'NOMINAL', 'seguro'), debtRole: 'CARD_CHARGE' as const },
+    ];
+    const [month] = FeeBreakdown.build({
+      facts,
+      feeCategoryIds: new Set(['fees']),
+      periods: OCT,
+      policy: policy(),
+    });
+    expect(month?.byType.map((b) => [b.type, b.amount.consolidated.toFixed()])).toEqual([
+      ['CONVERSION', '2.00'],
+      ['TRANSFER', '5.00'],
+      ['LOAN', '400.00'],
+      ['CARD', '4.80'],
+      ['FEE_CATEGORY', '15.00'],
+    ]);
+    expect(month?.total.consolidated.toFixed()).toBe('426.80');
+  });
+
+  it('[TC-REPORTING-REPORTS-059] un cargo de tarjeta en la categoría de comisiones cuenta solo como tarjetas', () => {
+    const [month] = FeeBreakdown.build({
+      facts: [{ ...fee('12.00', 'EXPENSE', 'NOMINAL', 'fees'), debtRole: 'CARD_CHARGE' as const }],
+      feeCategoryIds: new Set(['fees']),
+      periods: OCT,
+      policy: policy(),
+    });
+    expect(month?.byType.find((b) => b.type === 'CARD')?.amount.consolidated.toFixed()).toBe('12.00');
+    expect(month?.byType.find((b) => b.type === 'FEE_CATEGORY')?.amount.consolidated.toFixed()).toBe('0.00');
+    expect(month?.total.consolidated.toFixed()).toBe('12.00');
+  });
+
+  it('[TC-REPORTING-REPORTS-061] un interés de tarjeta cargado a mano (sin rol) no cuenta como tarjetas', () => {
+    const [month] = FeeBreakdown.build({
+      facts: [fee('4.80', 'EXPENSE', 'NOMINAL', 'interes')],
+      feeCategoryIds: new Set(['fees']),
+      periods: OCT,
+      policy: policy(),
+    });
+    expect(month?.byType.find((b) => b.type === 'CARD')?.amount.consolidated.toFixed()).toBe('0.00');
+    expect(month?.total.consolidated.toFixed()).toBe('0.00');
   });
 
   it('[TC-REPORTING-REPORTS-042] una comisión de transferencia en categoría de comisiones no se cuenta dos veces', () => {
