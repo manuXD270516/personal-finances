@@ -420,7 +420,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-FORECAST-007 | Backtesting por serie con métricas (MASE/sMAPE) vs baseline; un modelo solo se publica para una serie si supera al baseline. | Should | 8 | forecast/expense-forecasting |
 | FR-FORECAST-008 | Forecast probabilístico de saldo líquido y probabilidad de déficit en el horizonte (complementa FR-REPORTING-015). **As-built (8, `add-predicted-cash-flow-band`, D435):** la corrida pronostica el gasto variable pagado desde cuentas líquidas por moneda (serie `LIQUID_VARIABLE_OUTFLOW`, en la moneda de la cuenta y sin conversión; las compras con tarjeta quedan fuera); el calendario lo reparte por día en una banda aparte (esperado, alto y bajo del 80 %) y la probabilidad de déficit es `LIKELY`/`POSSIBLE`/`UNLIKELY`, por niveles y sin porcentaje. | Should | 8 | forecast/expense-forecasting |
 | FR-FORECAST-009 | Historial de forecasts vs real (accuracy tracking) visible al usuario. | Should | 8 | forecast/expense-forecasting |
-| FR-FORECAST-010 | Detección de anomalías de gasto (transacción atípica para la categoría/counterparty). | Could | 8 | forecast/expense-forecasting |
+| FR-FORECAST-010 | Detección de anomalías de gasto (transacción atípica para la categoría/counterparty). Movida a Phase 9 por D442 (docs/66); capability propuesta `forecast/anomaly-detection` (EPIC-26, alcance en docs/03 §7 y docs/76). | Could | 9 | forecast/expense-forecasting |
 
 ## 18. NOTIFY — Notifications
 
