@@ -5,16 +5,19 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Detección diaria sin depender del servicio de pronósticos"
 scenario: "Pronósticos deshabilitados"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-FORECAST-006"]
 nfr: ["NFR-REL-010"]
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/src/worker/forecasting-jobs.test.ts
+  - apps/api/test/api/spending-anomalies.api.test.ts
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

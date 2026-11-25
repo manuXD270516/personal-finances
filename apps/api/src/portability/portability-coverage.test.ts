@@ -65,7 +65,7 @@ describe('[TC-IDENTITY-EXPORT-010] cobertura de tablas del export (estática)', 
     }
   });
 
-  it('[TC-FORECAST-SERVICE-039] los pronósticos no viajan en la exportación: sus cinco tablas están excluidas con motivo y sin sección', () => {
+  it('[TC-FORECAST-SERVICE-039] [TC-FORECAST-ANOMALY-024] los pronósticos y los gastos atípicos no viajan en la exportación: sus siete tablas están excluidas con motivo y sin sección', () => {
     const excluded = PORTABILITY_EXCLUSIONS.filter((e) => e.table.startsWith('forecasting.'));
     expect(excluded.map((e) => e.table).sort()).toEqual([
       'forecasting.backtest_result',
@@ -73,6 +73,9 @@ describe('[TC-IDENTITY-EXPORT-010] cobertura de tablas del export (estática)', 
       'forecasting.forecast_point',
       'forecasting.forecast_run',
       'forecasting.forecast_series',
+      // add-spending-anomaly-detection (decisión 12): los gastos atípicos y sus evaluaciones tampoco viajan.
+      'forecasting.spending_anomaly',
+      'forecasting.spending_anomaly_scan',
     ]);
     expect(excluded.every((e) => e.reason.length > 20)).toBe(true);
     expect(PORTABILITY_SECTIONS.some((s) => s.table.startsWith('forecasting.'))).toBe(false);

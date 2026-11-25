@@ -141,7 +141,10 @@ describe('dataset Demo v2: carga y determinismo', () => {
   it('el canal email de todos los tipos queda apagado y el in-app activo para el usuario de la demo', async () => {
     const prefs = await read(() => q.r.notifications.preferences.get(ws, userId));
     expect(prefs.types.length).toBeGreaterThan(0);
-    expect(prefs.types.every((t) => t.email === false && t.inApp === true)).toBe(true);
+    // El aviso de gastos atípicos es el único tipo apagado por omisión también en la app (D474).
+    expect(prefs.types.every((t) => t.email === false && t.inApp === (t.type !== 'SPENDING_ANOMALY'))).toBe(
+      true,
+    );
   });
 });
 

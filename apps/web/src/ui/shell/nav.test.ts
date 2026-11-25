@@ -40,6 +40,9 @@ describe('navegación principal del marco', () => {
     // Phase 8 (add-expense-forecasts): pronósticos.
     expect(activeNav('/pronosticos')).toBe('forecasts');
     expect(activeNav('/en/pronosticos')).toBe('forecasts');
+    // Phase 9 (add-spending-anomaly-detection): gastos atípicos.
+    expect(activeNav('/gastos-atipicos')).toBe('spendingAnomalies');
+    expect(activeNav('/pt/gastos-atipicos')).toBe('spendingAnomalies');
     // Phase 7 (add-cash-flow-forecast): calendario de flujo de caja.
     expect(activeNav('/flujo-de-caja')).toBe('cashFlow');
     expect(activeNav('/en/flujo-de-caja')).toBe('cashFlow');

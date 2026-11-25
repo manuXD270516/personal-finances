@@ -193,5 +193,6 @@ Traduce `ExternalTransaction` → `StagedTransaction` (monto string + moneda, fe
 
 ## Nota as-built: `add-predicted-cash-flow-band` (Phase 8, 2026-11-13)
 
+- Gastos atípicos (as-built `add-spending-anomaly-detection`): FORECAST lee `ExpenseLineQuery` (TRANSACTIONS) y `ResolvedOccurrencesQuery` (COMMITMENTS) y avisa a NOTIFICATIONS por `NotificationIntakePort` (hecho `SPENDING_ANOMALY`, en proceso y en la misma unidad de trabajo, como `reporting.cash-flow-watch`); todo por `contracts`, sin ciclos y sin consumidores ni conexiones nuevas.
 - Relación REPORTING → FORECAST (fila 22b) en una sola dirección y solo por contratos: `GetCashFlowCalendar` y el resumen del Home llaman a `LatestForecastQuery.getLatest` (una consulta por la corrida vigente) y a `LiquidVariableSpendQuery.spentBetween` en la transacción de la petición; la composición resuelve FORECAST de forma tardía (se compone después de REPORTING). `arch:check` valida que no haya ciclo. Sin consumidores ni conexiones nuevas.
 - COMMITMENTS agrega `accountId` (cuenta de la versión de la definición) a `ResolvedOccurrenceDto` para restar los recurrentes resueltos pagados desde cuentas líquidas.

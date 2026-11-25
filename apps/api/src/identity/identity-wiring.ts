@@ -49,6 +49,7 @@ import {
   type ForecastingRuntime,
 } from '@pf/forecasting/interface/forecasting.module';
 import {
+  forecastingAnomalyPorts,
   forecastingMetrics,
   forecastingKnownPorts,
   forecastingReadPorts,
@@ -105,7 +106,7 @@ import {
   type DemoDataOptions,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
-import { NOTIFICATIONS_AUDIT_POLICY } from '@pf/notifications/contracts';
+import { NOTIFICATIONS_AUDIT_POLICY, type NotificationIntakePort } from '@pf/notifications/contracts';
 import {
   createNotificationsApiRuntime,
   NotificationsModule,
@@ -437,6 +438,11 @@ export function financeRuntimes(input: {
   readonly documentsRef?: DocumentsRef;
   /** Conexiones con proveedores (add-banking-providers); sin ellas el módulo queda deshabilitado. */
   readonly banking?: BankingRuntimeOptions;
+  /**
+   * Aviso de gastos atípicos (add-spending-anomaly-detection): solo el worker lo cablea, con el puerto de entrega directa de
+   * NOTIFICATIONS; la API nunca ejecuta la detección.
+   */
+  readonly notificationIntake?: Pick<NotificationIntakePort, 'notify'>;
 }) {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
   // IDENTITY según el actor: la API lee el workspace con la membresía del usuario de la petición; el job y los
@@ -938,6 +944,14 @@ export function financeRuntimes(input: {
     service: forecastingServiceClient(input.config),
     settings: forecastingSettingsFrom(input.config, rateValidityWindowDays),
     metrics: forecastingMetrics(),
+    // Gastos atípicos (add-spending-anomaly-detection): líneas de gasto de TRANSACTIONS y ocurrencias resueltas de COMMITMENTS.
+    anomalies: forecastingAnomalyPorts({
+      expenseLines: transactions.expenseLines,
+      resolved: commitments.queries,
+      config: input.config,
+      rateValidityWindowDays,
+      ...(input.notificationIntake ? { intake: input.notificationIntake } : {}),
+    }),
   });
   deferred.forecasting = forecasting;
   // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.

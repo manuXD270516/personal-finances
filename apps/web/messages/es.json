@@ -53,7 +53,8 @@
     "rules": "Reglas",
     "reports": "Reportes",
     "cashFlow": "Flujo de caja",
-    "forecasts": "Pronósticos"
+    "forecasts": "Pronósticos",
+    "spendingAnomalies": "Gastos atípicos"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -2624,7 +2625,8 @@
       "openFxFeedStatus": "Ver el estado de las tasas automáticas",
       "openFxRate": "Revisar la tasa retenida",
       "openCashFlowCalendar": "Ver el calendario de flujo de caja",
-      "openHome": "Ir al inicio"
+      "openHome": "Ir al inicio",
+      "openSpendingAnomalies": "Abrir los gastos atípicos"
     },
     "prefs": {
       "title": "Notificaciones",
@@ -2657,7 +2659,8 @@
         "FX_RATE_FEED_RECOVERED": "Tasa automática recuperada",
         "FX_RATE_ANOMALY_RETAINED": "Tasa retenida por variación anómala",
         "CASH_FLOW_SHORTFALL_RISK": "Riesgo de déficit en el flujo de caja",
-        "HOME_DIGEST": "Resumen periódico del inicio (email)"
+        "HOME_DIGEST": "Resumen periódico del inicio (email)",
+        "SPENDING_ANOMALY": "Gastos atípicos detectados (apagado por omisión)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalles (montos y nombres) en los emails",
@@ -7303,6 +7306,72 @@
       },
       "bySurface": "Por canal",
       "failed": "No se pudo leer la tasa de aceptación."
+    }
+  },
+  "SpendingAnomalies": {
+    "title": "Gastos atípicos",
+    "subtitle": "Gastos que se alejan de lo habitual para su categoría o su contraparte, con el motivo. Es solo un aviso: no cambia ninguna transacción ni ninguna cifra.",
+    "disclaimer": "La marca solo indica que el monto se aleja de lo habitual. Si era esperado, descártalo con «No es atípico»; puedes restaurarlo cuando quieras.",
+    "loading": "Cargando gastos atípicos…",
+    "disabled": "La detección de gastos atípicos está deshabilitada en esta instalación. Se muestra lo que ya se había detectado.",
+    "empty": "No hay gastos atípicos abiertos en este rango.",
+    "emptyFiltered": "No hay gastos atípicos con estos filtros.",
+    "more": "Cargar más",
+    "noName": "sin nombre",
+    "filters": {
+      "label": "Filtros de gastos atípicos",
+      "status": "Estado",
+      "from": "Desde",
+      "to": "Hasta",
+      "OPEN": "Abiertos",
+      "DISMISSED": "Descartados",
+      "ALL": "Todos"
+    },
+    "table": {
+      "caption": "Gastos atípicos del espacio de trabajo, del más reciente al más antiguo",
+      "date": "Fecha",
+      "amount": "Monto",
+      "category": "Categoría",
+      "counterparty": "Contraparte",
+      "reasons": "Motivo",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "status": {
+      "OPEN": "Abierto",
+      "DISMISSED": "Descartado"
+    },
+    "reportingAmount": "Equivale a {amount}",
+    "reason": {
+      "CATEGORY_OUTLIER": "{ratio} veces la mediana de \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "COUNTERPARTY_OUTLIER": "{ratio} veces la mediana de tus gastos con \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nueva \"{name}\", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil 95 de tus gastos ({reference}, {count} gastos)"
+    },
+    "dismiss": {
+      "label": "No es atípico",
+      "reasonLabel": "Motivo (opcional)",
+      "none": "Sin motivo",
+      "EXPECTED_ONE_OFF": "Gasto puntual esperado",
+      "NOT_UNUSUAL": "Es normal para mí",
+      "OTHER": "Otro motivo",
+      "done": "Gasto marcado como no atípico."
+    },
+    "restore": {
+      "label": "Restaurar",
+      "done": "Gasto restaurado entre los atípicos."
+    },
+    "decided": "Descartado el {at}",
+    "decidedReason": "Descartado el {at}: {reason}",
+    "changed": "La transacción cambió desde que se detectó.",
+    "openTransaction": "Ver transacción",
+    "mark": {
+      "label": "Atípico",
+      "hint": "Gasto atípico: {reasons}"
+    },
+    "detail": {
+      "title": "Gasto atípico",
+      "intro": "Este monto se aleja de lo habitual. No cambia la transacción ni ninguna cifra.",
+      "open": "Ver los gastos atípicos"
     }
   }
 }

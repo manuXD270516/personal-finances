@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Emails de gastos atípicos sin montos salvo opt-in"
 scenario: "Email en inglés con opt-in"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-002","FR-NOTIFY-006"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/spending-anomaly-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["notifications","anomalies","i18n"]

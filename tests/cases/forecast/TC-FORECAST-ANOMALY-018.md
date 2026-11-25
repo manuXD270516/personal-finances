@@ -5,16 +5,20 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Descartar y restaurar un gasto atípico"
 scenario: "Descarte de un falso positivo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/spending-anomalies.api.test.ts
+  - apps/web/src/ui/spending-anomalies/spending-anomalies.test.tsx
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+  - tests/e2e/specs/spending-anomalies.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

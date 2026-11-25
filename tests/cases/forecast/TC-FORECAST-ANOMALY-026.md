@@ -5,16 +5,18 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Rendimiento y métricas de la detección"
 scenario: "Workspace grande"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: ["NFR-PERF-012","NFR-OBS-004"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/anomalies.perf.ts
+  - apps/api/test/perf/suite-order.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies","perf"]

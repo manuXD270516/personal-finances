@@ -3,7 +3,12 @@ import { PgUnitOfWork, requireSqlExecutor, runWithRequestContext } from '@pf/pla
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import type { StoredKnownItem, StoredSeries } from '../../src/application/ports.js';
-import { ForecastRun } from '../../src/domain/index.js';
+import { ForecastRun, SpendingAnomaly, type AnomalyReason } from '../../src/domain/index.js';
+import {
+  PgAnomalyMaintenance,
+  PgAnomalyRepository,
+  PgAnomalyScanRepository,
+} from '../../src/infrastructure/pg-anomalies.js';
 import {
   PgForecastOperations,
   PgForecastingUnitOfWork,
@@ -560,5 +565,130 @@ describe('PgMaintenance', () => {
     expect(await inWs(w, () => maintenance.deleteRuns(w, [old.id]))).toBe(1);
     // La cascada se llevó las series y los puntos.
     expect(await inWs(w, () => series.listByRun(w, old.id))).toHaveLength(0);
+  });
+});
+
+// ───────────────────────────────────────────────────────────── gastos atípicos (add-spending-anomaly-detection)
+
+const REASON: AnomalyReason = {
+  kind: 'CATEGORY_OUTLIER',
+  categoryId: randomUUID(),
+  counterpartyId: null,
+  reference: '80.00',
+  ratio: '3.8',
+  robustScore: '20.15',
+  sampleSize: 12,
+};
+const newAnomaly = (ws: string, date: string, tx: string = randomUUID(), version = 1) =>
+  SpendingAnomaly.detect({
+    id: randomUUID(),
+    workspaceId: ws,
+    transactionId: tx,
+    transactionVersion: version,
+    transactionDate: date,
+    amount: { amount: '50.00', currency: 'USD' },
+    reportingAmount: { amount: '348.00', currency: 'BOB' },
+    categoryIds: [REASON.categoryId as string],
+    counterpartyId: null,
+    reasons: [REASON],
+    at: AT,
+  });
+
+describe('PgAnomalyRepository', () => {
+  const anomalies = new PgAnomalyRepository();
+  const scans = new PgAnomalyScanRepository();
+
+  it('[TC-FORECAST-ANOMALY-023] inserta una vez por transacción y versión, round-trip y control optimista', async () => {
+    const a = newAnomaly(w1, '2026-11-12');
+    expect(await inWs(w1, () => anomalies.insert(a))).toBe(true);
+    // La misma transacción y versión no se inserta dos veces (idempotencia de la pasada).
+    const dup = newAnomaly(w1, '2026-11-12', a.snapshot.transactionId, 1);
+    expect(await inWs(w1, () => anomalies.insert(dup))).toBe(false);
+    const read = await inWs(w1, () => anomalies.findById(w1, a.id));
+    expect(read?.snapshot).toMatchObject({
+      status: 'OPEN',
+      amount: { amount: '50.00', currency: 'USD' },
+      reportingAmount: { amount: '348.00', currency: 'BOB' },
+      transactionDate: '2026-11-12',
+      version: 1,
+    });
+    expect(read?.snapshot.reasons).toEqual([REASON]);
+    const v = read!.version;
+    read!.dismiss({ actorId: user, at: AT, reason: 'EXPECTED_ONE_OFF' });
+    expect(await inWs(w1, () => anomalies.save(read!, v))).toBe(true);
+    // Una versión vieja pierde la carrera.
+    expect(await inWs(w1, () => anomalies.save(read!, v))).toBe(false);
+    const dismissed = await inWs(w1, () => anomalies.list(w1, { status: 'DISMISSED', limit: 10 }));
+    expect(dismissed.map((x) => x.id)).toContain(a.id);
+  });
+
+  it('[TC-FORECAST-ANOMALY-020] una versión nueva reemplaza las anteriores y la lista las oculta', async () => {
+    const tx = randomUUID();
+    const v1 = newAnomaly(w1, '2026-11-12', tx, 1);
+    await inWs(w1, () => anomalies.insert(v1));
+    await inWs(w1, () => anomalies.insert(newAnomaly(w1, '2026-11-12', tx, 2)));
+    expect(await inWs(w1, () => anomalies.supersedeOlder(w1, tx, 2))).toBe(1);
+    const found = await inWs(w1, () => anomalies.byTransactionIds(w1, [tx]));
+    expect(found.map((x) => x.snapshot.transactionVersion)).toEqual([2]);
+    // Reemplazado: ya no se puede descartar (404 en la aplicación).
+    expect(await inWs(w1, () => anomalies.findById(w1, v1.id))).toBeNull();
+  });
+
+  it('[TC-FORECAST-ANOMALY-023] un gasto atípico de otro workspace no se ve ni se modifica (RLS forzada)', async () => {
+    const a = newAnomaly(w2, '2026-11-12');
+    await inWs(w2, () => anomalies.insert(a));
+    expect(await inWs(w1, () => anomalies.findById(w1, a.id))).toBeNull();
+    expect(await inWs(w1, () => anomalies.byTransactionIds(w1, [a.snapshot.transactionId]))).toEqual([]);
+    const other = SpendingAnomaly.restore({ ...a.snapshot, workspaceId: w1 });
+    expect(await inWs(w1, () => anomalies.save(other, 1))).toBe(false);
+    // Sin contexto de workspace la tabla falla cerrada (PF002).
+    const code = await sqlState(() =>
+      new PgForecastingUnitOfWork(app).runSystem(() => anomalies.countByStatus(w1, 'OPEN')),
+    );
+    expect(code).toBe('PF002');
+  });
+
+  it('[TC-FORECAST-ANOMALY-012] las evaluaciones registradas se leen desde la fecha pedida y repetirlas es inocuo', async () => {
+    const tx = randomUUID();
+    await inWs(w1, () => scans.record(w1, [{ transactionId: tx, version: 1 }], AT));
+    await inWs(w1, () => scans.record(w1, [{ transactionId: tx, version: 1 }], AT));
+    expect((await inWs(w1, () => scans.evaluated(w1, '2026-10-01T00:00:00.000Z'))).has(`${tx}:1`)).toBe(true);
+    expect((await inWs(w1, () => scans.evaluated(w1, '2026-12-01T00:00:00.000Z'))).has(`${tx}:1`)).toBe(
+      false,
+    );
+    expect((await inWs(w2, () => scans.evaluated(w2, '2026-10-01T00:00:00.000Z'))).has(`${tx}:1`)).toBe(
+      false,
+    );
+  });
+
+  it('[TC-FORECAST-ANOMALY-024] la retención purga por el rol de mantenimiento los gastos atípicos de hace más de 25 meses y las evaluaciones viejas', async () => {
+    const w = randomUUID();
+    await new PgUnitOfWork(app).run({ userId: user, workspaceId: w }, async () => {
+      await requireSqlExecutor().query(
+        `INSERT INTO iam.workspace (id, name, base_currency, time_zone, locale) VALUES ($1, 'Retención', 'BOB', 'America/La_Paz', 'es-BO')`,
+        [w],
+      );
+      await requireSqlExecutor().query(
+        `INSERT INTO iam.workspace_membership (workspace_id, user_id, role) VALUES ($1, $2, 'OWNER')`,
+        [w, user],
+      );
+    });
+    const oldOne = newAnomaly(w, '2024-01-10');
+    const recent = newAnomaly(w, '2026-11-12');
+    await inWs(w, () => anomalies.insert(oldOne));
+    await inWs(w, () => anomalies.insert(recent));
+    await inWs(w, () =>
+      scans.record(
+        w,
+        [{ transactionId: oldOne.snapshot.transactionId, version: 1 }],
+        '2026-01-01T00:00:00.000Z',
+      ),
+    );
+    const maintenance = new PgAnomalyMaintenance(uow);
+    const input = { transactionBefore: '2024-10-25', scanBeforeIso: '2026-10-14T00:00:00.000Z' };
+    expect(await maintenance.purgeCandidates(input)).toContain(w);
+    expect(await inWs(w, () => maintenance.purge(w, input))).toEqual({ anomalies: 1, scans: 1 });
+    expect(await inWs(w, () => anomalies.findById(w, oldOne.id))).toBeNull();
+    expect(await inWs(w, () => anomalies.findById(w, recent.id))).not.toBeNull();
   });
 });

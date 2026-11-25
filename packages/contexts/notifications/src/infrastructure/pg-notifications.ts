@@ -14,6 +14,7 @@ import type {
   UnitOfWork,
 } from '../application/ports/index.js';
 import {
+  defaultTypePreference,
   NotificationPreferences,
   NOTIFICATION_CHANNELS,
   isDigestFrequency,
@@ -419,7 +420,7 @@ function buildPreferences(
   const byType: Partial<Record<NotificationType, TypePreference>> = {};
   for (const row of rows) {
     if (!isNotificationType(row.notification_type)) continue; // tipo retirado del catálogo: se ignora
-    const current = byType[row.notification_type] ?? { inApp: true, email: true };
+    const current = byType[row.notification_type] ?? defaultTypePreference(row.notification_type);
     byType[row.notification_type] =
       row.channel === 'IN_APP' ? { ...current, inApp: row.enabled } : { ...current, email: row.enabled };
   }

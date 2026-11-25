@@ -23,6 +23,7 @@ import { BULK_EDIT_MAX_ITEMS } from './bulk-edit-logic';
 import { BulkEditPanel, type BulkFocus, type BulkTarget } from './BulkEditPanel';
 import { categoryOptions, useCatalogs } from './catalogs';
 import { EMPTY_TRANSACTION_FILTERS, transactionsQuery, type TransactionFilters } from './logic';
+import { useAnomalyMarks } from '../spending-anomalies/AnomalyMarks';
 import { TransactionsListView } from './TransactionsListView';
 
 const KINDS: readonly TransactionKind[] = [
@@ -94,6 +95,10 @@ function Register({
   });
   const [draftQ, setDraftQ] = useState('');
   const [items, setItems] = useState<readonly Transaction[] | undefined>();
+  // Marca de gasto atípico de las filas visibles (add-spending-anomaly-detection, decisión 10): dato accesorio, sin bloquear la lista.
+  const anomalyFormat = useFormat('SpendingAnomalies', ctx);
+  const itemIds = useMemo(() => (items ?? []).map((i) => i.id), [items]);
+  const anomalyMarks = useAnomalyMarks(ctx, itemIds);
   const [cursor, setCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
@@ -578,6 +583,7 @@ function Register({
           {...(filters.accountId ? { accountId: filters.accountId } : {})}
           selectable={ctx.canEdit}
           customFields={{ definitions: customFields.definitions, cf }}
+          anomalies={{ marks: anomalyMarks, f: anomalyFormat }}
           selected={selected}
           onToggle={(id) =>
             setSelected((prev) => {

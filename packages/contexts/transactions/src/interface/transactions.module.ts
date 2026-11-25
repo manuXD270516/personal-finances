@@ -58,12 +58,14 @@ import {
   PgTransactionStatusQuery,
 } from '../infrastructure/pg-imported.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
+import { PgExpenseLines } from '../infrastructure/pg-expense-lines.js';
 import { PgClassificationCoverage, PgClassificationSubjects } from '../infrastructure/pg-rule-queries.js';
 import { LOAN_TRANSACTIONS_PORT, type TransactionExistenceQuery } from '../contracts/index.js';
 import type {
   AccountMovementsQuery,
   ClassificationCoverageQuery,
   ClassificationSubjectsQuery,
+  ExpenseLineQuery,
   CounterpartyCategoryUsageQuery,
   RuleClassificationCommand,
   GoalTransferPort,
@@ -165,6 +167,8 @@ export interface TransactionsRuntime {
   readonly ruleClassification: RuleClassificationCommand;
   /** Cobertura de clasificación por reglas y estadísticas por regla (add-rule-engine, D334). */
   readonly classificationCoverage: ClassificationCoverageQuery;
+  /** Líneas de gasto para la detección de gastos atípicos de FORECAST (add-spending-anomaly-detection). */
+  readonly expenseLines: ExpenseLineQuery;
 }
 
 /**
@@ -254,6 +258,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     classificationSubjects: new PgClassificationSubjects(),
     ruleClassification: bulkEdit,
     classificationCoverage: new PgClassificationCoverage(),
+    expenseLines: new PgExpenseLines(deps.uow, deps.currencies),
   };
 }
 
