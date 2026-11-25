@@ -41,7 +41,7 @@ Trace: FR-FORECAST-010 · Priority: Should
 - **ENTONCES** el gasto no se marca
 
 ### Requirement: Gastos que se evalúan
-Solo DEBEN (MUST) evaluarse los gastos posteados (posteados, conciliables o conciliados) no anulados, no administrados por otro módulo (préstamos, cargos de tarjeta o metas) y no vinculados a una ocurrencia de un compromiso; cada porción de un gasto con varias porciones DEBE (MUST) evaluarse en su categoría, y las porciones en «sin categoría» NO DEBEN (MUST NOT) evaluarse por categoría. Un gasto en otra moneda DEBE (MUST) convertirse a la moneda de reporte con la tasa de su fecha; sin tasa disponible NO DEBE (MUST NOT) evaluarse. Ingresos, reembolsos, transferencias y conversiones NO DEBEN (MUST NOT) evaluarse.
+Solo DEBEN (MUST) evaluarse los gastos en estado posteado, conciliado o reconciliado, no anulados, no administrados por otro módulo (préstamos, cargos de tarjeta o metas) y no vinculados a una ocurrencia de un compromiso; cada porción de un gasto con varias porciones DEBE (MUST) evaluarse en su categoría, y las porciones en «sin categoría» NO DEBEN (MUST NOT) evaluarse por categoría. Un gasto en otra moneda DEBE (MUST) convertirse a la moneda de reporte con la tasa de su fecha; sin tasa disponible NO DEBE (MUST NOT) evaluarse. Ingresos, reembolsos, transferencias y conversiones NO DEBEN (MUST NOT) evaluarse.
 Trace: FR-FORECAST-010, FR-FORECAST-003 · Priority: Should
 
 #### Scenario: Gasto en dólares
