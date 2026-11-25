@@ -5,16 +5,18 @@ spec: debt/credit-cards
 related_specs: []
 requirement: "Anular un cargo de la tarjeta"
 scenario: "Cargo de un mes cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: ["INV-015"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+  - packages/contexts/debt/src/application/card-charges.service.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

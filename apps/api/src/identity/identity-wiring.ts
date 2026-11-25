@@ -858,6 +858,7 @@ export function financeRuntimes(input: {
     accountCatalog: accounts.catalog,
     balanceHistory: ledger.accountBalanceHistory,
     movements: transactions.movements,
+    cardCharges: transactions.cardCharges,
     openingEntries: ledger.openingEntries,
     pending: transactions.pending,
     links: transactions.links,

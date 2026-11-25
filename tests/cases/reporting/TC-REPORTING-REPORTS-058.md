@@ -5,16 +5,20 @@ spec: reporting/financial-reports
 related_specs: ["debt/credit-cards"]
 requirement: "Reporte de comisiones"
 scenario: "Intereses y cargos de tarjeta en octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008","FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+  - tests/e2e/specs/card-charges.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["reports","fees","card-charges"]

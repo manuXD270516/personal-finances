@@ -5,16 +5,18 @@ spec: reporting/financial-reports
 related_specs: ["debt/credit-cards"]
 requirement: "Reconciliación de los reportes ampliados con el ledger"
 scenario: "Cargos de tarjeta iguales en los dos reportes"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008","FR-REPORTING-010"]
 nfr: ["NFR-DATA-008"]
 invariants: ["INV-021"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/extended-reports.queries.test.ts
+  - packages/contexts/reporting/src/application/reports-reconciliation.test.ts
+status: automated
 regression_suite: true
 phase: 9
 tags: ["reports","reconciliation","card-charges"]

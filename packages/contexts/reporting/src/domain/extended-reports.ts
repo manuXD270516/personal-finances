@@ -281,8 +281,8 @@ export const TrendMatrix = {
 
 // ───────────────────────────────────────────── reporte 14: comisiones
 
-export type FeeType = 'CONVERSION' | 'TRANSFER' | 'LOAN' | 'FEE_CATEGORY';
-export const FEE_TYPES: readonly FeeType[] = ['CONVERSION', 'TRANSFER', 'LOAN', 'FEE_CATEGORY'];
+export type FeeType = 'CONVERSION' | 'TRANSFER' | 'LOAN' | 'CARD' | 'FEE_CATEGORY';
+export const FEE_TYPES: readonly FeeType[] = ['CONVERSION', 'TRANSFER', 'LOAN', 'CARD', 'FEE_CATEGORY'];
 
 export interface FeeFact {
   readonly date: string;
@@ -291,17 +291,21 @@ export interface FeeFact {
   /** Tipo de la transacción de la porción y su rol (`FEE` para las comisiones de transferencias y conversiones). */
   readonly transactionKind: string;
   readonly portionRole: 'NOMINAL' | 'FEE';
+  /** Rol de DEBT de la transacción (`CARD_CHARGE`: interés y cargos de una tarjeta, add-card-interest-ledger-portions). */
+  readonly debtRole?: 'CARD_CHARGE' | null;
 }
 
 /**
  * Clasificación EXCLUSIVA de una porción de gasto en un tipo de comisión (decisión 4): comisión de una conversión, de
- * una transferencia, porciones de un pago de préstamo (interés, cargos, seguro, impuestos) o gasto en las categorías de
- * comisiones del sistema. `null` si no es una comisión.
+ * una transferencia, porciones de un pago de préstamo (interés, cargos, seguro, impuestos), porciones de un cargo de
+ * tarjeta registrado o adoptado (`debtRole = CARD_CHARGE`, antes que las categorías: nunca inferido por categoría, D372) o
+ * gasto en las categorías de comisiones del sistema. `null` si no es una comisión.
  */
 export function classifyFee(f: FeeFact, feeCategoryIds: ReadonlySet<string>): FeeType | null {
   if (f.portionRole === 'FEE' && f.transactionKind === 'CONVERSION') return 'CONVERSION';
   if (f.portionRole === 'FEE' && f.transactionKind === 'TRANSFER') return 'TRANSFER';
   if (f.transactionKind === 'LOAN_PAYMENT') return 'LOAN';
+  if (f.debtRole === 'CARD_CHARGE') return 'CARD';
   if (f.portionRole === 'NOMINAL' && feeCategoryIds.has(f.categoryId)) return 'FEE_CATEGORY';
   return null;
 }
@@ -427,6 +431,12 @@ export interface DebtMonthInput {
         readonly charges: Money;
       }[]
     | null;
+  /**
+   * Cargado en el mes por las porciones de los cargos vigentes de una tarjeta (interés y demás cargos) con la fecha de
+   * cada cargo; `null` en préstamos (add-card-interest-ledger-portions).
+   */
+  readonly charged?:
+    readonly { readonly date: string; readonly interest: Money; readonly other: Money }[] | null;
 }
 
 export interface DebtSeries extends DebtInfo {
@@ -436,6 +446,9 @@ export interface DebtSeries extends DebtInfo {
     readonly principalPaid: Money | null;
     readonly interestPaid: Money | null;
     readonly chargesPaid: Money | null;
+    /** Interés y demás cargos (comisiones, seguro, impuestos) cargados por la tarjeta; `null` en préstamos. */
+    readonly interestCharged: Money | null;
+    readonly chargesCharged: Money | null;
   }[];
 }
 
@@ -461,12 +474,20 @@ export const DebtEvolutionSeries = {
             const code = m.outstanding.currency;
             return m.payments.reduce((acc, p) => acc.add(pick(p)), Money.zero(code));
           };
+          const charged = (
+            pick: (p: NonNullable<DebtMonthInput['charged']>[number]) => Money,
+          ): Money | null => {
+            if (m.charged === undefined || m.charged === null) return null;
+            return m.charged.reduce((acc, p) => acc.add(pick(p)), Money.zero(m.outstanding.currency));
+          };
           return {
             period: m.period,
             outstanding: m.outstanding,
             principalPaid: sum((p) => p.principal),
             interestPaid: sum((p) => p.interest),
             chargesPaid: sum((p) => p.charges),
+            interestCharged: charged((p) => p.interest),
+            chargesCharged: charged((p) => p.other),
           };
         }),
       }));
@@ -483,15 +504,19 @@ export const DebtEvolutionSeries = {
     readonly outstanding: ReportAmount;
     readonly principalPaid: ReportAmount;
     readonly interestPaid: ReportAmount;
+    readonly interestCharged: ReportAmount;
   }[] {
     return periods.map((period) => {
       const months = debts.flatMap((d) => d.months.filter((m) => m.period.to === period.to));
       const payments = months.flatMap((m) => m.payments ?? []);
+      const charges = months.flatMap((m) => m.charged ?? []);
       return {
         period,
         outstanding: balances.value(months.map((m) => ({ date: period.to, amount: m.outstanding }))),
         principalPaid: flows.value(payments.map((p) => ({ date: p.date, amount: p.principal }))),
         interestPaid: flows.value(payments.map((p) => ({ date: p.date, amount: p.interest }))),
+        // Solo el interés cargado de las tarjetas, a la tasa de la fecha de cada cargo.
+        interestCharged: flows.value(charges.map((p) => ({ date: p.date, amount: p.interest }))),
       };
     });
   },

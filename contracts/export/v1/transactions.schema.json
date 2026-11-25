@@ -42,7 +42,9 @@
     "review_reason",
     "review_rule_id",
     "review_rule_version",
-    "review_marked_at"
+    "review_marked_at",
+    "debt_role",
+    "debt_card_id"
   ],
   "properties": {
     "id": {
@@ -232,6 +234,19 @@
         "null"
       ],
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "debt_role": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "debt_card_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
     }
   },
   "x-pfos-table": "txn.transaction",

@@ -26,3 +26,4 @@ export * from './debt-summary-calculator.js';
 export * from './interest-attribution.js';
 export * from './debt-free-date-estimator.js';
 export * from './upcoming-debt-dues.js';
+export * from './card-charge.js';

@@ -955,6 +955,7 @@
       "remaining": "Left to assign: {amount}"
     },
     "list": {
+      "cardCharge": "Card charge",
       "title": "Transactions",
       "newActions": "Record",
       "new": "New movement",
@@ -5079,6 +5080,66 @@
       "done": "Card archived.",
       "archivedNotice": "This card is archived: you can only view it."
     },
+    "charges": {
+      "title": "Interest and charges",
+      "caption": "Interest and charges of the cycle closing on {closing}",
+      "empty": "No interest or charges registered in this cycle.",
+      "register": "Register interest and charges",
+      "hint": "Register what the bank billed: it creates a card expense with one portion per component and raises what you owe.",
+      "fields": {
+        "date": "Charge date",
+        "interest": "Interest ({currency})",
+        "fees": "Fees ({currency})",
+        "insurance": "Insurance ({currency})",
+        "taxes": "Taxes ({currency})"
+      },
+      "components": {
+        "interest": "Interest",
+        "fees": "Fees",
+        "insurance": "Insurance",
+        "taxes": "Taxes"
+      },
+      "totalShort": "Total",
+      "originShort": "Origin",
+      "actions": "Actions",
+      "origin": {
+        "RECORDED": "Registered",
+        "ADOPTED": "Adopted from an expense"
+      },
+      "total": "Charge total: {amount}",
+      "totalPending": "Charge total: complete the amounts in a valid format.",
+      "save": "Register charge",
+      "saved": "Charge registered.",
+      "cancel": "Cancel",
+      "void": "Void",
+      "voidTitle": "Void the charge of {amount}",
+      "voidDescription": "Its transaction is voided with the reversal of its entry and the debt returns to its previous value.",
+      "voidReason": "Reason for voiding",
+      "voidConfirm": "Void charge",
+      "voided": "Charge voided.",
+      "proposal": "The bank reported {amount} more than the system calculation. If it is interest or charges, register them.",
+      "useProposal": "Register the difference as a charge",
+      "duplicateWarning": "There are {count} expense(s) in this cycle under \"Interest paid\" or \"Fees\" that are not charges. If it is the same billing, adopt it from its detail so it is not registered twice:",
+      "errors": {
+        "INVALID": "Enter a valid amount.",
+        "SCALE": "The amount has more decimals than the currency allows.",
+        "NEGATIVE": "The amount cannot be negative.",
+        "NO_COMPONENT": "Enter at least one component greater than zero.",
+        "REQUIRED_DATE": "Enter the charge date."
+      },
+      "adopt": {
+        "title": "It is a card charge",
+        "hint": "Split the amount of the expense into components (they must add up to its amount). It creates no other transaction and does not change the balance.",
+        "prompt": "This expense belongs to an account of {card}. If it is interest or a bank charge, mark it as a charge so it counts in the fees and debts reports.",
+        "action": "It is a card charge",
+        "save": "Adopt as charge",
+        "done": "The expense is now a card charge."
+      }
+    },
+    "transaction": {
+      "badge": "Card charge",
+      "viewCard": "View the card"
+    },
     "statements": {
       "accountTitle": "Statements in {currency}",
       "empty": "There are no statements yet.",
@@ -6582,10 +6643,11 @@
       "CONVERSION": "Conversion fee",
       "TRANSFER": "Transfer fee",
       "LOAN": "Loan interest and charges",
+      "CARD": "Card interest and charges",
       "FEE_CATEGORY": "Fee categories",
       "total": "Total",
       "last12": "Last 12 complete periods: {amount}",
-      "cardNote": "Credit card interest is not recorded as spending and is not listed here; the card balance is in the debt evolution report.",
+      "cardNote": "Cards count here only the interest and charges registered as a card charge (or adopted from an expense); an ordinary expense under \"Interest paid\" is not inferred.",
       "chartTitle": "Total fees per period",
       "chartDesc": "Bars of {n} periods in {currency}; the table below separates each type."
     },
@@ -6617,6 +6679,8 @@
       "principalPaid": "Principal paid",
       "interestPaid": "Interest paid",
       "chargesPaid": "Charges paid",
+      "interestCharged": "Interest charged",
+      "chargesCharged": "Other charges billed",
       "kind": {
         "LOAN": "Loan",
         "CARD": "Card"
@@ -6624,7 +6688,7 @@
       "consolidated": "Consolidated in {currency}",
       "chartTitle": "Outstanding balance of {name}",
       "chartDesc": "Line of {n} months in {currency}; the table below has the payments.",
-      "cardNote": "Cards show only the outstanding balance."
+      "cardNote": "Cards show the outstanding balance and the interest and charges registered on the card; what was paid is not reported."
     },
     "recurring": {
       "caption": "Monthly and annual cost of the active recurring commitments",

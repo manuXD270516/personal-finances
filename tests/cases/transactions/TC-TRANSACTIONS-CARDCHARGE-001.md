@@ -5,16 +5,17 @@ spec: transactions/transaction-recording
 related_specs: ["debt/credit-cards"]
 requirement: "Transacciones de cargos de tarjeta administradas por la tarjeta"
 scenario: "Cargo de la tarjeta en el listado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013","FR-TRANSACTIONS-009"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/cards/charges.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

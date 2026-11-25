@@ -5,16 +5,17 @@ spec: reporting/financial-reports
 related_specs: ["debt/credit-cards"]
 requirement: "Reporte de comisiones"
 scenario: "Cargo de tarjeta en la categoría de comisiones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-008","FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/extended-reports.domain.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["reports","fees","card-charges"]

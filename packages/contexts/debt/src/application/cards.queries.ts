@@ -4,10 +4,12 @@ import { CardInstallmentPlan, diffFigures, expectationForOpen, type CreditCard }
 import { CardEngine, type AccountView, type CardClock, type CycleView } from './card-engine.js';
 import type { CardDeps } from './card-ports.js';
 import {
+  cardChargeView,
   cardView,
   figuresView,
   installmentPlanView,
   statementView,
+  type CardChargeView,
   type CardStatementView,
   type CreditCardView,
   type InstallmentPlanView,
@@ -86,6 +88,71 @@ export class CardsQueries implements CardPortfolioQuery {
     });
   }
 
+  /**
+   * Agrega a cada estado de cuenta los cargos vigentes de su cuenta con fecha en el ciclo (una sola consulta por
+   * tarjeta, sin N+1; las consultas de la unidad de trabajo corren una tras otra).
+   */
+  private async withCharges(
+    workspaceId: string,
+    rows: readonly CardStatementView[],
+  ): Promise<CardStatementView[]> {
+    if (rows.length === 0) return [];
+    const from = rows.reduce((min, r) => (r.cycleStart < min ? r.cycleStart : min), rows[0]!.cycleStart);
+    const to = rows.reduce((max, r) => (r.closingDate > max ? r.closingDate : max), rows[0]!.closingDate);
+    const charges = await this.deps.charges.activeForAccounts(
+      workspaceId,
+      [...new Set(rows.map((r) => r.cardAccountId))],
+      from,
+      to,
+    );
+    return rows.map((r) => ({
+      ...r,
+      charges: charges
+        .map((c) => c.snapshot)
+        .filter(
+          (c) =>
+            c.cardAccountId === r.cardAccountId &&
+            c.businessDate >= r.cycleStart &&
+            c.businessDate <= r.closingDate,
+        )
+        .map(cardChargeView),
+    }));
+  }
+
+  /** Cargos de la tarjeta, del más reciente al más antiguo, con paginación por cursor. */
+  listCharges(
+    workspaceId: string,
+    cardId: string,
+    filter: {
+      accountId?: string;
+      from?: string;
+      to?: string;
+      status?: string;
+      limit?: number;
+      after?: string;
+    } = {},
+  ): Promise<{ readonly items: readonly CardChargeView[]; readonly nextCursor: string | null }> {
+    return this.deps.uow.run(workspaceId, async () => {
+      const card = await this.card(workspaceId, cardId);
+      const accounts = filter.accountId
+        ? card.snapshot.accounts.filter((a) => a.accountId === filter.accountId || a.id === filter.accountId)
+        : card.snapshot.accounts;
+      if (filter.status !== undefined && filter.status !== 'ACTIVE' && filter.status !== 'VOIDED') {
+        throw new DomainError('VALIDATION_FAILED', 'status must be ACTIVE or VOIDED').at('/status');
+      }
+      const page = await this.deps.charges.list(workspaceId, {
+        cardId,
+        cardAccountIds: accounts.map((a) => a.id),
+        ...(filter.from ? { from: filter.from } : {}),
+        ...(filter.to ? { to: filter.to } : {}),
+        ...(filter.status ? { status: filter.status } : {}),
+        limit: filter.limit ?? 50,
+        ...(filter.after ? { after: filter.after } : {}),
+      });
+      return { items: page.items.map((c) => cardChargeView(c.snapshot)), nextCursor: page.nextCursor };
+    });
+  }
+
   private statementsOf(view: AccountView): CardStatementView[] {
     return [...view.cycles].reverse().map((cv: CycleView) => {
       const diff = cv.issued ? figuresView(diffFigures(cv.issued, cv.current)) : null;
@@ -112,6 +179,7 @@ export class CardsQueries implements CardPortfolioQuery {
         .flatMap((v) => this.statementsOf(v));
       if (filter.from) rows = rows.filter((r) => r.closingDate >= (filter.from as string));
       if (filter.to) rows = rows.filter((r) => r.closingDate <= (filter.to as string));
+      rows = await this.withCharges(workspaceId, rows);
       return rows.sort((a, b) =>
         a.closingDate === b.closingDate
           ? a.currency < b.currency
@@ -139,7 +207,7 @@ export class CardsQueries implements CardPortfolioQuery {
         // Estado anterior a la ventana calculada: se muestra con las cifras emitidas.
         throw notFound('card statement', statementId);
       }
-      return found;
+      return (await this.withCharges(workspaceId, [found]))[0] as CardStatementView;
     });
   }
 

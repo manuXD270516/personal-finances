@@ -331,7 +331,7 @@ export interface TrendsReportDto {
   }[];
 }
 
-export type FeeTypeDto = 'CONVERSION' | 'TRANSFER' | 'LOAN' | 'FEE_CATEGORY';
+export type FeeTypeDto = 'CONVERSION' | 'TRANSFER' | 'LOAN' | 'CARD' | 'FEE_CATEGORY';
 
 export interface FeesReportDto {
   readonly meta: ReportMetaDto;
@@ -381,6 +381,9 @@ export interface DebtsReportDto {
       readonly principalPaid: MoneyDto | null;
       readonly interestPaid: MoneyDto | null;
       readonly chargesPaid: MoneyDto | null;
+      /** Interés y demás cargos cargados por la tarjeta en el mes (sus cargos vigentes); `null` en préstamos. */
+      readonly interestCharged: MoneyDto | null;
+      readonly chargesCharged: MoneyDto | null;
     }[];
   }[];
   readonly consolidated: readonly {
@@ -388,6 +391,8 @@ export interface DebtsReportDto {
     readonly outstanding: ReportAmountDto;
     readonly principalPaid: ReportAmountDto;
     readonly interestPaid: ReportAmountDto;
+    /** Interés cargado por las tarjetas del mes, a la tasa de la fecha de cada cargo. */
+    readonly interestCharged: ReportAmountDto;
   }[];
 }
 

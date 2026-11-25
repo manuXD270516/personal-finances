@@ -21,6 +21,7 @@ import {
   type ApiResponse,
 } from '@pf/platform/nest';
 import { isDomainError } from '@pf/shared-kernel';
+import type { CardChargesService } from '../application/card-charges.service.js';
 import type { CardsQueries } from '../application/cards.queries.js';
 import type { CardsService, RegisterCardCommand } from '../application/cards.service.js';
 import type { InstallmentsService } from '../application/installments.service.js';
@@ -28,6 +29,7 @@ import type { InstallmentsService } from '../application/installments.service.js
 export const CARDS_SERVICE = Symbol('DEBT_CARDS_SERVICE');
 export const CARDS_QUERIES = Symbol('DEBT_CARDS_QUERIES');
 export const INSTALLMENTS_SERVICE = Symbol('DEBT_INSTALLMENTS_SERVICE');
+export const CARD_CHARGES_SERVICE = Symbol('DEBT_CARD_CHARGES_SERVICE');
 
 type Json = Record<string, unknown>;
 const str = (b: Json, k: string): string | undefined =>
@@ -61,6 +63,7 @@ export class CreditCardsController {
     @Inject(CARDS_SERVICE) private readonly cards: CardsService,
     @Inject(CARDS_QUERIES) private readonly queries: CardsQueries,
     @Inject(INSTALLMENTS_SERVICE) private readonly installments: InstallmentsService,
+    @Inject(CARD_CHARGES_SERVICE) private readonly charges: CardChargesService,
   ) {}
 
   @Get('workspaces/:workspaceId/credit-cards')
@@ -264,6 +267,83 @@ export class CreditCardsController {
     @ExpectedVersion() expectedVersion: number,
   ) {
     return this.installments.cancel({ workspaceId, userId: userIdOf(req), cardId, planId, expectedVersion });
+  }
+
+  // ───────────────────────────────────────────── cargos de la tarjeta (add-card-interest-ledger-portions)
+
+  @Get('workspaces/:workspaceId/credit-cards/:cardId/charges')
+  async listCharges(
+    @Param('workspaceId') workspaceId: string,
+    @Param('cardId') cardId: string,
+    @ValidatedQuery() query: Json,
+  ) {
+    const accountId = str(query, 'accountId');
+    const from = str(query, 'from');
+    const to = str(query, 'to');
+    const status = str(query, 'status');
+    const after = str(query, 'after');
+    const limit = query['limit'] === undefined ? undefined : Number(query['limit']);
+    return this.queries.listCharges(workspaceId, cardId, {
+      ...(accountId ? { accountId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(status ? { status } : {}),
+      ...(after ? { after } : {}),
+      ...(limit !== undefined && Number.isFinite(limit) ? { limit } : {}),
+    });
+  }
+
+  @Post('workspaces/:workspaceId/credit-cards/:cardId/charges')
+  @HttpCode(201)
+  async createCharge(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('cardId') cardId: string,
+    @Body() body: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ) {
+    const charge = await withDetails(() =>
+      this.charges.record({
+        workspaceId,
+        userId: userIdOf(req),
+        cardId,
+        accountId: body['accountId'],
+        ...('businessDate' in body ? { businessDate: body['businessDate'] } : {}),
+        ...('interest' in body ? { interest: body['interest'] } : {}),
+        ...('fees' in body ? { fees: body['fees'] } : {}),
+        ...('insurance' in body ? { insurance: body['insurance'] } : {}),
+        ...('taxes' in body ? { taxes: body['taxes'] } : {}),
+        ...('adoptTransactionId' in body ? { adoptTransactionId: body['adoptTransactionId'] } : {}),
+        ...('description' in body ? { description: body['description'] } : {}),
+      }),
+    );
+    res.setHeader(
+      'location',
+      `/api/v1/workspaces/${workspaceId}/credit-cards/${cardId}/charges/${charge.id}`,
+    );
+    return charge;
+  }
+
+  @Post('workspaces/:workspaceId/credit-cards/:cardId/charges/:chargeId/void')
+  @HttpCode(200)
+  voidCharge(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('cardId') cardId: string,
+    @Param('chargeId') chargeId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+  ) {
+    return withDetails(() =>
+      this.charges.void({
+        workspaceId,
+        userId: userIdOf(req),
+        cardId,
+        chargeId,
+        expectedVersion,
+        reason: body['reason'],
+      }),
+    );
   }
 
   @Get('workspaces/:workspaceId/credit-cards/:cardId/future-charges')

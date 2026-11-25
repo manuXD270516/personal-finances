@@ -51,6 +51,8 @@ export const errorStyle: CSSProperties = {
   margin: 0,
 };
 export const tableWrapStyle: CSSProperties = {
+  // Contenedor de posicionamiento: el `<caption>` accesible (`pf-sr-only`, absoluto) no debe ensanchar la página.
+  position: 'relative',
   overflowX: 'auto',
   maxWidth: '100%',
   background: 'var(--pf-surface-raised)',
