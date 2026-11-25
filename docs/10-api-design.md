@@ -332,6 +332,7 @@ Content-Type: application/json
 | debt (P4) | `CREDIT_CARD_ACCOUNT_IN_USE` | 409 | La cuenta ya pertenece a otra tarjeta activa |
 | debt (P4) | `CARD_PAYMENT_PLAN_CONFLICT` | 409 | Existe una transferencia recurrente activa del usuario hacia la cuenta de la tarjeta (`details.conflictingDefinitions[{definitionId, name}]`); el usuario la termina y activa el plan |
 | debt (P4) | `INSTALLMENT_PLAN_INVALID` | 422 | La compra no es un gasto posteado de una cuenta de la tarjeta, ya tiene plan, o las cuotas están fuera de 2..60 |
+| debt (P9) | `CARD_CHARGE_INVALID` | 422 | El cargo de la tarjeta no tiene ningún componente positivo, tiene una fecha futura o anterior a la apertura de la cuenta, la cuenta no es de la tarjeta o la tarjeta está archivada; o el gasto que se adopta no es un gasto posteado de la tarjeta, ya es un cargo, lo administra otro contexto o sus componentes no suman su monto |
 | debt (P4) | `PAYMENT_BREAKDOWN_MISMATCH` | 422 | Σ del desglose distinta del monto (`details {sum, amount}`) |
 | transactions (P4) | `TRANSACTION_MANAGED_EXTERNALLY` | 409 | La transacción `LOAN_DISBURSEMENT`/`LOAN_PAYMENT` la administra un préstamo: editar lo financiero o anularla se hace desde Debt (`details {managedBy: 'DEBT', loanId}`); descripción, notas y tags siguen editables. `POST W/transactions` con esos kinds responde `VALIDATION_FAILED` |
 | rules (P6) | `RULE_INVALID_REGEX` | 422 | La expresión regular de una condición no es válida o usa construcciones sin tiempo lineal (referencias hacia atrás, lookaround) o supera 200 caracteres (`add-rule-engine`) |

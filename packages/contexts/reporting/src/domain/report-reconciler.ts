@@ -185,6 +185,22 @@ export const ReportReconciler = {
     );
   },
 
+  /**
+   * Cargos de tarjeta (add-card-interest-ledger-portions): el interés y los demás cargos de las tarjetas del reporte de
+   * deudas suman, por mes y moneda, lo mismo que el tipo de tarjetas del reporte de comisiones (misma fuente: las
+   * porciones de los cargos vigentes).
+   */
+  cardCharges(period: string, debts: Money, fees: Money): ReconciliationMismatch[] {
+    return diff(
+      'DEBT_EVOLUTION',
+      period,
+      debts.currency.code,
+      'sum(card charges)=fees CARD',
+      fees.toDecimal(),
+      debts.toDecimal(),
+    );
+  },
+
   /** Metas: el acumulado de cada cierre = Σ de los movimientos de la meta a esa fecha (INV-018). */
   goalAccumulated(period: string, reported: Money, movements: readonly Money[]): ReconciliationMismatch[] {
     const sum = movements.reduce((a, m) => a.plus(m.toDecimal()), dec('0'));

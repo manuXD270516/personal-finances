@@ -5,16 +5,18 @@ spec: debt/credit-cards
 related_specs: []
 requirement: "Permisos, auditoría e idempotencia de los cargos de la tarjeta"
 scenario: "Cargo auditado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-012","FR-AUDIT-001"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/card-charges.api.test.ts
+  - packages/contexts/debt/src/application/card-charges.service.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]

@@ -37,6 +37,7 @@ import {
   type InstallmentForm,
   type PlanForm,
 } from './logic';
+import { ChargesSection } from './CardCharges';
 import { StatementStatusBadge } from './parts';
 import {
   CARD_MATERIALIZATION_MODES,
@@ -55,7 +56,12 @@ interface PanelProps {
   readonly onChanged: (message: string) => void;
 }
 
-const sectionGap = { display: 'grid', gap: 'var(--pf-space-3)' } as const;
+// `minmax(0, 1fr)`: una tabla ancha (cifras del estado de cuenta, cargos) se desplaza dentro de su contenedor y no ensancha la página.
+const sectionGap = {
+  display: 'grid',
+  gap: 'var(--pf-space-3)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+} as const;
 
 // ───────────────────────────── Estados de cuenta ─────────────────────────────
 
@@ -266,6 +272,7 @@ export function StatementItem({
   open,
   highlight,
   form,
+  charges,
 }: {
   statement: CardStatement;
   f: FormatContext;
@@ -273,6 +280,8 @@ export function StatementItem({
   highlight: boolean;
   /** Formulario de montos del banco (solo EDITOR/OWNER y estado emitido). */
   form?: ReactNode;
+  /** Cargos del ciclo (intereses, comisiones, seguro e impuestos) con su alta y anulación. */
+  charges?: ReactNode;
 }) {
   const changed = changedFigures(statement);
   const reported = statement.reported;
@@ -384,6 +393,7 @@ export function StatementItem({
             ) : null}
           </dl>
         ) : null}
+        {charges}
         {form}
       </div>
     </details>
@@ -458,6 +468,17 @@ export function StatementsPanel({
                   f={f}
                   open={highlightId ? s.id === highlightId : i === 0}
                   highlight={highlightId !== undefined && s.id === highlightId}
+                  charges={
+                    <ChargesSection
+                      ctx={ctx}
+                      card={card}
+                      statement={s}
+                      onChanged={(message) => {
+                        setTick((n) => n + 1);
+                        onChanged(message);
+                      }}
+                    />
+                  }
                   form={
                     ctx.canEdit && canReportBank(s) && card.status === 'ACTIVE' ? (
                       <ReportedForm

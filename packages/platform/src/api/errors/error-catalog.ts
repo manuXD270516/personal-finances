@@ -261,6 +261,8 @@ export const ERROR_CATALOG = {
     title: 'An active recurring transfer to the card prevents enabling the payment plan',
   },
   INSTALLMENT_PLAN_INVALID: { status: 422, title: 'The installment plan is not valid for this purchase' },
+  // debt / credit-cards (add-card-interest-ledger-portions)
+  CARD_CHARGE_INVALID: { status: 422, title: 'The card charge is not valid for this card or expense' },
   EARMARK_EXCEEDS_BALANCE: {
     status: 422,
     title: 'The reservation exceeds the available balance of the account',

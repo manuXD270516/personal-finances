@@ -23,11 +23,14 @@ const CATS = [
 ];
 const GROUP = '0190a000-0000-7000-8000-0000000000d1';
 const INCOME_CAT = '0190a000-0000-7000-8000-0000000000c9';
+// Categorías de sistema de un cargo de tarjeta: intereses y comisiones (la comisión del cargo cuenta como tarjetas).
+const INTEREST_CAT = '0190a000-0000-7000-8000-0000000000ca';
+const FEES_CAT = '0190a000-0000-7000-8000-0000000000cb';
 
 type Op =
   | { kind: 'income' | 'expense' | 'refund'; day: number; cents: number; ccy: 'BOB' | 'USD'; cat: number }
   | {
-      kind: 'transfer' | 'plazo' | 'card' | 'loan' | 'conversion';
+      kind: 'transfer' | 'plazo' | 'card' | 'loan' | 'conversion' | 'cardcharge';
       day: number;
       cents: number;
       extra: number;
@@ -51,6 +54,25 @@ const arbOp: fc.Arbitrary<Op> = fc.oneof(
     ccy: fc.constantFrom('BOB', 'USD'),
     cat: fc.integer({ min: 0, max: 2 }),
   }) as fc.Arbitrary<Op>,
+);
+
+/**
+ * Ledgers con cargos de tarjeta: sin reembolsos (un reembolso de otra categoría podría dejar el gasto neto por debajo de las
+ * comisiones, y la identidad «Σ tipos de comisión ≤ gasto» no aplica entonces) y con cargos de interés más comisiones.
+ */
+const arbChargeOps: fc.Arbitrary<Op[]> = fc.array(
+  fc.oneof(
+    arbOp.filter((o) => o.kind !== 'refund'),
+    fc.record({
+      kind: fc.constant('cardcharge'),
+      day: fc.integer({ min: 0, max: 91 }),
+      cents: fc.integer({ min: 100, max: 500_000 }),
+      extra: fc.integer({ min: 1, max: 99 }),
+      ccy: fc.constant('BOB'),
+      cat: fc.integer({ min: 0, max: 2 }),
+    }) as fc.Arbitrary<Op>,
+  ),
+  { minLength: 1, maxLength: 40 },
 );
 
 const amt = (cents: number) => `${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
@@ -80,6 +102,24 @@ function build(ops: readonly Op[], rateSeed: number): InMemoryFinancialReports {
         systemCode: null,
         archived: false,
       })),
+      {
+        categoryId: INTEREST_CAT,
+        name: 'Intereses pagados',
+        kind: 'EXPENSE' as const,
+        groupId: GROUP,
+        parentId: null,
+        systemCode: 'INTEREST',
+        archived: false,
+      },
+      {
+        categoryId: FEES_CAT,
+        name: 'Comisiones',
+        kind: 'EXPENSE' as const,
+        groupId: GROUP,
+        parentId: null,
+        systemCode: 'FEES',
+        archived: false,
+      },
       {
         categoryId: INCOME_CAT,
         name: 'Ingreso',
@@ -125,6 +165,7 @@ function build(ops: readonly Op[], rateSeed: number): InMemoryFinancialReports {
     amount: string,
     ccy: string,
     accountId: string,
+    debtRole: 'CARD_CHARGE' | null = null,
   ) => {
     split += 1;
     mem.portions.push({
@@ -138,6 +179,9 @@ function build(ops: readonly Op[], rateSeed: number): InMemoryFinancialReports {
       description: null,
       amount: { amount, currency: ccy },
       tagIds: [],
+      ...(debtRole
+        ? { origin: { transactionKind: 'EXPENSE', portionRole: 'NOMINAL' as const, debtRole } }
+        : {}),
     });
   };
   for (const op of ops) {
@@ -226,6 +270,19 @@ function build(ops: readonly Op[], rateSeed: number): InMemoryFinancialReports {
         `t${n}`,
       );
       portion(date, 'EXPENSE', cat, amt(interest), 'BOB', BANCO);
+    } else if (op.kind === 'cardcharge' && c === 'BOB') {
+      // Cargo de la tarjeta: gasto con una porción de interés y otra de comisiones (add-card-interest-ledger-portions).
+      mem.entry(
+        id,
+        date,
+        [
+          { account: TARJETA, currency: 'BOB', amount: neg(op.cents + op.extra) },
+          { account: 'SYSTEM:EXPENSE', currency: 'BOB', amount: amt(op.cents + op.extra) },
+        ],
+        `t${n}`,
+      );
+      portion(date, 'EXPENSE', INTEREST_CAT, amt(op.cents), 'BOB', TARJETA, 'CARD_CHARGE');
+      portion(date, 'EXPENSE', FEES_CAT, amt(op.extra), 'BOB', TARJETA, 'CARD_CHARGE');
     } else if (op.kind === 'conversion') {
       const usdCents = Math.max(1, Math.trunc(op.cents / 10));
       const fee = op.extra;
@@ -294,6 +351,54 @@ describe('Reconciliación de los reportes con el ledger', () => {
     );
     expect(checked).toBeGreaterThan(0);
   }, 180_000);
+
+  it('[TC-REPORTING-REPORTS-063] [PBT] los cargos de tarjeta suman lo mismo en el reporte de deudas y en el tipo tarjetas de comisiones', async () => {
+    let withCharges = 0;
+    await fc.assert(
+      fc.asyncProperty(arbChargeOps, fc.integer({ min: 0, max: 1_000_000 }), async (ops, seed) => {
+        const mem = build(ops, seed);
+        const mismatches = await reconcile(mem);
+        expect(mismatches, JSON.stringify(mismatches.slice(0, 3))).toEqual([]);
+        if (ops.some((o) => o.kind === 'cardcharge' && o.ccy === 'BOB')) withCharges += 1;
+      }),
+      { numRuns: 60 },
+    );
+    expect(withCharges).toBeGreaterThan(0);
+  }, 180_000);
+
+  it('[TC-REPORTING-REPORTS-063] un reporte de comisiones que pierde un cargo de tarjeta rompe la identidad y nombra reporte, mes y moneda', async () => {
+    const mem = build([{ kind: 'cardcharge', day: 70, cents: 400, extra: 80, ccy: 'BOB', cat: 0 }], 11);
+    const reports = new FinancialReportsService(mem.financialDeps());
+    const broken: typeof reports = Object.assign(Object.create(reports) as typeof reports, {
+      getFees: async (p: Parameters<typeof reports.getFees>[0]) => {
+        const r = await reports.getFees(p);
+        return {
+          ...r,
+          report: {
+            ...r.report,
+            months: r.report.months.map((m) => ({
+              ...m,
+              byType: m.byType.map((t) =>
+                t.type === 'CARD'
+                  ? { ...t, amount: { ...t.amount, byCurrency: [{ amount: '4.79', currency: 'BOB' }] } }
+                  : t,
+              ),
+            })),
+          },
+        };
+      },
+    });
+    const found = await new ReportsReconciliation(broken, mem).verify(input);
+    expect(found).toContainEqual(
+      expect.objectContaining({
+        report: 'DEBT_EVOLUTION',
+        currency: 'BOB',
+        identity: 'sum(card charges)=fees CARD',
+        expected: '4.79',
+        actual: '4.80',
+      }),
+    );
+  }, 60_000);
 
   it('[TC-REPORTING-REPORTS-052] un gasto de una cuenta que no figura en el reporte por cuenta rompe Σ cuentas = gasto y nombra el reporte', async () => {
     const mem = build([{ kind: 'expense', day: 70, cents: 330_000, ccy: 'BOB', cat: 0 }], 11);

@@ -356,6 +356,7 @@ export class ExtendedReportsQueries extends FinancialReportsQueries {
           categoryId: r.categoryId,
           transactionKind: r.origin.transactionKind,
           portionRole: r.origin.portionRole,
+          debtRole: r.origin.debtRole ?? null,
         });
       }
     }
@@ -540,6 +541,42 @@ export class ExtendedReportsQueries extends FinancialReportsQueries {
               charges: ctx.money({ amount: p.charges, currency: r.currency }),
             })),
           );
+      // Interés y demás cargos de las tarjetas: las porciones de los cargos vigentes (`debtRole = CARD_CHARGE`), una sola
+      // consulta por reporte (add-card-interest-ledger-portions, decisión 6); nunca se infiere por la categoría.
+      const interestCategoryIds = new Set(
+        ctx.tree.categories.filter((c) => c.systemCode === 'INTEREST').map((c) => c.categoryId),
+      );
+      const cardAccountIds = [...new Set(debts.filter((d) => d.kind === 'CARD').map((d) => d.accountId))];
+      const first = periods[0];
+      const last = periods.at(-1);
+      const chargeRows =
+        cardAccountIds.length === 0 || first === undefined || last === undefined
+          ? []
+          : (
+              await this.deps.flows.summarizeNominalFlows({
+                workspaceId: ws,
+                dateFrom: first.from,
+                dateTo: last.to,
+                accountIds: cardAccountIds,
+                groupBy: ['ACCOUNT', 'ORIGIN'],
+              })
+            ).filter((r) => r.nature === 'EXPENSE' && r.origin?.debtRole === 'CARD_CHARGE');
+      const chargedOf = (debt: Debt, period: ReportPeriod) =>
+        chargeRows
+          .filter(
+            (r) =>
+              r.accountId === debt.accountId && r.businessDate >= period.from && r.businessDate <= period.to,
+          )
+          .map((r) => {
+            const amount = ctx.money(r.amount);
+            const isInterest = interestCategoryIds.has(r.categoryId);
+            const zero = Money.zero(amount.currency);
+            return {
+              date: r.businessDate,
+              interest: isInterest ? amount : zero,
+              other: isInterest ? zero : amount,
+            };
+          });
       const inputs = debts.map((d) => ({
         debtId: d.debtId,
         kind: d.kind,
@@ -549,6 +586,7 @@ export class ExtendedReportsQueries extends FinancialReportsQueries {
           period,
           outstanding: owedAt(period.to, d),
           payments: d.kind === 'LOAN' ? paymentsOf(d.debtId, period) : null,
+          charged: d.kind === 'CARD' ? chargedOf(d, period) : null,
         })),
       }));
       const dated: DatedAmount[] = inputs.flatMap((d) =>
@@ -557,6 +595,10 @@ export class ExtendedReportsQueries extends FinancialReportsQueries {
           ...(m.payments ?? []).flatMap((p) => [
             { date: ctx.flowDate(p.date), amount: p.principal },
             { date: ctx.flowDate(p.date), amount: p.interest },
+          ]),
+          ...(m.charged ?? []).flatMap((p) => [
+            { date: ctx.flowDate(p.date), amount: p.interest },
+            { date: ctx.flowDate(p.date), amount: p.other },
           ]),
         ]),
       );
@@ -572,6 +614,7 @@ export class ExtendedReportsQueries extends FinancialReportsQueries {
         ctx.track(c.outstanding);
         ctx.track(c.principalPaid);
         ctx.track(c.interestPaid);
+        ctx.track(c.interestCharged);
       }
       const meta = await ctx.meta({
         reportId: 'DEBT_EVOLUTION',
@@ -594,6 +637,8 @@ export class ExtendedReportsQueries extends FinancialReportsQueries {
             principalPaid: m.principalPaid?.toJSON() ?? null,
             interestPaid: m.interestPaid?.toJSON() ?? null,
             chargesPaid: m.chargesPaid?.toJSON() ?? null,
+            interestCharged: m.interestCharged?.toJSON() ?? null,
+            chargesCharged: m.chargesCharged?.toJSON() ?? null,
           })),
         })),
         consolidated: consolidated.map((c) => ({
@@ -601,6 +646,7 @@ export class ExtendedReportsQueries extends FinancialReportsQueries {
           outstanding: amountDto(c.outstanding),
           principalPaid: amountDto(c.principalPaid),
           interestPaid: amountDto(c.interestPaid),
+          interestCharged: amountDto(c.interestCharged),
         })),
       };
     });

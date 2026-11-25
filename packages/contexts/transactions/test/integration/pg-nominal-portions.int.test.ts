@@ -246,12 +246,13 @@ describe('summarizeNominalFlows: coincidencia de etiquetas y origen (add-financi
   it('[TC-REPORTING-REPORTS-042] groupBy ORIGIN informa el tipo de la transacción y el rol de la porción', async () => {
     const rows = await summarize({ groupBy: ['ORIGIN'] });
     const fee = rows.find((r) => r.categoryId === catFees);
-    expect(fee?.origin).toEqual({ transactionKind: 'TRANSFER', portionRole: 'FEE' });
+    expect(fee?.origin).toEqual({ transactionKind: 'TRANSFER', portionRole: 'FEE', debtRole: null });
     const refund = rows.find((r) => r.amount.amount === '-200.00');
-    expect(refund?.origin).toEqual({ transactionKind: 'REFUND', portionRole: 'NOMINAL' });
+    expect(refund?.origin).toEqual({ transactionKind: 'REFUND', portionRole: 'NOMINAL', debtRole: null });
     expect(rows.find((r) => r.nature === 'INCOME')?.origin).toEqual({
       transactionKind: 'INCOME',
       portionRole: 'NOMINAL',
+      debtRole: null,
     });
     expect((await summarize()).every((r) => r.origin === undefined)).toBe(true);
   });

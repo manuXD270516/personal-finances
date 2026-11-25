@@ -24,6 +24,7 @@ import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../c
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
 import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { ConversionDetailView } from '../fx/ConversionDetailView';
+import { CardChargeAdoption, CardChargeInfo } from '../debt/cards/CardChargeTransaction';
 import { LoanTransactionInfo } from '../debt/LoanTransactionInfo';
 import { TransactionGoalInfo } from '../goals/TransactionGoalInfo';
 import { VoidImpactNotice } from '../goals/VoidImpact';
@@ -384,6 +385,15 @@ function Detail({
                   }
                 />
                 {tx.loanId ? <LoanTransactionInfo ctx={ctx} tx={tx} /> : null}
+                {tx.debtRole === 'CARD_CHARGE' ? <CardChargeInfo ctx={ctx} tx={tx} /> : null}
+                <CardChargeAdoption
+                  ctx={ctx}
+                  tx={tx}
+                  onAdopted={(message) => {
+                    setStatus(message);
+                    load();
+                  }}
+                />
                 <TransactionGoalInfo ctx={ctx} tx={tx} />
                 <section aria-labelledby="tx-legs-title" style={cardStyle}>
                   <h2 id="tx-legs-title" style={{ fontSize: '1rem', marginTop: 0 }}>
