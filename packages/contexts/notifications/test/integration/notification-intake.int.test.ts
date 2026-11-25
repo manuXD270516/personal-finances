@@ -242,6 +242,63 @@ describe('NotificationIntake sobre PostgreSQL', () => {
     expect(await deliveriesOf(episodeId)).toBe(2);
   });
 
+  it('[TC-NOTIFICATIONS-ANOMALY-001] [TC-NOTIFICATIONS-ANOMALY-003] el aviso de gastos atípicos nace apagado, con el tipo activado llega una vez por destinatario y repetirlo no duplica', async () => {
+    const passDate = '2026-11-13';
+    const spending = (): NotificationIntakeFact =>
+      ({
+        workspaceId: ws,
+        type: 'SPENDING_ANOMALY',
+        factKey: `spending-anomalies:${passDate}`,
+        sourceEventId: randomUUID(),
+        occurredAt: `${passDate}T05:15:00.000Z`,
+        payload: {
+          workspaceId: ws,
+          passDate,
+          count: 2,
+          top: {
+            anomalyId: randomUUID(),
+            transactionDate: '2026-11-12',
+            reportingAmount: { amount: '304.00', currency: 'BOB' },
+            reasons: ['CATEGORY_OUTLIER'],
+          },
+          timeZone: 'America/La_Paz',
+        },
+      }) as unknown as NotificationIntakeFact;
+    const count = () =>
+      superuser
+        .query<{ user_id: string; link: { kind: string; periodId: string; periodLabel: string } }>(
+          `SELECT user_id::text, link FROM notifications.notification
+            WHERE workspace_id = $1 AND dedupe_key = $2 ORDER BY user_id`,
+          [ws, `SPENDING_ANOMALY:${passDate}`],
+        )
+        .then((r) => r.rows);
+    // Sin tocar las preferencias nadie recibe nada ni se programa un email.
+    const scheduledBefore = scheduled.length;
+    expect(await intake().notify(spending())).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
+    expect(await count()).toHaveLength(0);
+    // El OWNER y el VIEWER activan el tipo en la app: solo el OWNER recibe la notificación (el VIEWER no es destinatario).
+    for (const user of [owner, viewer]) {
+      await appUow.run({ userId: user, workspaceId: ws }, async () => {
+        const repo = new PgPreferencesRepository();
+        const prefs = await repo.load(ws, user);
+        prefs.update({
+          types: [{ type: 'SPENDING_ANOMALY', inApp: true, email: false }],
+          quietHours: null,
+          includeDetailsInEmail: false,
+        });
+        await repo.save(prefs);
+      });
+    }
+    expect(await intake().notify(spending())).toEqual({ created: 1, refreshed: 0, deliveries: 0 });
+    expect(await intake().notify(spending())).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
+    const concurrent = await Promise.all(Array.from({ length: 6 }, () => intake().notify(spending())));
+    expect(concurrent.reduce((n, o) => n + o.created, 0)).toBe(0);
+    const rowsNow = await count();
+    expect(rowsNow.map((r) => r.user_id)).toEqual([owner]);
+    expect(rowsNow[0]?.link).toEqual({ kind: 'SPENDING_ANOMALIES', periodId: ws, periodLabel: '2026-11' });
+    expect(scheduled.length).toBe(scheduledBefore);
+  });
+
   it('[TC-NOTIFICATIONS-FX-009] un hecho mal formado lanza y no deja nada escrito', async () => {
     const episodeId = randomUUID();
     await expect(

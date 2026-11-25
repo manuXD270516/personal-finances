@@ -5,16 +5,18 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Permisos, auditoría y aislamiento de los gastos atípicos"
 scenario: "VIEWER intenta descartar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-IDENTITY-006"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/spending-anomalies.api.test.ts
+  - apps/web/src/ui/spending-anomalies/spending-anomalies.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies","rbac"]

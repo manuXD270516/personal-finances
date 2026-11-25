@@ -362,4 +362,5 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 ## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
 
+- Gastos atípicos (`add-spending-anomaly-detection`, Phase 9): **sin eventos nuevos**. La detección no publica `forecasting.AnomalyDetected.v1` (docs/15 §12): sin consumidores sería solo outbox (D249); el aviso va por el puerto en proceso `NotificationIntakePort`, en la misma unidad de trabajo que inserta los gastos atípicos.
 - `forecast.ForecastGenerated.v1` (productor FORECAST, agregado `ForecastRun`, sin montos, sin consumidores en Phase 8; actor `SYSTEM`). `planning.MonthClosed` no tiene consumidor FORECAST. Presupuesto del worker intacto: 28 consumidores + 4 reservadas = 32 de 34 (`TC-FORECAST-SERVICE-010`).

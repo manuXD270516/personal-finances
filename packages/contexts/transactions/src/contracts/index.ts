@@ -1203,3 +1203,53 @@ export interface TransactionExistenceQuery {
   existingTransactions(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
   existingConversions(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
 }
+
+// ───────────────────────────────────────────── add-spending-anomaly-detection (FORECAST)
+
+/**
+ * Porción de gasto con lo que la detección de gastos atípicos necesita (add-spending-anomaly-detection, decisión 2):
+ * el gasto (`EXPENSE`, nunca un reembolso ni una comisión), su versión, su contraparte y su categoría. Una transacción
+ * con varias porciones devuelve una línea por porción, todas con el mismo `transactionId` y `version`.
+ */
+export interface ExpenseLineDto {
+  readonly transactionId: string;
+  /** Versión de la transacción (control optimista de la aplicación). */
+  readonly version: number;
+  /** Fecha de negocio `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly status: 'POSTED' | 'CLEARED' | 'RECONCILED';
+  readonly accountId: string;
+  /** Contraparte de la transacción, o `null`. */
+  readonly counterpartyId: string | null;
+  readonly categoryId: string;
+  /** Posición de la porción dentro de la transacción (desde 0). */
+  readonly splitIndex: number;
+  /** Monto de la porción en su moneda, a la escala canónica. */
+  readonly amount: FlowMoneyDto;
+  /** Contexto que administra la transacción (`DEBT`, `GOAL`), o `null`. */
+  readonly managedBy: 'DEBT' | 'GOAL' | null;
+  /** Rol de DEBT de la transacción (`CARD_CHARGE`: interés y cargos de una tarjeta), o `null`. */
+  readonly debtRole: 'CARD_CHARGE' | null;
+}
+
+/**
+ * Líneas de gasto para FORECAST. Sin efectos; en la unidad de trabajo del llamador si existe. `listExpenseLines` recorre
+ * por keyset `(fecha, id)` de la transacción (`limit` transacciones por página, hasta 5 000) solo los `EXPENSE` no anulados
+ * en estado `POSTED`, `CLEARED` o `RECONCILED`; `after` es el cursor opaco de la página anterior. `transactionStates`
+ * devuelve el estado y la versión actuales por id (las inexistentes no figuran; una anulada figura como `VOIDED`).
+ */
+export interface ExpenseLineQuery {
+  listExpenseLines(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly limit: number;
+    readonly after?: string;
+  }): Promise<{ readonly items: readonly ExpenseLineDto[]; readonly next: string | null }>;
+  transactionStates(input: {
+    readonly workspaceId: string;
+    readonly transactionIds: readonly string[];
+  }): Promise<readonly { readonly transactionId: string; readonly version: number; readonly status: string }[]>;
+}
+
+export const EXPENSE_LINE_QUERY = Symbol.for('pf.transactions.ExpenseLineQuery');

@@ -5,16 +5,19 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Retención y portabilidad de los gastos atípicos"
 scenario: "Workspace importado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-IDENTITY-010"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/src/portability/portability-coverage.test.ts
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

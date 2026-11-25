@@ -5,16 +5,19 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Permisos, auditoría y aislamiento de los gastos atípicos"
 scenario: "Gasto atípico de otro workspace"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-IDENTITY-006"]
 nfr: ["NFR-SEC-003","NFR-SEC-004"]
 invariants: []
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/spending-anomalies.api.test.ts
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies","rls"]

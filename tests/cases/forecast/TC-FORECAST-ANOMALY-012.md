@@ -5,16 +5,18 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Detección diaria sin depender del servicio de pronósticos"
 scenario: "Gasto registrado tarde"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-FORECAST-006"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+  - packages/contexts/forecasting/test/integration/pg-forecasting.int.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

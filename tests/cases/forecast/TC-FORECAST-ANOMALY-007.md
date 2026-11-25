@@ -5,16 +5,17 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Contraparte nueva con monto alto"
 scenario: "Contraparte nueva con monto común"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/spending-anomaly-detector.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

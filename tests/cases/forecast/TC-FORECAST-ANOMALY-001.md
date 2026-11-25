@@ -5,16 +5,20 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Gastos atípicos para su categoría"
 scenario: "Cena muy por encima de lo habitual"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: ["NFR-DATA-001","NFR-DATA-002"]
 invariants: ["INV-001","INV-020"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/spending-anomalies.test.ts
+  - packages/contexts/forecasting/src/domain/expense-history-index.test.ts
+  - packages/contexts/forecasting/src/domain/robust-stats.test.ts
+  - packages/contexts/forecasting/src/domain/spending-anomaly-detector.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

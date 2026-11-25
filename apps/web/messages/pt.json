@@ -53,7 +53,8 @@
     "rules": "Regras",
     "reports": "Relatórios",
     "cashFlow": "Fluxo de caixa",
-    "forecasts": "Previsões"
+    "forecasts": "Previsões",
+    "spendingAnomalies": "Despesas atípicas"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -2624,7 +2625,8 @@
       "openFxFeedStatus": "Ver o estado das taxas automáticas",
       "openFxRate": "Revisar a taxa retida",
       "openCashFlowCalendar": "Ver o calendário de fluxo de caixa",
-      "openHome": "Ir para o início"
+      "openHome": "Ir para o início",
+      "openSpendingAnomalies": "Abrir as despesas atípicas"
     },
     "prefs": {
       "title": "Notificações",
@@ -2657,7 +2659,8 @@
         "FX_RATE_FEED_RECOVERED": "Taxa automática recuperada",
         "FX_RATE_ANOMALY_RETAINED": "Taxa retida por variação anômala",
         "CASH_FLOW_SHORTFALL_RISK": "Risco de déficit no fluxo de caixa",
-        "HOME_DIGEST": "Resumo periódico do início (email)"
+        "HOME_DIGEST": "Resumo periódico do início (email)",
+        "SPENDING_ANOMALY": "Despesas atípicas detectadas (desligado por padrão)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalhes (valores e nomes) nos e-mails",
@@ -7251,6 +7254,72 @@
       "lowCategorization": "Há despesa sem categoria que impede prever por categoria.",
       "link": "Ver as transações",
       "gap": "Uma lacuna de períodos sem movimentos encurtou o histórico usado."
+    }
+  },
+  "SpendingAnomalies": {
+    "title": "Despesas atípicas",
+    "subtitle": "Despesas que fogem do habitual para a sua categoria ou contraparte, com o motivo. É só um aviso: não altera nenhuma transação nem nenhum valor.",
+    "disclaimer": "A marca só indica que o valor foge do habitual. Se era esperado, descarte-o com «Não é atípico»; você pode restaurá-lo quando quiser.",
+    "loading": "Carregando despesas atípicas…",
+    "disabled": "A detecção de despesas atípicas está desabilitada nesta instalação. Mostra-se o que já havia sido detectado.",
+    "empty": "Não há despesas atípicas abertas neste intervalo.",
+    "emptyFiltered": "Não há despesas atípicas com estes filtros.",
+    "more": "Carregar mais",
+    "noName": "sem nome",
+    "filters": {
+      "label": "Filtros de despesas atípicas",
+      "status": "Estado",
+      "from": "De",
+      "to": "Até",
+      "OPEN": "Abertas",
+      "DISMISSED": "Descartadas",
+      "ALL": "Todas"
+    },
+    "table": {
+      "caption": "Despesas atípicas do espaço de trabalho, da mais recente à mais antiga",
+      "date": "Data",
+      "amount": "Valor",
+      "category": "Categoria",
+      "counterparty": "Contraparte",
+      "reasons": "Motivo",
+      "status": "Estado",
+      "actions": "Ações"
+    },
+    "status": {
+      "OPEN": "Aberta",
+      "DISMISSED": "Descartada"
+    },
+    "reportingAmount": "Equivale a {amount}",
+    "reason": {
+      "CATEGORY_OUTLIER": "{ratio} vezes a mediana de \"{name}\" ({reference} nos últimos 12 meses, {count} despesas)",
+      "COUNTERPARTY_OUTLIER": "{ratio} vezes a mediana das suas despesas com \"{name}\" ({reference} nos últimos 12 meses, {count} despesas)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nova \"{name}\", sem despesas nos últimos 12 meses, com valor igual ou maior que o percentil 95 das suas despesas ({reference}, {count} despesas)"
+    },
+    "dismiss": {
+      "label": "Não é atípico",
+      "reasonLabel": "Motivo (opcional)",
+      "none": "Sem motivo",
+      "EXPECTED_ONE_OFF": "Despesa pontual esperada",
+      "NOT_UNUSUAL": "É normal para mim",
+      "OTHER": "Outro motivo",
+      "done": "Despesa marcada como não atípica."
+    },
+    "restore": {
+      "label": "Restaurar",
+      "done": "Despesa restaurada entre as atípicas."
+    },
+    "decided": "Descartada em {at}",
+    "decidedReason": "Descartada em {at}: {reason}",
+    "changed": "A transação mudou desde que foi detectada.",
+    "openTransaction": "Ver transação",
+    "mark": {
+      "label": "Atípica",
+      "hint": "Despesa atípica: {reasons}"
+    },
+    "detail": {
+      "title": "Despesa atípica",
+      "intro": "Este valor foge do habitual. Não altera a transação nem nenhum valor.",
+      "open": "Ver as despesas atípicas"
     }
   }
 }

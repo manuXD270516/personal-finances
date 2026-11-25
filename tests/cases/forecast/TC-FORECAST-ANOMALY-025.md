@@ -5,16 +5,19 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Evaluación contra las anomalías etiquetadas del Large Seed"
 scenario: "Umbrales cumplidos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/anomalies.perf.ts
+  - apps/api/src/forecasting/anomaly-backtest-cli.test.ts
+  - packages/contexts/forecasting/src/application/backtest-spending-anomalies.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies"]

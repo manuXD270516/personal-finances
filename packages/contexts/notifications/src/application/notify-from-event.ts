@@ -1,6 +1,7 @@
 import { Instant } from '@pf/shared-kernel';
 import {
   createNotification,
+  defaultTypePreference,
   type NotificationPlan,
   type NotificationTypeDefinition,
 } from '../domain/index.js';
@@ -57,8 +58,9 @@ export class NotifyFromEvent {
       let deliveries = 0;
       for (const member of members) {
         const prefs = preferences.get(member.userId);
-        // Sin fila de preferencias = valores por defecto (ambos canales activos).
-        const inApp = prefs ? prefs.isEnabled(plan.type, 'IN_APP') : true;
+        // Sin fila de preferencias = valores por defecto del tipo (activos, salvo los apagados por omisión).
+        const defaults = defaultTypePreference(plan.type);
+        const inApp = prefs ? prefs.isEnabled(plan.type, 'IN_APP') : defaults.inApp;
         if (!inApp) continue;
         const notification = createNotification({
           id: deps.ids.next(),
@@ -81,7 +83,7 @@ export class NotifyFromEvent {
         }
         created += 1;
         deps.metrics.created(plan.type);
-        const emailOn = prefs ? prefs.isEnabled(plan.type, 'EMAIL') : true;
+        const emailOn = prefs ? prefs.isEnabled(plan.type, 'EMAIL') : defaults.email;
         if (!emailOn) continue;
         const quiet = prefs?.quietHours ?? null;
         const notBefore = quiet ? quiet.nextAllowed(now, member.timeZone) : now;

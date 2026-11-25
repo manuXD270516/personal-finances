@@ -1011,6 +1011,43 @@ export const VARIABLES = {
       'Fracción del gasto total esperado de un periodo a partir de la cual la vista de pronósticos informa la diferencia entre la suma de las categorías y el total (cada serie se pronostica por separado, sin reconciliación). `0.05` = 5 %.',
     default: '0.05',
   }),
+  // ── FORECAST: gastos atípicos (openspec add-spending-anomaly-detection; D473, D474; mediana y MAD en TypeScript) ──
+  FORECASTING_ANOMALIES_ENABLED: variable(bool, {
+    group: 'Forecasting',
+    description:
+      'Habilita la detección de gastos atípicos (API y worker). Corre dentro del trabajo diario `forecasting.schedule` aunque `FORECASTING_ENABLED` sea `false` (no usa el servicio `finance-ml`) y no suma consumidores ni conexiones. Deshabilitada, la API conserva la lista ya detectada e informa `featureStatus: DISABLED`. El aviso por notificación está apagado por omisión para cada usuario.',
+    default: 'true',
+  }),
+  FORECASTING_ANOMALY_LOOKBACK_DAYS: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Días hacia atrás (desde hoy, en la zona del workspace) de los gastos que la pasada diaria evalúa si su versión vigente no se evaluó todavía.',
+    default: '7',
+  }),
+  FORECASTING_ANOMALY_ROBUST_Z: variable(z.coerce.number().gt(0), {
+    group: 'Forecasting',
+    description:
+      'Puntaje robusto mínimo (0.6745 × (monto − mediana) / MAD) para marcar un gasto atípico por categoría o contraparte; se exige además `FORECASTING_ANOMALY_MIN_RATIO`. Con MAD igual a cero alcanza la razón.',
+    default: '3.5',
+  }),
+  FORECASTING_ANOMALY_MIN_RATIO: variable(z.coerce.number().gt(0), {
+    group: 'Forecasting',
+    description:
+      'Veces la mediana que debe alcanzar el monto de un gasto para marcarse como atípico por categoría o contraparte.',
+    default: '3.0',
+  }),
+  FORECASTING_ANOMALY_MIN_SAMPLE: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Gastos de historia (365 días anteriores) mínimos por categoría, por contraparte y en el workspace (percentil de contraparte nueva) para evaluar un gasto.',
+    default: '8',
+  }),
+  FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE: variable(z.coerce.number().gt(0).lte(100), {
+    group: 'Forecasting',
+    description:
+      'Percentil (por rango más cercano) de los gastos del workspace de los 365 días anteriores desde el cual un gasto con una contraparte sin gastos previos se marca como atípico.',
+    default: '95',
+  }),
   COMMITMENTS_SCHEDULER_CRON: variable(
     z
       .string()
@@ -1755,6 +1792,7 @@ export const APP_VARIABLES = {
     'FORECASTING_ENABLED',
     'FORECASTING_STALE_DAYS',
     'FORECASTING_COHERENCE_GAP_RATIO',
+    'FORECASTING_ANOMALIES_ENABLED',
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',
     'PLANNING_HISTORY_DEFAULT_PERIODS',
@@ -1845,6 +1883,12 @@ export const APP_VARIABLES = {
     'FORECASTING_HISTORY_MAX_PERIODS',
     'FORECASTING_MIN_PERIODS_MODEL',
     'FORECASTING_MIN_PERIODS_SIMPLE',
+    'FORECASTING_ANOMALIES_ENABLED',
+    'FORECASTING_ANOMALY_LOOKBACK_DAYS',
+    'FORECASTING_ANOMALY_ROBUST_Z',
+    'FORECASTING_ANOMALY_MIN_RATIO',
+    'FORECASTING_ANOMALY_MIN_SAMPLE',
+    'FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE',
     'GOALS_DAILY_CRON',
     // add-basic-csv-import: jobs diarios de expiración y purga del staging.
     'IMPORT_STAGING_RETENTION',

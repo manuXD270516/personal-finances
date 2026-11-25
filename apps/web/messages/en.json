@@ -53,7 +53,8 @@
     "rules": "Rules",
     "reports": "Reports",
     "cashFlow": "Cash flow",
-    "forecasts": "Forecasts"
+    "forecasts": "Forecasts",
+    "spendingAnomalies": "Unusual expenses"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -2624,7 +2625,8 @@
       "openFxFeedStatus": "View the status of the automatic rates",
       "openFxRate": "Review the held rate",
       "openCashFlowCalendar": "View the cash flow calendar",
-      "openHome": "Go to the home page"
+      "openHome": "Go to the home page",
+      "openSpendingAnomalies": "Open unusual expenses"
     },
     "prefs": {
       "title": "Notifications",
@@ -2657,7 +2659,8 @@
         "FX_RATE_FEED_RECOVERED": "Automatic rate recovered",
         "FX_RATE_ANOMALY_RETAINED": "Rate held for an abnormal change",
         "CASH_FLOW_SHORTFALL_RISK": "Cash flow shortfall risk",
-        "HOME_DIGEST": "Periodic home summary (email)"
+        "HOME_DIGEST": "Periodic home summary (email)",
+        "SPENDING_ANOMALY": "Unusual expenses detected (off by default)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
@@ -7251,6 +7254,72 @@
       "lowCategorization": "Some spending has no category, which prevents forecasting by category.",
       "link": "See the transactions",
       "gap": "A gap of periods without activity shortened the history used."
+    }
+  },
+  "SpendingAnomalies": {
+    "title": "Unusual expenses",
+    "subtitle": "Expenses that stand out from what is usual for their category or counterparty, with the reason. It is only a notice: it changes no transaction and no figure.",
+    "disclaimer": "The mark only says the amount is away from what is usual. If it was expected, dismiss it with \"Not unusual\"; you can restore it any time.",
+    "loading": "Loading unusual expenses…",
+    "disabled": "Unusual expense detection is disabled in this installation. What was already detected is still shown.",
+    "empty": "There are no open unusual expenses in this range.",
+    "emptyFiltered": "There are no unusual expenses with these filters.",
+    "more": "Load more",
+    "noName": "unnamed",
+    "filters": {
+      "label": "Unusual expense filters",
+      "status": "Status",
+      "from": "From",
+      "to": "To",
+      "OPEN": "Open",
+      "DISMISSED": "Dismissed",
+      "ALL": "All"
+    },
+    "table": {
+      "caption": "Unusual expenses of the workspace, most recent first",
+      "date": "Date",
+      "amount": "Amount",
+      "category": "Category",
+      "counterparty": "Counterparty",
+      "reasons": "Reason",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "OPEN": "Open",
+      "DISMISSED": "Dismissed"
+    },
+    "reportingAmount": "Equivalent to {amount}",
+    "reason": {
+      "CATEGORY_OUTLIER": "{ratio} times the median of \"{name}\" ({reference} over the last 12 months, {count} expenses)",
+      "COUNTERPARTY_OUTLIER": "{ratio} times the median of your expenses with \"{name}\" ({reference} over the last 12 months, {count} expenses)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "New counterparty \"{name}\", with no expenses in the last 12 months, at or above the 95th percentile of your expenses ({reference}, {count} expenses)"
+    },
+    "dismiss": {
+      "label": "Not unusual",
+      "reasonLabel": "Reason (optional)",
+      "none": "No reason",
+      "EXPECTED_ONE_OFF": "Expected one-off expense",
+      "NOT_UNUSUAL": "It is normal for me",
+      "OTHER": "Other reason",
+      "done": "Expense marked as not unusual."
+    },
+    "restore": {
+      "label": "Restore",
+      "done": "Expense restored to the unusual ones."
+    },
+    "decided": "Dismissed on {at}",
+    "decidedReason": "Dismissed on {at}: {reason}",
+    "changed": "The transaction changed since it was detected.",
+    "openTransaction": "View transaction",
+    "mark": {
+      "label": "Unusual",
+      "hint": "Unusual expense: {reasons}"
+    },
+    "detail": {
+      "title": "Unusual expense",
+      "intro": "This amount is away from what is usual. It changes neither the transaction nor any figure.",
+      "open": "View unusual expenses"
     }
   }
 }

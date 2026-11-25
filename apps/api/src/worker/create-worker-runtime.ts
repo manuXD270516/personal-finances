@@ -552,6 +552,8 @@ export async function createWorkerRuntime(
     config,
     outbox: fxOutbox,
     documentsRef,
+    // Aviso de gastos atípicos (add-spending-anomaly-detection): entrega directa dentro de la unidad de trabajo del workspace.
+    notificationIntake: notifications.intake,
   });
   financeRef.current = finance;
   const commitments = createCommitmentsRuntime({
@@ -650,6 +652,7 @@ export async function createWorkerRuntime(
   // conexiones nuevas (D249): comparten la reserva de trabajos periódicos y la llamada al servicio no retiene conexión.
   await registerForecastingJobs(queue, finance.forecasting, logger, {
     enabled: config.FORECASTING_ENABLED,
+    anomaliesEnabled: config.FORECASTING_ANOMALIES_ENABLED,
     scheduleCron: config.FORECASTING_SCHEDULE_CRON,
     runnerCron: config.FORECASTING_RUNNER_CRON,
     runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),

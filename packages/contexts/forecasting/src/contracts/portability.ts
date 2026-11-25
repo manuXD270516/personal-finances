@@ -29,4 +29,14 @@ export const FORECASTING_PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[]
     table: 'forecasting.backtest_result',
     reason: 'Dato derivado de la corrida: el backtesting se recalcula con ella.',
   },
+  // add-spending-anomaly-detection (decisión 12): los gastos atípicos se recalculan desde las transacciones.
+  {
+    table: 'forecasting.spending_anomaly',
+    reason:
+      'Dato derivado y reconstruible: la detección diaria lo recalcula desde las transacciones; los descartes pierden sentido porque la importación crea transacciones con ids nuevos.',
+  },
+  {
+    table: 'forecasting.spending_anomaly_scan',
+    reason: 'Registro operativo de las versiones ya evaluadas por la detección diaria; no es dato del usuario.',
+  },
 ];
