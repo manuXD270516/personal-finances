@@ -181,12 +181,21 @@ export class LoansQueries implements LoanPortfolioQuery, LoanScheduleQuery, Debt
         workspaceId,
         loans.map((l) => l.snapshot.accountId),
       );
+      // Cronogramas y pagos de todos los préstamos en 2 consultas (no 2 por préstamo).
+      const withSchedule = loans.filter((l) => l.snapshot.currentScheduleVersion !== null);
+      const stored = await this.deps.schedules.installmentsForLoans(
+        withSchedule.map((l) => ({ loanId: l.id, version: l.snapshot.currentScheduleVersion as number })),
+      );
+      const paid = await this.deps.payments.paidByInstallmentForLoans(withSchedule.map((l) => l.id));
       const out: LoanListItemView[] = [];
       for (const l of loans) {
         const s = l.snapshot;
         const scale = await this.scaleOf(s.currency);
         const balance = dec(balances.get(s.accountId) ?? '0').toFixed(scale);
-        const states = await this.states(l, scale);
+        const states =
+          s.currentScheduleVersion === null
+            ? []
+            : installmentStates(stored.get(l.id) ?? [], paid.get(l.id) ?? new Map(), scale);
         const figures = this.figuresOf(l, { scale, today, balance, states });
         out.push({
           ...toLoanView(s, s.lenderCounterpartyId ? (names.get(s.lenderCounterpartyId) ?? null) : null),

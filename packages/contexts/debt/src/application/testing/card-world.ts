@@ -65,6 +65,10 @@ export class CardWorld {
   readonly entries: Entry[] = [];
   /** Asientos de apertura (saldo inicial de la cuenta, presentados): sin transacción, no salen en los movimientos. */
   readonly openings: { accountId: string; date: string; amount: string }[] = [];
+  /** Saldo que el ledger tiene pero ningún movimiento explica (fuerza un ciclo descuadrado en las pruebas). */
+  readonly unexplained: { accountId: string; date: string; amount: string }[] = [];
+  /** Incrementos de métricas registrados por el motor. */
+  readonly metrics: { name: string; labels: Readonly<Record<string, string>>; value: number }[] = [];
   readonly pending: PendingFlowRowDto[] = [];
   readonly outbox: { eventType: string; aggregateVersion: number; payload: Record<string, unknown> }[] = [];
   readonly audit: {
@@ -226,7 +230,11 @@ export class CardWorld {
         new Map(
           dates.map((d) => [
             d,
-            [...world.entries, ...world.openings.map((o) => ({ ...o, cls: 'OTHER' as const }))]
+            [
+              ...world.entries,
+              ...world.openings.map((o) => ({ ...o, cls: 'OTHER' as const })),
+              ...world.unexplained,
+            ]
               .filter((e) => e.accountId === accountId && e.date <= d)
               .reduce((acc, e) => acc.plus(e.amount), dec('0'))
               .toFixed(SCALES[world.currencyOf(accountId)] ?? 2),
@@ -327,6 +335,7 @@ export class CardWorld {
     };
 
     this.deps = {
+      metrics: { increment: (name, labels, value = 1) => world.metrics.push({ name, labels, value }) },
       uow: { run: (_ws, fn) => fn() },
       cards,
       statements,
