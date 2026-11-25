@@ -25,11 +25,11 @@ preconditions:
   - "FixedClock en la fecha del escenario (TZ America/La_Paz); datos ficticios"
 input: {}
 steps:
-  - "el workspace tiene día de inicio del mes financiero 25 y en el periodo 2026-10 (del 2026-09-25 al 2026-10-24) registró gastos de 1200.00 BOB y 50.00 USD el 2026-10-02 con tasa 6.96 BOB por USD, y un reembolso de 100.00 BOB"
+  - "el workspace tiene día de inicio del mes financiero 25 y en el periodo 2026-09 (del 2026-09-25 al 2026-10-24, etiquetado por el mes de inicio según D59) registró gastos de 1200.00 BOB y 50.00 USD el 2026-10-02 con tasa 6.96 BOB por USD, y un reembolso de 100.00 BOB"
 expected_result:
-  - "la historia del gasto total tiene 1448.00 BOB en el periodo 2026-10"
+  - "la historia del gasto total tiene 1448.00 BOB en el periodo 2026-09"
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-25
 ---
 
 # TC-FORECAST-SERVICE-011 — La historia del periodo convierte con la tasa de cada fecha y descuenta el reembolso
@@ -42,8 +42,8 @@ Verifica el scenario "Periodo con gastos en dos monedas y un reembolso" del requ
 
 ```gherkin
 Dado Workspace "W1 Personal Demo" con moneda de reporte BOB y TZ America/La_Paz
-Cuando el workspace tiene día de inicio del mes financiero 25 y en el periodo 2026-10 (del 2026-09-25 al 2026-10-24) registró gastos de 1200.00 BOB y 50.00 USD el 2026-10-02 con tasa 6.96 BOB por USD, y un reembolso de 100.00 BOB
-Entonces la historia del gasto total tiene 1448.00 BOB en el periodo 2026-10
+Cuando el workspace tiene día de inicio del mes financiero 25 y en el periodo 2026-09 (del 2026-09-25 al 2026-10-24, etiquetado por el mes de inicio según D59) registró gastos de 1200.00 BOB y 50.00 USD el 2026-10-02 con tasa 6.96 BOB por USD, y un reembolso de 100.00 BOB
+Entonces la historia del gasto total tiene 1448.00 BOB en el periodo 2026-09
 ```
 
 ## Notas
