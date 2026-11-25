@@ -153,7 +153,7 @@ test.describe('Sugerencias de categoría (classification/auto-classification)', 
     const today = todayLaPaz();
     const ofxDate = (iso: string) => iso.replaceAll('-', '');
     const tx = (date: string, amount: string, fitid: string, name: string) =>
-      `<STMTTRN>\n<TRNTYPE>DEBIT\n<DTPOSTED>${ofxDate(date)}\n<TRNAMT>${amount}\n<FITID>${fitid}\n<NAME>${name}\n<MEMO>SINTETICO\n</STMTTRN>\n`;
+      `<STMTTRN>\n<TRNTYPE>DEBIT\n<DTPOSTED>${ofxDate(date)}\n<TRNAMT>${amount}\n<FITID>${fitid}\n<NAME>${name}\n</STMTTRN>\n`;
     const ofx = [
       'OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\nSECURITY:NONE\nENCODING:USASCII\nCHARSET:1252\nCOMPRESSION:NONE\nOLDFILEUID:NONE\nNEWFILEUID:NONE\n\n',
       '<OFX>\n<BANKMSGSRSV1>\n<STMTTRNRS>\n<TRNUID>1\n<STMTRS>\n<CURDEF>BOB\n',
