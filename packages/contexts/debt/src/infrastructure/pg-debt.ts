@@ -398,6 +398,29 @@ export class PgScheduleRepository implements ScheduleRepository {
     return rows.map(toInstallment);
   }
 
+  async installmentsForLoans(
+    loans: readonly { readonly loanId: string; readonly version: number }[],
+  ): Promise<ReadonlyMap<string, readonly StoredInstallment[]>> {
+    const out = new Map<string, StoredInstallment[]>(loans.map((l) => [l.loanId, []]));
+    if (loans.length === 0) return out;
+    // Misma regla de «cronograma efectivo» que `installments`, con la versión de cada préstamo (unnest paralelo).
+    const { rows } = await sql<InstallmentRow>`
+      WITH wanted(loan_id, version) AS (
+        SELECT * FROM unnest(${loans.map((l) => l.loanId)}::uuid[], ${loans.map((l) => l.version)}::int[])
+      )
+      SELECT ${INSTALLMENT_COLUMNS}
+        FROM wanted w
+        JOIN debt.loan_installment i ON i.loan_id = w.loan_id AND i.schedule_version <= w.version
+        JOIN fx.currency c ON c.code = i.currency
+       WHERE i.schedule_version = (
+           SELECT MAX(v.schedule_version) FROM debt.loan_schedule_version v
+            WHERE v.loan_id = i.loan_id AND v.schedule_version <= w.version
+              AND v.from_installment_no <= i.installment_no)
+       ORDER BY i.loan_id, i.installment_no`.execute(db());
+    for (const r of rows) out.get(r.loan_id)?.push(toInstallment(r));
+    return out;
+  }
+
   async ownInstallments(loanId: string, version: number): Promise<readonly StoredInstallment[]> {
     const { rows } = await sql<InstallmentRow>`
       SELECT ${INSTALLMENT_COLUMNS}
@@ -635,6 +658,40 @@ export class PgPaymentRepository implements PaymentRepository {
         ] as const;
       }),
     );
+  }
+
+  async paidByInstallmentForLoans(
+    loanIds: readonly string[],
+  ): Promise<ReadonlyMap<string, ReadonlyMap<string, ComponentAmounts>>> {
+    const out = new Map<string, Map<string, ComponentAmounts>>(loanIds.map((id) => [id, new Map()]));
+    if (loanIds.length === 0) return out;
+    const { rows } = await sql<{
+      loan_id: string;
+      installment_id: string;
+      principal: string;
+      interest: string;
+      fees: string;
+      insurance: string;
+      taxes: string;
+      scale: number;
+    }>`
+      SELECT a.loan_id, a.installment_id, SUM(a.principal) AS principal, SUM(a.interest) AS interest,
+             SUM(a.fees) AS fees, SUM(a.insurance) AS insurance, SUM(a.taxes) AS taxes, MAX(c.scale) AS scale
+        FROM debt.loan_payment_allocation a
+        JOIN debt.loan_payment p ON p.id = a.payment_id AND p.status = 'ACTIVE'
+        JOIN debt.loan l ON l.id = a.loan_id JOIN fx.currency c ON c.code = l.currency
+       WHERE a.loan_id = ANY(${[...loanIds]}::uuid[]) GROUP BY a.loan_id, a.installment_id`.execute(db());
+    for (const r of rows) {
+      const scale = Number(r.scale);
+      out.get(r.loan_id)?.set(r.installment_id, {
+        taxes: money(r.taxes, scale),
+        insurance: money(r.insurance, scale),
+        fees: money(r.fees, scale),
+        interest: money(r.interest, scale),
+        principal: money(r.principal, scale),
+      });
+    }
+    return out;
   }
 
   async totalsByLoan(workspaceId: string, loanIds: readonly string[]) {

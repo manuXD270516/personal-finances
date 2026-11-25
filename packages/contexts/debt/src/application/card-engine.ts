@@ -38,7 +38,7 @@ import {
   type ThresholdState,
   type Utilization,
 } from '../domain/index.js';
-import type { CardDeps, StatementRecord } from './card-ports.js';
+import { CARD_CYCLE_MISMATCH_METRIC, type CardDeps, type StatementRecord } from './card-ports.js';
 
 export const CARD_AGGREGATE = 'CreditCard';
 
@@ -252,6 +252,9 @@ export class CardEngine {
         paymentsAfterClose,
       };
     });
+    // Un ciclo que no cuadra no se esconde: la vista lo marca (`consistent = false`) y se cuenta (design de add-credit-cards).
+    const mismatches = views.filter((v) => !v.current.consistent).length;
+    if (mismatches > 0) deps.metrics?.increment(CARD_CYCLE_MISMATCH_METRIC, {}, mismatches);
     return {
       account,
       currency,
