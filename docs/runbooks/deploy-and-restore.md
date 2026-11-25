@@ -28,8 +28,8 @@ Acción: `lightsail_bundle_id = "medium_3_0"` (4 GB, USD 24 → total ≈ USD 27
 
 ### 2.1 Cuentas y prerequisitos (owner)
 
-1. **AWS**: cuenta nueva; root con MFA y sin access keys; IAM Identity Center con un usuario del owner (MFA); región `sa-east-1`. Bucket de state a mano: `aws s3api create-bucket --bucket pfos-tfstate-<sufijo> --region sa-east-1 --create-bucket-configuration LocationConstraint=sa-east-1`, luego `put-bucket-versioning Status=Enabled` y `put-public-access-block` (todo en `true`).
-2. **Backblaze B2**: cuenta (elegir región de datos; el endpoint queda como `s3.<región>.backblazeb2.com`). Crear una application key **temporal** con `writeBuckets`, `writeKeys`, `listBuckets`, `listKeys`, `deleteKeys` y vencimiento de 1 día solo para el `tofu apply`.
+1. **AWS**: cuenta nueva; root con MFA y sin access keys; IAM Identity Center con un usuario del owner (MFA) y un permission set con acceso de administrador asignado a la cuenta; perfil SSO del CLI `pfos-admin` (`aws configure sso --profile pfos-admin`, región del perfil `sa-east-1`; la región de Identity Center puede ser otra); email de alertas de AWS Budgets que el owner lea (el presupuesto lo crea `tofu apply`, no la consola). Bucket de state a mano: `aws s3api create-bucket --bucket pfos-tfstate-<sufijo> --region sa-east-1 --create-bucket-configuration LocationConstraint=sa-east-1`, luego `put-bucket-versioning Status=Enabled` y `put-public-access-block` (todo en `true`).
+2. **Backblaze B2**: cuenta con Object Lock habilitable (al crear un bucket, la consola ofrece el interruptor *Object Lock*; los dos buckets los crea `tofu apply`, no los crees a mano). Elegir la región de datos: el endpoint queda como `s3.<región>.backblazeb2.com`. Crear una application key **temporal** con `writeBuckets`, `writeKeys`, `listBuckets`, `listKeys`, `deleteKeys`, `readBucketEncryption`, `writeBucketEncryption`, `readBucketRetentions` y `writeBucketRetentions` (los buckets llevan cifrado y retención por omisión) y vencimiento de 1 día, **justo antes** del `tofu apply`. Si el apply falla por una capacidad faltante, agregala a la clave y repetí el plan.
 3. **Tailscale** (plan Personal, gratis): política de acceso mínima:
    ```json
    {
@@ -40,11 +40,11 @@ Acción: `lightsail_bundle_id = "medium_3_0"` (4 GB, USD 24 → total ≈ USD 27
      ]
    }
    ```
-   Y una credencial de **federación OIDC** para GitHub Actions (consola de Tailscale, credenciales de identidad federada; verificar el nombre exacto del menú; issuer `https://token.actions.githubusercontent.com`, subject `repo:manuXD270516/personal-finances:environment:production`, tag `tag:pfos-ci`). Anotar client id y audience.
-4. **Grafana Cloud Free**: stack (región `sa-east-1` si está disponible), token de **solo escritura** OTLP → `PF_OTLP_ENDPOINT` y `OTEL_EXPORTER_OTLP_HEADERS`.
-5. **Dominio + DNS** (p. ej. Cloudflare, DNS gratis): tres nombres, `app.<dominio>`, `auth.<dominio>` y `files.<dominio>` (D316; `files` recibe las subidas firmadas de documentos). Registros **solo DNS** (sin proxy) para que Caddy obtenga los certificados.
+   Instalá el cliente de Tailscale en tu PC, iniciá sesión y dejá MagicDNS activo (el host se resuelve como `pfos-prod`). Y una credencial de **federación OIDC** para GitHub Actions (consola de Tailscale, credenciales de identidad federada; verificar el nombre exacto del menú; issuer `https://token.actions.githubusercontent.com`, subject `repo:manuXD270516/personal-finances:environment:production`, tag `tag:pfos-ci`). Anotar client id y audience.
+4. **Grafana Cloud Free**: stack (región `sa-east-1` si está disponible), token de **solo escritura** OTLP (política de acceso solo con `metrics:write`, `logs:write` y `traces:write`) → `PF_OTLP_ENDPOINT` (gateway OTLP, termina en `/otlp`) y `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Basic%20<base64(instanceId:token)>`). No uses un token con permisos de lectura o de administración.
+5. **Dominio + DNS**: un dominio propio y dedicado a PFOS (D452) con la zona en Cloudflare (plan gratis; nameservers del dominio apuntando a Cloudflare, zona *Active*): tres nombres, `app.<dominio>`, `auth.<dominio>` y `files.<dominio>` (D316; `files` recibe las subidas firmadas de documentos). Registros **solo DNS** (nube gris, sin proxy) para que Caddy obtenga los certificados; se crean en §2.2, cuando existe la IP.
 6. **GHCR**: marcar públicos los paquetes `finance-api`, `finance-web`, `pfos-postgres`, `finance-ml` y `pfos-keycloak` (el repo ya es público; las imágenes no contienen secretos) **o** dejar en el host un `docker login ghcr.io` con un token `read:packages` de vida limitada.
-7. Opcional: cuenta en healthchecks.io (gratis) → URL de ping para `PF_BACKUP_HEARTBEAT_URL`.
+7. **healthchecks.io** (gratis; recomendado: sin él ningún trabajo avisa si deja de correr): un proyecto cuya URL de ping (`https://hc-ping.com/<ping-key>`) va a `PF_BACKUP_HEARTBEAT_URL`, con **ocho** checks cuyo nombre es el slug que pinguea el host (`<URL>/<slug>`): `pfos-full` (7 d, gracia 1 d), `pfos-diff` (1 d, 6 h), `pfos-monthly` (31 d, 1 d), `pfos-docs-replica` (1 d, 6 h), `pfos-check` (1 h, 30 min), `pfos-drill` (31 d, 1 d), `pfos-verify` (7 d, 1 d) y `pfos-image-prune` (7 d, 1 d). Con un email de aviso verificado.
 
 ### 2.2 Infraestructura (OpenTofu, desde la máquina del owner)
 
@@ -60,7 +60,7 @@ tofu plan -var-file=prod.tfvars -out=prod.tfplan && tofu apply prod.tfplan
 tofu output                                                                        # IP, bucket, key ids
 ```
 
-Después: borrar la clave temporal de B2; crear los registros A (y AAAA opcionales) de `app` y `auth` con `host_public_ip`.
+Después: borrar la clave temporal de B2; crear los registros A (y AAAA opcionales) de `app`, `auth` y `files` con `host_public_ip`.
 
 ### 2.3 Secretos del host
 
