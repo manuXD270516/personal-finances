@@ -7,7 +7,7 @@ import { LiquidBalanceCard } from './LiquidBalanceCard';
 import { NetWorthCard } from './NetWorthCard';
 import { SpendableCard } from '../spendable/SpendableView';
 import { ActionHint, NotAvailableWidget, statusOf } from './QuestionWidgets';
-import { HOME_CSS } from './styles';
+import './home.css';
 import { TopCategoriesWidget } from './TopCategoriesWidget';
 import type { FormatContext, ReportSummary } from './types';
 
@@ -40,9 +40,6 @@ export interface DashboardViewProps extends FormatContext {
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
   readonly evolutionCard?: ReactNode;
 }
-
-/** Hoja de estilos del Home (tokens de docs/28 §5). */
-const HomeStyles = () => <style>{HOME_CSS}</style>;
 
 /**
  * Home (reporting/dashboard, tareas 6.1 y 6.2; D50): jerarquía visual de lo más consultado a lo menos —
@@ -94,7 +91,6 @@ export function DashboardView({
 
   return (
     <div data-testid="dashboard" data-complete={summary.meta.complete ? 'true' : 'false'} className="pf-home">
-      <HomeStyles />
       <LiquidBalanceCard
         summary={summary}
         ctx={fctx}
@@ -264,7 +260,6 @@ export function DashboardSkeleton({ label }: { label: string }) {
   const block = (height: string) => <div className="pf-home-skel" style={{ height }} />;
   return (
     <div data-testid="dashboard-skeleton" role="status" aria-busy="true" className="pf-home">
-      <HomeStyles />
       <span className="pf-home-sr">{label}</span>
       <div aria-hidden="true" className="pf-home-group">
         {block('8.5rem')}

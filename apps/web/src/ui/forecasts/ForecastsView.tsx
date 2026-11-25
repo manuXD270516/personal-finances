@@ -14,7 +14,7 @@ import {
   sortSeries,
   type ForecastHorizon,
 } from './logic';
-import { FORECASTS_CSS } from './styles';
+import './forecasts.css';
 import type {
   ForecastConfidence,
   ForecastDriver,
@@ -331,7 +331,6 @@ export function ForecastsView(props: ForecastsViewProps) {
   const gaps = points.filter((p) => p.coherenceGap);
   return (
     <div className="pf-fc" data-testid="forecasts-root">
-      <style>{FORECASTS_CSS}</style>
       <header className="pf-fc-header">
         <h2>{f.t('title')}</h2>
         <p className="pf-fc-muted">{f.t('subtitle')}</p>

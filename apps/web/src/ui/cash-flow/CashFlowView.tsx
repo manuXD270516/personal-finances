@@ -17,7 +17,7 @@ import {
   seriesRows,
   type CashFlowSelection,
 } from './logic';
-import { CASH_FLOW_CSS } from './styles';
+import './cash-flow.css';
 import type { CashFlowCalendar, CashFlowCurrency, CashFlowEvent, CashFlowRisk } from './types';
 
 export interface CashFlowViewProps {
@@ -728,7 +728,6 @@ export function CashFlowView(props: CashFlowViewProps & { createAccountHref?: st
   const current = pickCurrency(calendar.currencies, selection.currency);
   return (
     <div className="pf-cf" data-testid="cash-flow-page" data-horizon={calendar.horizonDays}>
-      <style>{CASH_FLOW_CSS}</style>
       <header style={{ display: 'grid', gap: 'var(--pf-space-1)' }}>
         <h1>{f.t('title')}</h1>
         <p className="pf-cf-muted">

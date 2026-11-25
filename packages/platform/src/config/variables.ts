@@ -502,6 +502,12 @@ export const VARIABLES = {
     description: 'Duración máxima de la sesión desde el login, haya o no actividad (`12h`…).',
     default: '12h',
   }),
+  WEB_CSP_REPORT_ONLY: variable(bool, {
+    group: 'BFF (finance-web)',
+    description:
+      'Interruptor de emergencia de la CSP de la web (D458): `true` emite `Content-Security-Policy-Report-Only` (la misma política, sin bloquear) en lugar de `Content-Security-Policy`. Se usa si una pantalla se rompe en producción: se cambia en `/etc/pfos/pfos.env` y se redespliega el mismo SHA.',
+    default: 'false',
+  }),
   RATE_LIMIT_STORE: variable(z.enum(['memory', 'valkey']), {
     group: 'Convenciones de API',
     description:
@@ -1499,7 +1505,7 @@ export const VARIABLES = {
   OBJECT_STORAGE_PUBLIC_ENDPOINT: variable(httpUrl, {
     group: 'Documentos adjuntos',
     description:
-      'Endpoint S3 PÚBLICO con el que se firman las URL de subida (el host forma parte de la firma y debe ser alcanzable por el navegador). Sin valor: el mismo `OBJECT_STORAGE_ENDPOINT`. En producción es el hostname `PF_DOMAIN_FILES` de Caddy, limitado a `PUT` firmados sobre el bucket de cuarentena.',
+      'Endpoint S3 PÚBLICO con el que se firman las URL de subida (el host forma parte de la firma y debe ser alcanzable por el navegador). Sin valor: el mismo `OBJECT_STORAGE_ENDPOINT`. En producción es el hostname `PF_DOMAIN_FILES` de Caddy, limitado a `PUT` firmados sobre el bucket de cuarentena. En finance-web, su origen (esquema, host y puerto) va en `connect-src` de la CSP y es obligatoria con `PFOS_ENV=staging|production`.',
     optional: true,
     // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'http://127.0.0.1:29000',
@@ -1912,6 +1918,8 @@ export const APP_VARIABLES = {
   web: [
     ...GENERAL,
     'WEB_PUBLIC_URL',
+    'WEB_CSP_REPORT_ONLY',
+    'OBJECT_STORAGE_PUBLIC_ENDPOINT',
     'FINANCE_API_URL',
     'OIDC_ISSUER_URL',
     'OIDC_DISCOVERY_URL',

@@ -107,7 +107,7 @@ const view = (over: Partial<ForecastsViewProps> = {}, data: LatestForecast = lat
       {...over}
     />,
   );
-const strip = (html: string) => textOf(html.replace(/<style>[\s\S]*?<\/style>/g, ''));
+const strip = (html: string) => textOf(html);
 
 describe('selección y rutas de la vista (add-expense-forecasts, tarea 7.1)', () => {
   it('[TC-FORECAST-EXPENSE-018] solo se admiten los horizontes 1, 3, 6 y 12; cualquier otro cae a 3', () => {

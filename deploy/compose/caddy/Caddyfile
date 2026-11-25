@@ -18,6 +18,14 @@
 # finance-web (Next.js BFF). El navegador solo habla con este origen y con el de Keycloak.
 {$PF_DOMAIN_APP} {
 	import security_headers
+	# Red de seguridad de la CSP (openspec add-web-content-security-policy): la política con nonce la emite `proxy.ts` en las
+	# páginas HTML. El prefijo `?` escribe esta SOLO si la respuesta no trae la suya (activa `defer`), así que cubre /api/*,
+	# /_next/static/* y los errores sin pisar la de la web ni la `sandbox` de la descarga de documentos (ADR-0030).
+	header ?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+	header {
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+	}
 	encode zstd gzip
 	reverse_proxy finance-web:3000
 }
@@ -27,6 +35,7 @@
 # a otros buckets: todo lo demás responde 404. La descarga de documentos pasa siempre por la API (cifrado de la aplicación).
 {$PF_DOMAIN_FILES} {
 	import security_headers
+	header ?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 	@signed_put {
 		method PUT
 		path /{$PF_QUARANTINE_BUCKET}/ws/*

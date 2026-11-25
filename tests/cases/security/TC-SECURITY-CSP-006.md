@@ -5,22 +5,26 @@ spec: security/access-control
 related_specs: ["reporting/cash-flow-calendar"]
 requirement: "Estilos bajo la política de la web"
 scenario: "Vista con gráfico y estilos propios"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-SEC-008"]
 invariants: []
 priority: high
 type: security
 level: e2e
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/content-security-policy.spec.ts
+  - apps/web/src/security/csp.test.ts
+  - apps/web/src/ui/cash-flow/cash-flow.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["csp","security-headers","add-web-content-security-policy"]
 error_code: null
 preconditions:
   - "Stack E2E con la Minimal Seed; usuario owner con sesión"
-  - "Pregunta 1 de docs/73 (style-src-attr unsafe-inline) resuelta"
+  - "Decisión D457 de docs/74 (style-src-attr unsafe-inline) aplicada"
 input: {"paths":["/es/flujo-de-caja","/es","/es/reportes"]}
 steps:
   - "Abrir el calendario de flujo de caja de 30 días, el Home y la vista de reportes"
@@ -50,5 +54,5 @@ Entonces las vistas se muestran con sus estilos y sin violaciones de la CSP
 
 ## Notas
 
-- Provisional hasta la pregunta 1 de docs/73: si el owner elige reescribir los estilos, style-src-attr pasa a none y este TC cambia.
+- Confirmado por D457 (docs/74): se permiten los atributos style en línea (style-src-attr 'unsafe-inline'); los estilos de componentes viven en hojas estáticas.
 - Cubre también el scenario «Elemento de estilo sin nonce» con un test de la spec E2E que inyecta un style sin nonce y espera la violación.

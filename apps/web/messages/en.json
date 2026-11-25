@@ -3,6 +3,11 @@
     "title": "PFOS — Personal finances",
     "description": "Personal finance operating system"
   },
+  "NotFound": {
+    "title": "Page not found",
+    "body": "The address you opened does not exist or is no longer available.",
+    "home": "Back to home"
+  },
   "Home": {
     "title": "Home",
     "subtitle": "Your money today, how the month is going and your net worth.",
