@@ -5,16 +5,17 @@ spec: imports/import-pipeline
 related_specs: ["platform/api-conventions"]
 requirement: "Propuesta de la vista previa con un tipo de valor por campo"
 scenario: "Descripción con forma de id"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-009"]
 nfr: ["NFR-MAINT-009"]
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["imports","contract","preview"]

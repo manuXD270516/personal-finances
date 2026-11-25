@@ -15,7 +15,6 @@ import {
   type ImportPdfInfo,
   type ImportPreviewRow,
   type ImportProfile,
-  type ImportProposedField,
   type ImportRevertPreview,
   type ImportRowClassification,
   type ImportStage,
@@ -168,7 +167,7 @@ export function effectiveField(row: ImportPreviewRow, field: EditableField): Fie
   if (edits && Object.prototype.hasOwnProperty.call(edits, field) && edits[field] !== undefined) {
     return { value: edits[field] ?? null, origin: 'MANUAL', ruleId: null, ruleVersion: null };
   }
-  const proposed: ImportProposedField | undefined = row.proposal?.[field];
+  const proposed = row.proposal?.[field];
   if (!proposed) return null;
   return {
     value: proposed.value,
