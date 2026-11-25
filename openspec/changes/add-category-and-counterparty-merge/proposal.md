@@ -20,7 +20,8 @@ D480 (pregunta 16 de docs/76, recomendación aplicada por omisión) las incluye 
   - Los alias de la origen y su nombre pasan a ser alias de la destino, y la categoría por defecto se resuelve con una regla fija.
   - Tiene la misma vista previa y el mismo bloqueo de desarchivo.
 - **Recorrido** (`audit/lifecycle-timeline`): la fusión es una transición de la origen hacia `ARCHIVED` que enlaza la destino, y una anotación en la destino. Revisa D52, que en Phase 1 declaró la máquina sin fusión.
-- **Periodos cerrados:** las porciones con fecha en un periodo cerrado conservan la origen y los reportes de esos periodos no cambian. Es la recomendación de la pregunta abierta 1 del design, que bloquea la implementación del grupo 3.
+- **Periodos cerrados:** las porciones con fecha en un periodo cerrado conservan la origen y los reportes de esos periodos no cambian. El owner adoptó la recomendación (D494, docs/77).
+- **Continuidad de la historia en lo analítico** (D496): FORECAST (series por categoría y gastos atípicos) y RULES (sugerencias de categoría) leen la historia de la origen como historia de la destino con la consulta `CategoryMergeQuery.resolve`; los reportes por periodo y lo ya calculado no cambian.
 - **Sin consumidores ni conexiones nuevas** (D249): la fusión corre síncrona en una unidad de trabajo. Cada contexto dueño de una referencia implementa un puerto que define CLASSIFICATION, como `PeriodCreatedHook`. Los eventos `classification.CategoriesMerged.v1` y `classification.CounterpartiesMerged.v1` se publican al outbox sin suscriptores.
 - **Fuera de alcance:**
   - Deshacer una fusión.
@@ -28,7 +29,7 @@ D480 (pregunta 16 de docs/76, recomendación aplicada por omisión) las incluye 
   - Fusionar más de una origen por operación.
   - Fusionar automáticamente o sugerir duplicados.
   - Cambiar los snapshots de cierre o los reportes de periodos cerrados.
-  - Unificar la historia de la origen y la destino en los reportes por periodo (pregunta abierta 3).
+  - Unificar la historia de la origen y la destino en los reportes por periodo (D496). Los pronósticos por categoría, los gastos atípicos y las sugerencias de categoría sí la unifican al leer la historia.
 
 ## Capabilities
 
@@ -36,20 +37,20 @@ D480 (pregunta 16 de docs/76, recomendación aplicada por omisión) las incluye 
 Ninguna.
 
 ### Modified Capabilities
-- `classification/categories`: 6 ADDED. Fusionar categorías, vista previa, subcategorías, periodos cerrados, referencias en otros contextos y categoría fusionada no desarchivable.
+- `classification/categories`: 7 ADDED. Fusionar categorías, vista previa, subcategorías, periodos cerrados, referencias en otros contextos, categoría fusionada no desarchivable y continuidad de la historia en los análisis (D496).
 - `classification/counterparties`: 4 ADDED. Fusionar contrapartes, vista previa, referencias en otros contextos y contraparte fusionada no desarchivable.
 - `audit/lifecycle-timeline`: 1 ADDED. Fusión en el recorrido de categorías y contrapartes.
 
 ## Impact
 
 **Specs impactadas:**
-- `classification/categories` (6 ADDED), `classification/counterparties` (4 ADDED) y `audit/lifecycle-timeline` (1 ADDED).
+- `classification/categories` (7 ADDED), `classification/counterparties` (4 ADDED) y `audit/lifecycle-timeline` (1 ADDED).
 - Sin deltas en `planning/budgets`, `planning/budget-templates`, `commitments/recurrence-engine`, `commitments/subscriptions`, `rules/rule-engine`, `debt/loans` ni `transactions/*`: el comportamiento de la fusión sobre sus datos se especifica en los requirements de CLASSIFICATION que la definen (decisión 4 del design). `rules/rule-engine` y `debt/loans` todavía no existen en `openspec/specs/`.
 
 **Componentes/contextos impactados:**
 - CLASSIFICATION:
   - Comandos `MergeCategories` y `MergeCounterparties`, consultas de vista previa y DS `CategoryMergePolicy`.
-  - Puerto `ClassificationMergeParticipant` (contracts), columnas `merged_into_id` y `merged_at`, y el recorrido.
+  - Puerto `ClassificationMergeParticipant` y consulta `CategoryMergeQuery.resolve` (contracts), columnas `merged_into_id` y `merged_at`, y el recorrido.
 - Participantes (implementan el puerto, sin consumidores):
   - TRANSACTIONS: porciones y contraparte de transacciones en periodos no cerrados, y proveedor de conversiones.
   - PLANNING: líneas de planes no cerrados y versiones de plantillas.
@@ -58,6 +59,7 @@ Ninguna.
   - REPORTING: esenciales del disponible.
   - DEBT: prestamista del préstamo.
   - IMPORTS: filas de importaciones aún no persistidas.
+- Lectores de la historia (D496): FORECAST (series por categoría y gastos atípicos) y RULES (sugerencias de categoría) resuelven la origen hacia la destino con `CategoryMergeQuery.resolve`.
 - `apps/api`: composición de los participantes. `apps/web`: acción «Fusionar en…» con vista previa en las pantallas de categorías y contrapartes, con i18n es/en/pt.
 
 **APIs impactadas:** `contracts/openapi/finance-api.v1.yaml` (aditivo):
@@ -74,7 +76,7 @@ Ninguna.
 
 **Migraciones requeridas:** una migración expand con las dos columnas nullable y sus FK compuestas `(merged_into_id, workspace_id)`. Sin datos.
 
-**Test cases:** AÑADIDOS: TC-CLASSIFICATION-MERGE-001..027 (27) y TC-AUDIT-LIFECYCLE-028..029 (2). MODIFICADOS: ninguno. DEPRECADOS: ninguno.
+**Test cases:** AÑADIDOS: TC-CLASSIFICATION-MERGE-001..030 (30) y TC-AUDIT-LIFECYCLE-028..029 (2). MODIFICADOS: ninguno. DEPRECADOS: ninguno.
 
 **Impacto de regresión:**
 - Archivar y desarchivar sin fusión no cambian (TC-CLASSIFICATION-ARCHIVE-*, -UNARCHIVE-*).
@@ -84,7 +86,7 @@ Ninguna.
 
 **Riesgos introducidos:**
 - Una fusión equivocada no se deshace: vista previa obligatoria en la UI y confirmación explícita.
-- Historia partida entre la origen (periodos cerrados) y la destino (pregunta abierta 3).
+- Historia partida entre la origen (periodos cerrados) y la destino en los reportes por periodo (aceptado por D496; los análisis la unifican).
 - Bloqueos de filas durante la fusión de una categoría muy usada: unidad de trabajo única con actualizaciones por conjunto.
 
 **Invariantes afectadas:**

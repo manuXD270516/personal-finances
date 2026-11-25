@@ -50,37 +50,37 @@ Referencias a una categoría o contraparte en el código de `main`:
    - Origen y destino distintas (`VALIDATION_FAILED`), del mismo workspace (si no, `RESOURCE_NOT_FOUND`) y del mismo tipo de movimiento (`CATEGORY_KIND_MISMATCH`).
    - La origen no puede ser de sistema (`SYSTEM_CATEGORY_IMMUTABLE`); la destino sí puede serlo.
    - La destino debe estar activa (`CATEGORY_ARCHIVED`), y ni la origen ni la destino pueden estar ya fusionadas (`CATEGORY_MERGED`).
-   - La origen puede estar activa o archivada, para limpiar duplicados viejos (pregunta abierta 4).
+   - La origen puede estar activa o archivada, para limpiar duplicados viejos (D497).
    - **Subcategorías:**
      - Las subcategorías activas de la origen pasan a ser hijas de la destino si la destino es de primer nivel. Un nombre repetido entre hermanas activas rechaza con `CLASSIFICATION_MERGE_CONFLICT` (motivo `SUBCATEGORY_NAME_TAKEN`).
      - Si la destino es una subcategoría y la origen tiene hijas activas: `CATEGORY_DEPTH_EXCEEDED`.
      - Fusionar una subcategoría en su propio padre está permitido.
      - Las subcategorías archivadas de la origen no se mueven.
    - Contrapartes: distintas, del mismo workspace, destino activa (`COUNTERPARTY_ARCHIVED`), ninguna fusionada (`COUNTERPARTY_MERGED`). El tipo de la contraparte puede diferir: la destino conserva el suyo.
-   - Roles: EDITOR u OWNER, como archivar (`INSUFFICIENT_ROLE` para VIEWER). `If-Match` con la versión de la origen (`PRECONDITION_FAILED`). Cuota `costly` (10 por minuto).
+   - Roles: EDITOR u OWNER, como archivar (`INSUFFICIENT_ROLE` para VIEWER; D499). `If-Match` con la versión de la origen (`PRECONDITION_FAILED`). Cuota `costly` (10 por minuto).
    - Idempotencia: `Idempotency-Key` como las demás acciones `POST`. Repetir la misma fusión ya aplicada devuelve el resultado guardado; una fusión distinta de una origen ya fusionada se rechaza con `CATEGORY_MERGED`.
 
-3. **Periodos cerrados (recomendación de la pregunta abierta 1, bloquea el grupo 3).**
+3. **Periodos cerrados (D494).**
    - TRANSACTIONS reasigna solo las porciones y transacciones cuya fecha de negocio cae fuera de un periodo `closed`, con el mismo criterio de rango que `PERIOD_CLOSED`. Las de periodos cerrados conservan la origen.
    - Los reportes y snapshots de esos periodos no cambian. La origen se muestra archivada con la marca «fusionada en <destino>».
    - Un periodo reabierto (`reopened`) cuenta como no cerrado.
    - La vista previa informa cuántas porciones quedan en la origen por estar en periodos cerrados.
-   - *Alternativas en la pregunta 1:* rechazar la fusión si hay porciones en periodos cerrados; reasignar todas, incluidas las cerradas.
+   - *Alternativas descartadas:* rechazar la fusión si hay porciones en periodos cerrados (la vuelve inútil tras unos cierres); reasignar todas, incluidas las cerradas (cambia los reportes de periodos cerrados respecto de su snapshot).
 
 4. **Qué hace cada participante.** Los requirements de CLASSIFICATION describen el resultado visible. No se agregan deltas a las specs de los demás contextos: `rules/rule-engine` y `debt/loans` todavía no existen en `openspec/specs/`, y un delta en cada una duplicaría la misma regla siete veces.
 
    | Participante | Categoría | Contraparte | Conflictos |
    |---|---|---|---|
    | TRANSACTIONS | `UPDATE` por conjunto de `transaction_split.category_id` en periodos no cerrados | `transaction.counterparty_id` y `transaction_split.counterparty_id` en periodos no cerrados; `conversion_detail.provider_counterparty_id` (dato descriptivo, todas) | — |
-   | PLANNING | Líneas de planes de periodos no cerrados: la línea de la origen pasa a la destino; si el plan ya tiene línea de la destino ⇒ conflicto `BUDGET_LINE_EXISTS` (pregunta abierta 2). Plantillas: versión nueva con la línea retargeteada si la vigente la referencia; conflicto igual si ya tiene la destino | — | `BUDGET_LINE_EXISTS`, `TEMPLATE_LINE_EXISTS` |
+   | PLANNING | Líneas de planes de periodos no cerrados: la línea de la origen pasa a la destino; si el plan ya tiene línea de la destino ⇒ conflicto `BUDGET_LINE_EXISTS` (D495). Plantillas: versión nueva con la línea retargeteada si la vigente la referencia; conflicto igual si ya tiene la destino | — | `BUDGET_LINE_EXISTS`, `TEMPLATE_LINE_EXISTS` |
    | COMMITMENTS | Definiciones activas: categoría actualizada en la versión vigente como anotación (no crea versión, no cambia ocurrencias ni montos) | Ídem con la contraparte; suscripciones activas | — |
    | RULES | Cada regla no archivada cuya condición o acción usa la origen recibe una versión nueva con la destino (`changeReason = MERGE`); una condición que queda duplicada se colapsa | Ídem | — |
    | REPORTING | Esenciales del disponible: la origen se reemplaza por la destino, sin duplicar | — | — |
-   | CLASSIFICATION | `counterparty.default_category_id` = origen ⇒ destino | Alias de la origen pasan a la destino; el nombre de la origen se agrega como alias si su forma normalizada no es el nombre ni un alias de la destino; categoría por defecto: la de la destino si tiene, si no la de la origen si está activa (pregunta abierta 5) | — |
+   | CLASSIFICATION | `counterparty.default_category_id` = origen ⇒ destino | Alias de la origen pasan a la destino; el nombre de la origen se agrega como alias si su forma normalizada no es el nombre ni un alias de la destino; categoría por defecto: la de la destino si tiene, si no la de la origen si está activa (D498) | — |
    | DEBT | — | `loan.lender_counterparty_id` | — |
    | IMPORTS | Filas de importaciones en `AWAITING_MAPPING` o `AWAITING_REVIEW` con la origen en su clasificación o sugerencia ⇒ destino | Ídem | — |
 
-   La historia analítica no se toca: decisiones y resultados de sugerencias, corridas de pronóstico publicadas y gastos atípicos ya marcados.
+   La historia analítica ya calculada no se toca: decisiones y resultados de sugerencias, corridas de pronóstico publicadas y gastos atípicos ya marcados. Las lecturas nuevas de historia sí resuelven la origen hacia la destino (decisión 9).
 
 5. **Marca en la origen y recorrido.**
    - `classification.category` y `classification.counterparty` suman `merged_into_id uuid NULL` (FK compuesta `(merged_into_id, workspace_id)`) y `merged_at timestamptz NULL`.
@@ -104,6 +104,14 @@ Referencias a una categoría o contraparte en el código de `main`:
 
 8. **Volumen.** Actualizaciones por conjunto, sin bucles por fila. Objetivo de diseño (no es un requirement): una categoría con 10 000 porciones se fusiona en menos de 10 s en CI. Se mide en la tarea 5.3; si no se alcanza, se pregunta al owner antes de cambiar el enfoque.
 
+9. **Continuidad de la historia en lo analítico (D496).**
+   - `@pf/classification/contracts` suma `CategoryMergeQuery.resolve(workspaceId, categoryIds) → Map<categoryId, categoryId>`: para cada categoría fusionada devuelve la destino vigente, siguiendo la cadena si la destino se fusionó después en otra; las no fusionadas no aparecen. Lectura sin efectos, en la unidad de trabajo del llamador.
+   - FORECAST: la preparación de las series por categoría y la historia de la detección de gastos atípicos (change 72) cuentan las porciones de la origen como de la destino, incluidas las que quedaron en periodos cerrados.
+   - RULES: las sugerencias de categoría (change 73) cuentan la evidencia de la origen como de la destino y nunca proponen una categoría fusionada.
+   - Los reportes por periodo, los snapshots y lo ya calculado no cambian (decisión 4).
+   - `arch:check`: FORECAST y RULES dependen de `@pf/classification/contracts`, como hoy.
+   - *Alternativa descartada:* que nada la resuelva. La serie de la destino perdería los meses cerrados y el pronóstico empeoraría justo después de ordenar las categorías.
+
 ## Contratos
 
 **`contracts/openapi/finance-api.v1.yaml` (aditivo; `oasdiff` limpio, Spectral y Redocly sin errores):**
@@ -119,7 +127,7 @@ Referencias a una categoría o contraparte en el código de `main`:
 - `ErrorCode` suma `CLASSIFICATION_MERGE_CONFLICT` (409, con `details.conflicts`), `CATEGORY_MERGED` (409) y `COUNTERPARTY_MERGED` (409).
 - `LifecycleTransition` (o su enum de operación) suma `MERGE` y la anotación `MERGED_FROM`, si el contrato del recorrido los enumera (`x-extensible-enum`).
 
-**Contratos internos (TypeScript):** `@pf/classification/contracts` define `ClassificationMergeParticipant`, `MergeKind = 'CATEGORY' | 'COUNTERPARTY'`, `MergeCount` y `MergeConflict`. Lo implementan TRANSACTIONS, PLANNING, COMMITMENTS, RULES, REPORTING, DEBT e IMPORTS.
+**Contratos internos (TypeScript):** `@pf/classification/contracts` define `ClassificationMergeParticipant`, `MergeKind = 'CATEGORY' | 'COUNTERPARTY'`, `MergeCount`, `MergeConflict` y `CategoryMergeQuery` (decisión 9). Lo implementan TRANSACTIONS, PLANNING, COMMITMENTS, RULES, REPORTING, DEBT e IMPORTS.
 
 **Eventos (`contracts/events/classification/`):** `CategoriesMerged.v1.schema.json` y `CounterpartiesMerged.v1.schema.json`, con ejemplos; docs/11 y `contracts/events/README.md` actualizados.
 
@@ -135,7 +143,7 @@ Referencias a una categoría o contraparte en el código de `main`:
 ## Riesgos / Trade-offs
 
 - [Fusión equivocada sin deshacer] → vista previa obligatoria en la UI, confirmación con el nombre de la destino, auditoría con `operationId`. Deshacer queda como mejora (sería otra fusión inversa más mover las porciones por `operationId`).
-- [Historia partida entre periodos cerrados y abiertos] → la origen se muestra «fusionada en»; la pregunta abierta 3 decide si FORECAST y las anomalías la resuelven hacia la destino.
+- [Historia partida entre periodos cerrados y abiertos] → la origen se muestra «fusionada en»; FORECAST, las anomalías y las sugerencias la resuelven hacia la destino al leer (decisión 9, D496); los reportes por periodo no.
 - [Unidad de trabajo larga] → actualizaciones por conjunto; objetivo de 10 s con 10 000 porciones; la cuota `costly` evita repeticiones.
 - [Siete participantes en una sola transacción] → orden fijo y de a uno; un test de arquitectura verifica que todos los contextos con una referencia registrada implementan el puerto (la tabla del Contexto como lista cerrada).
 - [Reglas con versión nueva] → el dry-run y la cobertura (change 55) leen la versión vigente; las versiones anteriores quedan para la auditoría.
@@ -156,36 +164,13 @@ Migración expand sin datos. Rollback: sin la UI y los endpoints, las columnas q
 
 ## Preguntas abiertas
 
-Una bloquea la implementación del grupo 3 (la 1). Ninguna bloquea el orden de Phase 9. La spec está redactada con la recomendación de cada una, como los changes 70 a 74.
+Ninguna. El owner adoptó el 2026-11-25 las seis recomendaciones ([docs/77](../../../docs/77-phase-9-and-card-interest-decisions.md) § «Respuestas posteriores»), incluida la que bloqueaba el grupo 3:
 
-1. **[B para el grupo 3] Porciones en periodos cerrados.** Recategorizar en un periodo cerrado se rechaza con `PERIOD_CLOSED`.
-   - (a) **Reasignar solo las de periodos no cerrados; las cerradas conservan la origen, marcada «fusionada en»**.
-   - (b) Rechazar la fusión mientras la origen tenga porciones en periodos cerrados (hay que reabrirlos).
-   - (c) Reasignar todas, incluidas las cerradas, sin tocar los snapshots.
-
-   **Recomendación: (a).** Es coherente con `PERIOD_CLOSED`, no reescribe periodos cerrados y no bloquea la fusión para siempre cuando el owner cierre meses. (b) la vuelve inútil tras unos cierres. (c) cambia los reportes de periodos cerrados respecto de su snapshot.
-2. **Plan con línea de la origen y de la destino.**
-   - (a) **Conflicto que bloquea la fusión hasta que el usuario quite una de las dos líneas**.
-   - (b) Sumar las dos líneas si son del mismo tipo, y conflicto si no.
-
-   **Recomendación: (a).** Sumar montos de presupuesto es una decisión financiera que no conviene tomar en silencio. La vista previa lista los planes en conflicto.
-3. **Continuidad de la historia en lo analítico.** Con (a) en la pregunta 1, la historia de la origen en periodos cerrados no pasa a la destino.
-   - (a) **FORECAST (series por categoría), las anomalías (change 72) y la sugerencia de categorías (change 73) resuelven la origen hacia la destino al leer la historia (consulta `CategoryMergeQuery.resolve`); los reportes por periodo no**.
-   - (b) Nada la resuelve.
-
-   **Recomendación: (a).** Sin eso, la serie de la destino pierde los meses cerrados y el pronóstico empeora justo después de ordenar las categorías. Si se acepta, se agrega como tarea 3.9 (consulta en CLASSIFICATION y su uso en FORECAST y RULES), con un requirement en `forecast/expense-forecasting` en el mismo change.
-4. **Origen archivada.**
-   - (a) **Se puede fusionar una origen archivada**.
-   - (b) Solo orígenes activas.
-
-   **Recomendación: (a).** Permite limpiar duplicados viejos que el owner ya archivó.
-5. **Categoría por defecto de la contraparte destino.**
-   - (a) **La de la destino si tiene; si no, la de la origen si está activa**.
-   - (b) Siempre la de la destino (puede quedar sin categoría por defecto).
-
-   **Recomendación: (a).**
-6. **Rol para fusionar.**
-   - (a) **EDITOR u OWNER, como archivar**.
-   - (b) Solo OWNER, por ser masiva e irreversible.
-
-   **Recomendación: (a).** En N1 el workspace es de un solo usuario y la vista previa obligatoria limita el error.
+| Pregunta | Decisión | Efecto en este change |
+|---|---|---|
+| 1. Porciones en periodos cerrados | D494: (a) solo se reasignan las de periodos no cerrados; las cerradas conservan la origen, marcada «fusionada en» | Decisión 3; el grupo 3 queda desbloqueado. |
+| 2. Plan con línea de la origen y de la destino | D495: (a) conflicto `BUDGET_LINE_EXISTS` que bloquea la fusión | Decisión 4. |
+| 3. Continuidad de la historia en lo analítico | D496: (a) FORECAST, las anomalías y las sugerencias resuelven la origen hacia la destino al leer; los reportes por periodo no | Decisión 9, requirement «Continuidad de la historia de una categoría fusionada en los análisis» en `classification/categories` (TC-CLASSIFICATION-MERGE-028..030) y tarea 3.9. Va en `classification/categories` y no en `forecast/expense-forecasting` por el criterio de la decisión 4: las specs de FORECAST y de las sugerencias todavía no están en `openspec/specs/`. |
+| 4. Origen archivada | D497: (a) se puede fusionar | Decisión 2. |
+| 5. Categoría por defecto de la contraparte destino | D498: (a) la de la destino si tiene; si no, la de la origen si está activa | Decisión 4. |
+| 6. Rol para fusionar | D499: (a) EDITOR u OWNER | Decisión 2. |

@@ -17,16 +17,16 @@ Verificación en `origin/main` (2026-11-25) de la lista de docs/38 §4 y de la p
 | Notas y descripción de `LOAN_*` no editables desde la UI | Abierto: la API las acepta (`assertManagedEditAllowed`), pero `TransactionDetail` solo ofrece «Editar» a `EXPENSE`, `INCOME`, `REFUND` y `ADJUSTMENT` | Sí (decisión 1) |
 | Rótulo «cuotas» en Q8 | Abierto: el requirement «Cuotas de tarjeta futuras en los próximos pagos» existe y TC-DEBT-CARD-033 figura `automated`, pero su test solo comprueba monto y `amountType: ESTIMATED`; ni la ocurrencia ni `UpcomingPaymentItem` saben de dónde sale el estimado | Sí (decisión 2; opción (a) `expected.basis`, aceptada por el owner el 2026-11-25) |
 | Q5 sin periodo financiero que cubra hoy | Implementado (`spendable.queries.ts`: mes calendario, `period.id = null`, `budgetView.status = NO_PLAN`; el test cita TC-REPORTING-SPENDABLE-011, que es de otro scenario). La spec no lo define | Sí (decisión 3; el owner confirmó el diseño actual el 2026-11-25) |
-| «N tarjetas sin pago programado» de Q5 | Implementado como supuesto (D213); la spec no lo define | No: pregunta abierta 3 |
+| «N tarjetas sin pago programado» de Q5 | Implementado como supuesto (D213); la spec no lo define | Sí (decisión 6; criterio confirmado por D491) |
 | Filas de muestra al retomar una importación | Abierto: `getImport` devuelve `ImportJob` sin `sampleRows`; la UI avisa con `mapping-no-sample` | Sí (decisión 4; el owner aceptó el arreglo chico el 2026-11-25) |
 | Job horario de metas (`GOALS_DAILY_CRON`) | Se queda (D481, idempotente) | No |
 | «Decisión Phase 7» | Cerrada por `add-cash-flow-forecast` (horizonte hasta el próximo ingreso, esenciales y alerta de déficit; D218) | No |
-| Préstamo en borrador no editable desde la pantalla; tabla del banco con fechas distintas | Abiertos, fuera de la pregunta 17 | No: pregunta abierta 2 |
+| Préstamo en borrador no editable desde la pantalla; tabla del banco con fechas distintas | Abiertos, fuera de la pregunta 17 | No: quedan en docs/38 (D490) |
 
 ## Objetivos / No objetivos
 
 **Objetivos**
-- Cerrar los cuatro puntos abiertos de la tabla con contratos aditivos, sin migraciones de datos y sin consumidores ni conexiones nuevas (D249).
+- Cerrar los cinco puntos abiertos de la tabla con contratos aditivos, sin migraciones de datos y sin consumidores ni conexiones nuevas (D249).
 - Que cada TC del change compruebe de verdad lo que dice su scenario (el caso de TC-DEBT-CARD-033).
 
 **No objetivos**
@@ -39,7 +39,7 @@ Verificación en `origin/main` (2026-11-25) de la lista de docs/38 §4 y de la p
 1. **Edición descriptiva de las transacciones administradas (UI).**
    - `TransactionDetail` ofrece «Editar descripción y notas» a las transacciones `LOAN_DISBURSEMENT` y `LOAN_PAYMENT` no anuladas, a los roles con edición. Abre un formulario reducido (descripción y notas) que manda `PATCH /transactions/{id}` con `If-Match` y solo esos campos; el endpoint ya los acepta sin tocar el ledger.
    - Un cargo de tarjeta (`EXPENSE` con `debtRole = CARD_CHARGE`) abre el formulario de edición con monto, cuenta, fecha, moneda y la categoría de sus porciones como solo lectura, con el aviso «Lo administra la tarjeta» y el enlace a ella. Descripción, notas, tags y contraparte quedan editables, como dice su requirement.
-   - Los tags de un préstamo no se ofrecen: las transacciones `LOAN_*` no tienen splits y el tag vive en el split (pregunta abierta 1).
+   - Los tags de un préstamo no se ofrecen: las transacciones `LOAN_*` no tienen splits y el tag vive en el split (D489; el delta de `add-loans` ya dice «descripción y notas»).
    - Sin cambios de API ni de dominio. El rechazo del servidor sigue siendo la defensa (TC-TRANSACTIONS-CARDCHARGE-002).
 
 2. **Origen del esperado de una ocurrencia (opción (a) `expected.basis`).**
@@ -68,17 +68,19 @@ Verificación en `origin/main` (2026-11-25) de la lista de docs/38 §4 y de la p
    - `getImport` responde `ImportJobDetail`: `ImportJob` más `sampleRows` opcional. El campo solo está en `AWAITING_MAPPING` y lleva hasta 20 registros posteriores al primero, leídos de `imports.staged_transaction.raw` por `row_number`, la misma fuente que el mapeo.
    - En los demás estados el campo no está y la respuesta es la de hoy.
    - El `ETag` se calcula como hoy: la muestra no cambia mientras el estado es `AWAITING_MAPPING`.
-   - `suggestedMapping` no se agrega a `getImport` (pregunta abierta 4): el owner aceptó el arreglo de la muestra, no el del mapeo sugerido.
+   - `suggestedMapping` (D492, Could): en `AWAITING_MAPPING`, `ImportJobDetail` lleva también el mapeo sugerido opcional, el mismo de `ImportCreated.suggestedMapping` (el de la última importación de la cuenta, leído de `jobs.lastMapping`), con la misma condición de estado. Si la cuenta no tiene importaciones anteriores, el campo no está. La UI lo usa para precargar el formulario al retomar, como al crear.
    - La UI (`MappingStep`) usa la muestra de `getImport` al retomar y conserva el aviso `mapping-no-sample` solo si la respuesta no la trae.
    - Texto no confiable: se escapa siempre, como al crear.
 
-5. **Por qué las filas de muestra van en este change.** El arreglo de la muestra no es deuda de Phase 4. Va aquí porque tiene la misma forma que el resto (aditivo, sin migración de datos, chico) y porque abrir un change propio para un campo opcional duplicaría el proceso. Si el owner prefiere separarlo, se mueve a un `fix-import-resume-sample-rows` sin tocar lo demás (pregunta abierta 5, no bloqueante).
+5. **Por qué las filas de muestra van en este change.** El arreglo de la muestra no es deuda de Phase 4. Va aquí porque tiene la misma forma que el resto (aditivo, sin migración de datos, chico) y porque abrir un change propio para un campo opcional duplicaría el proceso. El owner lo confirmó (D493).
+
+6. **«N tarjetas sin pago programado» en Q5 (D491).** Se agrega el requirement con el criterio vigente de D213, sin cambio de código productivo: cuenta las tarjetas con saldo adeudado sin ninguna transferencia recurrente no resuelta ni transacción pendiente hacia ellas con fecha hasta el fin del horizonte, sin comparar con el pago mínimo. *Alternativa descartada:* contar también las que tienen programado menos que el mínimo; exige que REPORTING lea el mínimo del estado de cuenta de DEBT, una dependencia nueva. Los tests existentes de `cardsWithoutPaymentCount` pasan a citar TC-REPORTING-SPENDABLE-017 y -018 (tarea 3.6).
 
 ## Contratos
 
 **`contracts/openapi/finance-api.v1.yaml` (aditivo; `oasdiff` limpio, Spectral y Redocly sin errores):**
 - `UpcomingPaymentItem.expectedBasis` (opcional): `type: string`, `x-extensible-enum: [STATEMENT, OPEN_CYCLE, INSTALLMENTS]`. Descripción: «Origen del monto esperado de un pago de tarjeta: estado de cuenta emitido, ciclo abierto o cuotas programadas de un ciclo posterior. Ausente en los demás pagos».
-- `ImportJobDetail` (nuevo): `allOf: [ImportJob, {type: object, properties: {sampleRows: {type: array, maxItems: 20, items: {type: array, items: {type: string}}}}}]`, con la descripción de `ImportCreated.sampleRows`. `getImport` responde `ImportJobDetail` en el 200. El cambio de `$ref` es compatible: el esquema nuevo es `ImportJob` más una propiedad opcional (se verifica con `pnpm contract:breaking` en la tarea 5.1).
+- `ImportJobDetail` (nuevo): `allOf: [ImportJob, {type: object, properties: {sampleRows: {type: array, maxItems: 20, items: {type: array, items: {type: string}}}, suggestedMapping: {$ref: <el esquema de ImportCreated.suggestedMapping>}}}]`, con las descripciones de `ImportCreated.sampleRows` y `ImportCreated.suggestedMapping`; las dos propiedades son opcionales y solo están en `AWAITING_MAPPING` (`suggestedMapping`, además, solo si la cuenta tiene una importación anterior; D492). `getImport` responde `ImportJobDetail` en el 200. El cambio de `$ref` es compatible: el esquema nuevo es `ImportJob` más una propiedad opcional (se verifica con `pnpm contract:breaking` en la tarea 5.1).
 - Sin códigos de error nuevos.
 
 **Contratos internos (TypeScript, aditivos):**
@@ -86,7 +88,7 @@ Verificación en `origin/main` (2026-11-25) de la lista de docs/38 §4 y de la p
   - `ManagedExpectationDto.basis?: 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS'`.
   - `UpcomingPaymentDto.expectedBasis` y `ManagedOccurrenceDto.expectedBasis` (`… | null`).
 - `@pf/debt`: interno (`payment-plan-expectation`, `card-engine`).
-- `@pf/imports`: `JobView` de `getImport` suma `sampleRows?` en `AWAITING_MAPPING`.
+- `@pf/imports`: `JobView` de `getImport` suma `sampleRows?` y `suggestedMapping?` en `AWAITING_MAPPING`.
 
 **Eventos:** ninguno.
 
@@ -110,38 +112,20 @@ Migración expand sin datos. Rollback: la columna queda sin uso; la UI vuelve a 
 
 ## Cambios a docs compartidos (al implementar)
 
-- **docs/10:** `expectedBasis` en próximos pagos y `sampleRows` en `getImport`.
+- **docs/10:** `expectedBasis` en próximos pagos, `sampleRows` y `suggestedMapping` en `getImport`, y el criterio de `cardsWithoutPaymentCount` (D491).
 - **docs/08:** columna `expected_basis` de `commitments.recurring_occurrence`.
-- **docs/13 §7:** la muestra al retomar.
+- **docs/13 §7:** la muestra y el mapeo sugerido al retomar.
 - **docs/17 y la matriz:** TC nuevos y TC-DEBT-CARD-033 modificado.
 - **docs/38 §4:** tachar «Notas `LOAN_*`», «Rótulo de cuotas en Q8», «Q5 sin periodo» y «`getImport` sin filas de muestra», con el PR.
 
 ## Preguntas abiertas
 
-Ninguna bloquea el orden de implementación. Las respuestas van al siguiente `…-decisions.md`.
+Ninguna. El owner adoptó el 2026-11-25 las cinco recomendaciones ([docs/77](../../../docs/77-phase-9-and-card-interest-decisions.md) § «Respuestas posteriores»):
 
-1. **Tags en las transacciones de préstamo.** El delta de `add-loans` (sin archivar) dice que la descripción, las notas y los tags de `LOAN_*` siguen editables, pero esas transacciones no tienen splits y el tag vive en el split.
-   - (a) Corregir ese delta para que diga «descripción y notas» antes de archivar `add-loans`.
-   - (b) Agregar tags a nivel de transacción solo para las administradas.
-
-   **Recomendación: (a).** (b) introduce un segundo lugar para los tags que reportes y reglas no leen. Este change ya edita solo descripción y notas.
-2. **Préstamo en borrador y tabla del banco con fechas distintas** (docs/38 §4, fuera de la pregunta 17).
-   - (a) Dejarlos en docs/38 hasta que el owner cargue su préstamo real (`add-loans` 8.4).
-   - (b) Sumarlos a este change.
-
-   **Recomendación: (a).** El borrador se edita por `PATCH`, y la adopción con fechas distintas depende de la tabla real del owner.
-3. **«N tarjetas sin pago programado» en Q5.** Hoy cuenta las tarjetas con saldo adeudado sin ninguna transferencia ni pago (ocurrencia o pendiente) hacia ellas hasta el fin del periodo, sin distinguir mínimo de total (D213, supuesto sin confirmar).
-   - (a) Confirmarlo y agregar el scenario a este change.
-   - (b) Contar también las que tienen programado menos que el pago mínimo.
-
-   **Recomendación: (a).** (b) exige leer el mínimo del estado de cuenta desde REPORTING, que hoy no depende de DEBT.
-4. **`suggestedMapping` al retomar.** Al retomar, la UI arma el formulario con `job.mapping`, que es `null` en `AWAITING_MAPPING`, así que el mapeo sugerido (el de la última importación de la cuenta) se pierde igual que la muestra.
-   - (a) Solo la muestra, como aceptó el owner.
-   - (b) Agregar también `suggestedMapping` opcional a `ImportJobDetail` en `AWAITING_MAPPING`.
-
-   **Recomendación: (b).** Es el mismo esquema, la misma condición de estado y la misma lectura (`jobs.lastMapping`), y completa el «retomar». Mientras no haya respuesta, se implementa (a) y (b) queda como tarea Could (6.5).
-5. **Dónde va el arreglo de la muestra.**
-   - (a) En este change, con su propio grupo de tareas.
-   - (b) En un change aparte `fix-import-resume-sample-rows`.
-
-   **Recomendación: (a)** (decisión 5).
+| Pregunta | Decisión | Efecto en este change |
+|---|---|---|
+| 1. Tags en las transacciones de préstamo | D489: (a) el delta de `add-loans` dice «descripción y notas» | Corregidos el delta y el design de `add-loans` (decisión 10); este change ya editaba solo descripción y notas (decisión 1). |
+| 2. Préstamo en borrador y tabla del banco con fechas distintas | D490: (a) quedan en docs/38 hasta que el owner cargue su préstamo real (`add-loans` 8.4) | Ninguno. |
+| 3. «N tarjetas sin pago programado» en Q5 | D491: (a) se confirma el criterio de D213 | Decisión 6 y requirement «Aviso de tarjetas sin pago programado en el disponible» en `reporting/dashboard` (TC-REPORTING-SPENDABLE-017 y -018). |
+| 4. `suggestedMapping` al retomar | D492: (b) `suggestedMapping` opcional en `ImportJobDetail` | Decisión 4, contrato y requirement «Mapeo sugerido al retomar una importación» (Could, TC-IMPORTS-CSV-034 y -035); tarea 6.5. |
+| 5. Dónde va el arreglo de la muestra | D493: (a) en este change | Ninguno (decisión 5). |

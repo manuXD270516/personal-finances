@@ -138,3 +138,21 @@ Trace: FR-CLASSIFICATION-007, FR-CLASSIFICATION-002 · Priority: Could
 #### Scenario: Fusionar de nuevo una categoría fusionada
 - **CUANDO** "Super" se fusionó en "Supermercado" y el EDITOR intenta fusionar "Super" en "Mercado"
 - **ENTONCES** se rechaza con `CATEGORY_MERGED` sin cambios
+
+### Requirement: Continuidad de la historia de una categoría fusionada en los análisis
+Los pronósticos por categoría, la detección de gastos atípicos y las sugerencias de categoría DEBEN (MUST) leer la historia de una categoría fusionada como historia de su destino vigente, incluidas las porciones que conservaron la origen por estar en periodos cerrados. Una sugerencia de categoría NO DEBE (MUST NOT) proponer una categoría fusionada. Los reportes por periodo, los snapshots de cierre y lo ya calculado (pronósticos publicados, gastos atípicos marcados y decisiones sobre sugerencias) NO DEBEN (MUST NOT) cambiar por esa lectura.
+Trace: FR-CLASSIFICATION-007, FR-FORECAST-001, FR-FORECAST-010, FR-CLASSIFICATION-014 · Priority: Could
+
+#### Scenario: Serie de pronóstico con meses cerrados de la origen
+- **CUANDO** "Super" tiene un gasto de 100.00 BOB en cada mes de mayo a octubre de 2026, todos periodos cerrados, "Supermercado" no tiene gastos en esos meses, y en noviembre de 2026 el EDITOR fusiona "Super" en "Supermercado"
+- **ENTONCES** la siguiente corrida de pronóstico prepara la serie de "Supermercado" con 100.00 BOB en cada mes de mayo a octubre de 2026
+- **Y** el reporte de octubre de 2026 sigue mostrando "Super" = 100.00 BOB
+
+#### Scenario: Gasto atípico con la historia de la origen
+- **CUANDO** "Super" tiene 12 gastos de entre 70.00 y 90.00 BOB en periodos cerrados, "Supermercado" no tiene gastos anteriores, el EDITOR fusiona "Super" en "Supermercado" y después se registra un gasto de 400.00 BOB en "Supermercado"
+- **ENTONCES** la detección evalúa ese gasto con una historia de 12 gastos de "Supermercado"
+- **Y** los gastos atípicos marcados antes de la fusión no cambian
+
+#### Scenario: Sugerencia con la evidencia de la origen
+- **CUANDO** los gastos con la descripción "HIPERMAXI" están clasificados en "Super" en periodos cerrados, el EDITOR fusiona "Super" en "Supermercado" y después registra un gasto con la descripción "HIPERMAXI"
+- **ENTONCES** la sugerencia de categoría es "Supermercado" y nunca "Super"

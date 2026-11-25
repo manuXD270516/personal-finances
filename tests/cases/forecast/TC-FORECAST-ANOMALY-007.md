@@ -5,7 +5,7 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Contraparte nueva con monto alto"
 scenario: "Contraparte nueva con monto común"
-requirement_status: confirmed
+requirement_status: provisional
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
@@ -25,7 +25,7 @@ preconditions:
   - "FixedClock en la fecha del escenario (TZ America/La_Paz); datos ficticios"
 input: {}
 steps:
-  - "el percentil 95 de los gastos del workspace de los 365 días anteriores es 900.00 BOB"
+  - "el percentil 99.5 de los gastos del workspace de los 365 días anteriores es 900.00 BOB"
   - "se registra un gasto de 120.00 BOB con una contraparte nueva"
 expected_result:
   - "el gasto no se marca"
@@ -43,7 +43,7 @@ Verifica el scenario "Contraparte nueva con monto común" del requirement "Contr
 
 ```gherkin
 Dado Workspace "W1 Personal Demo" con moneda de reporte BOB, TZ America/La_Paz y la detección de gastos atípicos habilitada
-Cuando el percentil 95 de los gastos del workspace de los 365 días anteriores es 900.00 BOB
+Cuando el percentil 99.5 de los gastos del workspace de los 365 días anteriores es 900.00 BOB
 Y se registra un gasto de 120.00 BOB con una contraparte nueva
 Entonces el gasto no se marca
 ```
@@ -51,3 +51,4 @@ Entonces el gasto no se marca
 ## Notas
 
 - Change `add-spending-anomaly-detection` (Phase 9). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; montos como strings decimales; ningún dato real del owner.
+- Modificado por `refine-spending-anomaly-calibration` (D488 y pregunta 1 de docs/80): el percentil por omisión pasa de 95 a 99.5; las cifras no cambian. El test automatizado se actualiza al implementar ese change.
