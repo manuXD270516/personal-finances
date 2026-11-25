@@ -1,7 +1,7 @@
 {
   "version": 1,
   "actualizado": "2026-11-24",
-  "estado": "decidido-sin-desplegar",
+  "estado": "fase-0-cerrada-sin-desplegar",
   "modo": "ratificar",
   "parametros": {
     "profundidad": "rapida",
@@ -21,49 +21,50 @@
     "arbitro": null,
     "documento": "docs/despliegue/DECISION-DESPLIEGUE.md"
   },
+  "notaFase0": "Fase 0 cerrada en el código (PRs #263 a #270). Abiertos: C8 y C14 (se miden en el PoC) y C12c (condicional al plan B). Antes del primer apply: dominio D452, cuentas, tofu fmt y validate, pgbackrest-restore.env y checks pfos-drill, pfos-verify y pfos-image-prune; PFOS_KEYCLOAK_OPTIMIZED solo después del primer apply.",
   "condiciones": [
     {
       "id": "C1",
       "texto": "Quinto digest (finance-ml) en el comando forzado del cloud-init; la parte de deploy.yml ya está hecha (#234)",
       "origen": "B1",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
-    { "id": "C2", "texto": "Puerto 22 en ufw con límite de tasa", "origen": "B9", "fase": 0, "cerrada": false },
+    { "id": "C2", "texto": "Puerto 22 en ufw con límite de tasa", "origen": "B9", "fase": 0, "cerrada": true },
     {
       "id": "C3",
       "texto": "Retención de los respaldos mensuales protegida frente a un host comprometido",
       "origen": "B2",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C4",
       "texto": "Prefijo de respaldo del PoC cargado antes del primer deploy y quitado en la limpieza",
       "origen": "runbook, fases 4 y 7 (stanza del PoC)",
       "fase": 4,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C5",
       "texto": "Drill de restore programado que avise si falla",
       "origen": "B4",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C6",
       "texto": "Limpieza de imágenes y alerta de disco",
       "origen": "B7",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C7",
       "texto": "Keycloak con build optimizado o techo mayor",
       "origen": "B6",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C8",
@@ -72,34 +73,34 @@
       "fase": 7,
       "cerrada": false
     },
-    { "id": "C9", "texto": "Hora del snapshot de Lightsail fuera de la ventana de respaldos", "origen": "B11", "fase": 0, "cerrada": false },
+    { "id": "C9", "texto": "Hora del snapshot de Lightsail fuera de la ventana de respaldos", "origen": "B11", "fase": 0, "cerrada": true },
     {
       "id": "C10",
       "texto": "Volumen 0400 de la clave privada de conexiones en el worker",
       "origen": "B10",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C11",
       "texto": "Documentación desactualizada (runbook vigente, docs/30, ADR-0033 y ADR-0027)",
       "origen": "B11 y B12",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C12a",
       "texto": "Plan B: imágenes multi-arch en main.yml y pr.yml con verify-by-digest sobre el índice",
       "origen": "ratificación 2026-11-24 (salida del PoC por CPU)",
       "fase": 1,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C12b",
       "texto": "Plan B: digests de índice multi-arch de terceros, RCLONE_IMAGE y pgbackrest arm64",
       "origen": "ratificación 2026-11-24 (salida del PoC por CPU)",
       "fase": 1,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C12c",
@@ -113,7 +114,7 @@
       "texto": "Content-Security-Policy de la web",
       "origen": "B14",
       "fase": 0,
-      "cerrada": false
+      "cerrada": true
     },
     {
       "id": "C14",
@@ -140,7 +141,7 @@
   "runbook": {
     "documento": "docs/despliegue/RUNBOOK-DESPLIEGUE.md",
     "fases": [
-      { "n": 0, "nombre": "Cerrar las brechas de código", "quien": "Claude", "terminada": false, "fecha": null },
+      { "n": 0, "nombre": "Cerrar las brechas de código", "quien": "Claude", "terminada": true, "fecha": "2026-11-24" },
       { "n": 1, "nombre": "Decisiones del owner (docs/71)", "quien": "Vos", "terminada": false, "fecha": null },
       { "n": 2, "nombre": "Cuentas", "quien": "Vos", "terminada": false, "fecha": null },
       { "n": 3, "nombre": "Infraestructura", "quien": "Vos", "terminada": false, "fecha": null },

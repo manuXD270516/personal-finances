@@ -34,7 +34,7 @@
 
 - [x] 6.1 E2E `tests/e2e/specs/content-security-policy.spec.ts`: oyente de `securitypolicyviolation` y de mensajes «Refused to» con `page.addInitScript`; recorrido de todas las rutas de `NAV_ITEMS` en `es`, una en `en` y `pt` y las páginas de `auth`; subida de un documento y calendario de flujo de caja; cabecera con nonce distinto en dos cargas, `frame-ancestors 'none'` y el origen de archivos en `connect-src`; lista de violaciones vacía: TC-SECURITY-CSP-001..003, -005, -006 (2026-11-24: `tests/e2e/specs/content-security-policy.spec.ts` (8 tests).)
 - [x] 6.2 E2E de enmarcado: página de prueba servida por Playwright en otro origen con un iframe del Home; el iframe no carga: TC-SECURITY-CSP-004 (2026-11-24: incluido en la misma spec (iframe desde otro origen: la frame termina en `chrome-error:`).)
-- [ ] 6.3 Suite E2E completa en verde con la CSP aplicada (dos corridas), incluidas `auth.spec.ts` y `documents.spec.ts`: TC-SECURITY-CSP-008
+- [x] 6.3 Suite E2E completa en verde con la CSP aplicada (dos corridas), incluidas `auth.spec.ts` y `documents.spec.ts`: TC-SECURITY-CSP-008 (2026-11-24: suite completa con la CSP real: 115 verdes y 1 omitido en una corrida con stack nuevo, y el check `e2e` de CI de #270 en verde; la otra corrida local, sobre un stack reutilizado, falló solo en `TC-FX-PROVIDER-010` por estado acumulado, ajeno a la CSP.)
 - [x] 6.4 Automatizar todos los TC con el TC-id en el nombre del test; actualizar el front matter (2026-11-24: TC-SECURITY-CSP-001..008 con `automated_tests`; -008 queda con el login/logout de producción a mano (fase 6).)
 
 ## 7. DOCUMENTATION
@@ -42,4 +42,4 @@
 - [x] 7.1 Runbook de despliegue, fase 6 (`docs/despliegue/RUNBOOK-DESPLIEGUE.md`): comprobación 9 desde afuera, `curl -sI $BASE/ | grep -i content-security-policy` muestra `nonce-`, `frame-ancestors 'none'` y el origen `$FILES` en `connect-src`, y la de `$FILES/` trae `frame-ancestors 'none'`; regla de corte si falta. Ampliar la comprobación 6 con `permissions-policy` y `cross-origin-opener-policy` (2026-11-24: comprobación 9 y comprobación 6 ampliadas.)
 - [x] 7.2 `docs/runbooks/deploy-and-restore.md` §7: qué hacer ante una pantalla rota por la CSP (`WEB_CSP_REPORT_ONLY=true` y redeploy, si se aceptó la pregunta 2) (2026-11-24: fila «Pantalla rota por la CSP» en §7.)
 - [x] 7.3 docs/12 §12 (política as-built, `style-src-attr` y `form-action 'self'`), ADR-0019 (pendiente de Phase 1 cerrado), ADR-0027 (nota del 2026-10-29 resuelta) y NFR-SEC-008 (verificación por E2E) (2026-11-24: docs/12 §12, ADR-0019, ADR-0027 y NFR-SEC-008 actualizados.)
-- [ ] 7.4 Matriz de trazabilidad; `pnpm spec:validate`, `pnpm traceability:check` y `pnpm format:check`
+- [x] 7.4 Matriz de trazabilidad; `pnpm spec:validate`, `pnpm traceability:check` y `pnpm format:check` (2026-11-24: spec:validate, traceability:check y format:check en verde en el PR de cierre.)
