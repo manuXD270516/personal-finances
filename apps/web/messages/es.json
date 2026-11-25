@@ -593,6 +593,11 @@
     "noWorkspace": "Selecciona o crea un espacio de trabajo.",
     "loading": "Cargando…"
   },
+  "Forms": {
+    "errorSummary": {
+      "title": "Hay {count, plural, one {# error} other {# errores}}"
+    }
+  },
   "Accounts": {
     "title": "Cuentas",
     "actions": "Acciones de cuentas",
@@ -3781,7 +3786,7 @@
         "credit": "Crédito"
       },
       "formLabel": "Asignación de columnas",
-      "errorsTitle": "Corrige estos datos para continuar:",
+      "errorsTitle": "Hay {count, plural, one {# error} other {# errores}}",
       "hasHeader": "La primera fila (después de las que se saltan) es un encabezado",
       "skipRows": "Filas a saltar al inicio",
       "skipRowsHint": "Texto del banco antes del encabezado; entre 0 y 50.",

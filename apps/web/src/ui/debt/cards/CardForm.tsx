@@ -1,11 +1,23 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uuidv7, type ApiProblemBody } from '../../../bff/finance-api-client';
 import { ProblemMessage } from '../../../errors/ProblemMessage';
 import { AccountForm } from '../../accounts/AccountForm';
+import { ErrorSummary, type ErrorSummaryItem } from '../../common/ErrorSummary';
+import { useFocusFirstError } from '../../common/forms';
 import type { Account, Institution } from '../../common/types';
-import { Field, formStyle, inputStyle, mutedStyle, pageStyle, rowStyle, warningStyle } from '../../common/ui';
+import {
+  Field,
+  fieldAnchorId,
+  formStyle,
+  inputStyle,
+  mutedStyle,
+  pageStyle,
+  rowStyle,
+  warningStyle,
+} from '../../common/ui';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../../common/workspace';
 import type { FormatContext } from '../../dashboard/types';
 import { useCatalogs } from '../../transactions/catalogs';
@@ -37,6 +49,39 @@ export function stepOfField(field: string): Step {
 export function firstStepWithErrors(errors: CardFormErrors): Step | undefined {
   const steps = new Set(Object.keys(errors).map(stepOfField));
   return STEPS.find((s) => steps.has(s));
+}
+
+/** Resumen de errores de un paso del alta de tarjeta: un ítem por campo inválido del paso, con su etiqueta. */
+export function cardErrorItems(
+  f: FormatContext,
+  errors: Readonly<Record<string, string | undefined>>,
+  currencyOf: (accountId: string) => string,
+  /** Texto del error: el catálogo `errors.<código>` (alta) o el mensaje ya traducido (edición). */
+  messageOf: (value: string) => string,
+  step?: Step,
+): ErrorSummaryItem[] {
+  const labelOf = (key: string): string => {
+    const m = /^account\.(.+)\.(creditLimit|percent|floor|fixed|plan)$/.exec(key);
+    if (m) {
+      const currency = currencyOf(m[1]!);
+      switch (m[2]) {
+        case 'creditLimit':
+          return f.t('form.creditLimit', { currency });
+        case 'percent':
+          return f.t('form.minPercent');
+        case 'floor':
+          return f.t('form.minFloor', { currency });
+        case 'fixed':
+          return f.t('form.minFixed', { currency });
+        default:
+          return f.t('form.planSource');
+      }
+    }
+    return key === 'accounts' ? f.t('form.steps.accounts') : f.t(`form.${key}`);
+  };
+  return Object.keys(errors)
+    .filter((k) => errors[k] && (step === undefined || stepOfField(k) === step))
+    .map((field) => ({ field, label: labelOf(field), message: messageOf(errors[field]!) }));
 }
 
 export function NewCardPage() {
@@ -86,7 +131,7 @@ export function StepFields({
     return (
       <fieldset style={{ ...formStyle, margin: 0 }} data-testid="card-step-accounts">
         <legend>{f.t('form.steps.accounts')}</legend>
-        <Field label={f.t('form.name')} error={err('name')} hint={f.t('form.nameHint')}>
+        <Field anchor="name" label={f.t('form.name')} error={err('name')} hint={f.t('form.nameHint')}>
           {(p) => (
             <input
               {...p}
@@ -98,7 +143,11 @@ export function StepFields({
             />
           )}
         </Field>
-        <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--pf-space-2)' }}>
+        <fieldset
+          id={fieldAnchorId('accounts')}
+          tabIndex={-1}
+          style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--pf-space-2)' }}
+        >
           <legend>{f.t('form.accountsLegend')}</legend>
           <p style={{ ...mutedStyle, margin: 0 }}>{f.t('form.accountsHint')}</p>
           {choices.length === 0 ? (
@@ -142,7 +191,7 @@ export function StepFields({
             })
           )}
           {err('accounts') ? (
-            <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }} data-testid="field-error">
+            <p style={{ color: 'var(--pf-error)', margin: 0 }} data-testid="field-error">
               {err('accounts')}
             </p>
           ) : null}
@@ -162,7 +211,13 @@ export function StepFields({
     return (
       <fieldset style={{ ...formStyle, margin: 0 }} data-testid="card-step-limits">
         <legend>{f.t('form.steps.limits')}</legend>
-        <div role="radiogroup" aria-label={f.t('form.limitMode')} style={rowStyle}>
+        <div
+          role="radiogroup"
+          id={fieldAnchorId('limitMode')}
+          tabIndex={-1}
+          aria-label={f.t('form.limitMode')}
+          style={rowStyle}
+        >
           {(['SEPARATE', 'SHARED'] as const).map((m) => (
             <label key={m} style={{ display: 'flex', gap: 'var(--pf-space-1)', alignItems: 'center' }}>
               <input
@@ -176,15 +231,11 @@ export function StepFields({
             </label>
           ))}
         </div>
-        {err('limitMode') ? (
-          <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>
-            {err('limitMode')}
-          </p>
-        ) : null}
+        {err('limitMode') ? <p style={{ color: 'var(--pf-error)', margin: 0 }}>{err('limitMode')}</p> : null}
         <p style={{ ...mutedStyle, margin: 0 }}>{f.t(`form.limitHint.${form.limitMode}`)}</p>
         {form.limitMode === 'SHARED' ? (
           <div style={rowStyle}>
-            <Field label={f.t('form.sharedLimit')} error={err('sharedLimit')}>
+            <Field anchor="sharedLimit" label={f.t('form.sharedLimit')} error={err('sharedLimit')}>
               {(p) => (
                 <input
                   {...p}
@@ -223,6 +274,7 @@ export function StepFields({
               <legend>{f.t('form.accountTerms', { name: a.name, currency: a.currency })}</legend>
               {form.limitMode === 'SEPARATE' ? (
                 <Field
+                  anchor={`${key}.creditLimit`}
                   label={f.t('form.creditLimit', { currency: a.currency })}
                   error={err(`${key}.creditLimit`)}
                 >
@@ -255,6 +307,7 @@ export function StepFields({
               {v.minimumType === 'PERCENT' ? (
                 <div style={rowStyle}>
                   <Field
+                    anchor={`${key}.percent`}
                     label={f.t('form.minPercent')}
                     error={err(`${key}.percent`)}
                     hint={f.t('form.minPercentHint')}
@@ -271,6 +324,7 @@ export function StepFields({
                     )}
                   </Field>
                   <Field
+                    anchor={`${key}.floor`}
                     label={f.t('form.minFloor', { currency: a.currency })}
                     error={err(`${key}.floor`)}
                     hint={f.t('form.minFloorHint')}
@@ -288,7 +342,11 @@ export function StepFields({
                   </Field>
                 </div>
               ) : (
-                <Field label={f.t('form.minFixed', { currency: a.currency })} error={err(`${key}.fixed`)}>
+                <Field
+                  anchor={`${key}.fixed`}
+                  label={f.t('form.minFixed', { currency: a.currency })}
+                  error={err(`${key}.fixed`)}
+                >
                   {(p) => (
                     <input
                       {...p}
@@ -314,7 +372,7 @@ export function StepFields({
         <legend>{f.t('form.steps.calendar')}</legend>
         <p style={{ ...mutedStyle, margin: 0 }}>{f.t('form.calendarHint')}</p>
         <div style={rowStyle}>
-          <Field label={f.t('form.statementDay')} error={err('statementDay')}>
+          <Field anchor="statementDay" label={f.t('form.statementDay')} error={err('statementDay')}>
             {(p) => (
               <input
                 {...p}
@@ -326,7 +384,7 @@ export function StepFields({
               />
             )}
           </Field>
-          <Field label={f.t('form.dueDay')} error={err('dueDay')}>
+          <Field anchor="dueDay" label={f.t('form.dueDay')} error={err('dueDay')}>
             {(p) => (
               <input
                 {...p}
@@ -357,7 +415,12 @@ export function StepFields({
           </Field>
         </div>
         <div style={rowStyle}>
-          <Field label={f.t('form.annualRate')} error={err('annualRate')} hint={f.t('form.annualRateHint')}>
+          <Field
+            anchor="annualRate"
+            label={f.t('form.annualRate')}
+            error={err('annualRate')}
+            hint={f.t('form.annualRateHint')}
+          >
             {(p) => (
               <input
                 {...p}
@@ -369,7 +432,12 @@ export function StepFields({
               />
             )}
           </Field>
-          <Field label={f.t('form.thresholds')} error={err('thresholds')} hint={f.t('form.thresholdsHint')}>
+          <Field
+            anchor="thresholds"
+            label={f.t('form.thresholds')}
+            error={err('thresholds')}
+            hint={f.t('form.thresholdsHint')}
+          >
             {(p) => (
               <input
                 {...p}
@@ -381,7 +449,12 @@ export function StepFields({
               />
             )}
           </Field>
-          <Field label={f.t('form.reminderDays')} error={err('reminderDays')} hint={f.t('form.reminderHint')}>
+          <Field
+            anchor="reminderDays"
+            label={f.t('form.reminderDays')}
+            error={err('reminderDays')}
+            hint={f.t('form.reminderHint')}
+          >
             {(p) => (
               <input
                 {...p}
@@ -419,7 +492,11 @@ export function StepFields({
             </label>
             {v.planEnabled ? (
               <div style={rowStyle}>
-                <Field label={f.t('form.planSource')} error={err(`account.${a.id}.plan`)}>
+                <Field
+                  anchor={`account.${a.id}.plan`}
+                  label={f.t('form.planSource')}
+                  error={err(`account.${a.id}.plan`)}
+                >
                   {(p) => (
                     <select
                       {...p}
@@ -541,6 +618,11 @@ function NewCard({ ctx }: { ctx: WorkspaceContext }) {
   const [institutions, setInstitutions] = useState<readonly Institution[]>([]);
   const attemptKey = useRef(uuidv7());
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const tForms = useTranslations('Forms');
+  // Envío rechazado por la validación: el foco va al resumen de errores del paso (decisión 2 del change).
+  const [attempt, setAttempt] = useState(0);
+  useFocusFirstError(formRef, attempt);
 
   useEffect(() => {
     let cancelled = false;
@@ -623,7 +705,10 @@ function NewCard({ ctx }: { ctx: WorkspaceContext }) {
       ? {}
       : Object.fromEntries(Object.entries(built.errors).filter(([k]) => stepOfField(k) === step));
     setErrors(own);
-    if (Object.keys(own).length > 0) return;
+    if (Object.keys(own).length > 0) {
+      setAttempt((n) => n + 1);
+      return;
+    }
     const index = STEPS.indexOf(step);
     const target = STEPS[index + 1];
     if (target) goTo(target);
@@ -635,7 +720,8 @@ function NewCard({ ctx }: { ctx: WorkspaceContext }) {
     if (!built.ok) {
       setErrors(built.errors);
       const first = firstStepWithErrors(built.errors);
-      if (first) goTo(first);
+      if (first) setStep(first);
+      setAttempt((n) => n + 1);
       return;
     }
     setErrors({});
@@ -678,6 +764,13 @@ function NewCard({ ctx }: { ctx: WorkspaceContext }) {
 
   const index = STEPS.indexOf(step);
   const last = index === STEPS.length - 1;
+  const errorItems = cardErrorItems(
+    f,
+    errors,
+    (id) => choices.find((c) => c.account.id === id)?.account.currency ?? '',
+    (code) => f.t(`errors.${code}`),
+    step,
+  );
   return (
     <section aria-labelledby="card-form-title" style={pageStyle} data-testid="card-form-page">
       <p style={{ margin: 0 }}>
@@ -703,6 +796,7 @@ function NewCard({ ctx }: { ctx: WorkspaceContext }) {
         ))}
       </ol>
       <form
+        ref={formRef}
         style={{ display: 'grid', gap: 'var(--pf-space-4)' }}
         noValidate
         data-testid="card-form"
@@ -720,6 +814,11 @@ function NewCard({ ctx }: { ctx: WorkspaceContext }) {
         >
           {f.t(`form.steps.${step}`)}
         </h2>
+        <ErrorSummary
+          title={tForms('errorSummary.title', { count: errorItems.length })}
+          items={errorItems}
+          testId="card-form-error-summary"
+        />
         <StepFields
           step={step}
           f={f}
@@ -732,11 +831,6 @@ function NewCard({ ctx }: { ctx: WorkspaceContext }) {
           canCreateAccount={ctx.canEdit}
           onCreateAccount={() => setCreating(true)}
         />
-        {Object.keys(errors).length > 0 ? (
-          <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>
-            {f.t('form.fixErrors', { count: Object.keys(errors).length })}
-          </p>
-        ) : null}
         {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
         <div style={rowStyle}>
           {index > 0 ? (

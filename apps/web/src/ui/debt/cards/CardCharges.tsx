@@ -6,7 +6,7 @@ import { ProblemMessage } from '../../../errors/ProblemMessage';
 import { isZeroAmount } from '../../common/money';
 import type { Category, Page, Transaction } from '../../common/types';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cellStyle,
   formStyle,
@@ -364,7 +364,7 @@ export function ChargesSection({
         </div>
       )}
       {voiding ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="charge-void-panel"
           title={f.t('charges.voidTitle', { amount: formatMoney(voiding.total, f.locale) })}
           description={f.t('charges.voidDescription')}
@@ -387,7 +387,7 @@ export function ChargesSection({
               />
             )}
           </Field>
-        </ConfirmPanel>
+        </ConfirmDialog>
       ) : null}
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {editable && proposal && !form ? (

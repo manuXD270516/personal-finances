@@ -6,7 +6,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { Tabs } from '../common/Tabs';
 import { todayIn } from '../common/dates';
 import { scaleFor } from '../common/money';
-import { ConfirmPanel, Field, cardStyle, inputStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
+import { ConfirmDialog, Field, cardStyle, inputStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { useCatalogs } from '../transactions/catalogs';
@@ -435,7 +435,7 @@ function Detail({ ctx, goalId, prefill }: { ctx: WorkspaceContext; goalId: strin
       {panel === 'plan' ? <PlanPanel {...panelProps} /> : null}
       {panel === 'edit' ? <EditPanel {...panelProps} etag={etag} /> : null}
       {panel === 'close' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={f.t('confirm.closeTitle')}
           description={f.t('confirm.closeText')}
           confirmLabel={f.t('confirm.close')}
@@ -446,10 +446,10 @@ function Detail({ ctx, goalId, prefill }: { ctx: WorkspaceContext; goalId: strin
           testId="goal-close-confirm"
         >
           {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
-        </ConfirmPanel>
+        </ConfirmDialog>
       ) : null}
       {panel === 'cancel' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={f.t('confirm.cancelTitle')}
           description={f.t('confirm.cancelText')}
           confirmLabel={f.t('confirm.cancel')}
@@ -472,10 +472,10 @@ function Detail({ ctx, goalId, prefill }: { ctx: WorkspaceContext; goalId: strin
             )}
           </Field>
           {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
-        </ConfirmPanel>
+        </ConfirmDialog>
       ) : null}
       {panel === 'archive' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={f.t('confirm.archiveTitle')}
           description={f.t('confirm.archiveText')}
           confirmLabel={f.t('confirm.archive')}
@@ -486,10 +486,10 @@ function Detail({ ctx, goalId, prefill }: { ctx: WorkspaceContext; goalId: strin
           testId="goal-archive-confirm"
         >
           {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
-        </ConfirmPanel>
+        </ConfirmDialog>
       ) : null}
       {panel === 'removePlan' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={f.t('confirm.removePlanTitle')}
           description={f.t('confirm.removePlanText')}
           confirmLabel={f.t('confirm.removePlan')}
@@ -500,7 +500,7 @@ function Detail({ ctx, goalId, prefill }: { ctx: WorkspaceContext; goalId: strin
           testId="goal-remove-plan-confirm"
         >
           {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
-        </ConfirmPanel>
+        </ConfirmDialog>
       ) : null}
 
       <Tabs

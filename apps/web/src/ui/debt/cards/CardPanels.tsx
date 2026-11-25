@@ -6,7 +6,7 @@ import { ProblemMessage } from '../../../errors/ProblemMessage';
 import { isZeroAmount } from '../../common/money';
 import type { Account, Page, Transaction } from '../../common/types';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cellStyle,
   formStyle,
@@ -786,7 +786,7 @@ function PlanSection({
         />
       ) : null}
       {mode === 'disable' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="plan-disable-panel"
           title={f.t('plan.disableTitle')}
           description={f.t('plan.disableDescription')}
@@ -1155,7 +1155,7 @@ export function InstallmentsPanel({ ctx, card, onChanged }: PanelProps) {
         ))
       )}
       {cancelling ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="installment-cancel-panel"
           title={f.t('installments.cancelTitle')}
           description={f.t('installments.cancelDescription')}

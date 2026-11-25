@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemMessage } from '../../errors/error-messages';
-import { ConfirmPanel, mutedStyle, pageStyle } from '../common/ui';
+import { ConfirmDialog, mutedStyle, pageStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { BFF_API, useSession } from '../session-context';
 import {
@@ -431,7 +431,7 @@ export function ImportWizard({
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
 
       {confirmCancel ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="import-cancel-confirm"
           title={f.t('cancel.title')}
           description={f.t('cancel.description')}

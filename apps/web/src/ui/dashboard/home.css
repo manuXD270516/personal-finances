@@ -272,7 +272,6 @@
 .pf-home-skel {
   background: var(--pf-track);
   border-radius: 8px;
-  animation: pf-home-pulse 1.2s ease-in-out infinite;
 }
 @keyframes pf-home-pulse {
   0%,
@@ -297,8 +296,9 @@
     grid-template-columns: 1fr;
   }
 }
-@media (prefers-reduced-motion: reduce) {
+/* El pulso del esqueleto solo corre sin preferencia de movimiento reducido: con `reduce` queda estático. */
+@media (prefers-reduced-motion: no-preference) {
   .pf-home-skel {
-    animation: none;
+    animation: pf-home-pulse 1.2s ease-in-out infinite;
   }
 }

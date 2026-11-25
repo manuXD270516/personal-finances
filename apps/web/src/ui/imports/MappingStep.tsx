@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { ErrorSummary } from '../common/ErrorSummary';
+import { useFocusFirstError } from '../common/forms';
 import type { FormatContext } from '../dashboard/types';
 import {
   Field,
   cellStyle,
-  errorStyle,
   formStyle,
   inputStyle,
   mutedStyle,
@@ -121,12 +122,11 @@ export function MappingStep({
   const names = columnNames(header, form.hasHeader, form.skipRows);
   const records = sampleRecords(header, sampleRows);
   const disabled = busy || !canEdit;
-  const summaryRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const failed = MAPPING_FIELD_ORDER.filter((field) => errors[field] !== undefined);
-  const failedKey = failed.join(',');
-  useEffect(() => {
-    if (failedKey) summaryRef.current?.focus();
-  }, [failedKey]);
+  // Cada envío del formulario: si la validación lo rechazó, el foco va al resumen de errores (decisión 2 del change).
+  const [submits, setSubmits] = useState(0);
+  useFocusFirstError(formRef, submits);
 
   return (
     <div style={{ display: 'grid', gap: 'var(--pf-space-4)' }} data-testid="import-mapping">
@@ -178,32 +178,25 @@ export function MappingStep({
       </section>
 
       <form
+        ref={formRef}
         style={formStyle}
         noValidate
         aria-label={f.t('mapping.formLabel')}
         onSubmit={(e) => {
           e.preventDefault();
+          setSubmits((n) => n + 1);
           onApply();
         }}
       >
-        {failed.length > 0 ? (
-          <div
-            ref={summaryRef}
-            tabIndex={-1}
-            role="alert"
-            data-testid="mapping-errors"
-            style={{ ...errorStyle, display: 'grid', gap: 'var(--pf-space-1)' }}
-          >
-            <strong>{f.t('mapping.errorsTitle')}</strong>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-              {failed.map((field) => (
-                <li key={field}>
-                  {f.t(FIELD_LABEL[field])}: {errorText(f, errors, field)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <ErrorSummary
+          title={f.t('mapping.errorsTitle', { count: failed.length })}
+          items={failed.map((field) => ({
+            field,
+            label: f.t(FIELD_LABEL[field]),
+            message: errorText(f, errors, field) ?? '',
+          }))}
+          testId="mapping-errors"
+        />
 
         <div style={rowStyle}>
           <label style={{ display: 'flex', gap: 'var(--pf-space-2)', alignItems: 'center' }}>
@@ -217,6 +210,7 @@ export function MappingStep({
             {f.t('mapping.hasHeader')}
           </label>
           <Field
+            anchor="skipRows"
             label={f.t('mapping.skipRows')}
             hint={f.t('mapping.skipRowsHint')}
             error={errorText(f, errors, 'skipRows')}
@@ -237,7 +231,7 @@ export function MappingStep({
         </div>
 
         <div style={rowStyle}>
-          <Field label={f.t('mapping.date')} error={errorText(f, errors, 'dateIndex')}>
+          <Field anchor="dateIndex" label={f.t('mapping.date')} error={errorText(f, errors, 'dateIndex')}>
             {(p) => (
               <ColumnSelect
                 testId="mapping-date"
@@ -251,7 +245,11 @@ export function MappingStep({
               />
             )}
           </Field>
-          <Field label={f.t('mapping.description')} error={errorText(f, errors, 'descriptionIndex')}>
+          <Field
+            anchor="descriptionIndex"
+            label={f.t('mapping.description')}
+            error={errorText(f, errors, 'descriptionIndex')}
+          >
             {(p) => (
               <ColumnSelect
                 testId="mapping-description"
@@ -286,7 +284,11 @@ export function MappingStep({
 
         {form.amountMode === 'SIGNED' ? (
           <div style={rowStyle}>
-            <Field label={f.t('mapping.amount')} error={errorText(f, errors, 'amountIndex')}>
+            <Field
+              anchor="amountIndex"
+              label={f.t('mapping.amount')}
+              error={errorText(f, errors, 'amountIndex')}
+            >
               {(p) => (
                 <ColumnSelect
                   testId="mapping-amount"
@@ -301,6 +303,7 @@ export function MappingStep({
               )}
             </Field>
             <Field
+              anchor="signConvention"
               label={f.t('mapping.signConvention')}
               error={errorText(f, errors, 'signConvention')}
               hint={f.t('mapping.signHint')}
@@ -325,7 +328,11 @@ export function MappingStep({
           </div>
         ) : (
           <div style={rowStyle}>
-            <Field label={f.t('mapping.debit')} error={errorText(f, errors, 'debitIndex')}>
+            <Field
+              anchor="debitIndex"
+              label={f.t('mapping.debit')}
+              error={errorText(f, errors, 'debitIndex')}
+            >
               {(p) => (
                 <ColumnSelect
                   testId="mapping-debit"
@@ -339,7 +346,11 @@ export function MappingStep({
                 />
               )}
             </Field>
-            <Field label={f.t('mapping.credit')} error={errorText(f, errors, 'creditIndex')}>
+            <Field
+              anchor="creditIndex"
+              label={f.t('mapping.credit')}
+              error={errorText(f, errors, 'creditIndex')}
+            >
               {(p) => (
                 <ColumnSelect
                   testId="mapping-credit"
@@ -358,6 +369,7 @@ export function MappingStep({
 
         <div style={rowStyle}>
           <Field
+            anchor="dateFormat"
             label={f.t('mapping.dateFormat')}
             error={errorText(f, errors, 'dateFormat')}
             hint={f.t('mapping.dateFormatHint')}
@@ -381,6 +393,7 @@ export function MappingStep({
             )}
           </Field>
           <Field
+            anchor="decimalSeparator"
             label={f.t('mapping.decimalSeparator')}
             error={errorText(f, errors, 'decimalSeparator')}
             hint={f.t('mapping.decimalHint')}

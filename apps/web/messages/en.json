@@ -593,6 +593,11 @@
     "noWorkspace": "Select or create a workspace.",
     "loading": "Loading…"
   },
+  "Forms": {
+    "errorSummary": {
+      "title": "There {count, plural, one {is # error} other {are # errors}}"
+    }
+  },
   "Accounts": {
     "title": "Accounts",
     "actions": "Account actions",
@@ -3781,7 +3786,7 @@
         "credit": "Credit"
       },
       "formLabel": "Column assignment",
-      "errorsTitle": "Fix these items to continue:",
+      "errorsTitle": "There {count, plural, one {is # error} other {are # errors}}",
       "hasHeader": "The first row (after the skipped ones) is a header",
       "skipRows": "Rows to skip at the start",
       "skipRowsHint": "Bank text before the header; between 0 and 50.",

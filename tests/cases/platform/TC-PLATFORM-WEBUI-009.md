@@ -12,9 +12,10 @@ invariants: ["INV-008"]
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/web-interface.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["a11y","dialog","focus"]

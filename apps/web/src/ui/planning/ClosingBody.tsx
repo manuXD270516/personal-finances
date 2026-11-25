@@ -1,4 +1,12 @@
-import { cardStyle, ConfirmPanel, Field, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
+import {
+  cardStyle,
+  ConfirmDialog,
+  Field,
+  inputStyle,
+  mutedStyle,
+  rowStyle,
+  warningStyle,
+} from '../common/ui';
 import type { FormatContext } from '../dashboard/types';
 import { ClosingChecklistView } from './ClosingChecklistView';
 import { canReopen, NOTE_MAX, REASON_MAX, type CloseBlock, type CloseChecklist } from './closing-logic';
@@ -73,7 +81,7 @@ export function ClosingBody({
           </p>
           {canReopen(isOwner, period) ? (
             reopening ? (
-              <ConfirmPanel
+              <ConfirmDialog
                 title={f.t('reopen.confirmTitle', { name: periodName(period.label, f.locale) })}
                 description={f.t('reopen.confirmBody')}
                 confirmLabel={f.t('reopen.confirm')}
@@ -102,7 +110,7 @@ export function ClosingBody({
                     />
                   )}
                 </Field>
-              </ConfirmPanel>
+              </ConfirmDialog>
             ) : (
               <div style={rowStyle}>
                 <button type="button" onClick={onAskReopen} disabled={busy} data-testid="reopen">
