@@ -163,6 +163,13 @@ export interface ScheduleRepository {
    * `from_installment_no` lo cubre (las cuotas que una versión posterior reemplazó se excluyen).
    */
   installments(loanId: string, version: number): Promise<readonly StoredInstallment[]>;
+  /**
+   * `installments` de varios préstamos en una sola consulta (cada uno a su versión): la lista de préstamos no hace
+   * una consulta por fila. Un préstamo sin cuotas queda con arreglo vacío.
+   */
+  installmentsForLoans(
+    loans: readonly { readonly loanId: string; readonly version: number }[],
+  ): Promise<ReadonlyMap<string, readonly StoredInstallment[]>>;
   /** Solo las cuotas que la versión aporta. */
   ownInstallments(loanId: string, version: number): Promise<readonly StoredInstallment[]>;
 }
@@ -223,6 +230,10 @@ export interface PaymentRepository {
   allocationsOf(paymentId: string): Promise<readonly AllocationRecord[]>;
   /** Σ por cuota y componente de las imputaciones de pagos ACTIVE. */
   paidByInstallment(loanId: string): Promise<ReadonlyMap<string, ComponentAmounts>>;
+  /** `paidByInstallment` de varios préstamos en una sola consulta (la clave interna es el id de la cuota). */
+  paidByInstallmentForLoans(
+    loanIds: readonly string[],
+  ): Promise<ReadonlyMap<string, ReadonlyMap<string, ComponentAmounts>>>;
   /** Σ de los componentes pagados (pagos ACTIVE) de varios préstamos. */
   totalsByLoan(
     workspaceId: string,

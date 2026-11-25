@@ -16,6 +16,7 @@ import type {
 } from '@pf/ledger/contracts';
 import { pgExistingIds, runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
+import type { CounterMetrics } from '@pf/platform/otel';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
@@ -232,6 +233,8 @@ export interface CardsRuntimeOptions {
   /** Ventana de vigencia de las tasas de valoración (`REPORTING_RATE_VALIDITY_WINDOW`). */
   readonly rateValidityWindowDays: number;
   readonly settings?: Partial<CardSettings>;
+  /** Contadores OTel (`debt_card_cycle_mismatch_total`); sin ellos no se registran métricas. */
+  readonly counters?: CounterMetrics;
 }
 
 export const DEFAULT_CARD_SETTINGS: Omit<CardSettings, 'rateValidityWindowDays'> = {
@@ -310,6 +313,7 @@ export function createCardsRuntime(options: CardsRuntimeOptions): CardsRuntime {
     outbox: options.outbox,
     ids: uuidV7Ids,
     clock: options.clock,
+    ...(options.counters ? { metrics: options.counters } : {}),
     settings: {
       ...DEFAULT_CARD_SETTINGS,
       rateValidityWindowDays: options.rateValidityWindowDays,

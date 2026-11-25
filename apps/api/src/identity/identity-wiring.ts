@@ -865,6 +865,7 @@ export function financeRuntimes(input: {
     recurringQuery: commitments.recurringDefinitionQuery,
     rates: fx.valuation,
     rateValidityWindowDays,
+    counters: otelCounters('@pf/debt'),
   });
   deferred.cards = cards;
   // DEBT (add-debt-summary): resumen de deudas de solo lectura sobre `LoanPortfolioQuery` y `CardPortfolioQuery` del
