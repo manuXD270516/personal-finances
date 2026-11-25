@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -151,4 +151,30 @@ export async function serviceHealth(): Promise<Record<string, { state: string; h
   if (!file) throw new Error(`${ENV_FILE_VAR} no apunta a un .env (¿corrió el global setup?)`);
   const states = await serviceStates(composeContext(processEnvFor(file)));
   return Object.fromEntries(states.map((s) => [s.Service, { state: s.State, health: s.Health ?? '' }]));
+}
+
+/**
+ * Vuelca los logs de los contenedores del stack E2E a `<dir>/<servicio>.log` (con marcas de tiempo) justo antes de
+ * bajarlo, para subirlos como artefacto cuando un test falla (docs/38 §4: el flake de la banda predicha no se podía
+ * diagnosticar sin los logs del worker). Los secretos del stack E2E son de prueba (`.env` desechable). No lanza.
+ */
+export async function dumpServiceLogs(dir: string, file = process.env[ENV_FILE_VAR]): Promise<void> {
+  try {
+    if (!file) return;
+    mkdirSync(dir, { recursive: true });
+    const env = processEnvFor(file);
+    const ctx = composeContext(env);
+    const states = await serviceStates(ctx);
+    for (const { Service } of states) {
+      const result = await compose(
+        ['core', 'ml'],
+        ['logs', '--no-color', '--timestamps', Service],
+        { mode: 'capture', env },
+        ctx,
+      );
+      writeFileSync(join(dir, `${Service}.log`), result.stdout + result.stderr);
+    }
+  } catch (err) {
+    process.stderr.write(`[e2e] no se pudieron volcar los logs: ${String(err)}\n`);
+  }
 }
