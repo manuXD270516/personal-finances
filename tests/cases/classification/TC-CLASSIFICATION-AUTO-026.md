@@ -5,16 +5,18 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Rendimiento de las sugerencias"
 scenario: "Import de 5000 filas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014"]
 nfr: ["NFR-PERF-007"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/category-suggestions.test.ts
+  - apps/api/test/perf/category-suggestions.perf.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions","perf"]

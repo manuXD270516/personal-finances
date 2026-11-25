@@ -5,16 +5,20 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Sugerencia en la vista previa del import"
 scenario: "Aceptar las sugerencias de confianza alta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014","FR-IMPORTS-009"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.suggestions.test.ts
+  - apps/web/src/ui/category-suggestions/category-suggestions.test.tsx
+  - apps/api/test/api/category-suggestions.api.test.ts
+  - tests/e2e/specs/category-suggestions.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

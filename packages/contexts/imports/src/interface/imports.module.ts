@@ -50,6 +50,8 @@ import type {
   OutboxPort,
   ReferenceCatalogPort,
   RulesEvaluationPort,
+  CategorySuggestionFeedbackPort,
+  CategorySuggestionsPort,
   SystemCategoriesPort,
 } from '../application/ports/index.js';
 import {
@@ -158,6 +160,10 @@ export interface ImportsRuntimeOptions {
   readonly documents: DocumentSourcePort;
   /** Evaluación de reglas (add-rule-engine); sin el motor aplicado, un adaptador que falla deja `IMPORT_RULES_UNAVAILABLE`. */
   readonly rules: RulesEvaluationPort;
+  /** Sugerencias de categoría por historial (add-category-suggestions); sin él, la vista previa no las muestra. */
+  readonly suggestions?: CategorySuggestionsPort;
+  /** Tasa de aceptación de las sugerencias: se registra al aprobar, en la misma unidad de trabajo. */
+  readonly suggestionFeedback?: CategorySuggestionFeedbackPort;
   /** Contraparte por alias y categoría por defecto (CLASSIFICATION). */
   readonly counterparties: CounterpartyResolverPort;
   /** Coincidencias con compromisos y vínculo con la ocurrencia confirmada (COMMITMENTS). */
@@ -301,6 +307,8 @@ export function createImportsRuntime(options: ImportsRuntimeOptions): ImportsRun
     profiles: new PgMappingProfileRepository(),
     documents: options.documents,
     rules: options.rules,
+    ...(options.suggestions ? { suggestions: options.suggestions } : {}),
+    ...(options.suggestionFeedback ? { suggestionFeedback: options.suggestionFeedback } : {}),
     counterparties: options.counterparties,
     matching: options.matching,
     occurrenceLinks: options.occurrenceLinks,

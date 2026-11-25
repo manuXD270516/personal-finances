@@ -91,6 +91,49 @@ export interface RuleOutcome {
   readonly matched: readonly RuleOrigin[];
 }
 
+// ───────────────────────────────────────────────────────────── sugerencias de categoría (add-category-suggestions)
+
+/** Sugerencia de categoría por historial (misma forma que `CategorySuggestionDto` de `@pf/rules/contracts`). */
+export interface CategorySuggestionEntry {
+  readonly categoryId: string;
+  /** Texto decimal de 4 decimales (`0.9000`). */
+  readonly confidence: string;
+  readonly level: 'HIGH' | 'MEDIUM';
+  readonly support: number;
+  readonly matches: number;
+  readonly basis: 'COUNTERPARTY' | 'DESCRIPTION' | 'BOTH';
+  readonly descriptionKey: string | null;
+  readonly counterpartyId: string | null;
+}
+
+/** `CategorySuggestionQuery.suggestMany` de RULES: un índice por llamada; solo devuelve las filas con sugerencia. */
+export interface CategorySuggestionsPort {
+  suggestMany(input: {
+    readonly workspaceId: string;
+    readonly subjects: readonly {
+      readonly ref: string;
+      readonly kind: 'INCOME' | 'EXPENSE';
+      readonly description: string | null;
+      readonly counterpartyId: string | null;
+    }[];
+  }): Promise<ReadonlyMap<string, CategorySuggestionEntry>>;
+}
+
+/** `CategorySuggestionFeedbackPort.recordBatch` de RULES: el resultado de cada sugerencia mostrada (sin textos ni montos). */
+export interface CategorySuggestionFeedbackPort {
+  recordBatch(input: {
+    readonly workspaceId: string;
+    readonly surface: 'IMPORT';
+    readonly importJobId: string;
+    readonly outcomes: readonly {
+      readonly level: 'HIGH' | 'MEDIUM';
+      readonly outcome: 'ACCEPTED' | 'CORRECTED' | 'IGNORED';
+      readonly occurredOn: string;
+      readonly transactionId: string | null;
+    }[];
+  }): Promise<void>;
+}
+
 /** `RuleEvaluationQuery.evaluate` con `trigger = IMPORT` y `mode = FILL_EMPTY` (hasta 5 000 sujetos por llamada). */
 export interface RulesEvaluationPort {
   evaluate(input: {
@@ -248,6 +291,8 @@ export interface PipelineRowResult {
   readonly warnings: readonly RowIssue[];
   /** Tipo propuesto por la normalización (gasto/ingreso por la dirección). */
   readonly kind: RowKind | null;
+  /** Sugerencia de categoría por historial (solo para las filas que siguen sin categoría; nunca se aplica sola). */
+  readonly suggestedCategory?: CategorySuggestionEntry | null;
 }
 
 export interface PreviewFilter {
@@ -258,6 +303,8 @@ export interface PreviewFilter {
   /** Confianza del candidato de duplicado. */
   readonly candidateConfidence?: 'HIGH' | 'MEDIUM' | 'LOW' | undefined;
   readonly decision?: Decision | undefined;
+  /** Solo las filas con una sugerencia de categoría vigente (sin categoría editada), add-category-suggestions. */
+  readonly hasSuggestion?: boolean | undefined;
 }
 
 export interface BulkEditSet {

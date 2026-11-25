@@ -1345,6 +1345,58 @@ export const VARIABLES = {
       default: '50',
     },
   ),
+  // ── add-category-suggestions (classification/auto-classification, D476 y D477) ──
+  RULES_CATEGORY_SUGGEST_ENABLED: variable(bool, {
+    group: 'Rules',
+    description:
+      'Habilita las sugerencias de categoría por historial en la instalación (API y worker). Deshabilitado, la consulta responde `DISABLED` y la vista previa del import no muestra sugerencias; es el rollback del change.',
+    default: 'true',
+  }),
+  RULES_CATEGORY_SUGGEST_WINDOW_DAYS: variable(
+    positiveInt.refine((n) => n <= 366, 'hasta 366 días'),
+    {
+      group: 'Rules',
+      description:
+        'Ventana en días de la evidencia de las sugerencias de categoría (365): se cuentan las clasificaciones que fijó el usuario en los últimos N días.',
+      default: '365',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_MAX_EVIDENCE: variable(
+    positiveInt.refine((n) => n <= 5000, 'hasta 5000 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Máximo de transacciones de evidencia que lee el sugeridor de categorías (5000, las más recientes de la ventana); si hay más se cuenta en la métrica `rules_category_suggestion_evidence_truncated_total`.',
+      default: '5000',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_MIN_SUPPORT: variable(
+    positiveInt.refine((n) => n <= 1000, 'hasta 1000 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Apoyo mínimo de una sugerencia de categoría (2): transacciones del patrón (contraparte o clave de descripción) y del mismo tipo. Una sugerencia se confirma una por una, por eso es menor que el de las sugerencias de reglas.',
+      default: '2',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE: variable(
+    z.string().regex(/^(0.[0-9]{1,4}|1(.0{1,4})?)$/u, 'decimal entre 0 y 1 con hasta 4 decimales'),
+    {
+      group: 'Rules',
+      description:
+        'Confianza mínima de una sugerencia de categoría (0.7000, D477): transacciones del patrón en la categoría ganadora ÷ total del patrón y del mismo tipo, con 4 decimales HALF_EVEN.',
+      default: '0.7000',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS: variable(
+    positiveInt.refine((n) => n <= 3600, 'hasta 3600 segundos'),
+    {
+      group: 'Rules',
+      description:
+        'Vigencia en segundos de la caché en proceso del índice de evidencia por workspace de la consulta del alta manual (300, tope de 200 workspaces). Una aceptación no la invalida: la sugerencia siguiente puede tardar hasta este tiempo en reflejarla.',
+      default: '300',
+    },
+  ),
   IMPORT_PERSIST_BATCH_SIZE: variable(
     positiveInt.refine((n) => n <= 1000, 'hasta 1000 filas por lote'),
     {
@@ -1839,6 +1891,13 @@ export const APP_VARIABLES = {
     'RULES_SUGGEST_HIGH_MIN_SUPPORT',
     'RULES_SUGGEST_MAX_EVIDENCE',
     'RULES_SUGGEST_MAX_RESULTS',
+    // add-category-suggestions: la API resuelve la consulta del alta manual.
+    'RULES_CATEGORY_SUGGEST_ENABLED',
+    'RULES_CATEGORY_SUGGEST_WINDOW_DAYS',
+    'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE',
+    'RULES_CATEGORY_SUGGEST_MIN_SUPPORT',
+    'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE',
+    'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS',
     // add-workspace-export: la API solicita, descarga (descifra en streaming) e importa.
     ...EXPORT_PORTABILITY,
     'REAUTH_MAX_AGE',
@@ -1900,6 +1959,13 @@ export const APP_VARIABLES = {
     'IMPORT_PROCESSING_TIMEOUT',
     'IMPORT_DUPLICATE_HIGH_SCORE',
     'IMPORT_DUPLICATE_LOW_SCORE',
+    // add-category-suggestions: la etapa de clasificación del import (consumidor `imports.persist`) calcula las sugerencias.
+    'RULES_CATEGORY_SUGGEST_ENABLED',
+    'RULES_CATEGORY_SUGGEST_WINDOW_DAYS',
+    'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE',
+    'RULES_CATEGORY_SUGGEST_MIN_SUPPORT',
+    'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE',
+    'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS',
     // add-banking-providers: solo el worker tiene las claves privadas y habla con los proveedores.
     'CONNECTION_CREDENTIALS_PUBLIC_KEYS',
     'CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE',

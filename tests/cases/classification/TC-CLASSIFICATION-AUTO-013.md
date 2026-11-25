@@ -5,16 +5,19 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Sugerencia en el alta manual"
 scenario: "Sugerencia al escribir la descripción"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014"]
 nfr: ["NFR-SEC-009"]
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/category-suggestions/category-suggestions.test.tsx
+  - apps/api/test/api/category-suggestions.api.test.ts
+  - tests/e2e/specs/category-suggestions.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

@@ -7256,6 +7256,58 @@
       "gap": "Un hueco de periodos sin movimientos acortó la historia usada."
     }
   },
+  "CategorySuggestions": {
+    "level": {
+      "HIGH": "alta",
+      "MEDIUM": "media"
+    },
+    "chip": {
+      "suggestedLevel": "Sugerida: {category} · confianza {level}",
+      "default": "Categoría por defecto de la contraparte: {category}",
+      "lastUsed": "Última categoría usada con esta contraparte: {category}",
+      "accepted": "Categoría sugerida aceptada: {category}",
+      "accept": "Aceptar",
+      "other": "Otra",
+      "acceptAria": "Aceptar la categoría sugerida {category}",
+      "otherAria": "Elegir otra categoría",
+      "ruleApplies": "Una regla clasificará este movimiento al guardarlo; por eso no se sugiere una categoría."
+    },
+    "reason": {
+      "kind": {
+        "EXPENSE": "gastos",
+        "INCOME": "ingresos",
+        "REFUND": "reembolsos"
+      },
+      "description": "Elegiste \"{category}\" en {matches} de {support} {kind} parecidos a \"{key}\"",
+      "counterparty": "Elegiste \"{category}\" en {matches} de {support} {kind} con \"{counterparty}\"",
+      "both": "Elegiste \"{category}\" en {matches} de {support} {kind} parecidos a \"{key}\" y de la misma contraparte"
+    },
+    "import": {
+      "column": "Sugerencia",
+      "suggestedLevel": "Sugerida: {category} · confianza {level}",
+      "accept": "Aceptar",
+      "acceptAria": "Aceptar la categoría sugerida {category} en la línea {line}",
+      "acceptHigh": "Aceptar sugerencias de confianza alta",
+      "acceptMedium": "Aceptar sugerencias de confianza alta y media",
+      "hint": "Las sugerencias vienen de tu historial y nunca se aplican solas: las filas que no aceptes se crean sin categoría.",
+      "done": "Se aceptaron {count} sugerencias de categoría.",
+      "filter": "Con sugerencia"
+    },
+    "rate": {
+      "title": "Sugerencias de categoría",
+      "intro": "Qué hiciste con las sugerencias de categoría de este mes.",
+      "loading": "Cargando…",
+      "rate": "Tasa de aceptación",
+      "empty": "Todavía no hay sugerencias resueltas este mes.",
+      "summary": "{shown} mostradas · {accepted} aceptadas · {corrected} corregidas · {ignored} ignoradas",
+      "surface": {
+        "MANUAL_ENTRY": "Alta manual",
+        "IMPORT": "Importación"
+      },
+      "bySurface": "Por canal",
+      "failed": "No se pudo leer la tasa de aceptación."
+    }
+  },
   "SpendingAnomalies": {
     "title": "Gastos atípicos",
     "subtitle": "Gastos que se alejan de lo habitual para su categoría o su contraparte, con el motivo. Es solo un aviso: no cambia ninguna transacción ni ninguna cifra.",

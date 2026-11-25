@@ -411,6 +411,12 @@ export function financeRuntimes(input: {
         | 'RULES_SUGGEST_HIGH_MIN_SUPPORT'
         | 'RULES_SUGGEST_MAX_EVIDENCE'
         | 'RULES_SUGGEST_MAX_RESULTS'
+        | 'RULES_CATEGORY_SUGGEST_ENABLED'
+        | 'RULES_CATEGORY_SUGGEST_WINDOW_DAYS'
+        | 'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE'
+        | 'RULES_CATEGORY_SUGGEST_MIN_SUPPORT'
+        | 'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE'
+        | 'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS'
         | 'IMPORT_MAX_ROWS'
         | 'IMPORT_PROCESSING_TIMEOUT'
         | 'IMPORT_DUPLICATE_HIGH_SCORE'
@@ -566,6 +572,7 @@ export function financeRuntimes(input: {
   deferred.categoryUsage = transactions.categoryUsage;
   // RULES (add-rule-engine): reglas de clasificación. Solo contratos públicos de CLASSIFICATION y TRANSACTIONS; sin
   // consumidores de eventos ni colas nuevas (D249, presupuesto de conexiones).
+  const rulesCounters = otelCounters('@pf/rules');
   const rules = createRulesRuntime({
     pool: input.pool,
     clock: input.clock,
@@ -578,6 +585,7 @@ export function financeRuntimes(input: {
     coverage: transactions.classificationCoverage,
     calendar: workspaceCalendar(input.pool, input.clock, input.config.APP_TIMEZONE),
     settings: rulesSettingsFrom(input.config),
+    metrics: rulesCounters,
   });
   deferred.rules = rules;
   // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
@@ -969,6 +977,9 @@ export function financeRuntimes(input: {
       commitments,
       classification: classification.validator,
       rules: rules.evaluation,
+      categorySuggestions: rules.suggestionQuery,
+      suggestionFeedback: rules.suggestionFeedback,
+      counters: rulesCounters,
       accountCatalog: accounts.catalog,
     }),
     settings: importsSettingsFrom(input.config),
@@ -1305,6 +1316,12 @@ export function rulesSettingsFrom(
       | 'RULES_SUGGEST_HIGH_MIN_SUPPORT'
       | 'RULES_SUGGEST_MAX_EVIDENCE'
       | 'RULES_SUGGEST_MAX_RESULTS'
+      | 'RULES_CATEGORY_SUGGEST_ENABLED'
+      | 'RULES_CATEGORY_SUGGEST_WINDOW_DAYS'
+      | 'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE'
+      | 'RULES_CATEGORY_SUGGEST_MIN_SUPPORT'
+      | 'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE'
+      | 'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS'
     >
   >,
 ) {
@@ -1330,6 +1347,26 @@ export function rulesSettingsFrom(
         : {}),
       ...(config.RULES_SUGGEST_MAX_EVIDENCE ? { maxEvidence: config.RULES_SUGGEST_MAX_EVIDENCE } : {}),
       ...(config.RULES_SUGGEST_MAX_RESULTS ? { maxResults: config.RULES_SUGGEST_MAX_RESULTS } : {}),
+    },
+    categorySuggest: {
+      ...(config.RULES_CATEGORY_SUGGEST_ENABLED !== undefined
+        ? { enabled: config.RULES_CATEGORY_SUGGEST_ENABLED }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_WINDOW_DAYS
+        ? { windowDays: config.RULES_CATEGORY_SUGGEST_WINDOW_DAYS }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_MAX_EVIDENCE
+        ? { maxEvidence: config.RULES_CATEGORY_SUGGEST_MAX_EVIDENCE }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_MIN_SUPPORT
+        ? { minSupport: config.RULES_CATEGORY_SUGGEST_MIN_SUPPORT }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE
+        ? { minConfidence: config.RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS
+        ? { cacheTtlSeconds: config.RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS }
+        : {}),
     },
   };
 }

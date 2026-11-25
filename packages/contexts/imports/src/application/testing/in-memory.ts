@@ -19,6 +19,9 @@ import {
 import type {
   AccountView,
   BulkEditSet,
+  CategorySuggestionEntry,
+  CategorySuggestionFeedbackPort,
+  CategorySuggestionsPort,
   DocumentForImport,
   ImportJobFilter,
   ImportJobRepository,
@@ -120,6 +123,18 @@ export class MemoryWorld {
   /** La evaluación de reglas falla (RULES caído). */
   rulesFail = false;
   rulesCalls = 0;
+  /** Sugerencias de categoría por historial (add-category-suggestions): por descripción (substring en minúsculas). */
+  suggestionRules: { match: string; entry: CategorySuggestionEntry }[] = [];
+  /** El puerto de sugerencias está cableado (la función habilitada); `false` ⇒ la vista previa no muestra sugerencias. */
+  suggestionsEnabled = false;
+  /** El cálculo de sugerencias falla. */
+  suggestionsFail = false;
+  suggestionCalls = 0;
+  /** Resultados registrados por la aprobación (tasa de aceptación). */
+  feedback: {
+    importJobId: string;
+    outcomes: { level: string; outcome: string; occurredOn: string }[];
+  }[] = [];
   /** Ocurrencias de compromisos candidatas por descripción de ocurrencia (rowRef se resuelve por fecha y monto). */
   occurrences: (OccurrenceCandidateEntry & {
     amount: string;
@@ -339,6 +354,8 @@ const blankStaged = (id: string, jobId: string, rowNumber: number, raw: readonly
   decidedAt: null,
   decidedScore: null,
   warnings: [],
+  suggestedCategory: null,
+  suggestionAccepted: false,
 });
 
 const categoryOf = (r: StagedRow): string | null =>
@@ -348,6 +365,15 @@ function matchesFilter(r: StagedRow, f: PreviewFilter): boolean {
   if (f.classification && r.classification !== f.classification) return false;
   if (f.decision && r.decision !== f.decision) return false;
   if (f.needsCategory !== undefined && (categoryOf(r) === null) !== f.needsCategory) return false;
+  if (
+    f.hasSuggestion === true &&
+    !(
+      r.suggestedCategory !== null &&
+      r.edits.categoryId === undefined &&
+      (r.proposal?.category?.value ?? null) === null
+    )
+  )
+    return false;
   if (f.ruleId && !JSON.stringify(r.proposal ?? {}).includes(`"ruleId":"${f.ruleId}"`)) return false;
   if (f.candidateConfidence && r.candidates[0]?.confidence !== f.candidateConfidence) return false;
   return true;
@@ -428,6 +454,9 @@ class MemoryStaging implements StagingRepository {
         occurrenceLink: null,
         warnings: i.warnings,
         kind: i.kind,
+        suggestedCategory: byId.get(i.id)?.suggestionAccepted
+          ? byId.get(i.id)?.suggestedCategory
+          : (i.suggestedCategory ?? null),
         transactionId: null,
         batchNo: null,
         batchError: null,
@@ -442,11 +471,83 @@ class MemoryStaging implements StagingRepository {
   async applyProposals(
     _ws: string,
     jobId: string,
-    items: readonly { id: string; proposal: StagedRow['proposal']; warnings: StagedRow['warnings'] }[],
+    items: readonly {
+      id: string;
+      proposal: StagedRow['proposal'];
+      warnings: StagedRow['warnings'];
+      suggestedCategory?: StagedRow['suggestedCategory'];
+    }[],
   ) {
     const byId = new Map(this.rowsOf(jobId).map((s) => [s.id, s] as const));
-    for (const i of items)
-      Object.assign(byId.get(i.id) as MemStaged, { proposal: i.proposal, warnings: i.warnings });
+    for (const i of items) {
+      const row = byId.get(i.id) as MemStaged;
+      Object.assign(row, {
+        proposal: i.proposal,
+        warnings: i.warnings,
+        suggestedCategory: row.suggestionAccepted ? row.suggestedCategory : (i.suggestedCategory ?? null),
+      });
+    }
+  }
+
+  async suggestionCandidates(
+    _ws: string,
+    jobId: string,
+    filter: { levels: readonly ('HIGH' | 'MEDIUM')[]; rowIds?: readonly string[] | undefined },
+  ) {
+    return this.rowsOf(jobId)
+      .filter(
+        (r) =>
+          (r.classification === 'NEW' || r.classification === 'DUPLICATE_PROBABLE') &&
+          r.suggestedCategory !== null &&
+          filter.levels.includes(r.suggestedCategory.level) &&
+          r.edits.categoryId === undefined &&
+          (r.edits.kind ?? r.kind ?? 'EXPENSE') !== 'TRANSFER' &&
+          (r.edits.kind ?? r.kind ?? 'EXPENSE') !== 'CONVERSION' &&
+          (r.proposal?.category?.value ?? null) === null &&
+          (filter.rowIds === undefined || filter.rowIds.includes(r.id)),
+      )
+      .sort((a, b) => a.rowNumber - b.rowNumber)
+      .map((r) => ({ rowId: r.id, categoryId: (r.suggestedCategory as { categoryId: string }).categoryId }));
+  }
+
+  async acceptSuggestions(_ws: string, jobId: string, rowIds: readonly string[]) {
+    let n = 0;
+    for (const r of this.rowsOf(jobId)) {
+      if (!rowIds.includes(r.id) || r.suggestedCategory === null || r.edits.categoryId !== undefined)
+        continue;
+      r.edits = { ...r.edits, categoryId: r.suggestedCategory.categoryId };
+      r.suggestionAccepted = true;
+      n += 1;
+    }
+    return n;
+  }
+
+  async markSuggestionAccepted(_ws: string, jobId: string, rowId: string) {
+    const row = this.rowsOf(jobId).find((r) => r.id === rowId);
+    if (row) row.suggestionAccepted = true;
+  }
+
+  async suggestionOutcomes(_ws: string, jobId: string) {
+    return this.rowsOf(jobId)
+      .filter(
+        (r) =>
+          (r.classification === 'NEW' || r.classification === 'DUPLICATE_PROBABLE') &&
+          r.decision === 'CREATE' &&
+          r.suggestedCategory !== null &&
+          (r.edits.kind ?? r.kind ?? 'EXPENSE') !== 'TRANSFER' &&
+          (r.edits.kind ?? r.kind ?? 'EXPENSE') !== 'CONVERSION',
+      )
+      .sort((a, b) => a.rowNumber - b.rowNumber)
+      .map((r) => {
+        const suggestion = r.suggestedCategory as NonNullable<StagedRow['suggestedCategory']>;
+        return {
+          rowId: r.id,
+          level: suggestion.level,
+          suggestedCategoryId: suggestion.categoryId,
+          effectiveCategoryId: categoryOf(r),
+          accepted: r.suggestionAccepted,
+        };
+      });
   }
 
   async applyEdit(
@@ -1192,6 +1293,35 @@ export function createMemoryDeps(world: MemoryWorld, settings: Partial<ImportsSe
       },
       async linkToImport(input) {
         world.documents.get(input.documentId)?.linkedTo.push(input.importJobId);
+      },
+    },
+    // El puerto siempre está cableado; con la función deshabilitada devuelve un mapa vacío (como el adaptador real).
+    ...{
+      suggestions: {
+        async suggestMany(input: Parameters<CategorySuggestionsPort['suggestMany']>[0]) {
+          if (!world.suggestionsEnabled) return new Map<string, CategorySuggestionEntry>();
+          world.suggestionCalls += 1;
+          if (world.suggestionsFail) throw new Error('suggestions unavailable');
+          const out = new Map<string, CategorySuggestionEntry>();
+          for (const subject of input.subjects) {
+            const text = (subject.description ?? '').toLowerCase();
+            const found = world.suggestionRules.find((r) => text.includes(r.match));
+            if (found) out.set(subject.ref, found.entry);
+          }
+          return out;
+        },
+      },
+      suggestionFeedback: {
+        async recordBatch(input: Parameters<CategorySuggestionFeedbackPort['recordBatch']>[0]) {
+          world.feedback.push({
+            importJobId: input.importJobId,
+            outcomes: input.outcomes.map((o) => ({
+              level: o.level,
+              outcome: o.outcome,
+              occurredOn: o.occurredOn,
+            })),
+          });
+        },
       },
     },
     rules: {

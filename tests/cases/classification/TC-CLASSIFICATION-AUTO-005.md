@@ -5,16 +5,18 @@ spec: classification/auto-classification
 related_specs: []
 requirement: "Historial que cuenta para la sugerencia"
 scenario: "Clasificaciones hechas por una regla no cuentan"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-014","FR-RULES-011"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/rules/src/application/category-suggestions.test.ts
+  - apps/api/test/api/category-suggestions.api.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["category-suggestions"]

@@ -10316,6 +10316,10 @@ paths:
           in: query
           description: Only the rows without a proposed or edited category (`true`) or only those with one (`false`).
           schema: { type: boolean }
+        - name: hasSuggestion
+          in: query
+          description: Only the rows that show a category suggestion from the history (`true`; add-category-suggestions).
+          schema: { type: boolean }
         - name: ruleId
           in: query
           description: Only the rows whose classification came from this rule.
@@ -10598,6 +10602,52 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'VALIDATION_FAILED, CATEGORY_KIND_MISMATCH or REFERENCE_NOT_FOUND.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/rows/accept-suggestions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: acceptImportCategorySuggestions
+      summary: Accept the category suggestions of the rows of an import in review
+      description: |
+        An explicit user action (a suggestion is never applied on its own): sets, for every row of the import that shows a category suggestion of level `minLevel` (`HIGH`, or `MEDIUM` for the `HIGH` and `MEDIUM` ones), the suggested category as a manual edit, in ONE new version of the import. `rowIds` limits it to those rows. A row without a suggestion, already edited (or classified by a rule) or whose suggested category was archived since does not change. The rows that are not accepted are created without a category on approval. Only an import in `AWAITING_REVIEW`. `If-Match` is the version of the import; the response ETag carries the new one. Audited on the import.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportSuggestionAcceptInput' }
+            examples:
+              high:
+                summary: Accept the high confidence suggestions
+                value: { minLevel: HIGH }
+      responses:
+        '200':
+          description: Suggestions accepted
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportSuggestionAcceptResult' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (unknown `minLevel` or more than 5 000 `rowIds`).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is not in review).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -13590,6 +13640,132 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/category-suggestions/query:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: queryCategorySuggestion
+      summary: Suggest a category for a transaction from the user's own history
+      description: |
+        Suggests the category the user chose most often for the same pattern, with its confidence and level. Two patterns are looked at: the counterparty and the normalized description key (the same key as the rule suggestions: no accents, lowercase, without words with digits or asterisks or of one character, up to 5 words, at least 3 letters). `confidence` is the transactions of the pattern in the winning category divided by all the transactions of the pattern of the same kind (4 decimals HALF_EVEN); a suggestion needs at least 2 transactions, a confidence of at least 0.7000 and a category that wins strictly (`HIGH` from 0.9000 with 5 or more transactions, `MEDIUM` otherwise). If both patterns agree the answer is one suggestion with `basis = BOTH` and the greater confidence; if they differ the one with the greater confidence wins and, on a tie, the counterparty.
+        Only what the user chose counts (manual origin, or unknown origin before the rule engine on transactions entered by hand or imported), in the last 365 days and up to the 5 000 most recent, with an active category of the right kind; what a rule set never counts. Before looking at the history the active rules with the manual-creation trigger are evaluated over the draft: if one would set the category the answer is `RULE_APPLIES` with the rule and no suggestion. Nothing is applied: the suggestion is shown and the user accepts it or picks another category.
+        `POST` and not `GET` because the description is personal data and must not travel in a URL or an access log. The index of the history is cached in the process per workspace (300 s by default), so an accepted suggestion can take up to that long to count. With the function disabled (`RULES_CATEGORY_SUGGEST_ENABLED=false`) the answer is `DISABLED`. A read: no side effects, no audit, no `Idempotency-Key`.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: VIEWER
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategorySuggestionQueryInput' }
+            examples:
+              description:
+                summary: A new expense typed in the manual form
+                value: { kind: EXPENSE, description: 'PEDIDOSYA *8812' }
+      responses:
+        '200':
+          description: The suggestion, or why there is none
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategorySuggestionResult' }
+              examples:
+                suggested:
+                  summary: 9 of 10 similar expenses are in Restaurants
+                  value:
+                    status: SUGGESTED
+                    suggestion:
+                      categoryId: '01928c4e-0000-7000-8000-0000000ca001'
+                      confidence: '0.9000'
+                      level: HIGH
+                      support: 10
+                      matches: 9
+                      basis: DESCRIPTION
+                      descriptionKey: pedidosya
+                      counterpartyId: null
+                    ruleId: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (neither `description` nor `counterpartyId`, an unknown `kind` or a description over 500 characters).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/category-suggestions/feedback:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: recordCategorySuggestionOutcome
+      summary: Record what the user did with a suggestion shown in the manual form
+      description: |
+        After saving a transaction for which a suggestion was shown, the form reports whether the user accepted it (`chosenCategoryId` equals `suggestedCategoryId`), chose another category (`CORRECTED`) or left the transaction without a category (`IGNORED`). It stores only the channel, the level, the outcome and the business date: never descriptions, amounts or categories. Product telemetry: not audited and not part of the workspace export. If the call is lost, only a metric is lost.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategorySuggestionFeedbackInput' }
+      responses:
+        '204':
+          description: Outcome recorded
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED.'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/category-suggestions/stats:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Rules]
+      operationId: getCategorySuggestionStats
+      summary: Acceptance rate of the category suggestions in a date range
+      description: |
+        Counts the suggestions shown and resolved between `from` and `to` (business dates in the workspace time zone): accepted, corrected and ignored, in total, by channel (manual form or import) and by level, and the acceptance rate (accepted divided by shown, 4 decimals HALF_EVEN; `null` without suggestions). A range that goes backwards or spans more than 366 days is `INVALID_FILTER`.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/LocalDate' }
+      responses:
+        '200':
+          description: Acceptance rate of the range
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategorySuggestionStats' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'INVALID_FILTER (a range that goes backwards or spans more than 366 days) or an invalid query.'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -25028,6 +25204,12 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ImportRowConversion'
             - type: 'null'
+        suggestedCategory:
+          oneOf:
+            - $ref: '#/components/schemas/HistoryCategorySuggestion'
+            - type: 'null'
+          description: >-
+            Category suggested from the user's history for a row that has no category after the rules and the default category of the counterparty (add-category-suggestions). Never applied without an explicit action: accept it with `decideImportRow` (`acceptedSuggestion`) or in bulk with `acceptImportCategorySuggestions`.
     ImportPreview:
       type: object
       additionalProperties: false
@@ -25082,6 +25264,10 @@ components:
               properties:
                 occurrenceId: { $ref: '#/components/schemas/Uuid' }
             - type: 'null'
+        acceptedSuggestion:
+          type: boolean
+          description: >-
+            With `categoryId` equal to the `suggestedCategory` of the row, marks the category as an accepted suggestion (for the acceptance rate); any other `categoryId` with this flag is `VALIDATION_FAILED`.
     ImportRowDecisionResult:
       allOf:
         - $ref: '#/components/schemas/ImportPreviewRow'
@@ -25676,6 +25862,153 @@ components:
               items: { $ref: '#/components/schemas/Uuid' }
             counterpartyId: { $ref: '#/components/schemas/Uuid' }
             decision: { $ref: '#/components/schemas/ImportRowDecision' }
+    HistoryCategorySuggestion:
+      type: object
+      additionalProperties: false
+      required: [categoryId, confidence, level, support, matches, basis, descriptionKey, counterpartyId]
+      description: >-
+        A category suggested from the user's own history. It is never applied without an explicit user action.
+      properties:
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        confidence:
+          type: string
+          pattern: '^\d\.\d{4}$'
+          description: '`matches` divided by `support`, 4 decimals HALF_EVEN (at least `0.7000`).'
+        level:
+          type: string
+          x-extensible-enum: [HIGH, MEDIUM]
+          description: '`HIGH` from `0.9000` with 5 or more transactions; `MEDIUM` otherwise.'
+        support: { type: integer, minimum: 1, description: 'Transactions of the pattern of the same kind, in any category.' }
+        matches: { type: integer, minimum: 1, description: Transactions of the pattern in the suggested category. }
+        basis:
+          type: string
+          x-extensible-enum: [COUNTERPARTY, DESCRIPTION, BOTH]
+        descriptionKey:
+          type: [string, 'null']
+          description: Normalized description key of the pattern (lowercase, no accents); null when the basis is the counterparty.
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    CategorySuggestionQueryInput:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      description: The draft of the transaction. At least one of `description` or `counterpartyId`.
+      properties:
+        kind:
+          type: string
+          x-extensible-enum: [INCOME, EXPENSE, REFUND]
+        description: { type: string, maxLength: 500, description: 'Untrusted text; travels in the body, never in the URL.' }
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        accountId:
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+          description: Account of the draft, for the rules with the manual-creation trigger.
+        date:
+          allOf:
+            - $ref: '#/components/schemas/LocalDate'
+          description: Business date of the draft (today in the workspace time zone by default).
+    CategorySuggestionResult:
+      type: object
+      additionalProperties: false
+      required: [status, suggestion, ruleId]
+      properties:
+        status:
+          type: string
+          x-extensible-enum: [SUGGESTED, RULE_APPLIES, NONE, DISABLED]
+          description: '`RULE_APPLIES`: an active rule with the manual-creation trigger will set the category (`ruleId`), so there is no suggestion. `DISABLED`: the function is turned off in the installation.'
+        suggestion:
+          oneOf:
+            - $ref: '#/components/schemas/HistoryCategorySuggestion'
+            - type: 'null'
+        ruleId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    CategorySuggestionFeedbackInput:
+      type: object
+      additionalProperties: false
+      required: [surface, level, suggestedCategoryId, chosenCategoryId]
+      properties:
+        surface:
+          type: string
+          enum: [MANUAL_ENTRY]
+        level:
+          type: string
+          x-extensible-enum: [HIGH, MEDIUM]
+        suggestedCategoryId: { $ref: '#/components/schemas/Uuid' }
+        chosenCategoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+          description: The category the transaction was saved with; `null` if it was left without one.
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+    CategorySuggestionSurfaceCounts:
+      type: object
+      additionalProperties: false
+      required: [surface, shown, accepted, corrected, ignored]
+      properties:
+        surface: { type: string, x-extensible-enum: [MANUAL_ENTRY, IMPORT] }
+        shown: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        corrected: { type: integer, minimum: 0 }
+        ignored: { type: integer, minimum: 0 }
+    CategorySuggestionLevelCounts:
+      type: object
+      additionalProperties: false
+      required: [level, shown, accepted, corrected, ignored]
+      properties:
+        level: { type: string, x-extensible-enum: [HIGH, MEDIUM] }
+        shown: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        corrected: { type: integer, minimum: 0 }
+        ignored: { type: integer, minimum: 0 }
+    CategorySuggestionStats:
+      type: object
+      additionalProperties: false
+      required: [from, to, shown, accepted, corrected, ignored, acceptanceRate, bySurface, byLevel]
+      properties:
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        shown: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        corrected: { type: integer, minimum: 0 }
+        ignored: { type: integer, minimum: 0 }
+        acceptanceRate:
+          type: [string, 'null']
+          pattern: '^\d\.\d{4}$'
+          description: '`accepted` divided by `shown`, 4 decimals HALF_EVEN; null without suggestions.'
+        bySurface:
+          type: array
+          items: { $ref: '#/components/schemas/CategorySuggestionSurfaceCounts' }
+        byLevel:
+          type: array
+          items: { $ref: '#/components/schemas/CategorySuggestionLevelCounts' }
+    ImportSuggestionAcceptInput:
+      type: object
+      additionalProperties: false
+      required: [minLevel]
+      properties:
+        minLevel:
+          type: string
+          enum: [HIGH, MEDIUM]
+          description: '`HIGH` accepts the high confidence suggestions; `MEDIUM` accepts the high and the medium ones.'
+        rowIds:
+          type: array
+          maxItems: 5000
+          items: { $ref: '#/components/schemas/Uuid' }
+          description: Limit the acceptance to these rows (all the rows by default).
+    ImportSuggestionAcceptResult:
+      type: object
+      additionalProperties: false
+      required: [accepted, version]
+      properties:
+        accepted: { type: integer, minimum: 0, maximum: 5000 }
+        version:
+          allOf:
+            - $ref: '#/components/schemas/Version'
+          description: Version of the import (the ETag of the response).
     ImportBulkEditResult:
       type: object
       additionalProperties: false
