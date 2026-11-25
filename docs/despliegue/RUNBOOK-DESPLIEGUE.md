@@ -202,54 +202,89 @@ C="docker compose -f /opt/pfos/repo/deploy/compose/compose.yaml -f /opt/pfos/rep
 3. Correr los gates del repo: `pnpm format:check`, `pnpm turbo typecheck lint test build`, `pnpm arch:check`, `pnpm spec:validate` y `pnpm config:docs:check`.
 4. Comprobar que no haya secretos en el historial: lo cubre el check `secrets` de CI (gitleaks); en un worktree, gitleaks local escanea 0 commits.
 
-**Estado (2026-11-24): fase 0 cerrada en el código.** Hecho: C1 a C7, C9 a C13 (PRs #263 a #270, detalle en [cambios-de-codigo.md](cambios-de-codigo.md)). Siguen abiertos C8 y C14 (se miden en el PoC) y C12c (solo si se activa el plan B). **Antes del primer apply faltan acciones tuyas:** el dominio dedicado (D452); las cuentas (fase 2); correr `tofu fmt -check` y `tofu validate` en `infra/environments/prod`, que nadie corrió porque CI no valida OpenTofu; crear `/etc/pfos/pgbackrest-restore.env` y los tres checks de healthchecks `pfos-drill`, `pfos-verify` y `pfos-image-prune` (fase 4); y activar `PFOS_KEYCLOAK_OPTIMIZED=true` **solo después** del primer apply (fase 6).
+**Estado (2026-11-24): fase 0 cerrada en el código.** Hecho: C1 a C7, C9 a C13 (PRs #263 a #270, detalle en [cambios-de-codigo.md](cambios-de-codigo.md)). `tofu fmt -check` y `tofu validate` ya los corre CI en cada PR (job `config-docs`, [docs/23](../23-ci-cd.md) §5.1); en tu máquina son opcionales. Siguen abiertos C8 y C14 (se miden en el PoC) y C12c (solo si se activa el plan B). **Antes del primer apply faltan acciones tuyas:** el dominio dedicado (D452); las cuentas (fase 2); crear los ocho checks de healthchecks, incluidos `pfos-drill`, `pfos-verify` y `pfos-image-prune` (fase 2), y `/etc/pfos/pgbackrest-restore.env` (fase 4); y activar `PFOS_KEYCLOAK_OPTIMIZED=true` **solo después** del primer apply (fase 6).
 
 **Terminada cuando:** `git grep -n 'finance-ml' -- infra/modules/lightsail-host/cloud-init.yaml.tftpl` devuelve la validación del 5.º argumento; `ls deploy/host/systemd/` lista `pfos-restore-drill.timer` (C5) y `pfos-image-prune.timer` con su `.service` (C6); C14 está reflejado en este runbook (mediciones de la regla de corte y alarma de la fase 7), sin código en el host; y `gh run list --workflow main.yml --branch main --limit 1` muestra `completed` y `success`. La salida `ml` del job `resolve` de `deploy.yml` ya está (#234): `git grep -n 'steps.refs.outputs.ml' -- .github/workflows/deploy.yml` la devuelve hoy.
 
 ## Fase 1: decisiones del owner (Vos)
 
-Antes de abrir cuentas, respondé las preguntas de [docs/71](../71-despliegue-n1-questions.md) (opciones y recomendación en cada una) y anotá las respuestas en docs/38:
+**Cerrada.** Las seis decisiones están tomadas y registradas; no hay nada que hacer en esta fase.
 
-1. **Dominio** definitivo (pendiente del perfil).
-2. **Salida si el PoC falla, separada por causa** (ratificación del 2026-11-24): por memoria, ampliar a N2 (≈ USD 27–30) o ir al plan B; por CPU, solo el plan B, porque N2 no suma CPU sostenida. Decidí además si la preparación del plan B (C12a y C12b, multi-arch en una rama) se hace **antes** del PoC o se acepta hacerla con el PoC caído. Recomendación del panel: decidirlo ahora, no con el host ya caído.
-3. **Retención de los mensuales** (C3): bucket aparte con lock de 13 meses (recomendado) o quitar `deleteFiles` de la clave del host para el prefijo mensual.
-4. **Drill programado** (C5): drill local mensual en el host con la clave de solo lectura, más el drill fuera del host (§6) cada trimestre (recomendado).
-5. **Datos demo durante el PoC:** habilitar `DEMO_DATA_ENABLED=true` solo durante la fase 7 y volverlo a `false` en la limpieza (recomendado), o no usar la demo. Si no la habilitás, la [guía de pruebas](GUIA-PRUEBAS-FUNCIONALES.md#04-si-la-demo-no-se-habilita) dice qué casos dejan de ser bloqueantes.
-6. **Lectura de un PDF que cuadra** en la guía: dejarla para tus extractos reales (recomendado) o pedir un PDF sintético en disco.
+| # | Decisión | Resolución | Dónde |
+|---|---|---|---|
+| 1 | Dominio | Un dominio propio y dedicado a PFOS, con DNS en Cloudflare, para `app`, `auth` y `files` (D452) | [docs/72](../72-despliegue-n1-decisions.md) |
+| 2 | Salida si el PoC falla | Plan B (Oracle A1) tanto por memoria como por CPU; no se amplía a N2 (D453). C12a y C12b se hacen antes del PoC; C12c, solo si el PoC corta (D454) | [docs/72](../72-despliegue-n1-decisions.md) |
+| 3 | Retención de los mensuales | Segundo bucket de B2 con Object Lock de ≥ 395 días, imborrable con la clave del host (D455) | [docs/72](../72-despliegue-n1-decisions.md) |
+| 4 | Drill de restore | Drill local mensual con aviso por heartbeat más un drill fuera del host cada trimestre (D456) | [docs/72](../72-despliegue-n1-decisions.md) |
+| 5 | Datos demo | Solo durante el PoC (D460) | [docs/75](../75-despliegue-n1-pendientes-decisions.md) |
+| 6 | PDF que cuadra de la guía | Comando que escribe el PDF sintético (D461) | [docs/75](../75-despliegue-n1-pendientes-decisions.md) |
 
-**Terminada cuando:** docs/38 tiene las seis respuestas con fecha.
+**Pendiente (no bloquea las fases 2 a 7):** el tercer bucket de B2 para `documents/` se **re-pregunta antes de la fase 8** (D462, [docs/75](../75-despliegue-n1-pendientes-decisions.md)). Hoy `documents/` vive en el bucket principal, con el lock de 21 días.
+
+**Terminada cuando:** [docs/38](../38-estado-y-pendientes.md) registra D452 a D456 y D460 a D461 con fecha (ya está).
 
 ## Fase 2: cuentas (Vos)
 
-Seguí §2.1 de [deploy-and-restore.md](../runbooks/deploy-and-restore.md), ya corregido (B12, C11): §2.1.5 pide los **tres** hostnames `app`, `auth` y `files` (D316), todos en modo solo DNS, y §2.1.6 los **cinco** paquetes de GHCR (`finance-api`, `finance-web`, `pfos-postgres`, `finance-ml` y `pfos-keycloak`). Además:
-- En AWS, activá **MFA en root**, creá el usuario de IAM Identity Center y suscribite a las alertas de Budgets.
-- En Git Bash, configurá el perfil SSO del CLI (región `sa-east-1`, perfil `pfos-admin`) e iniciá sesión:
+Las cuentas se crean **todas ahora**, antes de tocar OpenTofu, salvo lo que depende de la IP o del host (marcado en la tabla). Los pasos detallados y las políticas están en §2.1 de [deploy-and-restore.md](../runbooks/deploy-and-restore.md), ya corregido (B12, C11). Reglas: el dominio es el dedicado de D452; los hostnames son **tres** (`app`, `auth` y `files`, D316), todos en modo solo DNS; los paquetes de GHCR son **cinco**.
 
-  ```bash
-  aws configure sso --profile pfos-admin
-  ```
+Anotá cada valor en tu gestor de contraseñas (nada de esto va al repo, a un chat ni a un log). Las pruebas de la última columna no crean nada.
 
-  ```bash
-  aws sso login --profile pfos-admin
-  ```
+| Cuenta | Qué crear | Qué anotar y dónde guardarlo | Cómo verificarlo |
+|---|---|---|---|
+| **AWS** | Cuenta nueva. MFA en root y sin access keys. IAM Identity Center con tu usuario (MFA) y un permission set de administrador asignado a la cuenta. Bucket de state `pfos-tfstate-<sufijo>` con versioning y Block Public Access ([§2.1.1](../runbooks/deploy-and-restore.md)). Perfil SSO `pfos-admin` en `sa-east-1`: `aws configure sso --profile pfos-admin`. Un email que leas para las alertas de Budgets (el presupuesto lo crea el apply de la fase 3) | Id de la cuenta, `<sufijo>` del bucket de state (va a `backend.hcl`, fase 3), email de alertas (`budget_alert_email` de `prod.tfvars`). Gestor | `aws sts get-caller-identity --profile pfos-admin --query Account --output text` imprime tu cuenta; `aws iam get-account-summary --profile pfos-admin --query SummaryMap.AccountMFAEnabled` da `1`; `aws s3api get-bucket-versioning --bucket pfos-tfstate-<sufijo> --profile pfos-admin` dice `Enabled` y `aws s3api get-public-access-block --bucket pfos-tfstate-<sufijo> --profile pfos-admin` muestra los cuatro en `true` |
+| **Backblaze B2** | Cuenta con Object Lock habilitable. **No** crees buckets (los crea el apply). La clave temporal del apply se crea al empezar la fase 3, no antes: vence en 1 día | Región de datos y endpoint `s3.<región>.backblazeb2.com` (a `PGBACKREST_REPO{1,2}_S3_ENDPOINT` y `_REGION`, fase 4). Gestor | En la consola, *Buckets → Create a Bucket* ofrece el interruptor *Object Lock* (cerrá el diálogo sin crear) y la lista de buckets está vacía |
+| **Cloudflare** | Cuenta gratuita y la zona del dominio dedicado (D452) con los nameservers del registrador apuntando a Cloudflare. Los tres registros A (`app`, `auth`, `files`, nube gris = solo DNS) se crean en la fase 3, cuando existe la IP | Dominio y los dos nameservers asignados (`PF_DOMAIN_APP`, `PF_DOMAIN_AUTH`, `PF_DOMAIN_FILES` en `pfos.env`, fase 4) | La zona figura como *Active*; `nslookup -type=NS <dominio>` responde con los dos nameservers de Cloudflare |
+| **GitHub** | Environment `production`: *required reviewers* = vos, *deployment branches* = `main` ([§2.5](../runbooks/deploy-and-restore.md)). Los cinco paquetes de GHCR públicos: `finance-api`, `finance-web`, `pfos-postgres`, `finance-ml` y `pfos-keycloak`. `PFOS_ML_ENABLED` y `PFOS_KEYCLOAK_OPTIMIZED` quedan **sin definir** (se activan más adelante: Keycloak en la fase 6, ML después del PoC) | Nada secreto. Los secretos y variables del environment se cargan en la fase 5 | `gh api repos/manuXD270516/personal-finances/environments/production --jq '[.protection_rules[].type], .deployment_branch_policy'` muestra `required_reviewers` y que solo `main` despliega; `gh variable list --env production` no lista ninguna de las dos variables. Paquetes (Git Bash, ver el bloque de abajo): `200` en los cinco |
+| **Tailscale** | Plan Personal. Política de acceso con los tags `tag:pfos-prod` y `tag:pfos-ci` y las dos reglas de [§2.1.3](../runbooks/deploy-and-restore.md). Credencial de federación OIDC (issuer de GitHub Actions, subject `repo:manuXD270516/personal-finances:environment:production`, tag `tag:pfos-ci`). Cliente de Tailscale en tu PC con MagicDNS activo | Client id y audience (a `TS_OIDC_CLIENT_ID` y `TS_OIDC_AUDIENCE`, fase 5). Gestor | La política se guarda sin errores y *Preview rules* muestra tu usuario con acceso `tcp:22` a `tag:pfos-prod`; la credencial figura en la consola con el tag `tag:pfos-ci`; `tailscale status` en tu PC muestra tu máquina conectada |
+| **healthchecks.io** | Proyecto gratuito con **ocho** checks, uno por trabajo (nombre = slug) y un email de aviso verificado: `pfos-full` (7 d, gracia 1 d), `pfos-diff` (1 d, 6 h), `pfos-monthly` (31 d, 1 d), `pfos-docs-replica` (1 d, 6 h), `pfos-check` (1 h, 30 min), `pfos-drill` (31 d, 1 d), `pfos-verify` (7 d, 1 d) y `pfos-image-prune` (7 d, 1 d) | URL de ping del proyecto `https://hc-ping.com/<ping-key>` (a `PF_BACKUP_HEARTBEAT_URL`, fase 4). Gestor | Git Bash, ver el bloque de abajo: `200` en los ocho (un slug inexistente da 404). Los pings dejan los checks en verde antes de tiempo: es esperable |
+| **Grafana Cloud** | Stack gratuito (región `sa-east-1` si existe). Token OTLP de **solo escritura**: política de acceso con `metrics:write`, `logs:write` y `traces:write`, sin lectura ni administración | Endpoint del gateway OTLP (termina en `/otlp`, a `PF_OTLP_ENDPOINT`) y la cabecera `Authorization=Basic%20<base64(instanceId:token)>` (a `OTEL_EXPORTER_OTLP_HEADERS`, fase 4). Gestor | Git Bash, ver el bloque de abajo: `200` (401 o 403: token o instancia incorrectos); la política del token no tiene permisos de lectura |
 
-**Terminada cuando:** `aws sts get-caller-identity --profile pfos-admin` devuelve tu cuenta, la consola de B2 muestra la cuenta sin buckets todavía y `nslookup -type=NS <dominio>` responde con los nameservers de Cloudflare.
+Verificaciones por línea de comandos (Git Bash en tu máquina; los `read -rs` no dejan el secreto en el historial):
+
+```bash
+for p in finance-api finance-web pfos-postgres finance-ml pfos-keycloak; do T=$(curl -s "https://ghcr.io/token?scope=repository:manuxd270516/$p:pull" | grep -o '"token":"[^"]*' | cut -d'"' -f4); curl -s -o /dev/null -w "$p %{http_code}\n" -H "Authorization: Bearer $T" "https://ghcr.io/v2/manuxd270516/$p/tags/list"; done
+```
+
+```bash
+read -rs HC; for s in full diff monthly docs-replica check drill verify image-prune; do curl -s -o /dev/null -w "pfos-$s %{http_code}\n" "$HC/pfos-$s"; done
+```
+
+```bash
+read -rs AUTH; curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: $AUTH" -H 'Content-Type: application/json' -d '{"resourceMetrics":[]}' "<PF_OTLP_ENDPOINT>/v1/metrics"
+```
+
+En el último, pegá `Basic <base64(instanceId:token)>` en el `read` y reemplazá `<PF_OTLP_ENDPOINT>` por el endpoint anotado.
+
+**Terminada cuando** las verificaciones de la tabla dan lo indicado y los valores anotados están en el gestor. En particular: `aws sts get-caller-identity --profile pfos-admin` devuelve tu cuenta, la consola de B2 muestra la cuenta sin buckets, `nslookup -type=NS <dominio>` responde con los nameservers de Cloudflare, los cinco paquetes de GHCR dan `200` y los ocho checks de healthchecks.io existen.
 
 ## Fase 3: infraestructura (Vos)
 
-1. Revisá el plan **antes** de aplicar. Seguí §2.2 hasta `tofu init`. Ojo: la línea de §2.2 encadena `plan && apply`; corré solo el plan:
+**Antes de empezar**, en tu máquina (Git Bash): instalá OpenTofu ≥ 1.10 (por ejemplo `winget install OpenTofu.Tofu`; CI usa 1.13.10) y el AWS CLI v2, y comprobá `tofu version`. La validación de formato y sintaxis (`tofu fmt -check`, `tofu validate`) la corre CI en cada PR (job `config-docs`); acá es opcional (`tofu fmt -check -recursive ../..` y `tofu validate` en `infra/environments/prod`, después del `init`).
+
+1. **Preparar y revisar el plan.** Todo en Git Bash, en `infra/environments/prod`. Creá la clave temporal de B2 (§2.1.2, vence en 1 día) y seguí §2.2 hasta `tofu init`; `prod.tfvars` se copia de [`prod.tfvars.example`](../../infra/environments/prod/prod.tfvars.example) (obligatorias: `deploy_ssh_public_key`, `b2_bucket_name`, `budget_alert_email`; los días de Object Lock no son variables del entorno). Ojo: la línea de §2.2 encadena `plan && apply`; corré solo el plan:
 
    ```bash
    tofu plan -var-file=prod.tfvars -out=prod.tfplan
    ```
 
-2. En el plan, comprobá tres cosas:
-   - que `user_data` incluya la validación del 5.º digest: `tofu show prod.tfplan | grep -c 'finance-ml'` da 1 o más;
-   - que el bucket (o los buckets, según C3) tenga el lock decidido en la fase 1;
-   - que el snapshot salga fuera de la ventana de 06:00–07:30 UTC.
-3. `tofu apply prod.tfplan`, borrá la clave temporal de B2 y creá los registros A de los tres hostnames con `host_public_ip`.
+2. **Chequeos del plan** (Git Bash, mismo directorio y misma sesión, con `TF_VAR_state_passphrase` exportada: el plan está cifrado). Guardá el plan en una variable, sin escribir nada a disco (`jq` no hace falta):
 
-**Terminada cuando:** `tofu output` muestra la IP y los ids de las claves, y `nslookup app.<dominio>`, `nslookup auth.<dominio>` y `nslookup files.<dominio>` devuelven esa IP.
+   ```bash
+   PLAN=$(tofu show -no-color prod.tfplan)
+   ```
+
+   - **Solo crea:** `grep -E '^Plan:' <<<"$PLAN"` termina en `0 to change, 0 to destroy`.
+   - **Lista cerrada del comando forzado (#264):** `grep -cF 'ghcr.io/manuxd270516/finance-ml@sha256' <<<"$PLAN"` y `grep -cF 'ghcr.io/manuxd270516/pfos-keycloak@sha256' <<<"$PLAN"` dan 1 o más cada uno.
+   - **ufw limita el 22 (C2):** `grep -cF 'ufw limit 22/tcp' <<<"$PLAN"` da 1 o más, y `grep -cF 'ufw allow 22/tcp' <<<"$PLAN"` da `0`.
+   - **Snapshot a las 10:00 UTC (C9):** `grep 'snapshot_time' <<<"$PLAN"` muestra `"10:00"`.
+   - **Dos buckets de B2 con lock (#263, D455):** `grep -E '# module\.backups\.b2_bucket\.|duration +=' <<<"$PLAN"` lista `b2_bucket.backups` seguido de `duration = 21` y `b2_bucket.monthly` seguido de `duration = 395`; `grep -c 'mode += "governance"' <<<"$PLAN"` da `2`. El bucket mensual se llamará `<b2_bucket_name>-monthly`.
+   - **La clave del host no puede saltarse el lock:** `grep -ciE 'bypassGovernance|writeFileRetentions|writeBucketRetentions|writeFileLegalHolds' <<<"$PLAN"` da `0`. Para ver las capacidades: `grep -A8 'capabilities' <<<"$PLAN"` muestra `deleteFiles`, `listBuckets`, `listFiles`, `readFiles` y `writeFiles` en la clave del host, y solo `listBuckets`, `listFiles` y `readFiles` en la de restore.
+   - **Sin VM de drill:** `grep -cF 'pfos-drill-host' <<<"$PLAN"` da `0` (`drill_enabled` queda en `false`).
+
+   Si algo no coincide, no apliques: avisale a Claude con la salida. El Object Lock **no se puede deshacer** y cambiar `user_data` reemplaza la instancia.
+3. **Aplicar y limpiar.** `tofu apply prod.tfplan`; después **borrá la clave temporal de B2** en la consola y creá los registros A de `app`, `auth` y `files` (solo DNS) con `tofu output -raw host_public_ip`.
+
+**Terminada cuando:** el plan pasó los chequeos del paso 2; `tofu output` muestra la IP y los ids de las claves, `tofu output b2_monthly_bucket_name` imprime `<b2_bucket_name>-monthly`, la clave temporal ya no figura en la consola de B2, y `nslookup app.<dominio>`, `nslookup auth.<dominio>` y `nslookup files.<dominio>` devuelven esa IP.
 
 ## Fase 4: secretos y custodia (Vos)
 
@@ -295,15 +330,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
    grep -cE '__set__|__generate__' /etc/pfos/pfos.env /etc/pfos/pgbackrest.env /etc/pfos/pgbackrest-restore.env
    ```
 
-6. **Checks del heartbeat (healthchecks.io), uno por trabajo nuevo.** Si no existen, un drill que no corre no avisa. El nombre es el slug de la URL (`<PF_BACKUP_HEARTBEAT_URL>/<slug>`) y el periodo y la gracia dejan pasar un solo atraso:
-
-   | Slug | Periodo | Gracia | Avisa |
-   |---|---|---|---|
-   | `pfos-drill` | 31 días | 1 día | Restore mensual (día 2, 09:00 UTC); el cuerpo trae la línea de `drills.log` |
-   | `pfos-verify` | 7 días | 1 día | `pgbackrest verify` de repo1 y repo2 (miércoles 11:00 UTC) |
-   | `pfos-image-prune` | 7 días | 1 día | Limpieza de imágenes (sábado 11:00 UTC) |
-
-   Los de respaldo (`pfos-full`, `pfos-diff`, `pfos-monthly`, `pfos-docs-replica` y `pfos-check`) ya existen desde antes.
+6. **Checks del heartbeat (healthchecks.io).** Los ocho checks (`pfos-full`, `pfos-diff`, `pfos-monthly`, `pfos-docs-replica`, `pfos-check`, `pfos-drill`, `pfos-verify` y `pfos-image-prune`) se crearon en la fase 2, con su periodo y su gracia. Acá solo cargá la URL de ping en `PF_BACKUP_HEARTBEAT_URL` de `pfos.env`: sin el check, un trabajo que no corre no avisa.
 
 **Terminada cuando** (comandos en el host, como root):
 
@@ -316,7 +343,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 - `grep -c '^PGBACKREST_REPO[12]_PATH=/pgbackrest/poc/' /etc/pfos/pgbackrest.env` da `2`;
 - `stat -c '%a' /etc/pfos/pgbackrest-restore.env` da `600`;
 - el paso 5 da `0` en los tres archivos;
-- los tres checks del paso 6 existen en healthchecks.io;
+- `grep -c '^PF_BACKUP_HEARTBEAT_URL=https' /etc/pfos/pfos.env` da `1` (los ocho checks ya existen desde la fase 2);
 - y el paso 3 imprimió `0` para cada `.age`, que ya están en el gestor.
 
 ## Fase 5: Tailscale y GitHub (Vos)

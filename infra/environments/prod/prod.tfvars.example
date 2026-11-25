@@ -1,5 +1,16 @@
-# Copiar a prod.tfvars (ignorado por git). Sin secretos: la passphrase del state va por TF_VAR_state_passphrase.
-deploy_ssh_public_key = "ssh-ed25519 AAAA... pfos-deploy@github-actions"
-b2_bucket_name        = "pfos-prod-backups-CAMBIAR"
-budget_alert_email    = "owner@example.com"
-# lightsail_bundle_id = "medium_3_0" # 4 GB (USD 24) si el PoC mide falta de memoria y el presupuesto lo permite
+# Copiar a prod.tfvars (ignorado por git). Sin secretos: la passphrase del state va por TF_VAR_state_passphrase y las
+# credenciales de AWS (perfil SSO) y de B2 (clave temporal) van por variables de entorno de la sesión.
+
+# Obligatorias
+deploy_ssh_public_key = "ssh-ed25519 AAAA... pfos-deploy@github-actions" # contenido de ~/.ssh/pfos-deploy.pub
+b2_bucket_name        = "pfos-prod-backups-CAMBIAR"                      # global en Backblaze; el de mensuales será "<nombre>-monthly"
+budget_alert_email    = "owner@example.com"                              # recibe las alertas de AWS Budgets
+
+# Opcionales (valores por omisión entre paréntesis)
+# aws_region          = "sa-east-1"   # (sa-east-1) no cambiar sin revisar ADR-0027
+# lightsail_bundle_id = "medium_3_0"  # (small_3_0, 2 GB) 4 GB (USD 24) si el PoC mide falta de memoria y el presupuesto lo permite
+# budget_limit_usd    = "20"          # (20) límite mensual de AWS Budgets, en USD
+# drill_enabled       = true          # (false) crea la VM efímera del restore drill de §6; volver a false al terminar
+
+# Los días de Object Lock (principal 21; mensuales 395, D455) NO son variables de este entorno: viven como default en
+# infra/modules/b2-backups/variables.tf y el lock es irreversible, así que no se ajustan desde aquí.

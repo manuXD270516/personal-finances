@@ -74,6 +74,20 @@ jobs:
         with: { persist-credentials: false }
       - uses: ./.github/actions/setup-workspace
       - run: pnpm config:docs:check
+      # OpenTofu de `infra/` (N1, runbook de despliegue fase 3): formato y validación SIN credenciales ni backend. La versión
+      # cumple `required_version` (>= 1.10) y se revisa a mano con las de Trivy y gitleaks (Renovate no ve este input).
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.10
+          tofu_wrapper: false
+      - name: OpenTofu fmt y validate (infra/)
+        run: |
+          tofu fmt -check -recursive -diff infra/
+          for d in infra/environments/*/ infra/modules/*/; do
+            echo "::group::tofu validate $d"
+            (cd "$d" && tofu init -backend=false -input=false -no-color && tofu validate -no-color)
+            echo "::endgroup::"
+          done
 
   contract:
     runs-on: ubuntu-latest
