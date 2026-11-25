@@ -337,7 +337,7 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 
 2. Vos aprobás el environment en GitHub.
 3. Vos, en el host: `pfos-bootstrap-storage.sh` y el primer full, según §2.6.2.
-4. Claude corre desde afuera las comprobaciones 1 a 6. Las 7 y 8 las hacés Vos: la 7 en el navegador y la 8 en el host.
+4. Claude corre desde afuera las comprobaciones 1 a 6 y la 9. Las 7 y 8 las hacés Vos: la 7 en el navegador y la 8 en el host.
 
 | # | Comprobación | Resultado esperado |
 |---|---|---|
@@ -346,13 +346,14 @@ Nunca pongas estos valores en un archivo versionado, en el repo, en un log de Ac
 | 3 | `curl -s -o /dev/null -w "%{http_code}\n" $AUTH/admin/` | `404` |
 | 4 | `curl -s -o /dev/null -w "%{http_code}\n" $FILES/` y un `GET` a cualquier objeto | `404` |
 | 5 | En PowerShell, con Tailscale desconectado: `22, 5432, 8080, 8333 \| ForEach-Object { Test-NetConnection -ComputerName <IP> -Port $_ -WarningAction SilentlyContinue \| Select-Object RemotePort, TcpTestSucceeded }` | `TcpTestSucceeded` en `False` para los cuatro |
-| 6 | `curl -sI $BASE/ \| grep -iE 'strict-transport-security\|x-content-type-options\|referrer-policy'` | Las tres cabeceras |
+| 6 | `curl -sI $BASE/ \| grep -iE 'strict-transport-security\|x-content-type-options\|referrer-policy\|permissions-policy\|cross-origin-opener-policy'` | Las cinco cabeceras; `permissions-policy` con `camera=(), microphone=(), geolocation=(), payment=(), usb=()` y `cross-origin-opener-policy: same-origin` |
 | 7 | (Vos) Atajos de desarrollo: login en `$BASE` con uno de los usuarios demo de `realm-pfos-dev.json` (los dos realms se llaman `pfos`; el de producción no trae usuarios) | El login falla con credenciales inválidas |
 | 8 | (Vos) En el host: `grep -E '^(DEMO_DATA_ENABLED\|IMPORTS_PROVIDER_FAKE_ENABLED)=' /etc/pfos/pfos.env` | Ninguno en `true` |
+| 9 | `curl -sI $BASE/auth/error \| grep -i content-security-policy` (página pública: `$BASE/` sin sesión redirige al login y no lleva CSP) y `curl -sI $FILES/ \| grep -i content-security-policy` | La primera trae `nonce-`, `frame-ancestors 'none'` y el origen `$FILES` en `connect-src`, y no trae `Content-Security-Policy-Report-Only`; la segunda trae `default-src 'none'; frame-ancestors 'none'`. Si la web quedó con `WEB_CSP_REPORT_ONLY=true`, la cabecera es la `-Report-Only` y hay que dejarla en `false` antes de los datos reales |
 
-**Regla de corte:** si 2, 3, 4, 5 o 7 no coinciden, parate.
+**Regla de corte:** si 2, 3, 4, 5, 7 o 9 no coinciden, parate.
 
-**Terminada cuando:** las ocho comprobaciones coinciden y, después de lanzar `gh workflow run deploy.yml -f action=status` y aprobarlo, `gh run list --workflow deploy.yml --limit 1` muestra `completed` y `success`, y el resumen del job muestra el SHA desplegado.
+**Terminada cuando:** las nueve comprobaciones coinciden y, después de lanzar `gh workflow run deploy.yml -f action=status` y aprobarlo, `gh run list --workflow deploy.yml --limit 1` muestra `completed` y `success`, y el resumen del job muestra el SHA desplegado.
 
 ## Fase 7: PoC de 48 h con datos ficticios (Vos y Claude)
 

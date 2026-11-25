@@ -39,7 +39,7 @@ import type { CashFlowCalendar, CashFlowEvent } from './types';
 const f = esContext('CashFlow');
 const rateCtx = esContext('Dashboard');
 const href = (path: string) => `/es${path}`;
-const strip = (html: string) => html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, '');
+const strip = (html: string) => html.replace(/<[^>]+>/g, '');
 
 const view = (
   over: Partial<CashFlowCalendar> = {},
@@ -127,6 +127,12 @@ describe('decimales y riesgo (solo presentación)', () => {
 });
 
 describe('vista /flujo-de-caja: saldo esperado, riesgo y gráfico (tarea 6.1)', () => {
+  it('[TC-SECURITY-CSP-006] la vista no emite elementos style en línea (la hoja es estática) y el gráfico conserva sus clases', () => {
+    const html = view({}, { horizon: 30, currency: 'BOB', accountId: undefined });
+    expect(html).not.toContain('<style');
+    expect(html).toContain('pf-cf');
+  });
+
   it('[TC-REPORTING-FORECAST-001] sin riesgo: saldo inicial, mínimo con fecha, final, umbral de la reserva mínima y la línea del umbral en el gráfico', () => {
     const html = view({}, { horizon: 30, currency: 'BOB', accountId: undefined });
     const text = strip(html);

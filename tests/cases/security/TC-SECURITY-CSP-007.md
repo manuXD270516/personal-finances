@@ -12,8 +12,10 @@ invariants: []
 priority: high
 type: security
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/stack/test/stack/caddy-headers.stack.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["csp","security-headers","add-web-content-security-policy"]

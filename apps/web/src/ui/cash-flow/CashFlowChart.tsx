@@ -13,28 +13,6 @@ export type PredictedCashFlowDay = PredictedCashFlow['series'][number];
  * el mínimo: el significado nunca depende solo del color. La tabla equivalente la pinta la vista (NFR-USAB-105). La
  * geometría usa enteros exactos (`ratioBetween`); las cifras que se leen salen de los strings decimales.
  */
-export const CASH_FLOW_CHART_CSS = `
-.pf-cfc-figure{display:grid;gap:0.5rem;min-width:0;margin:0}
-.pf-cfc-svg{width:100%;height:auto;display:block;overflow:visible}
-.pf-cfc-axis{stroke:var(--pf-border-strong);stroke-width:1}
-.pf-cfc-grid{stroke:var(--pf-border);stroke-width:1}
-.pf-cfc-tick{fill:var(--pf-fg-muted);font-size:11px;font-variant-numeric:tabular-nums}
-.pf-cfc-line{stroke:var(--pf-primary);stroke-width:2.5;fill:none}
-.pf-cfc-planned{stroke:var(--pf-fin-warning);stroke-width:2.5;fill:none;stroke-dasharray:7 4}
-.pf-cfc-threshold{stroke:var(--pf-error);stroke-width:2;stroke-dasharray:2 4}
-.pf-cfc-dot{fill:var(--pf-primary);stroke:var(--pf-bg);stroke-width:1.5}
-.pf-cfc-dot[data-flag="below"]{fill:var(--pf-bg);stroke:var(--pf-error);stroke-width:2.5}
-.pf-cfc-band{fill:var(--pf-primary);fill-opacity:0.14;stroke:var(--pf-primary);stroke-opacity:0.5;stroke-width:1}
-.pf-cfc-expected{stroke:var(--pf-primary);stroke-width:2.5;fill:none;stroke-dasharray:1 5;stroke-linecap:round}
-.pf-cfc-low{fill:var(--pf-error);stroke:var(--pf-bg);stroke-width:1.5}
-.pf-cfc-legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0.25rem 1rem;font-size:0.875rem;color:var(--pf-fg-muted)}
-.pf-cfc-legend li{display:inline-flex;align-items:center;gap:0.375rem}
-.pf-cfc-swatch{display:inline-block;width:1.5rem;height:0;border-top:3px solid var(--pf-primary)}
-.pf-cfc-swatch[data-kind="planned"]{border-top:3px dashed var(--pf-fin-warning)}
-.pf-cfc-swatch[data-kind="threshold"]{border-top:3px dotted var(--pf-error)}
-.pf-cfc-swatch[data-kind="expected"]{border-top:3px dotted var(--pf-primary)}
-.pf-cfc-swatch[data-kind="band"]{height:0.75rem;border:1px solid var(--pf-primary);background:var(--pf-primary);opacity:0.35}
-`;
 
 const W = 640;
 const G = { left: 84, right: 12, top: 16, bottom: 34, height: 280 } as const;

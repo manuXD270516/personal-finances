@@ -105,7 +105,9 @@ Sin datos. El orden de despliegue es el normal: un PR con `proxy.ts`, el layout,
 
 ## Preguntas abiertas
 
-En [docs/73](../../../docs/73-despliegue-n1-specs-questions.md):
+Resueltas el 2026-11-24 ([docs/74](../../../docs/74-despliegue-n1-specs-decisions.md), con la recomendación; preguntas en [docs/73](../../../docs/73-despliegue-n1-specs-questions.md)):
 
-- **Pregunta 1:** `style-src-attr 'unsafe-inline'` frente a reescribir los estilos en línea. Bloquea los grupos 3 a 5 solo si el owner elige reescribir.
-- **Pregunta 2:** aplicar desde el primer deploy con `WEB_CSP_REPORT_ONLY` como interruptor, o empezar en `Report-Only`. No bloquea.
+- **Pregunta 1 (D457):** `style-src-attr 'unsafe-inline'`; los estilos en línea de React no se reescriben.
+- **Pregunta 2 (D458):** aplicada desde el primer deploy, con `WEB_CSP_REPORT_ONLY` como interruptor.
+
+**As-built (2026-11-24):** la ruta `/es/…` sin página se resuelve con `app/[locale]/[...rest]/page.tsx` y `app/[locale]/not-found.tsx` (404 propio con i18n y por petición): el `/_not-found` que Next prerenderiza en el build no tiene nonce y trae un `<style>` en línea. `next-intl` arma el rewrite con las cabeceras de la petición que recibe, así que `proxy.ts` le pasa una petición que ya lleva la política (la rama «`NextResponse.next({ request })` sobre la respuesta de `next-intl`» no hizo falta); lo prueba `proxy.test.ts` y el E2E compara los nonces. `vitest.config.ts` de la web integra `next-intl` en línea para poder probar `proxy.ts`. Los compose no cambian: `finance-web` ya recibe `OBJECT_STORAGE_PUBLIC_ENDPOINT` por su `env_file`.

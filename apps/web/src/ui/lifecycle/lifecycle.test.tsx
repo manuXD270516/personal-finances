@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { tabTarget } from '../common/Tabs';
@@ -144,8 +145,11 @@ describe('recorrido: reporte visual y línea de tiempo (add-lifecycle-timeline 6
     expect(html).toContain(
       'aria-label="Diagrama de estados: estado actual Anulada. Camino: Pendiente → Contabilizada → Contabilizada → Anulada."',
     );
-    // Bajo 768 px se muestra la orientación vertical.
-    expect(html).toContain('@media (max-width: 767.98px)');
+    // Bajo 768 px se muestra la orientación vertical: la regla vive en una hoja estática, no en un <style> en línea (CSP).
+    expect(html).not.toContain('<style');
+    expect(readFileSync(new URL('./lifecycle.css', import.meta.url), 'utf8')).toContain(
+      '@media (max-width: 767.98px)',
+    );
   });
 
   it('[TC-AUDIT-LIFECYCLE-013] nodos y aristas con atributos de estado: visitados, actual, atenuados y numeración', () => {

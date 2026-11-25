@@ -12,8 +12,10 @@ invariants: []
 priority: medium
 type: security
 level: smoke
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/stack/test/stack/caddy-headers.stack.test.ts
+status: ready
 regression_suite: false
 phase: 9
 tags: ["csp","security-headers","add-web-content-security-policy"]
@@ -49,4 +51,4 @@ Entonces las dos redirecciones con Keycloak terminan en la web sin errores
 
 ## Notas
 
-- La suite E2E (auth.spec.ts incluida) corre sin Caddy; esta comprobación se hace en la fase 6 del runbook (comprobación 6 ampliada) y en el PoC. Cubre también el scenario «Cabeceras en el Home».
+- Automatizado en la parte de cabeceras (`caddy-headers.stack.test.ts`, Caddy real con la imagen fijada). El login y el logout contra el Keycloak de producción se verifican a mano en la fase 6 del runbook (comprobación 6 ampliada) y en el PoC; `auth.spec.ts` los ejercita sin Caddy. Cubre también el scenario «Cabeceras en el Home».
