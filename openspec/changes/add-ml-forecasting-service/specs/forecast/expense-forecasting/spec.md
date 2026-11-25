@@ -65,8 +65,8 @@ El sistema DEBE (MUST) construir la historia de cada serie por periodo financier
 Trace: FR-FORECAST-001, NFR-DATA-002 · Priority: Must
 
 #### Scenario: Periodo con gastos en dos monedas y un reembolso
-- **CUANDO** el workspace tiene día de inicio del mes financiero 25 y en el periodo 2026-10 (del 2026-09-25 al 2026-10-24) registró gastos de 1200.00 BOB y 50.00 USD el 2026-10-02 con tasa 6.96 BOB por USD, y un reembolso de 100.00 BOB
-- **ENTONCES** la historia del gasto total tiene 1448.00 BOB en el periodo 2026-10
+- **CUANDO** el workspace tiene día de inicio del mes financiero 25 y en el periodo 2026-09 (del 2026-09-25 al 2026-10-24, etiquetado por el mes de inicio según D59) registró gastos de 1200.00 BOB y 50.00 USD el 2026-10-02 con tasa 6.96 BOB por USD, y un reembolso de 100.00 BOB
+- **ENTONCES** la historia del gasto total tiene 1448.00 BOB en el periodo 2026-09
 
 #### Scenario: Flujo sin tasa
 - **CUANDO** además registró un gasto de 20.000000 USDT en una fecha sin tasa USDT a BOB

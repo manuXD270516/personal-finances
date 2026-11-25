@@ -353,6 +353,8 @@ jobs:
       FINANCE_API_IMAGE: pfos/finance-api:ci
       FINANCE_WEB_IMAGE: pfos/finance-web:ci
       FINANCE_ML_IMAGE: pfos/finance-ml:ci
+      # El teardown del global setup vuelca aquí los logs de los contenedores (worker, api, ml…) antes de bajar el stack.
+      PF_E2E_LOGS_DIR: ${{ github.workspace }}/tests/e2e/service-logs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -375,6 +377,7 @@ jobs:
           path: |
             tests/e2e/playwright-report
             tests/e2e/test-results
+            tests/e2e/service-logs
           if-no-files-found: ignore
           retention-days: 7
 

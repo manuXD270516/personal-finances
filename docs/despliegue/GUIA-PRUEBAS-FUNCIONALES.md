@@ -23,7 +23,7 @@ Esta guía recorre la plataforma ya desplegada, área por área, con **datos fic
 | Usuario principal | Lo creás vos en el realm `pfos` (runbook, §2.6.3). Para la guía, un usuario de prueba con nombre inventado, por ejemplo «Ana Prueba» |
 | Segundo usuario | Otro usuario ficticio del realm, para las pruebas de aislamiento y de roles |
 | Navegador | Uno de escritorio actualizado (Chrome, Edge o Firefox) y una ventana privada para el segundo usuario. Un teléfono para la prueba móvil |
-| Datos demo habilitados | Según tu decisión 5 de la fase 1 del runbook ([docs/71](../71-despliegue-n1-questions.md), pregunta 5). Si los habilitás: `DEMO_DATA_ENABLED=true` en `/etc/pfos/pfos.env` **solo durante el PoC** y redeploy del mismo SHA (fase 7, paso 1); la limpieza de la fase 7 lo vuelve a `false` y la fase 8 repite la comprobación 8 de la fase 6. Si no, mirá [§0.4](#04-si-la-demo-no-se-habilita) |
+| Datos demo habilitados | Decidido (D460, [docs/75](../75-despliegue-n1-pendientes-decisions.md)): `DEMO_DATA_ENABLED=true` en `/etc/pfos/pfos.env` **solo durante el PoC** y redeploy del mismo SHA (fase 7, paso 1); la limpieza de la fase 7 lo vuelve a `false` y la fase 8 repite la comprobación 8 de la fase 6 |
 | Archivos de ejemplo | Una copia local del repositorio (o descargá los archivos de `tests/fixtures/` desde GitHub). Son sintéticos |
 
 Configuración de N1 que condiciona lo que vas a ver:
@@ -67,14 +67,14 @@ Los endpoints de salud son de la web: **no** comprueban la API ni Keycloak. La 3
 
 La fecha ancla de la demo es **el día de la carga**, no 2026-09-30. Por eso la guía verifica estados y nombres, no saldos al centavo: los saldos exactos de la spec valen solo con el ancla 2026-09-30.
 
-### 0.4 Si la demo no se habilita
+### 0.4 Contingencia: si la demo no carga
 
-Si en la fase 1 elegiste no habilitar `DEMO_DATA_ENABLED`, la demo no existe y cambia esto:
+La demo está decidida (D460) y **los casos con demo son bloqueantes**. Solo si la carga falla y se documenta el defecto (o si `DEMO_DATA_ENABLED` no se pudo habilitar), la demo no existe y cambia esto:
 
 - **Dejan de ser bloqueantes y se saltean:** GF-ACC-09, GF-ACC-10, GF-COM-05, GF-DEU-07, GF-REP-02 y GF-EXP-06.
 - **Siguen siendo bloqueantes, pero en «GF Pruebas»:** los 15 reportes de §12.2 tienen que abrir sin error con los datos de «GF Pruebas» (las cifras esperadas de la tabla, que son de la demo, no aplican).
 - **Se saltean sin efecto en la aprobación:** GF-ACC-11, GF-PLA-06, GF-COM-06, GF-COM-07, GF-DEU-08, GF-DEU-09 y GF-MET-04. Los de §13 (GF-FLU-01 a 04) se pueden correr en «GF Pruebas» con la definición de GF-COM-01.
-- En la fase 7 del runbook, la carga se hace sin el paso de los datos demo.
+- En la fase 7 del runbook, la carga se hace sin el paso de los datos demo. Esta contingencia no se usa por elección: un caso con demo omitido por esto se anota con su causa.
 
 ## 1. Acceso y workspace
 
@@ -178,8 +178,9 @@ Todos los archivos son sintéticos y están en el repositorio. Las importaciones
 | GF-IMP-12 | PDF con texto que no es un extracto (por ejemplo, una página web impresa a PDF) | `PARSE_FAILED`: «Este PDF tiene texto pero no coincide con ningún formato de extracto conocido…»; 0 filas | No | TC-IMPORTS-PDF-014 |
 | GF-IMP-13 | PDF escaneado o una foto guardada como PDF | «Este PDF no tiene texto (parece escaneado o fotografiado)…»; 0 filas | No | TC-IMPORTS-PDF-010 |
 | GF-IMP-14 | Abrir `$BASE/imports/perfiles` y `$BASE/imports/conexiones` (el menú no tiene una entrada «Imports») | Perfiles: los guardados (o el estado vacío); conexiones: «Todavía no hay conexiones.» y el selector de proveedor sin opciones | No | TC-IMPORTS-BANKING-004 |
+| GF-IMP-15 | En el equipo donde tengas el repositorio: `pnpm imports:pdf:sample <ruta-absoluta>/extracto-ganadero-sintetico.pdf` (una ruta absoluta **fuera** del repositorio; el PDF no se versiona) y subir ese archivo a una cuenta con «Identificador (últimos 4)» = `0001` | Revisión con el diseño «Banco Ganadero» (`bo.ganadero.cuenta`), 2 páginas y **11 filas**, sin errores y sin líneas no reconocidas; aprobar crea 11 transacciones y reimportar el mismo archivo da 0 nuevas | **Sí** | TC-IMPORTS-PDF-048, TC-IMPORTS-PDF-050 |
 
-**Lectura de un PDF que sí cuadra:** el repositorio no versiona PDF; los E2E los generan con [`paint-statement.ts`](../../tests/fixtures/imports/statements-bo/pdf/paint-statement.ts) (diseño Ganadero: 11 filas, 2 de 2 páginas, TC-IMPORTS-PDF-048). No hay un comando que lo deje en disco. Por eso esta guía solo prueba los rechazos (GF-IMP-12 y 13). La prueba con extractos reales es del owner, fuera del repositorio (ver la sección final).
+**Lectura de un PDF que sí cuadra (D461):** el repositorio no versiona PDF. El comando `pnpm imports:pdf:sample <ruta>` escribe en disco el PDF sintético de «Banco Pampa Demo» (el mismo diseño Ganadero que usan los E2E, TC-IMPORTS-PDF-048; datos ficticios) y GF-IMP-15 lo prueba en la guía. Para ver solo la estructura que lee el sistema, `pnpm imports:pdf:probe <ruta>` debe informar `resultado: OK`. La prueba con extractos reales sigue siendo del owner, fuera del repositorio (ver la sección final, tarea 9.1 del change 57).
 
 Uso detallado: [importar-extracto-csv.md](../runbooks/importar-extracto-csv.md).
 
@@ -413,7 +414,7 @@ Los casos con `Bloq. = No` que fallen se anotan y se abren como defectos; no fre
 
 | Bloquean | No bloquean |
 |---|---|
-| Acceso y aislamiento, cuentas, transacciones y splits, transferencias y conversiones, reglas básicas, import CSV y OFX con reimport en 0, presupuestos, cierre de mes, compromisos, préstamos, adjuntos y su descarga, export y restore, los 15 reportes abriendo, operación | Rechazos de PDF, perfiles y conexiones, sugerencias de reglas y de presupuesto, tarjetas, metas, flujo de caja, pronósticos, notificaciones y email, inglés y portugués, vistas guardadas |
+| Acceso y aislamiento, cuentas, transacciones y splits, transferencias y conversiones, reglas básicas, import CSV y OFX con reimport en 0, lectura del PDF sintético (GF-IMP-15), presupuestos, cierre de mes, compromisos, préstamos, adjuntos y su descarga, export y restore, los 15 reportes abriendo, operación | Rechazos de PDF (GF-IMP-12 y 13), perfiles y conexiones, sugerencias de reglas y de presupuesto, tarjetas, metas, flujo de caja, pronósticos, notificaciones y email, inglés y portugués, vistas guardadas |
 
 Después de aprobar: borrá los datos ficticios como dice la fase 7 del runbook y volvé `DEMO_DATA_ENABLED` a `false`.
 
@@ -437,4 +438,4 @@ Se hacen en producción, con tus datos, y **nunca entran al repositorio** (solo 
 
 ## Preguntas abiertas
 
-Las preguntas que dependen de vos están consolidadas en [docs/71](../71-despliegue-n1-questions.md) y se responden en la fase 1 del runbook. Las que tocan esta guía son la 5 (datos demo durante el PoC; si no se habilitan, ver [§0.4](#04-si-la-demo-no-se-habilita)) y la 6 (lectura de un PDF que cuadra). El umbral del import de 5 000 filas en el host ya no es una pregunta: es la regla de corte de CPU de C14 (GF-OPS-06).
+Las preguntas que dependen de vos están consolidadas en [docs/71](../71-despliegue-n1-questions.md) y se responden en la fase 1 del runbook. Las que tocan esta guía ya están decididas (2026-11-25, [docs/75](../75-despliegue-n1-pendientes-decisions.md)): D460 (datos demo solo durante el PoC) y D461 (comando del PDF sintético, GF-IMP-15). Queda abierta para la fase 8 la del tercer bucket de `documents/` (D462). El umbral del import de 5 000 filas en el host ya no es una pregunta: es la regla de corte de CPU de C14 (GF-OPS-06).

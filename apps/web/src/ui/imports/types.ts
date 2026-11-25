@@ -285,19 +285,22 @@ export type ImportRowKind = 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'CONVERSION';
 export type FieldOrigin = 'ALIAS' | 'RULE' | 'DEFAULT' | 'MANUAL';
 export type DuplicateConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 
-export interface ImportProposedField {
-  /** Un id, una lista de ids o un texto. */
-  readonly value: string | readonly string[] | null;
+/** Un campo propuesto con su origen; el tipo de `value` es propio de cada campo (contrato por tipo de campo). */
+interface ImportProposedFieldOf<V> {
+  readonly value: V | null;
   readonly origin: FieldOrigin;
   readonly ruleId?: string | null;
   readonly ruleVersion?: number | null;
 }
+export type ImportProposedIdField = ImportProposedFieldOf<string>;
+export type ImportProposedIdListField = ImportProposedFieldOf<readonly string[]>;
+export type ImportProposedTextField = ImportProposedFieldOf<string>;
 
 export interface ImportRowProposal {
-  readonly categoryId?: ImportProposedField;
-  readonly counterpartyId?: ImportProposedField;
-  readonly tagIds?: ImportProposedField;
-  readonly description?: ImportProposedField;
+  readonly categoryId?: ImportProposedIdField;
+  readonly counterpartyId?: ImportProposedIdField;
+  readonly tagIds?: ImportProposedIdListField;
+  readonly description?: ImportProposedTextField;
   readonly excluded?: boolean;
   readonly needsCategory: boolean;
 }

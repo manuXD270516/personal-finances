@@ -235,23 +235,29 @@ export interface PreviewView {
 
 // ───────────────────────────────────────────────────────────── filas de la vista previa (Phase 6)
 
-export interface ProposedFieldView {
-  readonly value: string | readonly string[] | null;
+/** Un campo propuesto con su origen; el tipo de `value` es propio de cada campo (un id, una lista de ids o un texto). */
+export interface ProposedFieldView<V> {
+  readonly value: V | null;
   readonly origin: 'ALIAS' | 'RULE' | 'DEFAULT' | 'MANUAL';
   readonly ruleId: string | null;
   readonly ruleVersion: number | null;
 }
+export type ProposedIdFieldView = ProposedFieldView<string>;
+export type ProposedIdListFieldView = ProposedFieldView<readonly string[]>;
+export type ProposedTextFieldView = ProposedFieldView<string>;
 
 export interface RowProposalView {
-  readonly categoryId?: ProposedFieldView;
-  readonly counterpartyId?: ProposedFieldView;
-  readonly tagIds?: ProposedFieldView;
-  readonly description?: ProposedFieldView;
+  readonly categoryId?: ProposedIdFieldView;
+  readonly counterpartyId?: ProposedIdFieldView;
+  readonly tagIds?: ProposedIdListFieldView;
+  readonly description?: ProposedTextFieldView;
   readonly excluded?: boolean;
   readonly needsCategory: boolean;
 }
 
-const originView = (origin: FieldOrigin): Pick<ProposedFieldView, 'origin' | 'ruleId' | 'ruleVersion'> =>
+const originView = (
+  origin: FieldOrigin,
+): Pick<ProposedFieldView<never>, 'origin' | 'ruleId' | 'ruleVersion'> =>
   origin.type === 'RULE'
     ? { origin: 'RULE', ruleId: origin.ruleId, ruleVersion: origin.ruleVersion }
     : {
@@ -262,16 +268,17 @@ const originView = (origin: FieldOrigin): Pick<ProposedFieldView, 'origin' | 'ru
 
 /** Propuesta con el origen de cada campo; `needsCategory` mira lo EFECTIVO (edición sobre propuesta). */
 export function toProposalView(proposal: ClassificationProposal | null, edits: RowEdits): RowProposalView {
-  const field = <T extends string | readonly string[] | null>(
-    p: { readonly value: T; readonly origin: FieldOrigin } | null,
-  ): ProposedFieldView | undefined => (p === null ? undefined : { value: p.value, ...originView(p.origin) });
+  const field = <V>(p: { readonly value: V | null; readonly origin: FieldOrigin }): ProposedFieldView<V> => ({
+    value: p.value,
+    ...originView(p.origin),
+  });
   const effectiveCategory =
     edits.categoryId !== undefined ? edits.categoryId : (proposal?.category?.value ?? null);
   return {
-    ...(proposal?.category ? { categoryId: field(proposal.category) as ProposedFieldView } : {}),
-    ...(proposal?.counterparty ? { counterpartyId: field(proposal.counterparty) as ProposedFieldView } : {}),
-    ...(proposal?.tags ? { tagIds: field(proposal.tags) as ProposedFieldView } : {}),
-    ...(proposal?.description ? { description: field(proposal.description) as ProposedFieldView } : {}),
+    ...(proposal?.category ? { categoryId: field(proposal.category) } : {}),
+    ...(proposal?.counterparty ? { counterpartyId: field(proposal.counterparty) } : {}),
+    ...(proposal?.tags ? { tagIds: field(proposal.tags) } : {}),
+    ...(proposal?.description ? { description: field(proposal.description) } : {}),
     ...(proposal?.exclude ? { excluded: true } : {}),
     needsCategory: effectiveCategory === null,
   };

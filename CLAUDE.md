@@ -13,7 +13,7 @@ Estas reglas aplican a cualquier sesión, local o en la nube. Complementan los a
 ## Pull requests
 
 - Una rama por change. Commits y PR en español; los commits terminan con `Co-Authored-By` del modelo que los escribió.
-- Abre el PR y activa enseguida `gh pr merge --auto --squash --delete-branch`. `main` está protegida: los 18 checks son obligatorios, `strict` (la rama debe estar al día) y `enforce_admins`.
+- Abre el PR y activa enseguida `gh pr merge --auto --squash --delete-branch`. `main` está protegida: los 19 checks son obligatorios, `strict` (la rama debe estar al día) y `enforce_admins`.
 - Vigila el PR hasta que se fusione. Si queda atrás de `main`, `gh pr update-branch`. Si un check falla, lee el log del job (`gh api repos/<repo>/actions/jobs/<id>/logs`), corrige en la misma rama y vuelve a vigilar. Un fallo de un test ajeno al cambio se diagnostica antes de relanzar; no se relanza a ciegas más de una vez. Runners cancelados sin ejecutar: relanza (`gh run rerun --failed`).
 - Nunca abras un PR roto a propósito ni fusiones con checks en rojo o pendientes.
 - Tras la fusión de una feature, un PR aparte `chore(openspec): archivar <change>`.
