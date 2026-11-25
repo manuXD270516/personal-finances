@@ -612,9 +612,10 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
       for (const def of definitions) {
         expect(consumerWorkOptions(def, defaults).concurrency, def.consumer).toBe(1);
       }
-      // El trabajo diario `forecasting.schedule` queda registrado aunque los pronósticos estén deshabilitados.
+      // El trabajo diario `forecasting.schedule` queda registrado aunque los pronósticos estén deshabilitados (que el ejecutor
+      // no se registre lo prueba `forecasting-jobs.test.ts`: la base compartida conserva las colas de otros tests).
       const queues = await runtime.pool.query<{ name: string }>(
-        `SELECT name FROM pgboss.queue WHERE name IN ('forecasting.schedule', 'forecasting.runner') ORDER BY name`,
+        `SELECT name FROM pgboss.queue WHERE name = 'forecasting.schedule'`,
       );
       expect(queues.rows.map((r) => r.name)).toEqual(['forecasting.schedule']);
     } finally {
