@@ -12,8 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: contract
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - "scripts/host-ops/test/static.test.ts"
+status: automated
 regression_suite: false
 phase: 9
 tags: ["compose","secrets","connections","add-host-restore-drill"]

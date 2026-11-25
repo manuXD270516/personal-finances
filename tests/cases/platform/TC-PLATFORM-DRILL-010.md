@@ -12,8 +12,8 @@ invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-status: draft
+automation_status: manual
+status: ready
 regression_suite: false
 phase: 9
 tags: ["host","backup","restore-drill","runbook","add-host-restore-drill"]

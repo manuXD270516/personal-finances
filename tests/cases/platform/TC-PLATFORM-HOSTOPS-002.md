@@ -12,8 +12,10 @@ invariants: []
 priority: critical
 type: platform
 level: unit
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - "scripts/host-ops/test/hostops.test.ts"
+status: automated
 regression_suite: false
 phase: 9
 tags: ["host","docker","image-prune","rollback","add-host-restore-drill"]

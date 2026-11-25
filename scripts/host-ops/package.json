@@ -1,0 +1,18 @@
+{
+  "name": "@pf/host-ops",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pruebas de los scripts del host N1 (deploy/host/*.sh): dobles de docker, curl, df, date y sleep al frente del PATH (TC-PLATFORM-DRILL-*, TC-PLATFORM-HOSTOPS-*). Necesitan bash, flock y jq (Linux): se saltan donde no están.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "yaml": "2.9.1"
+  }
+}

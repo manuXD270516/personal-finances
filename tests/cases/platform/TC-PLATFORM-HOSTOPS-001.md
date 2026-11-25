@@ -12,8 +12,11 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - "scripts/host-ops/test/hostops.test.ts"
+  - "scripts/host-ops/test/drill.test.ts"
+status: automated
 regression_suite: false
 phase: 9
 tags: ["host","deploy","lock","add-host-restore-drill"]

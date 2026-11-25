@@ -12,8 +12,10 @@ invariants: ["INV-004", "INV-005"]
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - "scripts/host-ops/test/drill.test.ts"
+status: automated
 regression_suite: false
 phase: 9
 tags: ["host","backup","restore-drill","add-host-restore-drill"]

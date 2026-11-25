@@ -12,11 +12,14 @@
 set -euo pipefail
 umask 077
 
-readonly REPO=/opt/pfos/repo
+# Rutas: las variables PFOS_* existen solo para probar el script sin un host (scripts/host-ops); sudo y el comando forzado no
+# las definen, así que en producción valen los valores por omisión.
+readonly ETC_DIR="${PFOS_ETC_DIR:-/etc/pfos}"
+readonly REPO="${PFOS_REPO_DIR:-/opt/pfos/repo}"
 readonly COMPOSE_DIR="${REPO}/deploy/compose"
-readonly ENV_FILE=/etc/pfos/pfos.env
-readonly PGBR_ENV_FILE=/etc/pfos/pgbackrest.env
-readonly STATE_DIR=/var/lib/pfos
+readonly ENV_FILE="${ETC_DIR}/pfos.env"
+readonly PGBR_ENV_FILE="${ETC_DIR}/pgbackrest.env"
+readonly STATE_DIR="${PFOS_STATE_DIR:-/var/lib/pfos}"
 readonly RELEASE_ENV="${STATE_DIR}/release.env"
 # Una línea por release exitoso: <utc> <sha> <api-ref> <web-ref> <pg-ref> [<extra-ref>...] (los extras se reconocen por nombre)
 readonly RELEASES_LOG="${STATE_DIR}/releases.log"
@@ -70,7 +73,21 @@ write_release_env() {
 # La credencial de servicio del servicio de pronósticos es un secreto de archivo montado en el worker y en `ml-forecasting`
 # (0444 dentro de /etc/pfos, que es 0700 de root). Sin el servicio habilitado el archivo queda vacío y no se usa.
 ensure_ml_token_file() {
-  [ -e /etc/pfos/ml-service-token ] || install -m 0444 /dev/null /etc/pfos/ml-service-token
+  [ -e "${ETC_DIR}/ml-service-token" ] || install -m 0444 /dev/null "${ETC_DIR}/ml-service-token"
+}
+
+# Clave PRIVADA de las conexiones (D342): archivo 0400 del uid del worker (node, 1000) que solo `finance-worker` monta (compose.prod.yaml).
+# Si faltara, Docker crearía un DIRECTORIO como origen del montaje; vacío equivale a no tener claves. Si existe, solo se
+# normalizan dueño y permisos: el contenido nunca se toca (lo carga el owner, runbook de conexiones).
+ensure_connection_keys_file() {
+  local file="${ETC_DIR}/connection-credentials.keys"
+  [ ! -d "${file}" ] || die "${file} es un directorio: borrarlo y desplegar de nuevo"
+  if [ -e "${file}" ]; then
+    chown 1000:1000 "${file}"
+    chmod 0400 "${file}"
+  else
+    install -o 1000 -g 1000 -m 0400 /dev/null "${file}"
+  fi
 }
 
 pull_and_verify() {
@@ -90,7 +107,8 @@ install_host_units() {
   install -m 0644 "${REPO}"/deploy/host/systemd/*.service "${REPO}"/deploy/host/systemd/*.timer /etc/systemd/system/
   systemctl daemon-reload
   systemctl enable --now pfos-backup-full.timer pfos-backup-diff.timer pfos-backup-monthly.timer \
-    pfos-backup-check.timer pfos-docs-replica.timer >/dev/null
+    pfos-backup-check.timer pfos-docs-replica.timer pfos-restore-drill.timer pfos-backup-verify.timer \
+    pfos-image-prune.timer >/dev/null
 }
 
 stack_running() { [ -n "$(docker ps -q --filter label=com.docker.compose.project=pfos --filter label=com.docker.compose.service=postgres)" ]; }
@@ -141,6 +159,7 @@ cmd_deploy() {
   log "release ${sha}: pull por digest"
   pull_and_verify "${sha}" "${api}" "${web}" "${pg}" ${ML:+"${ML}"} ${KC:+"${KC}"}
   ensure_ml_token_file
+  ensure_connection_keys_file
   install_host_units
 
   candidate="$(mktemp "${STATE_DIR}/release.env.XXXXXX")"
@@ -176,6 +195,7 @@ redeploy_line() {
   git -C "${REPO}" -c advice.detachedHead=false checkout --quiet --detach "${sha}"
   write_release_env "${RELEASE_ENV}" "${sha}" "${api}" "${web}" "${pg}" "${ML}" "${KC}"
   ensure_ml_token_file
+  ensure_connection_keys_file
   up_release "${RELEASE_ENV}"
   smoke
 }
@@ -200,8 +220,15 @@ cmd_status() {
 }
 
 mkdir -p "${STATE_DIR}"
-exec 9>"${STATE_DIR}/deploy.lock"
-flock -n 9 || die "hay otro deploy en curso"
+# Lock compartido con las operaciones del host (drill, verify, image-prune de pfos-backup.sh): quien lo tiene escribe su
+# nombre en el archivo, y un deploy que lo encuentra tomado falla sin tocar nada e informa cuál es.
+exec 9<>"${STATE_DIR}/deploy.lock"
+if ! flock -n 9; then
+  holder="$(head -n 1 "${STATE_DIR}/deploy.lock" 2>/dev/null || true)"
+  die "operación del host en curso: ${holder:-desconocida}"
+fi
+: >"${STATE_DIR}/deploy.lock"
+printf '%s\n' "${1:-}${2:+ $2}" >&9
 
 case "${1:-}" in
   deploy)

@@ -95,7 +95,7 @@ Para N1/N2 se decide además:
 - Menor learning value de ECS/VPC hasta el N4.
 
 **Riesgos**
-- PITR propio mal configurado. *Mitigación:* drill mensual automatizado que falla si no restaura; alerta por `archive` atrasado; escalar a N3.
+- PITR propio mal configurado. *Mitigación:* drill mensual automatizado que falla si no restaura; alerta por `archive` atrasado; escalar a N3. *As-built (change `add-host-restore-drill`, D456, 2026-11-24):* el drill mensual corre en el propio host (`pfos-backup.sh drill`, día 2 a las 09:00 UTC, clave de B2 de solo lectura, falla y avisa por heartbeat si no restaura, si la copia pierde más de 15 min o si dura más de 60 min); `pgbackrest verify` semanal de repo1 y repo2; check horario con alerta de disco al 80 %; limpieza semanal de imágenes que conserva el release actual y el anterior. No cubre un host comprometido: lo cubre el drill manual trimestral fuera del host (runbook §6.2). Ver [openspec/changes/add-host-restore-drill](../../openspec/changes/add-host-restore-drill/design.md).
 - Memoria insuficiente en 2 GB (Keycloak llegó a 908 MiB sin límite tras E2E). *Mitigación:* techos por contenedor, heaps acotados, swap de 2 GiB, señales de salida en el runbook §1; N2 (4 GB, USD 24) con OK del owner o fallback N1-F.
 - Fallback Oracle A1: capacidad escasa, reclamo de instancias ociosas, ARM. *Mitigación:* solo con cuenta PAYG y tras habilitar imágenes multi-arch (½–1 día, SPIKE-09 §17.4).
 - Cambios de precio del proveedor. *Mitigación:* contratos estándar y IaC → mover de proveedor en horas; AWS Budgets.

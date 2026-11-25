@@ -142,6 +142,9 @@ Reglas del runbook:
 | Local/CI: `backup:local` → mutación → `restore:local` | Cada PR que toque scripts de backup; nightly | CI (compose) | `pnpm test:platform` (escenario round trip) | Estado idéntico (hash de tablas + objetos) |
 | Migración sobre snapshot de release | Cada release | CI | `test:migrations` up-from-release-snapshot ([16](16-testing-strategy.md) §5.9) | Invariantes OK tras migrar |
 | **Restore PITR de producción** | **Mensual** (`nightly.yml` con schedule mensual) | Cuenta **staging** (snapshot compartido/copiado cifrado) | Workflow `restore-drill`: restaura último punto → instancia efímera en subnet aislada → `verify-integrity.ts` → métricas (duración = RTO observado) → destruye | Integridad OK y **RTO observado < 1 h**; resultado publicado como artefacto + alarma si falla |
+| **Host N1 (ADR-0027, D456): restore drill del host** | **Mensual** (día 2, 09:00 UTC; `pfos-restore-drill.timer`) | El propio host, en un contenedor y un volumen temporales, sin archivado, sin puertos y fuera de la red del stack, con la clave de B2 de **solo lectura** | `pfos-backup.sh drill`: último punto de repo1 → INV-004 e INV-005 → pérdida frente al RPO de 15 min → duración → limpieza; línea en `/var/lib/pfos/drills.log` y aviso al heartbeat `pfos-drill` | Integridad OK, pérdida ≤ 15 min y **duración < 60 min**; si no, `/fail`. No cubre un host comprometido |
+| **Host N1: `pgbackrest verify`** | **Semanal** (miércoles 11:00 UTC) | Contenedor efímero con la clave de solo lectura | `pfos-backup.sh verify` de repo1 y repo2; heartbeat `pfos-verify` | Sin archivos inválidos en ninguno de los dos repositorios |
+| **Host N1: drill fuera del host** | **Trimestral** (primer mes del trimestre) | VM efímera `drill_enabled=true`, clave de solo lectura | Manual (runbook §6.2) | Integridad OK y RTO observado < 1 h, registrado en el issue trimestral |
 | Restore desde vault cross-account/region | Trimestral | Cuenta shared / región DR | Semi-manual (runbook) | Restore completo < 8 h |
 | Restore de versión S3 | Trimestral | staging | Script | Objeto recuperado con checksum igual |
 | Game day (región/compromiso) | Anual | staging | Manual guiado | Runbook ejecutable sin pasos no documentados |
@@ -194,6 +197,7 @@ Acceso a backups restringido por políticas de vault/bucket (solo roles de backu
 
 - Alarmas: job de AWS Backup fallido/no ejecutado en 26 h; copia cross-account fallida; `restore-drill` fallido; antigüedad del último `pg_dump` lógico > 8 días; `BackupRetentionPeriod` < esperado (AWS Config rule opcional o check en `infra-drift`).
 - Dashboard "Backups" en [18-observability.md](18-observability.md).
+- **Host N1 (ADR-0027, `add-host-restore-drill`):** el heartbeat (healthchecks.io, `PF_BACKUP_HEARTBEAT_URL`) tiene un check por trabajo: `pfos-full`, `pfos-diff`, `pfos-monthly`, `pfos-docs-replica`, `pfos-check` (horario: archivado de WAL, antigüedad del último backup y **disco > 80 %**), `pfos-drill` (periodo de 31 días y gracia de 1), `pfos-verify` (7 días) y `pfos-image-prune` (7 días). Cada uno avisa `/fail` ante un error y, si el trabajo deja de correr, el propio check vence.
 
 ## 13. Preguntas abiertas
 

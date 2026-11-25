@@ -13,7 +13,7 @@ priority: critical
 type: platform
 level: smoke
 automation_status: not_automated
-status: draft
+status: ready
 regression_suite: false
 phase: 9
 tags: ["host","backup","restore-drill","b2","add-host-restore-drill"]
