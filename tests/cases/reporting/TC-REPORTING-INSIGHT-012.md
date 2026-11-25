@@ -5,16 +5,18 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Riesgo en el plan del periodo"
 scenario: "Plan con una línea en riesgo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020","FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/budget-risk/budget-risk.test.tsx
+  - tests/e2e/specs/budget-overrun-risk.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk"]

@@ -385,6 +385,8 @@ export function financeRuntimes(input: {
       Pick<
         ApiConfig,
         | 'REPORTING_RATE_VALIDITY_WINDOW'
+        | 'REPORTING_BUDGET_RISK_ENABLED'
+        | 'REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS'
         | 'PLANNING_PERIOD_LOOKAHEAD'
         | 'PLANNING_HISTORY_DEFAULT_PERIODS'
         | 'PLANNING_HISTORY_MAX_PERIODS'
@@ -706,6 +708,33 @@ export function financeRuntimes(input: {
       getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
     },
     reconciliationMarks: transactions.reconciliationMarks,
+    // add-budget-overrun-risk: riesgo de exceder cada línea del plan. PLANNING y COMMITMENTS se componen después de
+    // REPORTING (resolución tardía); el pronóstico sale de `forecast` (deshabilitado = solo el ritmo del periodo).
+    budgetRisk: {
+      enabled: input.config.REPORTING_BUDGET_RISK_ENABLED ?? true,
+      minElapsedDays: input.config.REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS ?? 7,
+      budgets: {
+        getForPeriod: async (query) => {
+          const plan = await deferred.budgetVsActual?.getForPeriod(query);
+          return plan
+            ? {
+                budgetId: plan.budgetId,
+                currency: plan.currency,
+                lines: plan.lines.map((l) => ({
+                  budgetLineId: l.budgetLineId,
+                  target: l.target,
+                  nature: l.nature,
+                  kind: l.kind,
+                  reference: l.reference,
+                  actual: l.actual,
+                  actualComplete: l.actualComplete,
+                })),
+              }
+            : null;
+        },
+      },
+      listResolved: (query) => deferred.commitments?.resolved.listResolved(query) ?? Promise.resolve([]),
+    },
     // add-cash-flow-forecast: cada cambio de los ajustes del disponible se audita con los valores anterior y nuevo.
     settingsAudit: {
       updated: async (entry) => {

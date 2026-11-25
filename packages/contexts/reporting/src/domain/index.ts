@@ -302,3 +302,16 @@ export {
   type PredictedBand,
   type ShortfallLikelihood,
 } from './predicted-spending-band.js';
+export {
+  BudgetOverrunProjector,
+  DEFAULT_BUDGET_RISK_MIN_ELAPSED_DAYS,
+  periodDays,
+  type BudgetRiskBasis,
+  type BudgetRiskLevel,
+  type BudgetRiskLineInput,
+  type BudgetRiskLineKind,
+  type BudgetRiskPeriodInput,
+  type BudgetRiskReason,
+  type BudgetRiskResult,
+  type KnownPayment,
+} from './budget-overrun-projector.js';

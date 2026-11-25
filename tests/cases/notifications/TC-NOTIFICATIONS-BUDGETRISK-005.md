@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Emails de riesgo de presupuesto sin montos salvo opt-in"
 scenario: "Notificación en portugués"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-002"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/budget-risk-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["notifications","budget-risk","i18n"]

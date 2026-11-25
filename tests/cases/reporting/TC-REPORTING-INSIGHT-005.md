@@ -5,16 +5,18 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Banda del pronóstico en el riesgo"
 scenario: "Riesgo posible con la banda"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020","FR-FORECAST-001","FR-FORECAST-004"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/budget-risk.queries.test.ts
+  - packages/contexts/reporting/src/domain/budget-overrun-projector.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk"]

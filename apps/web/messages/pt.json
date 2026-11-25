@@ -2660,7 +2660,8 @@
         "FX_RATE_ANOMALY_RETAINED": "Taxa retida por variação anômala",
         "CASH_FLOW_SHORTFALL_RISK": "Risco de déficit no fluxo de caixa",
         "HOME_DIGEST": "Resumo periódico do início (email)",
-        "SPENDING_ANOMALY": "Despesas atípicas detectadas (desligado por padrão)"
+        "SPENDING_ANOMALY": "Despesas atípicas detectadas (desligado por padrão)",
+        "BUDGET_OVERRUN_RISK": "Risco de estourar um orçamento (desligado por padrão)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalhes (valores e nomes) nos e-mails",
@@ -7306,6 +7307,52 @@
       },
       "bySurface": "Por canal",
       "failed": "Não foi possível ler a taxa de aceitação."
+    }
+  },
+  "BudgetRisk": {
+    "none": "Sem risco calculado",
+    "level": {
+      "EXCEEDED": "Ultrapassada",
+      "LIKELY": "Provável",
+      "POSSIBLE": "Possível",
+      "UNLIKELY": "Improvável",
+      "NOT_AVAILABLE": "Indisponível"
+    },
+    "reason": {
+      "LINE_TYPE": "Linhas fixas e de mínimo não são projetadas",
+      "NO_REFERENCE": "A linha não tem valor planejado",
+      "TOO_EARLY": "Faltam dados do período"
+    },
+    "basis": {
+      "RUN_RATE": "com base no ritmo do período",
+      "FORECAST": "com base na previsão"
+    },
+    "detail": {
+      "projected": "Projeção {amount}",
+      "projectedHigh": "alta {amount}",
+      "date": "estouro estimado por volta de {date}"
+    },
+    "incomplete": "Falta a taxa de algum pagamento conhecido: a projeção está incompleta",
+    "column": "Risco de estourar",
+    "legend": {
+      "intro": "O risco é uma projeção com o ritmo do período ou com a previsão, não uma certeza; não altera nenhum valor do plano.",
+      "possible": "\"Possível\" significa que só ocorreria se o gasto chegar perto do alto do habitual (limite superior do intervalo de 80 % da previsão)."
+    },
+    "sentence": {
+      "likely": "No ritmo atual, {name} ultrapassaria o limite por volta de {date}.",
+      "likelyNoDate": "No ritmo atual, {name} ultrapassaria o limite antes do fim do período.",
+      "likelyForecast": "Segundo a previsão, {name} ultrapassaria o limite por volta de {date}.",
+      "likelyForecastNoDate": "Segundo a previsão, {name} ultrapassaria o limite antes do fim do período.",
+      "possible": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite por volta de {date}.",
+      "possibleNoDate": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite antes do fim do período.",
+      "possibleForecast": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite por volta de {date}.",
+      "possibleForecastNoDate": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite antes do fim do período."
+    },
+    "home": {
+      "title": "Orçamentos em risco",
+      "subtitle": "Plano de {period}",
+      "figures": "Projeção {projected} de {reference}",
+      "more": "e mais {count, plural, one {# linha} other {# linhas}} em risco no plano"
     }
   },
   "SpendingAnomalies": {

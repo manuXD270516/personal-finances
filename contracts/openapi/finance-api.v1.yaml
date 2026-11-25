@@ -6780,6 +6780,50 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/periods/{periodId}/budget-risk:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Reporting]
+      operationId: getBudgetRisk
+      summary: Risk of exceeding each expense line of the plan of the current period (no side effects)
+      description: |
+        For each expense line of the plan whose target is a category or a group (tag and income lines are not
+        evaluated) of the period that contains today (workspace time zone), projects the spending at the end of the
+        period as `actual + knownPending + remaining variable spending` and compares it with the `reference` of the line
+        (the effective planned amount, or the maximum of a range). The remaining variable spending is the pace of the
+        period (`variableActual / elapsedDays × remainingDays`, today included in the elapsed days) or, with the forecasts
+        enabled and a current forecast of the category for the period (also a stale one), the expected value minus the
+        variable spending already made. `variableActual` excludes what the commitment occurrences already paid in the
+        period (they are not extrapolated) and `knownPending` adds the pending occurrences of the line categories that
+        fall due up to the end of the period (those in another currency converted with the current rate; without a rate
+        they are left out and `projectionComplete` is `false`). `level`: `EXCEEDED` when `actual` is over the reference,
+        `LIKELY` when `projected` is over it, `POSSIBLE` when only `projectedHigh` (with the upper limit of the 80 %
+        interval; only for a category line with a forecast) is over it, `UNLIKELY` otherwise, and `NOT_AVAILABLE` with a
+        `reason` for fixed and minimum lines (`LINE_TYPE`), a zero reference (`NO_REFERENCE`) and, without a forecast,
+        while fewer days than `REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS` (7) have elapsed (`TOO_EARLY`) unless the actual
+        plus the known payments already exceed the reference. `estimatedDate` is the first day on which the actual plus
+        the known payments due up to that day plus the remaining spending split in equal exact parts exceeds the
+        reference. A projection, never a certainty: it does not change any figure of the plan (planned, actual,
+        thresholds or the spendable amount). Any member can read it. Period of another workspace is `404`. HALF_EVEN only
+        when presenting. Response `status`: `NO_PLAN`, `NOT_CURRENT_PERIOD` and `DISABLED`
+        (`REPORTING_BUDGET_RISK_ENABLED=false`) come without lines.
+      x-openspec-capability: [reporting/predictive-insights]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Budget risk
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetRisk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/periods/{periodId}/close:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -22459,6 +22503,14 @@ components:
           oneOf:
             - $ref: '#/components/schemas/CashFlowHomeBlock'
             - type: 'null'
+        budgetRisk:
+          description: |
+            Lines of the plan of the current period at `LIKELY` risk of exceeding their limit (Home Q5,
+            add-budget-overrun-risk), from the same calculation as `getBudgetRisk`; it does not change the spendable amount.
+            Null without a plan, without lines at risk, with the feature disabled or when the summary is historical (`asOf`).
+          oneOf:
+            - $ref: '#/components/schemas/BudgetRiskHomeBlock'
+            - type: 'null'
         forecast:
           description: |
             Expected spending of the period (Home Q3, add-predicted-cash-flow-band): the forecast of the total expense for
@@ -22565,6 +22617,107 @@ components:
           uniqueItems: true
           description: Active expense categories (an income one is `CATEGORY_KIND_MISMATCH`, an archived one `CATEGORY_ARCHIVED`)
           items: { $ref: '#/components/schemas/Uuid' }
+    BudgetLineRisk:
+      type: object
+      additionalProperties: false
+      required: [budgetLineId, target, targetName, reference, actual, variableActual, knownPending, projected, projectedHigh, projectionComplete, level, reason, estimatedDate, basis]
+      description: Risk of exceeding one expense line of the plan (a projection, never a certainty).
+      properties:
+        budgetLineId: { $ref: '#/components/schemas/Uuid' }
+        target:
+          type: object
+          additionalProperties: false
+          required: [kind, id]
+          properties:
+            kind: { type: string, enum: [CATEGORY, GROUP] }
+            id: { $ref: '#/components/schemas/Uuid' }
+        targetName: { type: string, description: Name of the category or group }
+        reference: { $ref: '#/components/schemas/Money' }
+        actual: { $ref: '#/components/schemas/Money' }
+        variableActual:
+          $ref: '#/components/schemas/Money'
+          description: Spent minus what the commitment occurrences already paid in the period (never negative)
+        knownPending:
+          $ref: '#/components/schemas/Money'
+          description: Pending occurrences of the line categories that fall due up to the end of the period
+        projected:
+          description: Expected spending at the end of the period; null when it is not available or the line is exceeded
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        projectedHigh:
+          description: Projection with the upper limit of the 80 % interval of the forecast; null without a forecast
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        projectionComplete:
+          type: boolean
+          description: False when a known payment in another currency was left out for lack of a rate
+        level:
+          type: string
+          x-extensible-enum: [EXCEEDED, LIKELY, POSSIBLE, UNLIKELY, NOT_AVAILABLE]
+        reason:
+          description: Why the risk is not available (`NOT_AVAILABLE` only)
+          oneOf:
+            - type: string
+              x-extensible-enum: [LINE_TYPE, NO_REFERENCE, TOO_EARLY]
+            - type: 'null'
+        estimatedDate:
+          description: Estimated date of the overrun for `LIKELY` and `POSSIBLE` (null when there are no days ahead)
+          oneOf:
+            - { $ref: '#/components/schemas/LocalDate' }
+            - type: 'null'
+        basis:
+          description: Pace of the period or forecast; null when the risk is not available or the line is exceeded
+          oneOf:
+            - type: string
+              enum: [RUN_RATE, FORECAST]
+            - type: 'null'
+
+    BudgetRisk:
+      type: object
+      additionalProperties: false
+      required: [status, periodId, budgetId, asOf, currency, elapsedDays, remainingDays, forecastRunId, lines]
+      properties:
+        status:
+          type: string
+          x-extensible-enum: [AVAILABLE, NO_PLAN, NOT_CURRENT_PERIOD, DISABLED]
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        budgetId:
+          description: Plan of the period (null without a plan)
+          oneOf:
+            - { $ref: '#/components/schemas/Uuid' }
+            - type: 'null'
+        asOf: { $ref: '#/components/schemas/LocalDate' }
+        currency:
+          type: string
+          description: Currency of the plan (empty when there is no plan)
+        elapsedDays: { type: integer, minimum: 0, description: 'Days elapsed in the period, today included' }
+        remainingDays: { type: integer, minimum: 0, description: 'Days left in the period, today not included' }
+        forecastRunId:
+          description: Forecast run used by at least one line (null when every line uses the pace of the period)
+          oneOf:
+            - { $ref: '#/components/schemas/Uuid' }
+            - type: 'null'
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetLineRisk' }
+
+    BudgetRiskHomeBlock:
+      type: object
+      additionalProperties: false
+      required: [periodId, periodLabel, lines, moreCount]
+      description: Lines of the plan at `LIKELY` risk of exceeding their limit (Home Q5, add-budget-overrun-risk).
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        lines:
+          type: array
+          maxItems: 3
+          description: Up to 3 `LIKELY` lines by estimated date and then by name
+          items: { $ref: '#/components/schemas/BudgetLineRisk' }
+        moreCount: { type: integer, minimum: 0, description: 'LIKELY lines not listed' }
+
     CashFlowHomeBlock:
       type: object
       description: Q8 card block of the Home (30 days).
@@ -23954,7 +24107,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED, CASH_FLOW_SHORTFALL_RISK, HOME_DIGEST, SPENDING_ANOMALY]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED, CASH_FLOW_SHORTFALL_RISK, HOME_DIGEST, SPENDING_ANOMALY, BUDGET_OVERRUN_RISK]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.

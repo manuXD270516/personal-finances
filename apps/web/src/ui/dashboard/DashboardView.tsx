@@ -35,6 +35,8 @@ export interface DashboardViewProps extends FormatContext {
   readonly upcomingHref?: string | undefined;
   /** Ajustes del disponible (horizonte y esenciales; add-cash-flow-forecast). */
   readonly spendableSettingsHref?: string | undefined;
+  /** Presupuestos en riesgo de excederse (Q5, add-budget-overrun-risk), justo después del disponible para gastar. */
+  readonly budgetRiskCard?: ReactNode;
   /** Tarjeta "Deudas" (add-debt-summary), junto a la de metas en "Metas y deudas". */
   readonly debtWidget?: ReactNode;
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
@@ -65,6 +67,7 @@ export function DashboardView({
   upcomingHref,
   spendableSettingsHref,
   debtWidget,
+  budgetRiskCard,
   evolutionCard,
   commitmentsSection,
   ...ctx
@@ -113,6 +116,8 @@ export function DashboardView({
           }}
         />
       ) : null}
+
+      {budgetRiskCard ?? null}
 
       {commitmentsSection ?? null}
 
