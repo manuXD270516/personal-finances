@@ -1,4 +1,4 @@
-import { ENV_FILE_VAR, createEnvFile, pnpm, processEnvFor, removeEnvFile } from './stack.js';
+import { ENV_FILE_VAR, createEnvFile, dumpServiceLogs, pnpm, processEnvFor, removeEnvFile } from './stack.js';
 
 /**
  * Levanta el stack `pfos-e2e` en modo B (perfiles core y ml: postgres, Keycloak con el realm de desarrollo, migrate,
@@ -19,6 +19,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   process.env[ENV_FILE_VAR] = file;
   const env = processEnvFor(file);
   const teardown = async () => {
+    // CI: los logs de los contenedores se vuelcan antes de bajar el stack y se suben como artefacto si algo falló.
+    const logsDir = process.env['PF_E2E_LOGS_DIR'];
+    if (logsDir) await dumpServiceLogs(logsDir);
     if (process.env['PF_E2E_KEEP_STACK'] === '1') {
       process.stderr.write(`[e2e] stack ${env['PF_COMPOSE_PROJECT']} sigue arriba (PF_ENV_FILE=${file})\n`);
       return;
