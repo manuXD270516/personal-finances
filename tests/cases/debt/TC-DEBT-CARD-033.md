@@ -30,8 +30,9 @@ steps:
   - 'Consultar los próximos 60 días'
 expected_result:
   - '2026-12-15 "Pago de tarjeta · Visa Oro" 333.33 BOB estimado con indicación "cuotas"'
+  - 'La respuesta informa el origen del monto esperado: expectedBasis INSTALLMENTS (change fix-phase-4-debt-followups)'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-11-25
 ---
 
 # TC-DEBT-CARD-033 — Cuotas futuras de la tarjeta en los próximos pagos
@@ -46,8 +47,10 @@ Las cuotas futuras alimentan Q8 y el comprometido.
 Dado la segunda cuota de "Laptop" en el ciclo que vence el 2026-12-15
 Cuando consulto 60 días
 Entonces aparece 333.33 BOB estimado como cuotas
+Y la respuesta informa que el origen del monto esperado son cuotas programadas
 ```
 
 ## Notas
 
 - Change: `add-credit-cards` (borrador; cifras con `FixedClock` en America/La_Paz).
+- 2026-11-25, change `fix-phase-4-debt-followups` (75): el test automatizado solo comprobaba el monto y `amountType: ESTIMATED`, no la indicación «cuotas». El change agrega el origen del esperado (`expectedBasis`) y el test pasa a comprobarlo (tarea 7.1); hasta entonces este TC no cubre la indicación.
