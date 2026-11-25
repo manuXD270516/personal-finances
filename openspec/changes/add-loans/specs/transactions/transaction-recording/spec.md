@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Transacciones de préstamo administradas por el préstamo
-Las transacciones de desembolso de préstamo y de pago de préstamo DEBEN (MUST) crearse solo desde el préstamo; DEBEN (MUST) aparecer en el listado, los filtros por tipo y el detalle de transacciones con su desglose (principal, interés, comisiones, seguro e impuestos) y el préstamo de origen; crearlas desde la API de transacciones DEBE (MUST) rechazarse con `VALIDATION_FAILED`, y editar sus montos, cuentas, fecha o moneda, o anularlas fuera del préstamo, DEBE (MUST) rechazarse con `TRANSACTION_MANAGED_EXTERNALLY` indicando el préstamo; editar la descripción, las notas y los tags DEBE (MUST) seguir permitido sin tocar el ledger.
+Las transacciones de desembolso de préstamo y de pago de préstamo DEBEN (MUST) crearse solo desde el préstamo; DEBEN (MUST) aparecer en el listado, los filtros por tipo y el detalle de transacciones con su desglose (principal, interés, comisiones, seguro e impuestos) y el préstamo de origen; crearlas desde la API de transacciones DEBE (MUST) rechazarse con `VALIDATION_FAILED`, y editar sus montos, cuentas, fecha o moneda, o anularlas fuera del préstamo, DEBE (MUST) rechazarse con `TRANSACTION_MANAGED_EXTERNALLY` indicando el préstamo; editar la descripción y las notas DEBE (MUST) seguir permitido sin tocar el ledger (estas transacciones no tienen porciones y los tags viven en la porción, D489).
 Trace: FR-DEBT-002, FR-DEBT-007, FR-TRANSACTIONS-009 · Priority: Must
 
 #### Scenario: Pago de préstamo en el listado
