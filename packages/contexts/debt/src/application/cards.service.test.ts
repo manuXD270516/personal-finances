@@ -769,5 +769,35 @@ describe('Próximo vencimiento y saldo inicial (fix-phase-4-gaps)', () => {
     expect(f?.otherNet.amount).toBe('1200.00');
     expect(f?.closingBalance.amount).toBe('1550.00');
     expect(account?.openCycle.consistent).toBe(true);
+    expect(world.metrics).toEqual([]);
+  });
+});
+
+describe('Listado completo y métrica de descuadres (fix-debt-cards-loans-gaps)', () => {
+  it('[TC-DEBT-CARD-041] el listado informa los estados vencidos más antiguos igual que el detalle', async () => {
+    const { world, svc, daily, queries } = setup('2026-09-20T14:00:00.000Z');
+    octoberHistory(world);
+    const { id } = await svc.register(registerBob());
+    world.setNow('2026-10-26T14:00:00.000Z');
+    await daily.runWorkspace(WS);
+    // El estado del 25-10 (vence el 15-11) sigue impago el 20-12: hay dos ciclos cerrados desde entonces.
+    world.setNow('2026-12-20T14:00:00.000Z');
+    const detail = (await queries.get(WS, id)).accounts[0];
+    const listed = (await queries.list(WS)).find((c) => c.id === id)?.accounts[0];
+    expect(detail?.overdueStatements.map((o) => o.closingDate)).toEqual(['2026-10-25']);
+    expect(listed?.overdueStatements).toEqual(detail?.overdueStatements);
+    expect(listed?.nextDueDate).toBe(detail?.nextDueDate);
+  });
+
+  it('[TC-DEBT-CARD-042] un ciclo que no cuadra se marca consistent = false y cuenta debt_card_cycle_mismatch_total', async () => {
+    const { world, svc, queries } = setup('2026-10-20T14:00:00.000Z');
+    world.addEntry({ accountId: 'acct-bob', date: '2026-10-08', cls: 'PURCHASE', amount: '350.00' });
+    // 10.00 BOB en el saldo del ledger que ningún movimiento explica.
+    world.unexplained.push({ accountId: 'acct-bob', date: '2026-10-09', amount: '10.00' });
+    const { id } = await svc.register(registerBob());
+    world.metrics.length = 0;
+    const account = (await queries.get(WS, id)).accounts[0];
+    expect(account?.openCycle.consistent).toBe(false);
+    expect(world.metrics).toEqual([{ name: 'debt_card_cycle_mismatch_total', labels: {}, value: 1 }]);
   });
 });

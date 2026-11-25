@@ -1,17 +1,17 @@
 ---
 id: TC-DEBT-CARD-047
-title: "Anular un cargo revierte su asiento y la deuda de la tarjeta"
+title: "El estado de cuenta lista el cargo y la diferencia con el banco queda en cero"
 spec: debt/credit-cards
 related_specs: []
-requirement: "Anular un cargo de la tarjeta"
-scenario: "Cargo registrado por error"
+requirement: "Cargos registrados en el estado de cuenta"
+scenario: "Diferencia con el banco cubierta por el cargo"
 requirement_status: provisional
 fr: ["FR-DEBT-013"]
 nfr: []
-invariants: ["INV-007","INV-008"]
-priority: critical
-type: integration
-level: database-integration
+invariants: []
+priority: high
+type: api
+level: api
 automation_status: not_automated
 automated_tests: []
 status: draft
@@ -25,26 +25,24 @@ preconditions:
   - "FixedClock en 2026-10-28T12:00 America/La_Paz salvo que el escenario diga otra fecha; datos ficticios"
 input: {}
 steps:
-  - "el EDITOR anula con el motivo \"monto equivocado\" el cargo de 4.80 BOB del 2026-10-25 de \"Visa Oro BOB\", que adeuda 1525.30 BOB"
+  - "el estado de cuenta cerrado el 2026-10-25 de \"Visa Oro BOB\" se emitió con saldo facturado 1120.50 BOB, el banco informó 1125.30 BOB y se registra el cargo de 4.00 BOB de interés y 0.80 BOB de seguro con fecha 2026-10-25"
 expected_result:
-  - "la transacción del cargo queda anulada con la reversa de su asiento y \"Visa Oro BOB\" adeuda 1520.50 BOB"
-  - "las compras del ciclo del 2026-09-26 al 2026-10-25 vuelven a 1170.50 BOB"
+  - "el detalle lista ese cargo con total 4.80 BOB, el saldo facturado recalculado es 1125.30 BOB, la diferencia con lo emitido es 4.80 BOB y la diferencia con lo informado por el banco es 0.00 BOB"
 created: 2026-11-25
 updated: 2026-11-25
 ---
-# TC-DEBT-CARD-047 — Anular un cargo revierte su asiento y la deuda de la tarjeta
+# TC-DEBT-CARD-047 — El estado de cuenta lista el cargo y la diferencia con el banco queda en cero
 
 ## Intención
 
-Verifica el scenario "Cargo registrado por error" del requirement "Anular un cargo de la tarjeta" de `debt/credit-cards` (FR-DEBT-013).
+Verifica el scenario "Diferencia con el banco cubierta por el cargo" del requirement "Cargos registrados en el estado de cuenta" de `debt/credit-cards` (FR-DEBT-013).
 
 ## Escenario
 
 ```gherkin
 Dado Workspace "W1 Personal Demo" con moneda de reporte BOB y TZ America/La_Paz; tarjeta "Visa Oro" bimoneda con "Visa Oro BOB" y "Visa Oro USD", cierre el día 25 y vencimiento el día 15
-Cuando el EDITOR anula con el motivo "monto equivocado" el cargo de 4.80 BOB del 2026-10-25 de "Visa Oro BOB", que adeuda 1525.30 BOB
-Entonces la transacción del cargo queda anulada con la reversa de su asiento y "Visa Oro BOB" adeuda 1520.50 BOB
-Y las compras del ciclo del 2026-09-26 al 2026-10-25 vuelven a 1170.50 BOB
+Cuando el estado de cuenta cerrado el 2026-10-25 de "Visa Oro BOB" se emitió con saldo facturado 1120.50 BOB, el banco informó 1125.30 BOB y se registra el cargo de 4.00 BOB de interés y 0.80 BOB de seguro con fecha 2026-10-25
+Entonces el detalle lista ese cargo con total 4.80 BOB, el saldo facturado recalculado es 1125.30 BOB, la diferencia con lo emitido es 4.80 BOB y la diferencia con lo informado por el banco es 0.00 BOB
 ```
 
 ## Notas

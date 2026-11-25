@@ -42,7 +42,7 @@ Ninguna.
 
 **Migraciones requeridas:** dos migraciones expand, no destructivas, con timestamp posterior a la última de `main`: `txn.transaction.debt_role` con sus CHECK (`NOT VALID` + `VALIDATE`) y `debt.card_charge`. Sin backfill.
 
-**Test cases:** AÑADIDOS — TC-DEBT-CARD-041..054 (14), TC-TRANSACTIONS-CARDCHARGE-001..004 (4) y TC-REPORTING-REPORTS-058..063 (6). MODIFICADOS — ninguno (los scenarios existentes de los tres requirements MODIFIED no cambian: TC-REPORTING-REPORTS-042, -044 y -052 siguen válidos). DEPRECADOS — ninguno.
+**Test cases:** AÑADIDOS — TC-DEBT-CARD-043..056 (14), TC-TRANSACTIONS-CARDCHARGE-001..004 (4) y TC-REPORTING-REPORTS-058..063 (6). MODIFICADOS — ninguno (los scenarios existentes de los tres requirements MODIFIED no cambian: TC-REPORTING-REPORTS-042, -044 y -052 siguen válidos). DEPRECADOS — ninguno.
 
 **Impacto de regresión:** los gastos con `debtRole` siguen siendo `EXPENSE`, así que cuentan igual que hoy en gastos, presupuestos, Q3, pronósticos y el resumen de deudas; el único cambio de cifras es que el reporte de comisiones pasa a contar como `CARD` los cargos (antes no contaba el interés de tarjeta, y una comisión de tarjeta en «Comisiones» contaba como `FEE_CATEGORY`). La regla de transacción administrada se amplía de «kind administrado» a «kind administrado o `debtRole` no nulo».
 

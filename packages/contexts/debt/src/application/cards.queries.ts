@@ -72,7 +72,9 @@ export class CardsQueries implements CardPortfolioQuery {
       const clock = await this.engine.clockOf(workspaceId);
       const cards = await this.deps.cards.list(workspaceId, filter);
       const out: CreditCardView[] = [];
-      for (const card of cards) out.push(await this.detail(card, clock, 1));
+      // Con la ventana completa de ciclos: `overdueStatements[]` de cada cuenta sale completo, igual que en el detalle
+      // (spec «Próximo vencimiento»: cada estado emitido vencido con faltante se informa aparte).
+      for (const card of cards) out.push(await this.detail(card, clock, this.deps.settings.historyCycles));
       return out;
     });
   }

@@ -1,52 +1,48 @@
 ---
 id: TC-DEBT-CARD-041
-title: "Registrar interés y seguro crea un gasto de la tarjeta con una porción por componente"
+title: "El listado de tarjetas informa todos los estados vencidos con faltante, igual que el detalle"
 spec: debt/credit-cards
-related_specs: ["transactions/transaction-recording","ledger/journal-posting"]
-requirement: "Registro de los intereses y cargos de una tarjeta"
-scenario: "Interés y seguro del estado de cuenta de octubre"
-requirement_status: provisional
-fr: ["FR-DEBT-013","FR-REPORTING-008"]
+related_specs: []
+requirement: "Próximo vencimiento de la tarjeta"
+scenario: "Estado de cuenta vencido con saldo pendiente"
+requirement_status: confirmed
+fr: ["FR-DEBT-013"]
 nfr: []
-invariants: ["INV-004","INV-021"]
-priority: critical
+invariants: []
+priority: medium
 type: integration
-level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+level: unit
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/application/cards.service.test.ts
+status: automated
 regression_suite: false
-phase: 9
-tags: ["credit-cards","card-charges"]
+phase: 5
+tags: ["credit-cards","overdue","list","fix-debt-cards-loans-gaps"]
 error_code: null
 preconditions:
-  - "Workspace \"W1 Personal Demo\" con moneda de reporte BOB y TZ America/La_Paz; tarjeta \"Visa Oro\" bimoneda con \"Visa Oro BOB\" y \"Visa Oro USD\", cierre el día 25 y vencimiento el día 15"
-  - "Datos del ciclo del 2026-09-26 al 2026-10-25 de \"Visa Oro BOB\" según el scenario «Ciclo de octubre de Visa Oro BOB» (saldo al cierre 1120.50 BOB) y una compra de 400.00 BOB el 2026-10-26"
-  - "FixedClock en 2026-10-28T12:00 America/La_Paz salvo que el escenario diga otra fecha; datos ficticios"
-input: {}
+  - "Estado de cuenta de \"Visa Oro BOB\" cerrado el 2026-10-25 con 1120.50 BOB, sin pagos"
+  - "Hoy es 2026-12-20: ya cerraron dos ciclos desde ese estado"
+input: {"today": "2026-12-20", "currency": "BOB"}
 steps:
-  - "el 2026-10-28 el EDITOR registra en \"Visa Oro BOB\", que adeuda 1520.50 BOB, un cargo con fecha 2026-10-25 de 4.00 BOB de interés y 0.80 BOB de seguro"
+  - "Consultar `GET W/credit-cards` y `GET W/credit-cards/{id}`"
 expected_result:
-  - "se crea un gasto posteado de 4.80 BOB en \"Visa Oro BOB\" con una porción de 4.00 BOB en \"Intereses pagados\" y otra de 0.80 BOB en \"Seguros\", ambas identificadas como cargo de la tarjeta"
-  - "\"Visa Oro BOB\" adeuda 1525.30 BOB y las compras del ciclo del 2026-09-26 al 2026-10-25 pasan de 1170.50 BOB a 1175.30 BOB"
+  - "Ambas respuestas informan el estado cerrado el 2026-10-25 en `overdueStatements`"
+  - "El listado y el detalle coinciden en `overdueStatements` y `nextDueDate`"
 created: 2026-11-25
 updated: 2026-11-25
 ---
-# TC-DEBT-CARD-041 — Registrar interés y seguro crea un gasto de la tarjeta con una porción por componente
+
+# TC-DEBT-CARD-041 — El listado de tarjetas informa todos los estados vencidos con faltante, igual que el detalle
 
 ## Intención
 
-Verifica el scenario "Interés y seguro del estado de cuenta de octubre" del requirement "Registro de los intereses y cargos de una tarjeta" de `debt/credit-cards` (FR-DEBT-013, FR-REPORTING-008).
+El listado calculaba un solo ciclo cerrado y omitía los estados vencidos más antiguos (docs/38 §4). Ahora usa la misma ventana de ciclos que el detalle.
 
 ## Escenario
 
 ```gherkin
-Dado Workspace "W1 Personal Demo" con moneda de reporte BOB y TZ America/La_Paz; tarjeta "Visa Oro" bimoneda con "Visa Oro BOB" y "Visa Oro USD", cierre el día 25 y vencimiento el día 15
-Cuando el 2026-10-28 el EDITOR registra en "Visa Oro BOB", que adeuda 1520.50 BOB, un cargo con fecha 2026-10-25 de 4.00 BOB de interés y 0.80 BOB de seguro
-Entonces se crea un gasto posteado de 4.80 BOB en "Visa Oro BOB" con una porción de 4.00 BOB en "Intereses pagados" y otra de 0.80 BOB en "Seguros", ambas identificadas como cargo de la tarjeta
-Y "Visa Oro BOB" adeuda 1525.30 BOB y las compras del ciclo del 2026-09-26 al 2026-10-25 pasan de 1170.50 BOB a 1175.30 BOB
+Dado el estado de cuenta de "Visa Oro BOB" cerrado el 2026-10-25, sin pagos
+Cuando se lista y se consulta la tarjeta el 2026-12-20
+Entonces el listado y el detalle informan ese estado como atrasado
 ```
-
-## Notas
-
-- Change `add-card-interest-ledger-portions` (Phase 9). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; montos como strings decimales; ningún dato real del owner.

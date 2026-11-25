@@ -157,6 +157,14 @@ export interface CardSettings {
   readonly planHorizonDays: number;
 }
 
+/** Métricas del motor de tarjetas (contador sin etiquetas de alta cardinalidad). */
+export interface CardMetricsPort {
+  increment(name: string, labels: Readonly<Record<string, string>>, value?: number): void;
+}
+
+/** Ciclos cuyo cálculo no cuadra (`previous + compras − reembolsos − pagos + otros ≠ cierre`); la vista marca `consistent = false`. */
+export const CARD_CYCLE_MISMATCH_METRIC = 'debt_card_cycle_mismatch_total';
+
 export interface CardDeps {
   readonly uow: UnitOfWork;
   readonly cards: CardRepository;
@@ -181,6 +189,8 @@ export interface CardDeps {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly settings: CardSettings;
+  /** Opcional: sin él (pruebas, CLI) los descuadres solo se marcan en la vista. */
+  readonly metrics?: CardMetricsPort;
 }
 
 export type { AccountBalanceHistoryQuery };

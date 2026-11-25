@@ -1,14 +1,14 @@
 ---
 id: TC-DEBT-CARD-049
-title: "Adoptar un gasto manual como cargo no cambia el saldo ni crea transacciones"
+title: "Anular un cargo revierte su asiento y la deuda de la tarjeta"
 spec: debt/credit-cards
 related_specs: []
-requirement: "Adoptar un gasto existente como cargo de la tarjeta"
-scenario: "Interés cargado a mano antes del change"
+requirement: "Anular un cargo de la tarjeta"
+scenario: "Cargo registrado por error"
 requirement_status: provisional
-fr: ["FR-DEBT-013","FR-REPORTING-008"]
+fr: ["FR-DEBT-013"]
 nfr: []
-invariants: ["INV-021"]
+invariants: ["INV-007","INV-008"]
 priority: critical
 type: integration
 level: database-integration
@@ -25,26 +25,26 @@ preconditions:
   - "FixedClock en 2026-10-28T12:00 America/La_Paz salvo que el escenario diga otra fecha; datos ficticios"
 input: {}
 steps:
-  - "\"Visa Oro BOB\" tiene un gasto manual \"Interés Visa\" de 4.80 BOB del 2026-10-25 en \"Intereses pagados\" y el EDITOR lo adopta como cargo con 4.80 BOB de interés"
+  - "el EDITOR anula con el motivo \"monto equivocado\" el cargo de 4.80 BOB del 2026-10-25 de \"Visa Oro BOB\", que adeuda 1525.30 BOB"
 expected_result:
-  - "la transacción conserva su monto de 4.80 BOB, su cuenta y su fecha, su porción de 4.80 BOB queda identificada como cargo de la tarjeta y \"Visa Oro BOB\" no cambia de saldo"
-  - "no se crea ninguna transacción nueva"
+  - "la transacción del cargo queda anulada con la reversa de su asiento y \"Visa Oro BOB\" adeuda 1520.50 BOB"
+  - "las compras del ciclo del 2026-09-26 al 2026-10-25 vuelven a 1170.50 BOB"
 created: 2026-11-25
 updated: 2026-11-25
 ---
-# TC-DEBT-CARD-049 — Adoptar un gasto manual como cargo no cambia el saldo ni crea transacciones
+# TC-DEBT-CARD-049 — Anular un cargo revierte su asiento y la deuda de la tarjeta
 
 ## Intención
 
-Verifica el scenario "Interés cargado a mano antes del change" del requirement "Adoptar un gasto existente como cargo de la tarjeta" de `debt/credit-cards` (FR-DEBT-013, FR-REPORTING-008).
+Verifica el scenario "Cargo registrado por error" del requirement "Anular un cargo de la tarjeta" de `debt/credit-cards` (FR-DEBT-013).
 
 ## Escenario
 
 ```gherkin
 Dado Workspace "W1 Personal Demo" con moneda de reporte BOB y TZ America/La_Paz; tarjeta "Visa Oro" bimoneda con "Visa Oro BOB" y "Visa Oro USD", cierre el día 25 y vencimiento el día 15
-Cuando "Visa Oro BOB" tiene un gasto manual "Interés Visa" de 4.80 BOB del 2026-10-25 en "Intereses pagados" y el EDITOR lo adopta como cargo con 4.80 BOB de interés
-Entonces la transacción conserva su monto de 4.80 BOB, su cuenta y su fecha, su porción de 4.80 BOB queda identificada como cargo de la tarjeta y "Visa Oro BOB" no cambia de saldo
-Y no se crea ninguna transacción nueva
+Cuando el EDITOR anula con el motivo "monto equivocado" el cargo de 4.80 BOB del 2026-10-25 de "Visa Oro BOB", que adeuda 1525.30 BOB
+Entonces la transacción del cargo queda anulada con la reversa de su asiento y "Visa Oro BOB" adeuda 1520.50 BOB
+Y las compras del ciclo del 2026-09-26 al 2026-10-25 vuelven a 1170.50 BOB
 ```
 
 ## Notas

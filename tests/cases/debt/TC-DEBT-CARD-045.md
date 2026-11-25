@@ -1,48 +1,48 @@
 ---
 id: TC-DEBT-CARD-045
-title: "El estado de cuenta lista el cargo y la diferencia con el banco queda en cero"
+title: "Un cargo sin componentes positivos o con fecha futura se rechaza"
 spec: debt/credit-cards
 related_specs: []
-requirement: "Cargos registrados en el estado de cuenta"
-scenario: "Diferencia con el banco cubierta por el cargo"
+requirement: "Registro de los intereses y cargos de una tarjeta"
+scenario: "Cargo sin componentes positivos o con fecha futura"
 requirement_status: provisional
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
-type: api
-level: api
+type: domain
+level: domain
 automation_status: not_automated
 automated_tests: []
 status: draft
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges"]
-error_code: null
+error_code: CARD_CHARGE_INVALID
 preconditions:
   - "Workspace \"W1 Personal Demo\" con moneda de reporte BOB y TZ America/La_Paz; tarjeta \"Visa Oro\" bimoneda con \"Visa Oro BOB\" y \"Visa Oro USD\", cierre el día 25 y vencimiento el día 15"
   - "Datos del ciclo del 2026-09-26 al 2026-10-25 de \"Visa Oro BOB\" según el scenario «Ciclo de octubre de Visa Oro BOB» (saldo al cierre 1120.50 BOB) y una compra de 400.00 BOB el 2026-10-26"
   - "FixedClock en 2026-10-28T12:00 America/La_Paz salvo que el escenario diga otra fecha; datos ficticios"
 input: {}
 steps:
-  - "el estado de cuenta cerrado el 2026-10-25 de \"Visa Oro BOB\" se emitió con saldo facturado 1120.50 BOB, el banco informó 1125.30 BOB y se registra el cargo de 4.00 BOB de interés y 0.80 BOB de seguro con fecha 2026-10-25"
+  - "el 2026-10-28 el EDITOR registra en \"Visa Oro BOB\" un cargo con todos los componentes en 0.00 BOB, o un cargo de 4.00 BOB de interés con fecha 2026-10-30"
 expected_result:
-  - "el detalle lista ese cargo con total 4.80 BOB, el saldo facturado recalculado es 1125.30 BOB, la diferencia con lo emitido es 4.80 BOB y la diferencia con lo informado por el banco es 0.00 BOB"
+  - "se rechaza con `CARD_CHARGE_INVALID` y no se crea ninguna transacción"
 created: 2026-11-25
 updated: 2026-11-25
 ---
-# TC-DEBT-CARD-045 — El estado de cuenta lista el cargo y la diferencia con el banco queda en cero
+# TC-DEBT-CARD-045 — Un cargo sin componentes positivos o con fecha futura se rechaza
 
 ## Intención
 
-Verifica el scenario "Diferencia con el banco cubierta por el cargo" del requirement "Cargos registrados en el estado de cuenta" de `debt/credit-cards` (FR-DEBT-013).
+Verifica el scenario "Cargo sin componentes positivos o con fecha futura" del requirement "Registro de los intereses y cargos de una tarjeta" de `debt/credit-cards` (FR-DEBT-013).
 
 ## Escenario
 
 ```gherkin
 Dado Workspace "W1 Personal Demo" con moneda de reporte BOB y TZ America/La_Paz; tarjeta "Visa Oro" bimoneda con "Visa Oro BOB" y "Visa Oro USD", cierre el día 25 y vencimiento el día 15
-Cuando el estado de cuenta cerrado el 2026-10-25 de "Visa Oro BOB" se emitió con saldo facturado 1120.50 BOB, el banco informó 1125.30 BOB y se registra el cargo de 4.00 BOB de interés y 0.80 BOB de seguro con fecha 2026-10-25
-Entonces el detalle lista ese cargo con total 4.80 BOB, el saldo facturado recalculado es 1125.30 BOB, la diferencia con lo emitido es 4.80 BOB y la diferencia con lo informado por el banco es 0.00 BOB
+Cuando el 2026-10-28 el EDITOR registra en "Visa Oro BOB" un cargo con todos los componentes en 0.00 BOB, o un cargo de 4.00 BOB de interés con fecha 2026-10-30
+Entonces se rechaza con `CARD_CHARGE_INVALID` y no se crea ninguna transacción
 ```
 
 ## Notas

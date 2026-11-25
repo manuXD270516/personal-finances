@@ -1,12 +1,12 @@
 ---
 id: TC-DEBT-CARD-054
-title: "La ida y vuelta del export conserva los cargos y su transacción"
+title: "El registro de un cargo se audita con actor y componentes"
 spec: debt/credit-cards
-related_specs: ["identity/workspace-portability"]
-requirement: "Cargos de la tarjeta en la exportación del workspace"
-scenario: "Ida y vuelta con un cargo vigente y uno anulado"
+related_specs: []
+requirement: "Permisos, auditoría e idempotencia de los cargos de la tarjeta"
+scenario: "Cargo auditado"
 requirement_status: provisional
-fr: ["FR-IDENTITY-010","FR-DEBT-013"]
+fr: ["FR-DEBT-012","FR-AUDIT-001"]
 nfr: []
 invariants: []
 priority: high
@@ -25,24 +25,24 @@ preconditions:
   - "FixedClock en 2026-10-28T12:00 America/La_Paz salvo que el escenario diga otra fecha; datos ficticios"
 input: {}
 steps:
-  - "\"W1\" tiene en \"Visa Oro BOB\" el cargo vigente de 4.80 BOB del 2026-10-25 y un cargo anulado de 2.00 BOB del 2026-09-25, y el OWNER exporta e importa en un workspace nuevo"
+  - "el EDITOR registra el cargo de 4.00 BOB de interés y 0.80 BOB de seguro del 2026-10-25 en \"Visa Oro BOB\""
 expected_result:
-  - "el workspace nuevo tiene los dos cargos con sus componentes y estados, cada uno vinculado a su transacción, y \"Visa Oro BOB\" adeuda lo mismo que en \"W1\""
+  - "la auditoría de \"Visa Oro\" registra al EDITOR como actor y los componentes interés 4.00 BOB y seguro 0.80 BOB"
 created: 2026-11-25
 updated: 2026-11-25
 ---
-# TC-DEBT-CARD-054 — La ida y vuelta del export conserva los cargos y su transacción
+# TC-DEBT-CARD-054 — El registro de un cargo se audita con actor y componentes
 
 ## Intención
 
-Verifica el scenario "Ida y vuelta con un cargo vigente y uno anulado" del requirement "Cargos de la tarjeta en la exportación del workspace" de `debt/credit-cards` (FR-IDENTITY-010, FR-DEBT-013).
+Verifica el scenario "Cargo auditado" del requirement "Permisos, auditoría e idempotencia de los cargos de la tarjeta" de `debt/credit-cards` (FR-DEBT-012, FR-AUDIT-001).
 
 ## Escenario
 
 ```gherkin
 Dado Workspace "W1 Personal Demo" con moneda de reporte BOB y TZ America/La_Paz; tarjeta "Visa Oro" bimoneda con "Visa Oro BOB" y "Visa Oro USD", cierre el día 25 y vencimiento el día 15
-Cuando "W1" tiene en "Visa Oro BOB" el cargo vigente de 4.80 BOB del 2026-10-25 y un cargo anulado de 2.00 BOB del 2026-09-25, y el OWNER exporta e importa en un workspace nuevo
-Entonces el workspace nuevo tiene los dos cargos con sus componentes y estados, cada uno vinculado a su transacción, y "Visa Oro BOB" adeuda lo mismo que en "W1"
+Cuando el EDITOR registra el cargo de 4.00 BOB de interés y 0.80 BOB de seguro del 2026-10-25 en "Visa Oro BOB"
+Entonces la auditoría de "Visa Oro" registra al EDITOR como actor y los componentes interés 4.00 BOB y seguro 0.80 BOB
 ```
 
 ## Notas
