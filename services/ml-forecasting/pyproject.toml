@@ -2,7 +2,7 @@
 name = "finance-ml"
 version = "0.1.0"
 description = "Servicio interno de pronósticos de PFOS (sin estado, sin acceso a datos)."
-requires-python = ">=3.13,<3.15"
+requires-python = ">=3.13,<3.16"
 dependencies = [
   "fastapi==0.136.1",
   "uvicorn==0.46.0",
