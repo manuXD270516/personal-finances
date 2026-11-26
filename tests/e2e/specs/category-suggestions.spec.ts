@@ -102,7 +102,7 @@ test.describe('Sugerencias de categoría (classification/auto-classification)', 
     await expect(form.getByTestId('category-suggestion-label')).toContainText(
       'Categoría sugerida aceptada: Restaurantes',
     );
-    await form.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await form.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByTestId('transaction-detail')).toBeVisible();
     const list = await api(page, 'GET', `${W}/transactions?limit=5`);
     const saved = (
