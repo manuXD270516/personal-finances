@@ -48,7 +48,7 @@
 ## 7. AUTOMATED TESTS y E2E
 
 - [x] 7.1 Automatizar todos los TC del change con el TC-id en el nombre del test y actualizar el front matter Nota 2026-11-26: cada TC con su id en el nombre del test y el front matter actualizado.
-- [ ] 7.2 E2E con el dataset Demo y un plan con una línea en riesgo: indicador en el plan y la línea en Q5, sin violaciones serias de axe: TC-REPORTING-INSIGHT-012
+- [x] 7.2 E2E con el dataset Demo y un plan con una línea en riesgo: indicador en el plan y la línea en Q5, sin violaciones serias de axe: TC-REPORTING-INSIGHT-012 Nota 2026-11-26: `tests/e2e/specs/budget-overrun-risk.spec.ts` (workspace propio con plan del periodo en curso, no el dataset Demo: el worker del stack no lee los workspaces demo); suite completa `pnpm test:e2e`: 120 passed, 1 skipped (month-closing, ajena).
 - [x] 7.3 Regresión: TC-PLANNING-THRESHOLD-*, TC-PLANNING-BUDGET-*, TC-REPORTING-SPENDABLE-* y TC-REPORTING-FORECAST-018/019 en verde sin cambios Nota 2026-11-26: suites de PLANNING (umbrales y presupuestos), REPORTING (disponible y FORECAST-018/019) sin cambios y en verde.
 - [ ] 7.4 Criterio de salida con datos reales (espera al owner, D472): un periodo completo con el plan del owner, registrando cuántas líneas avisó el riesgo y cuántas terminaron excedidas, sin montos ni nombres
 

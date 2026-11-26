@@ -29,7 +29,28 @@ let budgetId: string;
 let lineId: string;
 let category: string;
 
-const api = () => w1Api(h, { ws });
+/**
+ * Cliente de la API con un reintento ante `ECONNRESET`: tras esperar a un trabajo del worker, el socket keep-alive que se
+ * reutiliza pudo cerrarlo el servidor (ocurre antes de enviar nada, así que repetir es seguro).
+ */
+const api = () => {
+  const base = w1Api(h, { ws });
+  const retry = async <T>(call: () => Promise<T>): Promise<T> => {
+    try {
+      return await call();
+    } catch (err) {
+      if (!String(err).includes('ECONNRESET')) throw err;
+      return call();
+    }
+  };
+  return {
+    ...base,
+    get: (u: User, path: string) => retry(() => base.get(u, path)),
+    post: (u: User, path: string, body?: unknown) => retry(() => base.post(u, path, body)),
+    put: (u: User, path: string, body: unknown, version: number) =>
+      retry(() => base.put(u, path, body, version)),
+  };
+};
 const ok = (r: { status: number; body: Json }, status = 200) => {
   expect(r.status, JSON.stringify(r.body)).toBe(status);
   return r.body;
