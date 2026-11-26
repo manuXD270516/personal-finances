@@ -43,8 +43,9 @@ test.describe('Foco al primer error y resumen de errores (platform/web-interface
 
     const account = form.locator('select[name="accountId"]');
     const amount = form.locator('input[name="amount"]');
-    await expect(account).toBeFocused();
-    for (const field of [account, amount]) {
+    // Orden del alta rápida (add-quick-capture): el monto va antes que la cuenta, así que es el primer campo inválido.
+    await expect(amount).toBeFocused();
+    for (const field of [amount, account]) {
       await expect(field).toHaveAttribute('aria-invalid', 'true');
       const describedBy = (await field.getAttribute('aria-describedby'))!;
       const message = page.locator(`[id="${describedBy.split(' ')[0]}"]`);

@@ -54,7 +54,13 @@
     "reports": "Reports",
     "cashFlow": "Cash flow",
     "forecasts": "Forecasts",
-    "spendingAnomalies": "Unusual expenses"
+    "spendingAnomalies": "Unusual expenses",
+    "notices": {
+      "label": "Notices",
+      "close": "Close",
+      "actionsAvailable": "Actions available"
+    },
+    "quickAdd": "Record"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -1201,6 +1207,19 @@
       "DEBT": "Debts",
       "GOAL": "Savings goal",
       "SYSTEM": "System"
+    },
+    "quick": {
+      "saved": {
+        "EXPENSE": "Expense of {amount} recorded",
+        "INCOME": "Income of {amount} recorded",
+        "REFUND": "Refund of {amount} recorded",
+        "ADJUSTMENT": "Adjustment of {amount} recorded"
+      },
+      "undo": "Undo",
+      "view": "View",
+      "voided": "Entry voided",
+      "undoReason": "Undone from the recording notice",
+      "recordAndDetail": "Record and go to details"
     }
   },
   "Fx": {

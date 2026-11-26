@@ -49,7 +49,7 @@ test.describe('Recorrido del ciclo de vida (audit/lifecycle-timeline)', () => {
     await form.getByLabel('Monto (BOB)').fill('80,00');
     await form.getByLabel('Descripción').fill('Gasto con recorrido');
     await form.getByLabel('Estado').selectOption('PENDING');
-    await form.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await form.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByTestId('tx-status').first()).toHaveText('Pendiente');
     await page.getByRole('button', { name: 'Contabilizar' }).click();
     await expect(page.getByText('Transacción contabilizada.')).toBeVisible();

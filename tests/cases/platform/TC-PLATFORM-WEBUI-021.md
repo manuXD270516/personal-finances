@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/common/notices-state.test.ts
+  - tests/e2e/specs/quick-capture.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["notices","a11y","focus","wcag-2.2.1"]

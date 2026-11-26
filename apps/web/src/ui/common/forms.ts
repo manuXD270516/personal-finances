@@ -105,14 +105,21 @@ export function nextFieldError(
   return state.current === undefined ? undefined : state.computed;
 }
 
-/** Campos que el usuario modificó (`dirty`), sin provocar renders. */
-export function useDirtyFields(): { isDirty: (name: string) => boolean; markDirty: (name: string) => void } {
+/** Campos que el usuario modificó (`dirty`), sin provocar renders. `resetDirty` los olvida (formulario que vuelve a empezar). */
+export function useDirtyFields(): {
+  isDirty: (name: string) => boolean;
+  markDirty: (name: string) => void;
+  resetDirty: () => void;
+} {
   const dirty = useRef(new Set<string>());
   const isDirty = useCallback((name: string) => dirty.current.has(name), []);
   const markDirty = useCallback((name: string) => {
     dirty.current.add(name);
   }, []);
-  return { isDirty, markDirty };
+  const resetDirty = useCallback(() => {
+    dirty.current.clear();
+  }, []);
+  return { isDirty, markDirty, resetDirty };
 }
 
 /** Copia del mapa de errores con el mensaje de `name` puesto o quitado (`undefined`). */

@@ -92,3 +92,14 @@ export function initialOf(name: string): string {
 export function isNotificationsRoute(pathname: string): boolean {
   return within(stripLocale(pathname), '/notificaciones');
 }
+
+/** Ruta del alta de movimientos (sin prefijo de locale). */
+export const NEW_TRANSACTION_PATH = '/transacciones/nueva';
+
+/**
+ * Acceso «＋ Registrar» de la barra superior (add-quick-capture, decisión 5): solo para quien puede editar el workspace
+ * (la API decide la autorización; la UI solo oculta la acción) y no en el alta, para no duplicar la acción.
+ */
+export function showQuickAdd(pathname: string, role: 'OWNER' | 'EDITOR' | 'VIEWER' | undefined): boolean {
+  return (role === 'OWNER' || role === 'EDITOR') && stripLocale(pathname) !== NEW_TRANSACTION_PATH;
+}
