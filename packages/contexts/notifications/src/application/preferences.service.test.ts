@@ -32,6 +32,7 @@ describe('PreferencesService', () => {
         { type: 'HOME_DIGEST', inApp: true, email: true },
         // Primer tipo apagado por omisión (add-spending-anomaly-detection, D474).
         { type: 'SPENDING_ANOMALY', inApp: false, email: false },
+        { type: 'BUDGET_OVERRUN_RISK', inApp: false, email: false },
       ],
       quietHours: null,
       includeDetailsInEmail: false,

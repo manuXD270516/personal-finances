@@ -25,12 +25,7 @@ export type CashFlowHorizonDays = (typeof CASH_FLOW_HORIZONS)[number];
 
 export type CashFlowRiskDto = 'NONE' | 'LOW' | 'POSSIBLE' | 'HIGH';
 export type CashFlowEventKindDto =
-  | 'INCOME'
-  | 'EXPENSE'
-  | 'TRANSFER'
-  | 'CONVERSION'
-  | 'LOAN_PAYMENT'
-  | 'CARD_PAYMENT';
+  'INCOME' | 'EXPENSE' | 'TRANSFER' | 'CONVERSION' | 'LOAN_PAYMENT' | 'CARD_PAYMENT';
 export type CashFlowCertaintyDto = 'KNOWN' | 'ESTIMATED' | 'EXPECTED';
 
 export interface CashFlowDayDto {

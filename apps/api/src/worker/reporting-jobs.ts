@@ -1,4 +1,8 @@
-import { CASH_FLOW_WATCH_JOB, type EvaluateShortfallRisk } from '@pf/reporting/interface/reporting.module';
+import {
+  CASH_FLOW_WATCH_JOB,
+  type EvaluateBudgetRiskNotices,
+  type EvaluateShortfallRisk,
+} from '@pf/reporting/interface/reporting.module';
 import type { Logger } from '@pf/platform/logging';
 import type { JobQueue } from '@pf/platform/queue';
 
@@ -30,21 +34,57 @@ export async function registerCashFlowWatchJob(
   watch: EvaluateShortfallRisk,
   logger: Logger,
   options: ReportingJobsOptions,
+  budgetRiskWatch?: Pick<EvaluateBudgetRiskNotices, 'run'>,
 ): Promise<void> {
   await queue.work<CashFlowWatchPayload>(CASH_FLOW_WATCH_JOB, { concurrency: 1 }, async (job) => {
-    const summary = await watch.run();
-    if (summary.failed > 0) {
-      logger.warn(
-        { trigger: job.payload.trigger, failed: summary.failed, errors: summary.errors },
-        'cash flow watch: some workspaces failed and will be retried',
-      );
+    // Paso 1: riesgo de déficit del flujo de caja. Un fallo no impide el paso 2 (cada paso aísla sus errores).
+    let cashFlowFailure: unknown;
+    try {
+      const summary = await watch.run();
+      if (summary.failed > 0) {
+        logger.warn(
+          { trigger: job.payload.trigger, failed: summary.failed, errors: summary.errors },
+          'cash flow watch: some workspaces failed and will be retried',
+        );
+      }
+      if (summary.opened + summary.closed > 0) {
+        logger.info(
+          { trigger: job.payload.trigger, opened: summary.opened, closed: summary.closed },
+          'cash flow shortfall episodes changed',
+        );
+      }
+    } catch (err) {
+      cashFlowFailure = err;
     }
-    if (summary.opened + summary.closed > 0) {
-      logger.info(
-        { trigger: job.payload.trigger, opened: summary.opened, closed: summary.closed },
-        'cash flow shortfall episodes changed',
-      );
+    // Paso 2 (add-budget-overrun-risk): avisos de riesgo de presupuesto, por workspace y con su duración registrada.
+    // Aislado del paso 1: una falla aquí nunca revierte ni oculta el flujo de caja.
+    if (budgetRiskWatch) {
+      try {
+        const risk = await budgetRiskWatch.run();
+        logger.info(
+          {
+            trigger: job.payload.trigger,
+            'job.step': 'budget-risk',
+            durationMs: risk.durationMs,
+            workspaces: risk.workspaces,
+            notified: risk.notified,
+          },
+          'budget risk step finished',
+        );
+        if (risk.failed > 0) {
+          logger.warn(
+            { trigger: job.payload.trigger, failed: risk.failed, errors: risk.errors },
+            'budget risk step: some workspaces failed and will be retried',
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          { trigger: job.payload.trigger, error: err instanceof Error ? err.name : typeof err },
+          'budget risk step failed and will be retried',
+        );
+      }
     }
+    if (cashFlowFailure !== undefined) throw cashFlowFailure;
   });
   if (options.cron === 'off') {
     await queue.unschedule(CASH_FLOW_WATCH_JOB);
