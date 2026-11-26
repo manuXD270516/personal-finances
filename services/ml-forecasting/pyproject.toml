@@ -37,7 +37,7 @@ packages = ["src/finance_ml"]
 
 [tool.uv]
 # Solo versiones publicadas hace al menos dos semanas (NFR-SEC-013).
-exclude-newer = "2026-10-29T00:00:00Z"
+exclude-newer = "2026-11-12T00:00:00Z"
 
 [tool.ruff]
 line-length = 120
