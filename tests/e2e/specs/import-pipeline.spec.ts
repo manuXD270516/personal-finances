@@ -55,7 +55,7 @@ async function seriousViolations(page: Page) {
 }
 
 test.describe('Pipeline de importación (imports/import-pipeline)', () => {
-  test('[TC-IMPORTS-PIPELINE-002] [TC-IMPORTS-PIPELINE-004] [TC-IMPORTS-PIPELINE-007] [TC-IMPORTS-PIPELINE-044] [TC-IMPORTS-PIPELINE-048] [TC-IMPORTS-PIPELINE-057] [TC-IMPORTS-PIPELINE-059] [TC-IMPORTS-PIPELINE-062] importar un OFX como documento, resolver el duplicado, marcar la transferencia, confirmar la coincidencia, aprobar, ver la reconciliación, deshacer y reimportar', async ({
+  test('[TC-IMPORTS-PIPELINE-002] [TC-IMPORTS-PIPELINE-004] [TC-IMPORTS-PIPELINE-007] [TC-IMPORTS-PIPELINE-044] [TC-IMPORTS-PIPELINE-048] [TC-IMPORTS-PIPELINE-057] [TC-IMPORTS-PIPELINE-059] [TC-IMPORTS-PIPELINE-062] [TC-PLATFORM-WEBUI-010] importar un OFX como documento, resolver el duplicado, marcar la transferencia, confirmar la coincidencia, aprobar, ver la reconciliación, deshacer y reimportar', async ({
     browser,
   }) => {
     test.setTimeout(420_000);
@@ -162,7 +162,12 @@ test.describe('Pipeline de importación (imports/import-pipeline)', () => {
     await page.getByTestId('revert-open').click();
     await expect(page.getByTestId('revert-counts')).toContainText('Se anularán 3 transacciones');
     await page.getByTestId('revert-all').click();
-    await page.getByTestId('revert-confirm').getByRole('button', { name: 'Deshacer' }).click();
+    // TC-PLATFORM-WEBUI-010: la confirmación es un diálogo modal de alerta con el foco en la acción segura.
+    const revertConfirm = page.getByTestId('revert-confirm');
+    await expect(revertConfirm).toHaveAttribute('role', 'alertdialog');
+    expect(await revertConfirm.evaluate((el) => el.tagName)).toBe('DIALOG');
+    await expect(revertConfirm.getByRole('button').first()).toBeFocused();
+    await revertConfirm.getByRole('button', { name: 'Deshacer' }).click();
     await expect(page.getByTestId('import-rolled-back')).toBeVisible({ timeout: 120_000 });
     await expect(page.getByTestId('import-rolled-back')).toContainText('Importación deshecha');
 

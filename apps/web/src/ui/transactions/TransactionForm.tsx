@@ -5,6 +5,7 @@ import { FinanceApiError, uuidv7, type ApiProblemBody } from '../../bff/finance-
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
 import { todayIn } from '../common/dates';
+import { nextFieldError, useDirtyFields, withFieldError } from '../common/forms';
 import { parseAmount, scaleFor } from '../common/money';
 import {
   PAYMENT_METHODS,
@@ -167,6 +168,18 @@ export function TransactionForm({
   const money = { locale, currency, scale };
   const parsedAmount = parseAmount(s.amount, money);
   const total = parsedAmount.ok ? parsedAmount.value : null;
+  // Validación del monto al salir del campo (decisión 4 del change): el error aparece al salir de un campo modificado y se limpia al corregir.
+  const { isDirty, markDirty } = useDirtyFields();
+  const validateAmountField = (event: 'blur' | 'input', raw: string) =>
+    setErrors((prev) => {
+      const parsed = parseAmount(raw, money);
+      const computed = parsed.ok ? undefined : t(`errors.amount.${parsed.error}`, { scale, currency });
+      return withFieldError(
+        prev,
+        'amount',
+        nextFieldError(event, { dirty: isDirty('amount'), current: prev['amount'], computed }),
+      );
+    });
   const categoryKind = s.kind === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const cats = useMemo(
     () => categoryOptions(catalogs.categories, catalogs.groups, categoryKind),
@@ -470,7 +483,12 @@ export function TransactionForm({
               autoComplete="off"
               style={inputStyle}
               value={s.amount}
-              onChange={(e) => set({ amount: e.target.value })}
+              onChange={(e) => {
+                markDirty('amount');
+                set({ amount: e.target.value });
+                validateAmountField('input', e.target.value);
+              }}
+              onBlur={() => validateAmountField('blur', s.amount)}
             />
           )}
         </Field>

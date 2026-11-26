@@ -253,7 +253,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | notify | `notifications/alerts` |
 | audit | `audit/audit-trail`, `audit/lifecycle-timeline` |
 | assistant | `assistant/read-only-assistant` |
-| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery` |
+| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery`, `platform/web-interface` (patrones transversales de la UI web: accesibilidad de formularios, diálogos, avisos, movimiento y cobertura de navegadores; change `refine-web-accessibility-foundations`, [docs/79](79-ui-ux-modern-web-decisions.md)) |
 | security | `security/access-control`, `security/file-upload-security` |
 | quality | `quality/test-traceability` |
 

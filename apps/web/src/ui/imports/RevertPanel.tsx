@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { ConfirmPanel, cardStyle, mutedStyle, rowStyle } from '../common/ui';
+import { ConfirmDialog, cardStyle, mutedStyle, rowStyle } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import { blockedOf, blockedReasonKey, revertPath, revertPreviewPath } from './pipeline-logic';
@@ -129,7 +129,7 @@ export function RevertPanel({
             </div>
           ) : null}
           {confirm ? (
-            <ConfirmPanel
+            <ConfirmDialog
               testId="revert-confirm"
               title={confirm === 'ALL' ? f.t('revert.confirmAllTitle') : f.t('revert.confirmPartialTitle')}
               description={

@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../bff/finance-api-client';
 import { ProblemMessage } from '../errors/ProblemMessage';
-import { cardStyle, ConfirmPanel } from './common/ui';
+import { cardStyle, ConfirmDialog, ConfirmPanel } from './common/ui';
 import { useSession } from './session-context';
 
 /** `DemoDataStatus` del contrato (add-demo-data). */
@@ -195,7 +195,7 @@ export function DemoDataPanel() {
         />
       ) : null}
       {confirm === 'cleanup' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="demo-cleanup-confirm"
           title={t('cleanupConfirmTitle')}
           description={t('cleanupConfirmBody')}

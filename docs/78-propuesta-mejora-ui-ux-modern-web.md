@@ -1,6 +1,6 @@
 # 78 — Propuesta de mejora de UI/UX con Modern Web Guidance
 
-> **Estado:** Propuesta revisada por el agente `frontend` (§ 11); pendiente de decisiones del owner · **Fecha:** 2026-11-25 · **Autor:** agente `ui-ux` · **Relacionado:** [28-ui-ux-design-system.md](28-ui-ux-design-system.md), [02-non-functional-requirements.md](02-non-functional-requirements.md) (NFR-USAB-001..010, 101..108), [00-product-vision.md](00-product-vision.md) (§ PWA), `openspec/changes/archive/2026-11-24-add-web-content-security-policy`, [despliegue/GUIA-PRUEBAS-FUNCIONALES.md](despliegue/GUIA-PRUEBAS-FUNCIONALES.md)
+> **Estado:** Propuesta revisada por el agente `frontend` (§ 11); **decidida por el owner el 2026-11-25** (adopta todas las recomendaciones de P1–P12; respuestas en [docs/79](79-ui-ux-modern-web-decisions.md), D500–D512) · **Fecha:** 2026-11-25 · **Autor:** agente `ui-ux` · **Relacionado:** [28-ui-ux-design-system.md](28-ui-ux-design-system.md), [02-non-functional-requirements.md](02-non-functional-requirements.md) (NFR-USAB-001..010, 101..108), [00-product-vision.md](00-product-vision.md) (§ PWA), `openspec/changes/archive/2026-11-24-add-web-content-security-policy`, [despliegue/GUIA-PRUEBAS-FUNCIONALES.md](despliegue/GUIA-PRUEBAS-FUNCIONALES.md)
 >
 > **Fuente de referencia:** guías de **Modern Web Guidance** de Google Chrome (licencia Apache-2.0), commit `2b4aa13` del 2026-11-23, leídas localmente como material de consulta (no se ejecutó su CLI ni se copiaron al repositorio). Cada guía se cita por su id (ruta relativa a `guides/` sin `.md`); los enlaces están en el [§ 12](#12-referencias).
 
@@ -246,6 +246,8 @@ Deuda transversal (sin lote propio): reducir `style={{…}}` y mover estilos a c
 | **Alcance** | 1 291 estilos en línea hacen que cada cambio visual toque muchos archivos. | Lotes por dominio, sin reescrituras masivas; re-tematizar primero (barato) y migrar componentes solo donde cambia la interacción. |
 
 ## 10. Preguntas para el owner
+
+> **Respuestas:** el owner adoptó todas las recomendaciones el 2026-11-25 (P1–P12 → D500–D511; D512: los lotes los implementa el agente `frontend`). Excepción de P10: si el spike de la cookie `Secure` en WebKit falla, la decisión vuelve al owner. Detalle en [docs/79](79-ui-ux-modern-web-decisions.md).
 
 | ID | Pregunta | Opciones | Recomendación |
 |---|---|---|---|

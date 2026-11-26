@@ -6,7 +6,7 @@ import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { Tabs } from '../common/Tabs';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   badgeStyle,
   cellStyle,
   mutedStyle,
@@ -351,7 +351,7 @@ function RulesTab({ ctx }: { ctx: WorkspaceContext }) {
       </div>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {archiving ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={f.t('list.archiveTitle', { name: archiving.name })}
           description={f.t('list.archiveBody')}
           confirmLabel={f.t('list.archive')}

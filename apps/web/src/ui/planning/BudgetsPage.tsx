@@ -6,7 +6,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { AuditHistory } from '../AuditHistory';
 import { scaleFor } from '../common/money';
 import { todayIn } from '../common/dates';
-import { cardStyle, ConfirmPanel, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
+import { cardStyle, ConfirmDialog, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import {
@@ -470,7 +470,7 @@ function PlanView({
       >
         <h2 id="budget-lines-title">{f.t('lines.title')}</h2>
         {removing ? (
-          <ConfirmPanel
+          <ConfirmDialog
             title={f.t('lines.confirmRemoveTitle', { name: nameOfRemoving })}
             description={f.t('lines.confirmRemoveBody')}
             confirmLabel={f.t('lines.remove')}
