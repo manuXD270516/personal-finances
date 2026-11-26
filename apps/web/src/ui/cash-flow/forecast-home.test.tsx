@@ -21,7 +21,7 @@ import { HOME_BLOCK_HIGH, HOME_BLOCK_NONE, HOME_BLOCK_PREDICTED, bob } from './f
 import { homeCashFlowSummary } from './logic';
 import type { SpendableSettings } from './types';
 
-const strip = (html: string) => html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, '');
+const strip = (html: string) => html.replace(/<[^>]+>/g, '');
 const href = (path: string) => `/es${path}`;
 
 // ───────────────────────────────────────────── Q8

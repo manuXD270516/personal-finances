@@ -1,5 +1,5 @@
 // ENTRYPOINT de la imagen finance-api (ADR-0011: una imagen, varios comandos):
-//   node dist/entrypoint.js api | worker | migrate | seed [--profile=minimal] | forecast-report
+//   node dist/entrypoint.js api | worker | migrate | seed [--profile=minimal] | forecast-report | forecast-anomalies-backtest | category-suggestions-backtest
 // Forma exec + `init: true` en Compose (SPIKE-08): node recibe SIGTERM directamente y los handlers de apagado
 // ordenado de api/worker se ejecutan. Sin imports estáticos: OpenTelemetry (si OTEL_ENABLED=true) debe
 // registrarse ANTES de cargar Nest, pg, etc.
@@ -9,6 +9,16 @@ const COMMANDS = {
   migrate: { module: './main.migrate.js', otel: false, service: 'finance-api' },
   seed: { module: './main.seed.js', otel: false, service: 'finance-api' },
   'forecast-report': { module: './main.forecast-report.js', otel: false, service: 'finance-api' },
+  'forecast-anomalies-backtest': {
+    module: './main.anomaly-backtest.js',
+    otel: false,
+    service: 'finance-api',
+  },
+  'category-suggestions-backtest': {
+    module: './main.category-backtest.js',
+    otel: false,
+    service: 'finance-api',
+  },
 } as const;
 
 type Command = keyof typeof COMMANDS;

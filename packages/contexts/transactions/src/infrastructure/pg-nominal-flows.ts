@@ -24,6 +24,7 @@ interface FlowRow {
   account_id?: string;
   counterparty_id?: string | null;
   tx_kind?: string;
+  debt_role?: 'CARD_CHARGE' | null;
   amount: string;
 }
 
@@ -158,7 +159,7 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
     const extraSelect = [
       ...(byAccount ? [sql`${ACCOUNT_EXPR}::text AS account_id`] : []),
       ...(byCounterparty ? [sql`${COUNTERPARTY_EXPR}::text AS counterparty_id`] : []),
-      ...(byOrigin ? [sql`t.kind AS tx_kind`] : []),
+      ...(byOrigin ? [sql`t.kind AS tx_kind`, sql`t.debt_role AS debt_role`] : []),
     ];
     const extraSelectSql = extraSelect.length > 0 ? sql`, ${sql.join(extraSelect)}` : sql``;
     const groupPositions = ['1', '2', '3', '4', '5', ...extraSelect.map((_, i) => String(6 + i))].join(', ');
@@ -202,6 +203,8 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
                   transactionKind: r.tx_kind,
                   // Las únicas porciones de transferencias y conversiones son comisiones.
                   portionRole: r.tx_kind === 'TRANSFER' || r.tx_kind === 'CONVERSION' ? 'FEE' : 'NOMINAL',
+                  // Cargos de tarjeta (add-card-interest-ledger-portions): rol de DEBT de la transacción.
+                  debtRole: r.debt_role ?? null,
                 },
               }
             : {}),

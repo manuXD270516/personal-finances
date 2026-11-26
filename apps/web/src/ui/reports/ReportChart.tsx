@@ -7,25 +7,6 @@ import { highestAmount, lowestAmount, ratioBetween } from './logic';
  * datos equivalente (NFR-USAB-105) la pinta la vista. El significado nunca depende solo del color: las series
  * distinguen relleno sólido y rayado, y los puntos llevan marcador.
  */
-export const REPORT_CHART_CSS = `
-.pf-rc-figure{display:grid;gap:0.5rem;min-width:0}
-.pf-rc-svg{width:100%;height:auto;display:block;overflow:visible}
-.pf-rc-axis{stroke:var(--pf-border-strong);stroke-width:1}
-.pf-rc-grid{stroke:var(--pf-border);stroke-width:1}
-.pf-rc-tick{fill:var(--pf-fg-muted);font-size:11px;font-variant-numeric:tabular-nums}
-.pf-rc-bar-a{fill:var(--pf-fin-income)}
-.pf-rc-bar-b{fill:url(#pf-rc-hatch);stroke:var(--pf-fin-over-budget);stroke-width:1}
-.pf-rc-hatch-bg{fill:var(--pf-bg)}
-.pf-rc-hatch-line{stroke:var(--pf-fin-over-budget);stroke-width:2}
-.pf-rc-line{stroke:var(--pf-primary);stroke-width:2.5;fill:none}
-.pf-rc-dot{fill:var(--pf-primary);stroke:var(--pf-bg);stroke-width:1.5}
-.pf-rc-dot[data-flag="hollow"]{fill:var(--pf-bg);stroke:var(--pf-primary);stroke-width:2}
-.pf-rc-legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0.25rem 1rem;font-size:0.875rem;color:var(--pf-fg-muted)}
-.pf-rc-legend li{display:inline-flex;align-items:center;gap:0.375rem}
-.pf-rc-swatch{display:inline-block;width:0.875rem;height:0.875rem;border:1px solid var(--pf-border-strong)}
-.pf-rc-swatch[data-kind="a"]{background:var(--pf-fin-income)}
-.pf-rc-swatch[data-kind="b"]{background:repeating-linear-gradient(45deg,var(--pf-fin-over-budget) 0 2px,var(--pf-bg) 2px 5px)}
-`;
 
 const W = 640;
 const GEOMETRY = { left: 84, right: 12, top: 14, bottom: 34, height: 260 } as const;

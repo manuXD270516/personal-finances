@@ -1,8 +1,11 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { ErrorSummary, type ErrorSummaryItem } from '../common/ErrorSummary';
+import { useFocusFirstError } from '../common/forms';
 import { scaleFor } from '../common/money';
 import { todayIn } from '../common/dates';
 import type { Account, Counterparty } from '../common/types';
@@ -30,6 +33,64 @@ import {
   type LoanDetail,
   type SchedulePreview,
 } from './types';
+
+/** Orden de los campos del alta y la edición de un préstamo en pantalla (orden del resumen de errores). */
+const LOAN_ERROR_ORDER = [
+  'name',
+  'principal',
+  'ratePct',
+  'termInstallments',
+  'fixedPrincipal',
+  'asOf',
+  'nextInstallmentNo',
+  'firstDueDate',
+  'disbursementDate',
+  'newAccountName',
+  'accountId',
+  'disbursementAccountId',
+  'paymentAccountId',
+  'retainedFee',
+] as const;
+
+/** Resumen de errores del formulario de préstamo: un ítem por campo inválido, con la etiqueta que ve el usuario. */
+export function loanErrorItems(
+  f: FormatContext,
+  errors: LoanFormErrors,
+  existing: boolean,
+): ErrorSummaryItem[] {
+  const labelOf = (key: string): string => {
+    switch (key) {
+      case 'principal':
+        return f.t(existing ? 'form.outstanding' : 'form.principal');
+      case 'termInstallments':
+        return f.t(existing ? 'form.remaining' : 'form.term');
+      case 'ratePct':
+        return f.t('form.rate');
+      case 'nextInstallmentNo':
+        return f.t('form.nextNo');
+      case 'firstDueDate':
+        return f.t(existing ? 'form.nextDue' : 'form.firstDue');
+      case 'accountId':
+        return f.t('form.existingAccount');
+      case 'disbursementAccountId':
+        return f.t('form.disbursementAccount');
+      case 'paymentAccountId':
+        return f.t('form.paymentAccount');
+      default:
+        return key.startsWith('charges.')
+          ? f.t(`form.chargeKind.${key.slice('charges.'.length)}`)
+          : f.t(`form.${key}`);
+    }
+  };
+  const rank = (k: string) => {
+    const i = (LOAN_ERROR_ORDER as readonly string[]).indexOf(k);
+    return i === -1 ? LOAN_ERROR_ORDER.length : i;
+  };
+  return Object.keys(errors)
+    .filter((k) => errors[k])
+    .sort((a, b) => rank(a) - rank(b))
+    .map((field) => ({ field, label: labelOf(field), message: f.t(`errors.${errors[field]}`) }));
+}
 
 export function NewLoanPage() {
   return <WithWorkspace>{(ctx) => <NewLoan ctx={ctx} />}</WithWorkspace>;
@@ -63,7 +124,7 @@ export function LoanTermsFields({
     <fieldset style={{ ...formStyle, margin: 0 }} disabled={disabled}>
       <legend>{f.t('form.terms')}</legend>
       <div style={rowStyle}>
-        <Field label={f.t('form.name')} error={err('name')}>
+        <Field anchor="name" label={f.t('form.name')} error={err('name')}>
           {(p) => (
             <input
               {...p}
@@ -94,6 +155,7 @@ export function LoanTermsFields({
           )}
         </Field>
         <Field
+          anchor="principal"
           label={existing ? f.t('form.outstanding') : f.t('form.principal')}
           error={err('principal')}
           hint={existing ? f.t('form.outstandingHint') : undefined}
@@ -111,7 +173,7 @@ export function LoanTermsFields({
         </Field>
       </div>
       <div style={rowStyle}>
-        <Field label={f.t('form.rate')} error={err('ratePct')} hint={f.t('form.rateHint')}>
+        <Field anchor="ratePct" label={f.t('form.rate')} error={err('ratePct')} hint={f.t('form.rateHint')}>
           {(p) => (
             <input
               {...p}
@@ -158,6 +220,7 @@ export function LoanTermsFields({
           )}
         </Field>
         <Field
+          anchor="termInstallments"
           label={existing ? f.t('form.remaining') : f.t('form.term')}
           error={err('termInstallments')}
           hint={f.t('form.termHint')}
@@ -194,6 +257,7 @@ export function LoanTermsFields({
         </Field>
         {form.method === 'FIXED_PRINCIPAL' ? (
           <Field
+            anchor="fixedPrincipal"
             label={f.t('form.fixedPrincipal')}
             error={err('fixedPrincipal')}
             hint={f.t('form.fixedPrincipalHint')}
@@ -231,7 +295,7 @@ export function LoanTermsFields({
       <div style={rowStyle}>
         {existing ? (
           <>
-            <Field label={f.t('form.asOf')} error={err('asOf')}>
+            <Field anchor="asOf" label={f.t('form.asOf')} error={err('asOf')}>
               {(p) => (
                 <input
                   {...p}
@@ -243,7 +307,7 @@ export function LoanTermsFields({
                 />
               )}
             </Field>
-            <Field label={f.t('form.nextNo')} error={err('nextInstallmentNo')}>
+            <Field anchor="nextInstallmentNo" label={f.t('form.nextNo')} error={err('nextInstallmentNo')}>
               {(p) => (
                 <input
                   {...p}
@@ -255,7 +319,7 @@ export function LoanTermsFields({
                 />
               )}
             </Field>
-            <Field label={f.t('form.nextDue')} error={err('firstDueDate')}>
+            <Field anchor="firstDueDate" label={f.t('form.nextDue')} error={err('firstDueDate')}>
               {(p) => (
                 <input
                   {...p}
@@ -270,7 +334,11 @@ export function LoanTermsFields({
           </>
         ) : (
           <>
-            <Field label={f.t('form.disbursementDate')} error={err('disbursementDate')}>
+            <Field
+              anchor="disbursementDate"
+              label={f.t('form.disbursementDate')}
+              error={err('disbursementDate')}
+            >
               {(p) => (
                 <input
                   {...p}
@@ -282,7 +350,7 @@ export function LoanTermsFields({
                 />
               )}
             </Field>
-            <Field label={f.t('form.firstDue')} error={err('firstDueDate')}>
+            <Field anchor="firstDueDate" label={f.t('form.firstDue')} error={err('firstDueDate')}>
               {(p) => (
                 <input
                   {...p}
@@ -343,6 +411,7 @@ export function LoanChargesFields({
             </Field>
             {c.mode !== 'NONE' ? (
               <Field
+                anchor={`charges.${key}`}
                 label={c.mode === 'FIXED' ? f.t('form.chargeFixed') : f.t('form.chargeRate')}
                 error={err(`charges.${key}`)}
                 hint={c.mode === 'RATE_ON_BALANCE' ? f.t('form.chargeRateHint') : undefined}
@@ -471,6 +540,7 @@ export function LoanFields({
         <div style={rowStyle}>
           {form.accountMode === 'CREATE' ? (
             <Field
+              anchor="newAccountName"
               label={f.t('form.newAccountName')}
               error={err('newAccountName')}
               hint={f.t('form.newAccountHint')}
@@ -487,7 +557,7 @@ export function LoanFields({
               )}
             </Field>
           ) : (
-            <Field label={f.t('form.existingAccount')} error={err('accountId')}>
+            <Field anchor="accountId" label={f.t('form.existingAccount')} error={err('accountId')}>
               {(p) => (
                 <select
                   {...p}
@@ -507,7 +577,11 @@ export function LoanFields({
             </Field>
           )}
           {!existing ? (
-            <Field label={f.t('form.disbursementAccount')} error={err('disbursementAccountId')}>
+            <Field
+              anchor="disbursementAccountId"
+              label={f.t('form.disbursementAccount')}
+              error={err('disbursementAccountId')}
+            >
               {(p) => (
                 <select
                   {...p}
@@ -527,6 +601,7 @@ export function LoanFields({
             </Field>
           ) : null}
           <Field
+            anchor="paymentAccountId"
             label={f.t('form.paymentAccount')}
             error={err('paymentAccountId')}
             hint={f.t('form.paymentAccountHint')}
@@ -562,6 +637,7 @@ export function LoanFields({
             </label>
             {form.disburseNow ? (
               <Field
+                anchor="retainedFee"
                 label={f.t('form.retainedFee')}
                 error={err('retainedFee')}
                 hint={f.t('form.retainedFeeHint')}
@@ -667,7 +743,12 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const attemptKey = useRef(uuidv7());
   const errorsRef = useRef<HTMLDivElement>(null);
-  // El foco se aplica tras el render que muestra los errores (un `setTimeout` puede ganarle a React).
+  const formRef = useRef<HTMLFormElement>(null);
+  const tForms = useTranslations('Forms');
+  // Envío rechazado por la validación: el foco va al resumen de errores (decisión 2 del change).
+  const [attempt, setAttempt] = useState(0);
+  useFocusFirstError(formRef, attempt);
+  // Error del servidor: el foco va al contenedor del mensaje, tras el render que lo muestra.
   const [focusTick, setFocusTick] = useState(0);
   useEffect(() => {
     if (focusTick > 0) errorsRef.current?.focus();
@@ -691,7 +772,7 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
     const built = buildLoanInput(form, opts);
     if (!built.ok) {
       setErrors(built.errors);
-      setFocusTick((n) => n + 1);
+      setAttempt((n) => n + 1);
       return;
     }
     setErrors({});
@@ -717,7 +798,7 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
       </section>
     );
 
-  const errorList = Object.keys(errors);
+  const errorItems = loanErrorItems(f, errors, form.origin === 'EXISTING');
   return (
     <section aria-labelledby="loan-form-title" style={pageStyle} data-testid="loan-form-page">
       <p style={{ margin: 0 }}>
@@ -725,6 +806,7 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
       </p>
       <h1 id="loan-form-title">{f.t('form.title')}</h1>
       <form
+        ref={formRef}
         style={{ display: 'grid', gap: 'var(--pf-space-4)' }}
         noValidate
         data-testid="loan-form"
@@ -733,6 +815,11 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
           void submit();
         }}
       >
+        <ErrorSummary
+          title={tForms('errorSummary.title', { count: errorItems.length })}
+          items={errorItems}
+          testId="loan-form-error-summary"
+        />
         <LoanFields
           f={f}
           form={form}
@@ -745,11 +832,6 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
         />
         <SchedulePreviewSection f={f} ctx={ctx} preview={preview} />
         <div ref={errorsRef} tabIndex={-1} data-testid="loan-form-errors">
-          {errorList.length > 0 ? (
-            <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>
-              {f.t('form.fixErrors', { count: errorList.length })}
-            </p>
-          ) : null}
           {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
         </div>
         <div>

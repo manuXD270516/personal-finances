@@ -174,11 +174,7 @@ const waitJob = async (id: string, statuses: string[]) => {
 const rowsOf = async (id: string) => {
   const r = await get(owner, `/imports/${id}/preview?limit=200`);
   ok(r);
-  // `ImportProposedField.value` es un `oneOf` donde un id también es un texto (defecto previo del contrato, anotado en
-  // docs/38): se descartan solo esos errores de la validación.
-  const errors = contract
-    .validateResponse('getImportPreview', 200, r.body)
-    .filter((e) => !/\/proposal\/\w+\/value /.test(e));
+  const errors = contract.validateResponse('getImportPreview', 200, r.body);
   expect(errors, JSON.stringify(errors)).toEqual([]);
   return r.body['rows'] as any[];
 };
@@ -441,7 +437,7 @@ describe('Sincronización con el proveedor simulado', () => {
     expect(review).toMatchObject({ source: 'EXCHANGE_API', connectionId });
   }, 180_000);
 
-  it('[TC-IMPORTS-BANKING-023][TC-IMPORTS-BANKING-024][TC-IMPORTS-BANKING-025] la vista previa propone conversión, gasto con señal, comisión Fees y excluye el P2P; aprobar cuadra por moneda', async () => {
+  it('[TC-IMPORTS-PIPELINE-072][TC-IMPORTS-BANKING-023][TC-IMPORTS-BANKING-024][TC-IMPORTS-BANKING-025] la vista previa propone conversión, gasto con señal, comisión Fees y excluye el P2P; aprobar cuadra por moneda', async () => {
     const rows = await rowsOf(importId);
     const byId = new Map(rows.map((r) => [r.externalId, r]));
     expect([...byId.keys()].sort()).toEqual([

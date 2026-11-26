@@ -100,6 +100,18 @@ export interface RowPatch extends RowEdits {
   readonly decision?: Decision | undefined;
   /** Candidato elegido al omitir vinculando (por omisión, el asignado). */
   readonly candidateTransactionId?: string | undefined;
+  /** La `categoryId` del parche es la sugerencia por historial de la fila (add-category-suggestions): marca de aceptación. */
+  readonly acceptedSuggestion?: boolean | undefined;
+}
+
+/** Fecha de negocio `YYYY-MM-DD` de un instante en la zona del workspace. */
+function localDateOf(instant: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(Date.parse(instant)));
 }
 
 /**
@@ -519,12 +531,26 @@ export class ImportsService {
       const row = await deps.staging.find(cmd.workspaceId, job.id, cmd.rowId);
       if (!row) throw notFound(cmd.rowId);
 
-      const { decision: patchDecision, candidateTransactionId, ...editPatch } = cmd.patch ?? {};
+      const {
+        decision: patchDecision,
+        candidateTransactionId,
+        acceptedSuggestion,
+        ...editPatch
+      } = cmd.patch ?? {};
       const decision = cmd.decision ?? patchDecision;
       if (decision === undefined && isEmptyPatch(editPatch) && candidateTransactionId === undefined) {
         throw new DomainError('VALIDATION_FAILED', 'the body has nothing to change');
       }
       this.assertEditable(row, decision);
+      if (acceptedSuggestion === true) {
+        // La aceptación es de la sugerencia vigente de la fila: la categoría elegida debe ser esa.
+        if (!row.suggestedCategory || editPatch.categoryId !== row.suggestedCategory.categoryId) {
+          throw new DomainError(
+            'VALIDATION_FAILED',
+            'categoryId must be the suggested category of the row',
+          ).at('/acceptedSuggestion');
+        }
+      }
 
       const account = await deps.accounts.getAccount(cmd.workspaceId, job.state.accountId);
       if (!account) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found');
@@ -565,6 +591,9 @@ export class ImportsService {
         matchedTransactionId: matched,
         decidedScore,
       });
+      if (acceptedSuggestion === true) {
+        await deps.staging.markSuggestionAccepted(cmd.workspaceId, job.id, row.id);
+      }
       const summary = await deps.staging.summary(cmd.workspaceId, job.id);
       job.updateReviewCounters(countersOf(summary), deps.clock.now().toString());
       await this.save(job);
@@ -767,6 +796,7 @@ export class ImportsService {
             warnings: out?.rulesUnavailable
               ? [{ code: 'IMPORT_RULES_UNAVAILABLE' as const, severity: 'WARNING' as const }]
               : [],
+            suggestedCategory: r.classification === 'DUPLICATE_EXACT' ? null : (out?.suggestion ?? null),
           };
         }),
       );
@@ -797,6 +827,62 @@ export class ImportsService {
         changes: [{ field: 'ruleCount', before: null, after: byRule }],
       });
       return toJobView(job.state, account.currency);
+    });
+  }
+
+  // ───────────────────────────────────────────────────────────── aceptar sugerencias de categoría
+
+  /**
+   * `AcceptImportCategorySuggestions` (add-category-suggestions, D476): aplica, con una acción explícita, la categoría
+   * sugerida por historial a las filas con sugerencia de nivel `minLevel` (o de nivel «alta» y «media» con `MEDIUM`),
+   * todas o las elegidas, como edición manual y en UNA versión nueva de la importación. Una fila sin sugerencia, ya
+   * editada o cuya categoría sugerida se archivó desde entonces no cambia. Nada financiero se crea ni se modifica.
+   */
+  acceptCategorySuggestions(cmd: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly importId: string;
+    readonly expectedVersion: number;
+    readonly minLevel: 'HIGH' | 'MEDIUM';
+    readonly rowIds?: readonly string[] | undefined;
+  }): Promise<{ readonly accepted: number; readonly version: number }> {
+    const { deps } = this;
+    return deps.uow.run(cmd.workspaceId, async () => {
+      const job = await this.load(cmd.workspaceId, cmd.importId);
+      this.assertVersion(job, cmd.expectedVersion);
+      job.assertAwaitingReview();
+      const candidates = await deps.staging.suggestionCandidates(cmd.workspaceId, job.id, {
+        levels: cmd.minLevel === 'HIGH' ? ['HIGH'] : ['HIGH', 'MEDIUM'],
+        rowIds: cmd.rowIds,
+      });
+      // La categoría sugerida pudo archivarse desde que se calculó: esas filas no cambian.
+      const usable = new Set<string>();
+      for (const categoryId of new Set(candidates.map((c) => c.categoryId))) {
+        try {
+          await deps.refs.assertCategory(cmd.workspaceId, categoryId, null, '/categoryId');
+          usable.add(categoryId);
+        } catch (error) {
+          if (!(error instanceof DomainError)) throw error;
+        }
+      }
+      const accepted = await deps.staging.acceptSuggestions(
+        cmd.workspaceId,
+        job.id,
+        candidates.filter((c) => usable.has(c.categoryId)).map((c) => c.rowId),
+      );
+      const summary = await deps.staging.summary(cmd.workspaceId, job.id);
+      job.updateReviewCounters(countersOf(summary), deps.clock.now().toString());
+      await this.save(job);
+      await recordJob(deps, job, 'suggestions_accepted', {
+        changes: [
+          {
+            field: 'acceptedSuggestions',
+            before: null,
+            after: JSON.stringify({ minLevel: cmd.minLevel, count: accepted }),
+          },
+        ],
+      });
+      return { accepted, version: job.state.version };
     });
   }
 
@@ -967,6 +1053,31 @@ export class ImportsService {
       if (linkEntries.length > 0) {
         if (deps.audit.appendMany) await deps.audit.appendMany(linkEntries);
         else for (const entry of linkEntries) await deps.audit.append(entry);
+      }
+
+      // Tasa de aceptación (add-category-suggestions): el resultado de cada sugerencia mostrada, en esta unidad de trabajo.
+      if (deps.suggestionFeedback) {
+        const shown = await deps.staging.suggestionOutcomes(cmd.workspaceId, job.id);
+        if (shown.length > 0) {
+          const timeZone = await deps.calendar.timeZoneOf(cmd.workspaceId);
+          const occurredOn = localDateOf(deps.clock.now().toString(), timeZone);
+          await deps.suggestionFeedback.recordBatch({
+            workspaceId: cmd.workspaceId,
+            surface: 'IMPORT',
+            importJobId: job.id,
+            outcomes: shown.map((r) => ({
+              level: r.level,
+              outcome:
+                r.effectiveCategoryId === null
+                  ? ('IGNORED' as const)
+                  : r.effectiveCategoryId === r.suggestedCategoryId
+                    ? ('ACCEPTED' as const)
+                    : ('CORRECTED' as const),
+              occurredOn,
+              transactionId: null,
+            })),
+          });
+        }
       }
 
       const now = deps.clock.now().toString();

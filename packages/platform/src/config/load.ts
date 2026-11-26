@@ -114,6 +114,18 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
       }
     }
   }
+  // finance-web: el origen de subida de documentos entra en `connect-src` de la CSP (add-web-content-security-policy).
+  if (
+    app === 'web' &&
+    cloud &&
+    values['OBJECT_STORAGE_PUBLIC_ENDPOINT'] === undefined &&
+    !problems.some((p) => p.variable === 'OBJECT_STORAGE_PUBLIC_ENDPOINT')
+  ) {
+    problems.push({
+      variable: 'OBJECT_STORAGE_PUBLIC_ENDPOINT',
+      reason: 'falta (obligatoria en finance-web con PFOS_ENV=staging|production: su origen va en la CSP)',
+    });
+  }
   if (app === 'web' && values['BFF_DATABASE_URL'] !== undefined) {
     const user = decodeURIComponent(new URL(String(values['BFF_DATABASE_URL'])).username);
     if (user !== 'pf_bff') {

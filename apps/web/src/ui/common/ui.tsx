@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react';
 
 /**
  * Piezas mínimas de UI (sin framework CSS) compartidas por las pantallas financieras: campos rotulados con error
@@ -51,6 +51,8 @@ export const errorStyle: CSSProperties = {
   margin: 0,
 };
 export const tableWrapStyle: CSSProperties = {
+  // Contenedor de posicionamiento: el `<caption>` accesible (`pf-sr-only`, absoluto) no debe ensanchar la página.
+  position: 'relative',
   overflowX: 'auto',
   maxWidth: '100%',
   background: 'var(--pf-surface-raised)',
@@ -81,21 +83,30 @@ export const badgeStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-/** Campo rotulado: el `<label>` envuelve el control; el error se asocia con `aria-describedby`. */
+/** Id estable del control de un campo con `anchor` (destino de los enlaces del resumen de errores). */
+export const fieldAnchorId = (anchor: string): string => `field-${anchor.replace(/[^A-Za-z0-9_-]+/g, '-')}`;
+
+/**
+ * Campo rotulado: el `<label>` envuelve el control; el error se asocia con `aria-describedby`. Con `anchor`, el
+ * control toma un id estable (`fieldAnchorId`) para que el resumen de errores del formulario pueda enlazarlo.
+ */
 export function Field({
   label,
   error,
   hint,
   children,
   style,
+  anchor,
 }: {
   label: string;
   error?: string | undefined;
   hint?: string | undefined;
+  anchor?: string;
   children: (props: { id: string; 'aria-invalid'?: true; 'aria-describedby'?: string }) => ReactNode;
   style?: CSSProperties;
 }) {
-  const id = useId();
+  const generatedId = useId();
+  const id = anchor ? fieldAnchorId(anchor) : generatedId;
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ');
@@ -121,9 +132,59 @@ export function Field({
   );
 }
 
+type ConfirmProps = {
+  title: string;
+  description?: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  busy?: boolean;
+  /** Deshabilita solo el botón de confirmar (p. ej. falta el motivo). */
+  confirmDisabled?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  children?: ReactNode;
+  testId?: string;
+};
+
+/** Encabezado de la sección que contiene al elemento: destino del foco si el disparador ya no existe. */
+function sectionHeadingOf(el: Element | null): HTMLElement | null {
+  return (el?.closest('section, main, form')?.querySelector('h1, h2, h3') as HTMLElement | null) ?? null;
+}
+
 /**
- * Confirmación en línea de una acción irreversible o con efecto contable (archivar, cerrar, anular…): región
- * `alertdialog` rotulada, con el foco al abrirse; Escape cancela.
+ * Recuerda el elemento con foco al montarse el componente (antes de moverlo) y devuelve una función que lo
+ * recupera: el disparador si sigue en el DOM; si no, el encabezado de la sección (NFR-USAB-102, decisión 7 del change).
+ */
+function useFocusReturn(anchor: { current: Element | null }): () => void {
+  const previous = useRef<Element | null>(null);
+  const heading = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (previous.current) return;
+    const active = document.activeElement;
+    previous.current = active && active !== document.body ? active : null;
+    heading.current = sectionHeadingOf(anchor.current);
+  }, [anchor]);
+  return useCallback(() => {
+    requestAnimationFrame(() => {
+      const trigger = previous.current;
+      if (trigger instanceof HTMLElement && trigger.isConnected) {
+        trigger.focus();
+        return;
+      }
+      const target = heading.current;
+      if (target?.isConnected) {
+        if (!target.hasAttribute('tabindex')) target.tabIndex = -1;
+        target.focus();
+      }
+    });
+  }, []);
+}
+
+/**
+ * Confirmación en línea de una acción reversible o con un formulario propio (pausar, reanudar, aprobar una
+ * ocurrencia…): región `alertdialog` rotulada. El foco inicial va a «Cancelar» (la acción segura), que precede a la
+ * confirmación; Escape o «Cancelar» devuelven el foco al control que la abrió. Para acciones irreversibles o con
+ * efecto contable se usa `ConfirmDialog` (decisión 5).
  */
 export function ConfirmPanel({
   title,
@@ -136,24 +197,18 @@ export function ConfirmPanel({
   onCancel,
   children,
   testId,
-}: {
-  title: string;
-  description?: string;
-  confirmLabel: string;
-  cancelLabel: string;
-  busy?: boolean;
-  /** Deshabilita solo el botón de confirmar (p. ej. falta el motivo). */
-  confirmDisabled?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-  children?: ReactNode;
-  testId?: string;
-}) {
+}: ConfirmProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
+  const restoreFocus = useFocusReturn(ref);
   useEffect(() => {
-    ref.current?.focus();
+    cancelRef.current?.focus();
   }, []);
+  const cancel = () => {
+    onCancel();
+    restoreFocus();
+  };
   return (
     <div
       ref={ref}
@@ -163,20 +218,94 @@ export function ConfirmPanel({
       data-testid={testId ?? 'confirm-panel'}
       style={{ ...warningStyle, display: 'grid', gap: '0.5rem' }}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onCancel();
+        if (e.key === 'Escape') cancel();
       }}
     >
       <strong id={titleId}>{title}</strong>
       {description ? <p style={{ margin: 0 }}>{description}</p> : null}
       {children}
       <div style={rowStyle}>
+        <button ref={cancelRef} type="button" onClick={cancel} disabled={busy}>
+          {cancelLabel}
+        </button>
         <button type="button" onClick={onConfirm} disabled={busy || confirmDisabled}>
           {confirmLabel}
         </button>
-        <button type="button" onClick={onCancel} disabled={busy}>
-          {cancelLabel}
-        </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Confirmación modal de una acción irreversible o con efecto contable (anular, revertir, archivar, eliminar…) sobre
+ * `<dialog>` + `showModal()` (decisión 5 del change; guía `dialog` de Modern Web Guidance): el navegador aporta la inertización del
+ * resto de la página, la contención del foco, Escape y la devolución del foco al disparador. Misma firma que
+ * `ConfirmPanel`: migrar un uso es cambiar el nombre del componente. El rol `alertdialog` se declara explícito
+ * porque las pruebas y los lectores de pantalla lo esperan para una confirmación destructiva; el foco inicial va a
+ * «Cancelar» con `focus()` tras `showModal()` (con `autoFocus`, React enfocaría con el `<dialog>` aún cerrado).
+ */
+export function ConfirmDialog({
+  title,
+  description,
+  confirmLabel,
+  cancelLabel,
+  busy,
+  confirmDisabled,
+  onConfirm,
+  onCancel,
+  children,
+  testId,
+}: ConfirmProps) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const restoreFocus = useFocusReturn(ref);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    // StrictMode ejecuta el efecto dos veces: la guarda evita abrir dos veces un diálogo ya abierto.
+    if (!el.open) {
+      el.showModal();
+      cancelRef.current?.focus();
+    }
+    return () => {
+      if (el.open) el.close();
+    };
+  }, []);
+  const cancel = () => {
+    onCancel();
+    restoreFocus();
+  };
+  return (
+    <dialog
+      ref={ref}
+      role="alertdialog"
+      className="pf-confirm-dialog"
+      aria-labelledby={titleId}
+      {...(description ? { 'aria-describedby': descriptionId } : {})}
+      data-testid={testId ?? 'confirm-dialog'}
+      onCancel={(e) => {
+        // Escape: el cierre lo decide React (desmonta el diálogo); el navegador no debe cerrarlo por su cuenta.
+        e.preventDefault();
+        cancel();
+      }}
+    >
+      <strong id={titleId}>{title}</strong>
+      {description ? (
+        <p id={descriptionId} style={{ margin: 0 }}>
+          {description}
+        </p>
+      ) : null}
+      {children}
+      <div style={rowStyle}>
+        <button ref={cancelRef} type="button" onClick={cancel} disabled={busy}>
+          {cancelLabel}
+        </button>
+        <button type="button" onClick={onConfirm} disabled={busy || confirmDisabled}>
+          {confirmLabel}
+        </button>
+      </div>
+    </dialog>
   );
 }

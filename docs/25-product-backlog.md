@@ -981,9 +981,9 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 
 | Feature | Prioridad | Capability (a proponer) | Historias |
 |---------|-----------|------------|-----------|
-| FEAT-26.1 Detección de anomalías | Should | forecast/anomaly-detection | **US-246** Ver gastos atípicos por categoría/merchant con razones. **US-247** Alertar cargos duplicados o cambios de precio no anunciados. |
-| FEAT-26.2 Clasificación automática | Should | classification/auto-classification | **US-248** Recibir sugerencia de categoría con nivel de confianza, aceptarla o corregirla (las reglas explícitas tienen prioridad). |
-| FEAT-26.3 Insights predictivos | Should | reporting/predictive-insights | **US-249** Aviso temprano de riesgo de exceder un presupuesto antes de fin de mes. **US-250** Aviso de metas en riesgo y de shortfall proyectado. |
+| FEAT-26.1 Detección de anomalías | Should | forecast/anomaly-detection | **US-246** Ver gastos atípicos por categoría/merchant con razones (**implementada** por `add-spending-anomaly-detection`, change 72). **US-247** Alertar cargos duplicados o cambios de precio no anunciados (**cubierta por otras funciones, D475**: los cambios de precio de suscripciones ya se detectan en COMMITMENTS y los duplicados en la importación; no hay detector nuevo). |
+| FEAT-26.2 Clasificación automática | Should | classification/auto-classification | **US-248** Recibir sugerencia de categoría con nivel de confianza, aceptarla o corregirla (las reglas explícitas tienen prioridad). **Implementada** (2026-11-25, change 73 `add-category-suggestions`; falta el criterio de salida con los datos del owner, D477). |
+| FEAT-26.3 Insights predictivos | Should | reporting/predictive-insights | **US-249** Aviso temprano de riesgo de exceder un presupuesto antes de fin de mes. (**implementada** por `add-budget-overrun-risk`, change 74). **US-250** Aviso de metas en riesgo y de shortfall proyectado. |
 | FEAT-26.4 Automatizaciones avanzadas | Could | rules/automation-workflows | **US-251** (Could) Encadenar acciones sobre eventos (p. ej. al recibir salario proponer contribución a meta), siempre con confirmación y audit. |
 
 ## EPIC-24 — Producción y hardening (Hito H, paralelo a Phases 8–9)

@@ -22,6 +22,7 @@ export interface NotificationLink {
     | 'FX_RATE'
     | 'CASH_FLOW_CALENDAR'
     | 'HOME_DIGEST'
+    | 'SPENDING_ANOMALIES'
     | (string & {});
   readonly periodId: string;
   readonly periodLabel: string;
@@ -170,6 +171,8 @@ export function resourcePath(link: NotificationLink): string | undefined {
     return qs ? `/flujo-de-caja?${qs}` : '/flujo-de-caja';
   }
   if (link.kind === 'HOME_DIGEST') return '/';
+  // Gastos atípicos (add-spending-anomaly-detection): la lista de la pasada diaria.
+  if (link.kind === 'SPENDING_ANOMALIES') return '/gastos-atipicos';
   return undefined;
 }
 

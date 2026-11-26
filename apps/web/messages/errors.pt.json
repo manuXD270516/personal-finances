@@ -140,6 +140,7 @@
   "CREDIT_CARD_ACCOUNT_IN_USE": "Essa conta já pertence a outro cartão. Escolha outra conta ou arquive o cartão anterior.",
   "CARD_PAYMENT_PLAN_CONFLICT": "Já existe um pagamento recorrente ativo para este cartão. Encerre-o em Pagamentos recorrentes e ative o plano de pagamento novamente.",
   "INSTALLMENT_PLAN_INVALID": "Essa compra não pode ser paga em parcelas: deve ser uma despesa lançada de uma conta do cartão, sem outro plano de parcelas.",
+  "CARD_CHARGE_INVALID": "Não foi possível registrar o encargo: informe pelo menos um componente maior que zero, uma data que não seja futura nem anterior à abertura da conta, uma conta do cartão ativo ou uma despesa lançada do cartão cujos componentes somem o seu valor.",
   "EARMARK_EXCEEDS_BALANCE": "A reserva excede o saldo disponível da conta (saldo menos o que outras metas já reservam).",
   "GOAL_CLOSED": "A meta está encerrada ou cancelada e não aceita novos movimentos.",
   "GOAL_ACCOUNT_NOT_ELIGIBLE": "Essa conta não pode ser vinculada a uma meta: deve ser uma conta ativa de natureza ativo (não um passivo) do seu espaço.",

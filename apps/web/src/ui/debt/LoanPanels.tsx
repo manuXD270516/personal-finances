@@ -1,11 +1,28 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { ErrorSummary } from '../common/ErrorSummary';
+import { useFocusFirstError } from '../common/forms';
 import { scaleFor } from '../common/money';
-import { LoanChargesFields, LoanTermsFields, SchedulePreviewSection, useSchedulePreview } from './LoanForm';
-import { ConfirmPanel, Field, formStyle, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
+import {
+  LoanChargesFields,
+  LoanTermsFields,
+  SchedulePreviewSection,
+  loanErrorItems,
+  useSchedulePreview,
+} from './LoanForm';
+import {
+  ConfirmDialog,
+  Field,
+  formStyle,
+  inputStyle,
+  mutedStyle,
+  rowStyle,
+  warningStyle,
+} from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import type { Account, Counterparty } from '../common/types';
 import { PAYMENT_METHODS } from '../common/types';
@@ -401,7 +418,7 @@ export function ReasonPanel({
     }
   }
   return (
-    <ConfirmPanel
+    <ConfirmDialog
       title={f.t(`${kind}.title`)}
       description={f.t(`${kind}.description`)}
       confirmLabel={f.t(`${kind}.confirm`)}
@@ -426,7 +443,7 @@ export function ReasonPanel({
         )}
       </Field>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
-    </ConfirmPanel>
+    </ConfirmDialog>
   );
 }
 
@@ -449,6 +466,10 @@ export function DraftEditPanel({
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [busy, setBusy] = useState(false);
   const alertRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const tForms = useTranslations('Forms');
+  const [attempt, setAttempt] = useState(0);
+  useFocusFirstError(formRef, attempt);
   const [focusTick, setFocusTick] = useState(0);
   useEffect(() => {
     if (focusTick > 0) alertRef.current?.focus();
@@ -469,7 +490,7 @@ export function DraftEditPanel({
     const built = buildLoanEdit(form, loan, opts);
     if (!built.ok) {
       setErrors(built.errors);
-      setFocusTick((n) => n + 1);
+      setAttempt((n) => n + 1);
       return;
     }
     setErrors({});
@@ -484,9 +505,10 @@ export function DraftEditPanel({
     }
   }
 
-  const errorCount = Object.keys(errors).length;
+  const errorItems = loanErrorItems(f, errors, form.origin === 'EXISTING');
   return (
     <form
+      ref={formRef}
       style={{ display: 'grid', gap: 'var(--pf-space-4)' }}
       noValidate
       data-testid="loan-edit-form"
@@ -499,6 +521,11 @@ export function DraftEditPanel({
       <p style={{ ...mutedStyle, margin: 0 }} data-testid="loan-draft-edit-note">
         {f.t('edit.draftEditable')}
       </p>
+      <ErrorSummary
+        title={tForms('errorSummary.title', { count: errorItems.length })}
+        items={errorItems}
+        testId="loan-edit-error-summary"
+      />
       <LoanTermsFields
         f={f}
         form={form}
@@ -553,11 +580,6 @@ export function DraftEditPanel({
       </fieldset>
       <SchedulePreviewSection f={f} ctx={ctx} preview={preview} />
       <div ref={alertRef} tabIndex={-1} data-testid="loan-edit-errors">
-        {errorCount > 0 ? (
-          <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>
-            {f.t('form.fixErrors', { count: errorCount })}
-          </p>
-        ) : null}
         {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       </div>
       <div style={rowStyle}>

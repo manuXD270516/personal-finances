@@ -1,0 +1,88 @@
+{
+  "backtest": {
+    "months": 3,
+    "asOf": "2026-09",
+    "total": {
+      "month": null,
+      "truncated": false,
+      "transactions": 548,
+      "suggestions": 548,
+      "hits": 542,
+      "precision": "0.9891",
+      "coverage": "1.0000"
+    },
+    "byMonth": [
+      {
+        "month": "2026-07",
+        "truncated": false,
+        "transactions": 209,
+        "suggestions": 209,
+        "hits": 207,
+        "precision": "0.9904",
+        "coverage": "1.0000"
+      },
+      {
+        "month": "2026-08",
+        "truncated": false,
+        "transactions": 175,
+        "suggestions": 175,
+        "hits": 173,
+        "precision": "0.9886",
+        "coverage": "1.0000"
+      },
+      {
+        "month": "2026-09",
+        "truncated": false,
+        "transactions": 164,
+        "suggestions": 164,
+        "hits": 162,
+        "precision": "0.9878",
+        "coverage": "1.0000"
+      }
+    ],
+    "byLevel": [
+      {
+        "level": "HIGH",
+        "suggestions": 540,
+        "hits": 540,
+        "precision": "1.0000"
+      },
+      {
+        "level": "MEDIUM",
+        "suggestions": 8,
+        "hits": 2,
+        "precision": "0.2500"
+      }
+    ],
+    "byBasis": [
+      {
+        "basis": "COUNTERPARTY",
+        "suggestions": 6,
+        "hits": 0,
+        "precision": "0.0000"
+      },
+      {
+        "basis": "DESCRIPTION",
+        "suggestions": 374,
+        "hits": 374,
+        "precision": "1.0000"
+      },
+      {
+        "basis": "BOTH",
+        "suggestions": 168,
+        "hits": 168,
+        "precision": "1.0000"
+      }
+    ]
+  },
+  "query": {
+    "warmP95Ms": 15,
+    "coldP95Ms": 85,
+    "samples": 40
+  },
+  "import": {
+    "rows": 5000,
+    "previewMs": 89583,
+    "rowsWithSuggestionInFirstPage": 200
+  }
+}

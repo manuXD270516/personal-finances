@@ -75,7 +75,11 @@ import {
 } from '@pf/notifications/interface/notifications.module';
 import type { EmailSender, HomeDigestSourcePort } from '@pf/notifications/interface/notifications.module';
 import { PinoNestLogger } from '@pf/platform/nest';
-import { createCashFlowWatch, reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
+import {
+  createBudgetRiskWatch,
+  createCashFlowWatch,
+  reportingDataVersionConsumer,
+} from '@pf/reporting/interface/reporting.module';
 import { otelCounters, otelHistograms, shutdownTelemetry } from '@pf/platform/otel';
 import type { JobQueue } from '@pf/platform/queue';
 import { createObjectStorageClient } from '@pf/platform/storage';
@@ -552,6 +556,8 @@ export async function createWorkerRuntime(
     config,
     outbox: fxOutbox,
     documentsRef,
+    // Aviso de gastos atípicos (add-spending-anomaly-detection): entrega directa dentro de la unidad de trabajo del workspace.
+    notificationIntake: notifications.intake,
   });
   financeRef.current = finance;
   const commitments = createCommitmentsRuntime({
@@ -625,11 +631,52 @@ export async function createWorkerRuntime(
       },
     },
   });
-  await registerCashFlowWatchJob(queue, cashFlowWatch, logger, {
-    cron: config.REPORTING_CASH_FLOW_WATCH_CRON,
-    runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
-    scheduleCrons: options.reporting?.scheduleCrons ?? true,
+  // REPORTING (add-budget-overrun-risk): paso de avisos de riesgo de presupuesto DENTRO del mismo job (después del flujo de
+  // caja): sin trabajos, consumidores ni conexiones nuevas (28 + 4 = 32 de 34). Con la función deshabilitada no corre.
+  const budgetRiskEnabled = config.REPORTING_BUDGET_RISK_ENABLED ?? true;
+  const budgetRiskWatch = createBudgetRiskWatch({
+    pool,
+    clock: options.clock ?? systemClock,
+    queries: finance.reporting.budgetRisk,
+    workspaces: activeWorkspaces,
+    enabled: budgetRiskEnabled,
+    notifier: {
+      notify: async (f) => {
+        await notifications.intake.notify({
+          workspaceId: f.workspaceId,
+          type: 'BUDGET_OVERRUN_RISK',
+          // Una notificación por línea y periodo; la idempotencia del aviso la da `reporting.budget_overrun_notice`.
+          factKey: `budget-risk:${f.periodId}:${f.budgetLineId}`,
+          sourceEventId: uuidv7(),
+          occurredAt: f.detectedAt,
+          payload: {
+            periodId: f.periodId,
+            periodLabel: f.periodLabel,
+            budgetId: f.budgetId,
+            budgetLineId: f.budgetLineId,
+            target: f.target,
+            projected: f.projected,
+            reference: f.reference,
+            estimatedDate: f.estimatedDate,
+            basis: f.basis,
+            detectedAt: f.detectedAt,
+            timeZone: f.timeZone,
+          },
+        });
+      },
+    },
   });
+  await registerCashFlowWatchJob(
+    queue,
+    cashFlowWatch,
+    logger,
+    {
+      cron: config.REPORTING_CASH_FLOW_WATCH_CRON,
+      runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
+      scheduleCrons: options.reporting?.scheduleCrons ?? true,
+    },
+    budgetRiskEnabled ? budgetRiskWatch : undefined,
+  );
 
   // DEBT (add-credit-cards): job `debt.card-daily` (estados de cuenta, recordatorios y red de seguridad) y consumidor
   // `debt.card-activity`; las tarjetas usan los MISMOS contratos públicos que la API (movimientos por cuenta, saldos
@@ -650,6 +697,7 @@ export async function createWorkerRuntime(
   // conexiones nuevas (D249): comparten la reserva de trabajos periódicos y la llamada al servicio no retiene conexión.
   await registerForecastingJobs(queue, finance.forecasting, logger, {
     enabled: config.FORECASTING_ENABLED,
+    anomaliesEnabled: config.FORECASTING_ANOMALIES_ENABLED,
     scheduleCron: config.FORECASTING_SCHEDULE_CRON,
     runnerCron: config.FORECASTING_RUNNER_CRON,
     runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
@@ -680,6 +728,10 @@ export async function createWorkerRuntime(
       commitments: finance.commitments,
       classification: finance.classification.validator,
       rules: finance.rules.evaluation,
+      // add-category-suggestions: la etapa de clasificación del import calcula las sugerencias en el worker.
+      categorySuggestions: finance.rules.suggestionQuery,
+      suggestionFeedback: finance.rules.suggestionFeedback,
+      counters: otelCounters('@pf/rules'),
       accountCatalog: finance.accounts.catalog,
     }),
     settings: importsSettingsFrom(config),

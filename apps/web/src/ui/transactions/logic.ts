@@ -115,14 +115,15 @@ export function availableActions(tx: Transaction) {
   return {
     edit: s !== 'VOIDED',
     // Las transacciones de préstamo las administra el préstamo (TRANSACTION_MANAGED_EXTERNALLY): sin montos ni anulación.
-    financialEdit: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind),
+    // Las transacciones de préstamo y los cargos de tarjeta los administra su contexto (TRANSACTION_MANAGED_EXTERNALLY).
+    financialEdit: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind) && !tx.debtRole,
     post: s === 'PENDING',
     clear: s === 'POSTED',
     unclear: s === 'CLEARED',
     // Marcado directo como conciliada SIN extracto (docs/33 D74); la conciliación contra extracto es la sesión.
     reconcile: s === 'CLEARED',
     unreconcile: s === 'RECONCILED',
-    void: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind),
+    void: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind) && !tx.debtRole,
     duplicate: tx.kind === 'INCOME' || tx.kind === 'EXPENSE' || tx.kind === 'REFUND',
   };
 }

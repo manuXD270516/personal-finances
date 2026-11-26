@@ -42,7 +42,7 @@ test.describe('Campos personalizados (classification/custom-fields)', () => {
     await tx.getByLabel('Descripción').fill('Papelería de la oficina');
     await tx.getByLabel('Categoría de la parte 1').selectOption({ label: food!.name });
     await tx.getByLabel('Centro de costo').selectOption({ label: 'Oficina' });
-    await tx.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await tx.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByTestId('transaction-detail')).toBeVisible();
     // El detalle muestra el valor del split con la etiqueta del campo y la de la opción.
     await expect(page.getByTestId('split-custom-fields')).toContainText('Centro de costoOficina');
@@ -105,7 +105,7 @@ test.describe('Campos personalizados (classification/custom-fields)', () => {
     ).toBeVisible();
     await expect(page.getByTestId('transaction-detail')).toHaveCount(0);
     await tx.getByLabel('Factura').fill('F-777');
-    await tx.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await tx.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByTestId('transaction-detail')).toBeVisible();
     await expect(page.getByTestId('split-custom-fields')).toContainText('FacturaF-777');
 

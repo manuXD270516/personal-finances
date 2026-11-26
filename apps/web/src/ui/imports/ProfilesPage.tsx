@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { ConfirmPanel, cardStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
+import { ConfirmDialog, cardStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
 import type { Institution } from '../common/types';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatInstant } from '../dashboard/format';
@@ -166,7 +166,7 @@ function ProfilesList({ ctx }: { ctx: WorkspaceContext }) {
         {f.t('profiles.includeArchived')}
       </label>
       {archiving ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="profile-archive-confirm"
           title={f.t('profiles.archiveTitle', { name: archiving.name })}
           description={f.t('profiles.archiveBody')}

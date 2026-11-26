@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { HOME_CSS } from '../dashboard/styles';
+import '../dashboard/home.css';
 import type { FormatContext } from '../dashboard/types';
 import { localized, useSession } from '../session-context';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
@@ -101,7 +101,6 @@ function Evolution({ ctx }: { ctx: WorkspaceContext }) {
 
   return (
     <div className="pf-home" data-testid="net-worth-evolution-page">
-      <style>{HOME_CSS}</style>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {!history && !problem ? <p aria-busy="true">{f.t('loading')}</p> : null}
       {history ? (

@@ -7,7 +7,7 @@ import { LiquidBalanceCard } from './LiquidBalanceCard';
 import { NetWorthCard } from './NetWorthCard';
 import { SpendableCard } from '../spendable/SpendableView';
 import { ActionHint, NotAvailableWidget, statusOf } from './QuestionWidgets';
-import { HOME_CSS } from './styles';
+import './home.css';
 import { TopCategoriesWidget } from './TopCategoriesWidget';
 import type { FormatContext, ReportSummary } from './types';
 
@@ -35,14 +35,13 @@ export interface DashboardViewProps extends FormatContext {
   readonly upcomingHref?: string | undefined;
   /** Ajustes del disponible (horizonte y esenciales; add-cash-flow-forecast). */
   readonly spendableSettingsHref?: string | undefined;
+  /** Presupuestos en riesgo de excederse (Q5, add-budget-overrun-risk), justo después del disponible para gastar. */
+  readonly budgetRiskCard?: ReactNode;
   /** Tarjeta "Deudas" (add-debt-summary), junto a la de metas en "Metas y deudas". */
   readonly debtWidget?: ReactNode;
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
   readonly evolutionCard?: ReactNode;
 }
-
-/** Hoja de estilos del Home (tokens de docs/28 §5). */
-const HomeStyles = () => <style>{HOME_CSS}</style>;
 
 /**
  * Home (reporting/dashboard, tareas 6.1 y 6.2; D50): jerarquía visual de lo más consultado a lo menos —
@@ -68,6 +67,7 @@ export function DashboardView({
   upcomingHref,
   spendableSettingsHref,
   debtWidget,
+  budgetRiskCard,
   evolutionCard,
   commitmentsSection,
   ...ctx
@@ -94,7 +94,6 @@ export function DashboardView({
 
   return (
     <div data-testid="dashboard" data-complete={summary.meta.complete ? 'true' : 'false'} className="pf-home">
-      <HomeStyles />
       <LiquidBalanceCard
         summary={summary}
         ctx={fctx}
@@ -117,6 +116,8 @@ export function DashboardView({
           }}
         />
       ) : null}
+
+      {budgetRiskCard ?? null}
 
       {commitmentsSection ?? null}
 
@@ -264,7 +265,6 @@ export function DashboardSkeleton({ label }: { label: string }) {
   const block = (height: string) => <div className="pf-home-skel" style={{ height }} />;
   return (
     <div data-testid="dashboard-skeleton" role="status" aria-busy="true" className="pf-home">
-      <HomeStyles />
       <span className="pf-home-sr">{label}</span>
       <div aria-hidden="true" className="pf-home-group">
         {block('8.5rem')}

@@ -14,6 +14,7 @@ export type NavKey =
   | 'recurring'
   | 'cashFlow'
   | 'forecasts'
+  | 'spendingAnomalies'
   | 'goals'
   | 'debt'
   | 'reports'
@@ -46,6 +47,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'cashFlow', path: '/flujo-de-caja' },
   // Phase 8 (add-expense-forecasts): pronósticos de gasto e ingreso con rango probable, conocidos y motivos.
   { key: 'forecasts', path: '/pronosticos' },
+  // Phase 9 (add-spending-anomaly-detection): gastos atípicos con el motivo, descarte y restauración (OWNER y EDITOR).
+  { key: 'spendingAnomalies', path: '/gastos-atipicos' },
   // Phase 4 (add-savings-goals): Metas de ahorro (listado, alta, detalle y reservas por cuenta).
   { key: 'goals', path: '/goals' },
   // Phase 4 (add-loans): Deudas → préstamos (lista, alta, detalle y comparación con la tabla del banco).
@@ -88,4 +91,15 @@ export function initialOf(name: string): string {
  */
 export function isNotificationsRoute(pathname: string): boolean {
   return within(stripLocale(pathname), '/notificaciones');
+}
+
+/** Ruta del alta de movimientos (sin prefijo de locale). */
+export const NEW_TRANSACTION_PATH = '/transacciones/nueva';
+
+/**
+ * Acceso «＋ Registrar» de la barra superior (add-quick-capture, decisión 5): solo para quien puede editar el workspace
+ * (la API decide la autorización; la UI solo oculta la acción) y no en el alta, para no duplicar la acción.
+ */
+export function showQuickAdd(pathname: string, role: 'OWNER' | 'EDITOR' | 'VIEWER' | undefined): boolean {
+  return (role === 'OWNER' || role === 'EDITOR') && stripLocale(pathname) !== NEW_TRANSACTION_PATH;
 }

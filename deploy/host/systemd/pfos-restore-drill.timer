@@ -1,0 +1,14 @@
+# PFOS — restore drill mensual en el host (D456, add-host-restore-drill): día 2 a las 09:00 UTC = 05:00 La Paz. Después del full
+# mensual del día 1, fuera de la ventana de backups (06:00–07:30 UTC), después del reinicio de unattended-upgrades (08:30) y antes del
+# snapshot de Lightsail (10:00). Instalado y habilitado por deploy/host/pfos-deploy.sh.
+[Unit]
+Description=PFOS restore drill mensual (restaura el último punto de repo1 y verifica la copia)
+
+[Timer]
+OnCalendar=*-*-02 09:00:00 UTC
+Unit=pfos-backup@drill.service
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

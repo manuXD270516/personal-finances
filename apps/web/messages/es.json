@@ -3,6 +3,11 @@
     "title": "PFOS — Finanzas personales",
     "description": "Sistema operativo de finanzas personales"
   },
+  "NotFound": {
+    "title": "Página no encontrada",
+    "body": "La dirección que abriste no existe o ya no está disponible.",
+    "home": "Volver al inicio"
+  },
   "Home": {
     "title": "Inicio",
     "subtitle": "Tu dinero hoy, cómo va el mes y tu patrimonio.",
@@ -48,7 +53,14 @@
     "rules": "Reglas",
     "reports": "Reportes",
     "cashFlow": "Flujo de caja",
-    "forecasts": "Pronósticos"
+    "forecasts": "Pronósticos",
+    "spendingAnomalies": "Gastos atípicos",
+    "notices": {
+      "label": "Avisos",
+      "close": "Cerrar",
+      "actionsAvailable": "Acciones disponibles"
+    },
+    "quickAdd": "Registrar"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -587,6 +599,11 @@
     "noWorkspace": "Selecciona o crea un espacio de trabajo.",
     "loading": "Cargando…"
   },
+  "Forms": {
+    "errorSummary": {
+      "title": "Hay {count, plural, one {# error} other {# errores}}"
+    }
+  },
   "Accounts": {
     "title": "Cuentas",
     "actions": "Acciones de cuentas",
@@ -950,6 +967,7 @@
       "remaining": "Restante por asignar: {amount}"
     },
     "list": {
+      "cardCharge": "Cargo de tarjeta",
       "title": "Transacciones",
       "newActions": "Registrar",
       "new": "Nuevo movimiento",
@@ -1189,6 +1207,19 @@
       "DEBT": "Deudas",
       "GOAL": "Meta de ahorro",
       "SYSTEM": "Sistema"
+    },
+    "quick": {
+      "saved": {
+        "EXPENSE": "Gasto de {amount} registrado",
+        "INCOME": "Ingreso de {amount} registrado",
+        "REFUND": "Reembolso de {amount} registrado",
+        "ADJUSTMENT": "Ajuste de {amount} registrado"
+      },
+      "undo": "Deshacer",
+      "view": "Ver",
+      "voided": "Registro anulado",
+      "undoReason": "Deshecho desde el aviso de registro",
+      "recordAndDetail": "Registrar e ir al detalle"
     }
   },
   "Fx": {
@@ -2618,7 +2649,8 @@
       "openFxFeedStatus": "Ver el estado de las tasas automáticas",
       "openFxRate": "Revisar la tasa retenida",
       "openCashFlowCalendar": "Ver el calendario de flujo de caja",
-      "openHome": "Ir al inicio"
+      "openHome": "Ir al inicio",
+      "openSpendingAnomalies": "Abrir los gastos atípicos"
     },
     "prefs": {
       "title": "Notificaciones",
@@ -2651,7 +2683,9 @@
         "FX_RATE_FEED_RECOVERED": "Tasa automática recuperada",
         "FX_RATE_ANOMALY_RETAINED": "Tasa retenida por variación anómala",
         "CASH_FLOW_SHORTFALL_RISK": "Riesgo de déficit en el flujo de caja",
-        "HOME_DIGEST": "Resumen periódico del inicio (email)"
+        "HOME_DIGEST": "Resumen periódico del inicio (email)",
+        "SPENDING_ANOMALY": "Gastos atípicos detectados (apagado por omisión)",
+        "BUDGET_OVERRUN_RISK": "Riesgo de exceder un presupuesto (apagado por omisión)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalles (montos y nombres) en los emails",
@@ -3772,7 +3806,7 @@
         "credit": "Crédito"
       },
       "formLabel": "Asignación de columnas",
-      "errorsTitle": "Corrige estos datos para continuar:",
+      "errorsTitle": "Hay {count, plural, one {# error} other {# errores}}",
       "hasHeader": "La primera fila (después de las que se saltan) es un encabezado",
       "skipRows": "Filas a saltar al inicio",
       "skipRowsHint": "Texto del banco antes del encabezado; entre 0 y 50.",
@@ -5073,6 +5107,66 @@
       "description": "Termina sus planes de pago y deja de emitir estados de cuenta y avisos. Los estados de cuenta y los planes de cuotas siguen disponibles; las cuentas conservan su saldo.",
       "done": "Tarjeta archivada.",
       "archivedNotice": "Esta tarjeta está archivada: solo puedes consultarla."
+    },
+    "charges": {
+      "title": "Intereses y cargos",
+      "caption": "Intereses y cargos del ciclo que cierra el {closing}",
+      "empty": "No hay intereses ni cargos registrados en este ciclo.",
+      "register": "Registrar intereses y cargos",
+      "hint": "Registra lo que cobró el banco: crea un gasto de la tarjeta con una porción por componente y aumenta lo que debes.",
+      "fields": {
+        "date": "Fecha del cargo",
+        "interest": "Intereses ({currency})",
+        "fees": "Comisiones ({currency})",
+        "insurance": "Seguro ({currency})",
+        "taxes": "Impuestos ({currency})"
+      },
+      "components": {
+        "interest": "Intereses",
+        "fees": "Comisiones",
+        "insurance": "Seguro",
+        "taxes": "Impuestos"
+      },
+      "totalShort": "Total",
+      "originShort": "Origen",
+      "actions": "Acciones",
+      "origin": {
+        "RECORDED": "Registrado",
+        "ADOPTED": "Adoptado de un gasto"
+      },
+      "total": "Total del cargo: {amount}",
+      "totalPending": "Total del cargo: completa los montos con un formato válido.",
+      "save": "Registrar cargo",
+      "saved": "Cargo registrado.",
+      "cancel": "Cancelar",
+      "void": "Anular",
+      "voidTitle": "Anular el cargo de {amount}",
+      "voidDescription": "Se anula su transacción con la reversa del asiento y la deuda vuelve a su valor anterior.",
+      "voidReason": "Motivo de la anulación",
+      "voidConfirm": "Anular cargo",
+      "voided": "Cargo anulado.",
+      "proposal": "El banco informó {amount} más que el cálculo del sistema. Si son intereses o cargos, regístralos.",
+      "useProposal": "Registrar la diferencia como cargo",
+      "duplicateWarning": "Hay {count} gasto(s) del ciclo en «Intereses pagados» o «Comisiones» que no son cargos. Si es el mismo cobro, adóptalo desde su detalle para no registrarlo dos veces:",
+      "errors": {
+        "INVALID": "Escribe un monto válido.",
+        "SCALE": "El monto tiene más decimales de los que admite la moneda.",
+        "NEGATIVE": "El monto no puede ser negativo.",
+        "NO_COMPONENT": "Indica al menos un componente mayor que cero.",
+        "REQUIRED_DATE": "Indica la fecha del cargo."
+      },
+      "adopt": {
+        "title": "Es un cargo de la tarjeta",
+        "hint": "Reparte el monto del gasto en componentes (deben sumar su monto). No crea otra transacción ni cambia el saldo.",
+        "prompt": "Este gasto es de una cuenta de {card}. Si es un interés o cargo del banco, márcalo como cargo para que cuente en los reportes de comisiones y deudas.",
+        "action": "Es un cargo de la tarjeta",
+        "save": "Adoptar como cargo",
+        "done": "El gasto ahora es un cargo de la tarjeta."
+      }
+    },
+    "transaction": {
+      "badge": "Cargo de la tarjeta",
+      "viewCard": "Ver la tarjeta"
     },
     "statements": {
       "accountTitle": "Estados de cuenta en {currency}",
@@ -6577,10 +6671,11 @@
       "CONVERSION": "Comisión de conversión",
       "TRANSFER": "Comisión de transferencia",
       "LOAN": "Intereses y cargos de préstamos",
+      "CARD": "Intereses y cargos de tarjetas",
       "FEE_CATEGORY": "Categorías de comisiones",
       "total": "Total",
       "last12": "Últimos 12 periodos completos: {amount}",
-      "cardNote": "Los intereses de tarjeta no se registran como gasto y no figuran aquí; el saldo de la tarjeta está en la evolución de deudas.",
+      "cardNote": "Las tarjetas cuentan aquí solo los intereses y cargos registrados como cargo de la tarjeta (o adoptados desde un gasto); un gasto común en «Intereses pagados» no se infiere.",
       "chartTitle": "Total de comisiones por periodo",
       "chartDesc": "Barras de {n} periodos en {currency}; la tabla siguiente separa cada tipo."
     },
@@ -6612,6 +6707,8 @@
       "principalPaid": "Principal pagado",
       "interestPaid": "Interés pagado",
       "chargesPaid": "Cargos pagados",
+      "interestCharged": "Interés cargado",
+      "chargesCharged": "Otros cargos cargados",
       "kind": {
         "LOAN": "Préstamo",
         "CARD": "Tarjeta"
@@ -6619,7 +6716,7 @@
       "consolidated": "Consolidado en {currency}",
       "chartTitle": "Saldo pendiente de {name}",
       "chartDesc": "Línea de {n} meses en {currency}; la tabla siguiente tiene los pagos.",
-      "cardNote": "Las tarjetas muestran solo el saldo pendiente."
+      "cardNote": "Las tarjetas muestran el saldo pendiente y los intereses y cargos registrados en la tarjeta; lo pagado no se informa."
     },
     "recurring": {
       "caption": "Costo mensual y anual de los compromisos recurrentes activos",
@@ -7182,6 +7279,170 @@
       "lowCategorization": "Hay gasto sin categoría que impide pronosticar por categoría.",
       "link": "Ver las transacciones",
       "gap": "Un hueco de periodos sin movimientos acortó la historia usada."
+    }
+  },
+  "CategorySuggestions": {
+    "level": {
+      "HIGH": "alta",
+      "MEDIUM": "media"
+    },
+    "chip": {
+      "suggestedLevel": "Sugerida: {category} · confianza {level}",
+      "default": "Categoría por defecto de la contraparte: {category}",
+      "lastUsed": "Última categoría usada con esta contraparte: {category}",
+      "accepted": "Categoría sugerida aceptada: {category}",
+      "accept": "Aceptar",
+      "other": "Otra",
+      "acceptAria": "Aceptar la categoría sugerida {category}",
+      "otherAria": "Elegir otra categoría",
+      "ruleApplies": "Una regla clasificará este movimiento al guardarlo; por eso no se sugiere una categoría."
+    },
+    "reason": {
+      "kind": {
+        "EXPENSE": "gastos",
+        "INCOME": "ingresos",
+        "REFUND": "reembolsos"
+      },
+      "description": "Elegiste \"{category}\" en {matches} de {support} {kind} parecidos a \"{key}\"",
+      "counterparty": "Elegiste \"{category}\" en {matches} de {support} {kind} con \"{counterparty}\"",
+      "both": "Elegiste \"{category}\" en {matches} de {support} {kind} parecidos a \"{key}\" y de la misma contraparte"
+    },
+    "import": {
+      "column": "Sugerencia",
+      "suggestedLevel": "Sugerida: {category} · confianza {level}",
+      "accept": "Aceptar",
+      "acceptAria": "Aceptar la categoría sugerida {category} en la línea {line}",
+      "acceptHigh": "Aceptar sugerencias de confianza alta",
+      "acceptMedium": "Aceptar sugerencias de confianza alta y media",
+      "hint": "Las sugerencias vienen de tu historial y nunca se aplican solas: las filas que no aceptes se crean sin categoría.",
+      "done": "Se aceptaron {count} sugerencias de categoría.",
+      "filter": "Con sugerencia"
+    },
+    "rate": {
+      "title": "Sugerencias de categoría",
+      "intro": "Qué hiciste con las sugerencias de categoría de este mes.",
+      "loading": "Cargando…",
+      "rate": "Tasa de aceptación",
+      "empty": "Todavía no hay sugerencias resueltas este mes.",
+      "summary": "{shown} mostradas · {accepted} aceptadas · {corrected} corregidas · {ignored} ignoradas",
+      "surface": {
+        "MANUAL_ENTRY": "Alta manual",
+        "IMPORT": "Importación"
+      },
+      "bySurface": "Por canal",
+      "failed": "No se pudo leer la tasa de aceptación."
+    }
+  },
+  "BudgetRisk": {
+    "none": "Sin riesgo calculado",
+    "level": {
+      "EXCEEDED": "Excedida",
+      "LIKELY": "Probable",
+      "POSSIBLE": "Posible",
+      "UNLIKELY": "Improbable",
+      "NOT_AVAILABLE": "No disponible"
+    },
+    "reason": {
+      "LINE_TYPE": "Las líneas fijas y de mínimo no se proyectan",
+      "NO_REFERENCE": "La línea no tiene un monto planificado",
+      "TOO_EARLY": "Faltan datos del periodo"
+    },
+    "basis": {
+      "RUN_RATE": "según el ritmo del periodo",
+      "FORECAST": "según el pronóstico"
+    },
+    "detail": {
+      "projected": "Proyección {amount}",
+      "projectedHigh": "alta {amount}",
+      "date": "exceso estimado alrededor del {date}"
+    },
+    "incomplete": "Falta la tasa de algún pago conocido: la proyección está incompleta",
+    "column": "Riesgo de exceder",
+    "legend": {
+      "intro": "El riesgo es una proyección con el ritmo del periodo o con el pronóstico, no una certeza; no cambia ninguna cifra del plan.",
+      "possible": "«Posible» significa que solo ocurriría si el gasto se acerca a lo alto de lo habitual (límite superior del intervalo del 80 % del pronóstico)."
+    },
+    "sentence": {
+      "likely": "Con el ritmo actual, {name} superaría su tope alrededor del {date}.",
+      "likelyNoDate": "Con el ritmo actual, {name} superaría su tope antes de que termine el periodo.",
+      "likelyForecast": "Según el pronóstico, {name} superaría su tope alrededor del {date}.",
+      "likelyForecastNoDate": "Según el pronóstico, {name} superaría su tope antes de que termine el periodo.",
+      "possible": "Si el gasto en {name} se acerca a lo alto de lo habitual, podría superar su tope alrededor del {date}.",
+      "possibleNoDate": "Si el gasto en {name} se acerca a lo alto de lo habitual, podría superar su tope antes de que termine el periodo.",
+      "possibleForecast": "Si el gasto en {name} se acerca a lo alto de lo habitual, podría superar su tope alrededor del {date}.",
+      "possibleForecastNoDate": "Si el gasto en {name} se acerca a lo alto de lo habitual, podría superar su tope antes de que termine el periodo."
+    },
+    "home": {
+      "title": "Presupuestos en riesgo",
+      "subtitle": "Plan de {period}",
+      "figures": "Proyección {projected} de {reference}",
+      "more": "y {count, plural, one {# línea más} other {# líneas más}} en riesgo en el plan"
+    }
+  },
+  "SpendingAnomalies": {
+    "title": "Gastos atípicos",
+    "subtitle": "Gastos que se alejan de lo habitual para su categoría o su contraparte, con el motivo. Es solo un aviso: no cambia ninguna transacción ni ninguna cifra.",
+    "disclaimer": "La marca solo indica que el monto se aleja de lo habitual. Si era esperado, descártalo con «No es atípico»; puedes restaurarlo cuando quieras.",
+    "loading": "Cargando gastos atípicos…",
+    "disabled": "La detección de gastos atípicos está deshabilitada en esta instalación. Se muestra lo que ya se había detectado.",
+    "empty": "No hay gastos atípicos abiertos en este rango.",
+    "emptyFiltered": "No hay gastos atípicos con estos filtros.",
+    "more": "Cargar más",
+    "noName": "sin nombre",
+    "filters": {
+      "label": "Filtros de gastos atípicos",
+      "status": "Estado",
+      "from": "Desde",
+      "to": "Hasta",
+      "OPEN": "Abiertos",
+      "DISMISSED": "Descartados",
+      "ALL": "Todos"
+    },
+    "table": {
+      "caption": "Gastos atípicos del espacio de trabajo, del más reciente al más antiguo",
+      "date": "Fecha",
+      "amount": "Monto",
+      "category": "Categoría",
+      "counterparty": "Contraparte",
+      "reasons": "Motivo",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "status": {
+      "OPEN": "Abierto",
+      "DISMISSED": "Descartado"
+    },
+    "reportingAmount": "Equivale a {amount}",
+    "reason": {
+      "CATEGORY_OUTLIER": "{ratio} veces la mediana de \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "COUNTERPARTY_OUTLIER": "{ratio} veces la mediana de tus gastos con \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nueva \"{name}\", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil 95 de tus gastos ({reference}, {count} gastos)"
+    },
+    "dismiss": {
+      "label": "No es atípico",
+      "reasonLabel": "Motivo (opcional)",
+      "none": "Sin motivo",
+      "EXPECTED_ONE_OFF": "Gasto puntual esperado",
+      "NOT_UNUSUAL": "Es normal para mí",
+      "OTHER": "Otro motivo",
+      "done": "Gasto marcado como no atípico."
+    },
+    "restore": {
+      "label": "Restaurar",
+      "done": "Gasto restaurado entre los atípicos."
+    },
+    "decided": "Descartado el {at}",
+    "decidedReason": "Descartado el {at}: {reason}",
+    "changed": "La transacción cambió desde que se detectó.",
+    "openTransaction": "Ver transacción",
+    "mark": {
+      "label": "Atípico",
+      "hint": "Gasto atípico: {reasons}"
+    },
+    "detail": {
+      "title": "Gasto atípico",
+      "intro": "Este monto se aleja de lo habitual. No cambia la transacción ni ninguna cifra.",
+      "open": "Ver los gastos atípicos"
     }
   }
 }

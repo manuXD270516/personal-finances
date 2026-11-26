@@ -704,6 +704,80 @@ describe('Extractos solapados (criterio de salida sintético)', () => {
   }, 600_000);
 });
 
+describe('Propuesta de la vista previa con un tipo de valor por campo (fix-import-proposed-field-schema)', () => {
+  const DESCRIPTION_AS_ID = '0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d8e';
+
+  async function proposeWithRule(rowName: string, description: string) {
+    const categories = ok(await get(owner, '/categories?kind=EXPENSE&limit=200'))['data'] as {
+      id: string;
+      name: string;
+    }[];
+    const category = categories.find((c) => c.name === 'Seguros') ?? categories[0]!;
+    const counterparty = ok(await post(owner, '/counterparties', { name: `Aseguradora ${rowName}` }), 201)[
+      'id'
+    ] as string;
+    const tags = [
+      ok(await post(owner, '/tags', { name: `auto-${rowName}` }), 201)['id'] as string,
+      ok(await post(owner, '/tags', { name: `anual-${rowName}` }), 201)['id'] as string,
+    ];
+    ok(
+      await post(owner, '/rules', {
+        name: `Propuesta ${rowName}`,
+        priority: 100,
+        conditions: [{ field: 'DESCRIPTION', operator: 'contains', value: rowName }],
+        actions: [
+          { type: 'SET_CATEGORY', categoryId: category.id },
+          { type: 'SET_COUNTERPARTY', counterpartyId: counterparty },
+          { type: 'ADD_TAG', tagId: tags[0] },
+          { type: 'ADD_TAG', tagId: tags[1] },
+          { type: 'SET_DESCRIPTION', text: description },
+        ],
+      }),
+      201,
+    );
+    const account = await createAccount(`Banco ${rowName}`, 'BANK', '0.00');
+    const documentId = await uploadStatement(
+      OFX([{ id: `PROP-${rowName}`, date: '20260320', amount: '-120.00', name: rowName }]),
+      `${rowName}.ofx`,
+      'application/x-ofx',
+    );
+    const created = ok(await createImport(documentId, account), 202);
+    const review = await waitFor(created['id'] as string, ['AWAITING_REVIEW']);
+    const rows = (await preview(review.id)).rows as any[];
+    return { review, row: rows[0], category, counterparty, tags };
+  }
+
+  it('[TC-IMPORTS-PIPELINE-072] la propuesta publica cada campo con su tipo y la respuesta valida contra el contrato', async () => {
+    const { row, category, counterparty, tags } = await proposeWithRule('DEB AUT 0412', 'Seguro del auto');
+    expect(row.proposal.categoryId).toMatchObject({ value: category.id, origin: 'RULE' });
+    expect(row.proposal.counterpartyId).toMatchObject({ value: counterparty, origin: 'RULE' });
+    expect(row.proposal.tagIds).toMatchObject({ origin: 'RULE' });
+    expect([...row.proposal.tagIds.value].sort()).toEqual([...tags].sort());
+    expect(row.proposal.description).toMatchObject({ value: 'Seguro del auto', origin: 'RULE' });
+  }, 180_000);
+
+  it('[TC-IMPORTS-PIPELINE-073] una descripción propuesta con forma de id valida como texto', async () => {
+    const { row } = await proposeWithRule('DEB AUT 0413', DESCRIPTION_AS_ID);
+    expect(row.proposal.description).toMatchObject({ value: DESCRIPTION_AS_ID, origin: 'RULE' });
+  }, 180_000);
+
+  it('[TC-IMPORTS-PIPELINE-074] la edición de una fila devuelve una propuesta que valida contra el contrato', async () => {
+    const { review, row, category } = await proposeWithRule('DEB AUT 0414', 'Seguro del auto');
+    const edited = await patch(
+      owner,
+      `/imports/${review.id}/rows/${row.id}`,
+      { categoryId: category.id },
+      review.version,
+    );
+    ok(edited);
+    expect(
+      contract.validateResponse('decideImportRow', 200, edited.body),
+      JSON.stringify(edited.body),
+    ).toEqual([]);
+    expect((edited.body as any).proposal.categoryId).toMatchObject({ value: category.id });
+  }, 180_000);
+});
+
 // Extractos PDF con texto (openspec add-pdf-statement-parser; imports/import-pipeline): los PDF se GENERAN por código con
 // pdfkit desde los movimientos sintéticos (SINTETICO), nunca se versionan; DOCUMENTS los inspecciona y el worker real los
 // lee en el hilo aislado con PDF.js.

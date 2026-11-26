@@ -29,7 +29,11 @@ export interface LedgerEntry {
 export interface PortionFact extends NominalPortionDto {
   readonly tagIds: readonly string[];
   /** Tipo de la transacción y rol de la porción (por omisión `EXPENSE`/`NOMINAL`). */
-  readonly origin?: { readonly transactionKind: string; readonly portionRole: 'NOMINAL' | 'FEE' };
+  readonly origin?: {
+    readonly transactionKind: string;
+    readonly portionRole: 'NOMINAL' | 'FEE';
+    readonly debtRole?: 'CARD_CHARGE' | null;
+  };
 }
 
 /** Datos que sirven los puertos de los reportes ampliados (cada contexto dueño los calcula en producción). */
@@ -322,7 +326,9 @@ export class InMemoryFinancialReports extends InMemoryReporting {
               p.amount.currency,
               tags?.join(',') ?? '',
               groupBy.includes('ACCOUNT') ? p.accountId : '',
-              groupBy.includes('ORIGIN') ? `${origin.transactionKind}:${origin.portionRole}` : '',
+              groupBy.includes('ORIGIN')
+                ? `${origin.transactionKind}:${origin.portionRole}:${origin.debtRole ?? ''}`
+                : '',
             ].join('|');
             const prev = groups.get(key);
             groups.set(key, {

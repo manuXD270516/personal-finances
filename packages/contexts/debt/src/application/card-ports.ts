@@ -5,10 +5,13 @@ import type { AccountBalanceHistoryQuery, LedgerOpeningEntriesQuery } from '@pf/
 import type { Clock } from '@pf/shared-kernel';
 import type {
   AccountMovementsQuery,
+  CardChargeTransactionsPort,
   PendingFlowQuery,
   TransactionLinkQuery,
 } from '@pf/transactions/contracts';
 import type {
+  CardCharge,
+  CardChargeStatus,
   CardInstallmentPlan,
   CardStatementStatus,
   CreditCard,
@@ -142,6 +145,42 @@ export interface ReminderRepository {
   }): Promise<boolean>;
 }
 
+/** Filtro de la lista de cargos de una tarjeta (openspec add-card-interest-ledger-portions). */
+export interface CardChargeFilter {
+  readonly cardId: string;
+  /** Id de la cuenta de usuario (`accountId`) o de la cuenta de la tarjeta (`cardAccountId`). */
+  readonly cardAccountIds?: readonly string[];
+  readonly from?: string;
+  readonly to?: string;
+  readonly status?: CardChargeStatus;
+  readonly limit: number;
+  /** Cursor opaco de `nextCursor`. */
+  readonly after?: string;
+}
+
+/** Repositorio de los cargos de tarjeta (`debt.card_charge`). Nunca borra: anular marca `VOIDED`. */
+export interface CardChargeRepository {
+  insert(charge: CardCharge): Promise<void>;
+  /** `FOR UPDATE` con `lock: 'update'`. */
+  findById(workspaceId: string, id: string, options?: { lock?: 'update' }): Promise<CardCharge | null>;
+  /** Cargo vigente que lleva la transacción (a lo sumo uno). */
+  findActiveByTransaction(workspaceId: string, transactionId: string): Promise<CardCharge | null>;
+  /** Persiste la anulación con control optimista por versión; `false` si otro cambio ganó. */
+  saveVoid(charge: CardCharge): Promise<boolean>;
+  /** Del más reciente al más antiguo (fecha, id); `nextCursor` es `null` en la última página. */
+  list(
+    workspaceId: string,
+    filter: CardChargeFilter,
+  ): Promise<{ readonly items: readonly CardCharge[]; readonly nextCursor: string | null }>;
+  /** Cargos vigentes de las cuentas con fecha en `[from, to]` (detalle del estado de cuenta; una consulta por tarjeta). */
+  activeForAccounts(
+    workspaceId: string,
+    cardAccountIds: readonly string[],
+    from: string,
+    to: string,
+  ): Promise<readonly CardCharge[]>;
+}
+
 /** Saldos presentados (deuda positiva) por cuenta y fecha de corte, del ledger (INV-022). */
 export interface CardBalancePort {
   at(workspaceId: string, accountId: string, dates: readonly string[]): Promise<ReadonlyMap<string, string>>;
@@ -157,6 +196,14 @@ export interface CardSettings {
   readonly planHorizonDays: number;
 }
 
+/** Métricas del motor de tarjetas (contador sin etiquetas de alta cardinalidad). */
+export interface CardMetricsPort {
+  increment(name: string, labels: Readonly<Record<string, string>>, value?: number): void;
+}
+
+/** Ciclos cuyo cálculo no cuadra (`previous + compras − reembolsos − pagos + otros ≠ cierre`); la vista marca `consistent = false`. */
+export const CARD_CYCLE_MISMATCH_METRIC = 'debt_card_cycle_mismatch_total';
+
 export interface CardDeps {
   readonly uow: UnitOfWork;
   readonly cards: CardRepository;
@@ -164,6 +211,10 @@ export interface CardDeps {
   readonly plans: InstallmentPlanRepository;
   readonly utilization: UtilizationRepository;
   readonly reminders: ReminderRepository;
+  /** Cargos de tarjeta (add-card-interest-ledger-portions). */
+  readonly charges: CardChargeRepository;
+  /** Escritura de los cargos en TRANSACTIONS, en la unidad de trabajo del llamador. */
+  readonly chargeTransactions: CardChargeTransactionsPort;
   readonly accounts: AccountsPort;
   readonly balances: CardBalancePort;
   readonly movements: AccountMovementsQuery;
@@ -181,6 +232,8 @@ export interface CardDeps {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly settings: CardSettings;
+  /** Opcional: sin él (pruebas, CLI) los descuadres solo se marcan en la vista. */
+  readonly metrics?: CardMetricsPort;
 }
 
 export type { AccountBalanceHistoryQuery };

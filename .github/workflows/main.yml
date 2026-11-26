@@ -1,5 +1,6 @@
-# Build once (platform/delivery-pipeline, NFR-PORT-006, docs/23 §5.2): cada push a main construye UNA vez
-# finance-api y finance-web, las publica en GHCR con tag `sha-<commit>` y registra sus digests. Un segundo job
+# Build once (platform/delivery-pipeline, NFR-PORT-006, docs/23 §5.2): cada push a main construye UNA vez cada imagen propia
+# (api, web, postgres, ml, keycloak) para linux/amd64 y linux/arm64 con runners nativos, las une en un índice multi-arch en
+# GHCR con tag `sha-<commit>` y registra el digest del ÍNDICE (C12a, plan B Oracle A1). Un segundo job
 # descarga las imágenes POR DIGEST y verifica que corren sin reconstruir. El deploy a producción es aparte y manual
 # (deploy.yml, workflow_dispatch con aprobación) y reutiliza los digests registrados aquí (incluido pfos-postgres).
 # Acciones de terceros fijadas por SHA de commit completo (comentario = tag verificado).
@@ -23,17 +24,28 @@ env:
   DO_NOT_TRACK: '1'
 
 jobs:
+  # Una construcción por imagen Y plataforma en runners nativos (sin QEMU): linux/amd64 en ubuntu-24.04 y linux/arm64 en
+  # ubuntu-24.04-arm (C12a, plan B Oracle A1). Cada una sube su resultado SOLO por digest (sin tag); el job `merge` arma el
+  # índice multi-arch con el tag `sha-<commit>`.
   build-push:
-    name: build-push (${{ matrix.image }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    name: build-push (${{ matrix.image }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64]
+        image: [finance-api, finance-web, pfos-postgres, finance-ml, pfos-keycloak]
         include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
           - image: finance-api
             dockerfile: docker/api.Dockerfile
           - image: finance-web
@@ -45,6 +57,10 @@ jobs:
           # promueve por digest como las demás (FINANCE_ML_IMAGE, opcional en el host).
           - image: finance-ml
             dockerfile: docker/finance-ml.Dockerfile
+          # Keycloak con build optimizado (C7): evita rehacer el build de Quarkus en cada arranque del host de 2 GB;
+          # viaja por digest como las demás (PFOS_KEYCLOAK_IMAGE en release.env, extra del comando de deploy).
+          - image: pfos-keycloak
+            dockerfile: docker/keycloak.Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -54,36 +70,93 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build y push (sha-<commit>)
+      - name: Build y push por digest (${{ matrix.platform }})
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
           target: runtime
-          platforms: linux/amd64
-          push: true
-          tags: ${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}:sha-${{ github.sha }}
+          platforms: ${{ matrix.platform }}
+          # Sin tag: el tag `sha-<commit>` lo pone el índice en `merge`. provenance y sbom se generan por plataforma y
+          # `imagetools create` conserva esos manifiestos de attestation al unir los índices de origen (lo comprueba `merge`).
+          outputs: type=image,name=${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             GIT_SHA=${{ github.sha }}
             VERSION=0.0.0-sha.${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,scope=${{ matrix.image }},mode=max
-      - name: Registrar digest
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }},mode=max
+      - name: Exportar el digest de la plataforma
         env:
-          IMAGE: ${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
+          mkdir -p "$RUNNER_TEMP/parts"
+          touch "$RUNNER_TEMP/parts/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: part-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/parts/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Une los digests por plataforma en un índice OCI con el tag `sha-<commit>`, comprueba que trae las dos plataformas y
+  # sus attestations, y registra el digest del ÍNDICE (el que consumen verify-by-digest, deploy.yml y pfos-deploy.sh).
+  merge:
+    name: merge (${{ matrix.image }})
+    needs: [build-push]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [finance-api, finance-web, pfos-postgres, finance-ml, pfos-keycloak]
+    env:
+      IMAGE: ghcr.io/manuxd270516/${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: part-${{ matrix.image }}-*
+          path: ${{ runner.temp }}/parts
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Crear el índice multi-arch
+        working-directory: ${{ runner.temp }}/parts
+        run: |
+          [ "$(ls | wc -l)" = "2" ] || { echo "::error::se esperaban 2 digests (amd64 y arm64), hay $(ls | wc -l)"; exit 1; }
+          # shellcheck disable=SC2046
+          docker buildx imagetools create -t "${IMAGE}:sha-${GITHUB_SHA}" $(printf "${IMAGE}@sha256:%s " *)
+      - name: Verificar plataformas y attestations del índice
+        run: |
+          raw="$(docker buildx imagetools inspect "${IMAGE}:sha-${GITHUB_SHA}" --raw)"
+          echo "$raw" | jq -c '.manifests[] | {platform, annotations}'
+          for arch in amd64 arm64; do
+            echo "$raw" | jq -e --arg a "$arch" '[.manifests[] | select(.platform.os=="linux" and .platform.architecture==$a)] | length == 1' >/dev/null \
+              || { echo "::error::falta linux/${arch} en el índice de ${IMAGE}"; exit 1; }
+          done
+          n="$(echo "$raw" | jq '[.manifests[] | select(.annotations["vnd.docker.reference.type"]=="attestation-manifest")] | length')"
+          [ "$n" -ge 2 ] || { echo "::error::attestations (provenance/sbom) perdidas en el índice: ${n} manifiestos, se esperaban al menos 2"; exit 1; }
+      - name: Registrar digest del índice
+        run: |
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE}:sha-${GITHUB_SHA}" --format '{{json .Manifest}}' | jq -r .digest)"
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest de índice inválido: ${DIGEST}"; exit 1; }
           mkdir -p "$RUNNER_TEMP/digests"
-          printf '{"image":"%s","tag":"sha-%s","digest":"%s","ref":"%s@%s"}\n' \
+          printf '{"image":"%s","tag":"sha-%s","digest":"%s","ref":"%s@%s","platforms":["linux/amd64","linux/arm64"]}\n' \
             "$IMAGE" "$GITHUB_SHA" "$DIGEST" "$IMAGE" "$DIGEST" > "$RUNNER_TEMP/digests/${{ matrix.image }}.json"
           {
-            echo "### ${{ matrix.image }}"
+            echo "### ${{ matrix.image }} (índice multi-arch)"
             echo ""
-            echo "| tag | digest |"
+            echo "| tag | digest del índice |"
             echo "|---|---|"
             echo "| \`sha-${GITHUB_SHA}\` | \`${DIGEST}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -96,7 +169,7 @@ jobs:
 
   verify-by-digest:
     name: verify-by-digest (pull sin rebuild + stack core)
-    needs: [build-push]
+    needs: [merge]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:

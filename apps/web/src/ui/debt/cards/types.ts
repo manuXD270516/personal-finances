@@ -88,6 +88,30 @@ export interface CardStatement {
   readonly remainingMinimum: Money;
   readonly consistent: boolean;
   readonly version: number | null;
+  /** Cargos vigentes del ciclo (add-card-interest-ledger-portions); solo en el detalle y la lista de estados. */
+  readonly charges?: readonly CardCharge[];
+  /** Diferencia con el banco como cargo propuesto (solo lectura); `null` si no corresponde. */
+  readonly chargeProposal?: { readonly businessDate: string; readonly total: Money } | null;
+}
+
+/** Intereses y cargos que cobra el banco a una cuenta de la tarjeta (un gasto con una porción por componente). */
+export interface CardCharge {
+  readonly id: string;
+  readonly cardId: string;
+  readonly accountId: string;
+  readonly currency: string;
+  readonly businessDate: string;
+  readonly interest: Money;
+  readonly fees: Money;
+  readonly insurance: Money;
+  readonly taxes: Money;
+  readonly total: Money;
+  readonly origin: 'RECORDED' | 'ADOPTED';
+  readonly status: 'ACTIVE' | 'VOIDED';
+  readonly transactionId: string;
+  readonly voidReason: string | null;
+  readonly createdAt: string;
+  readonly version: number;
 }
 
 export interface CardUtilization {

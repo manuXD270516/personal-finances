@@ -25,7 +25,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "imports:pdf:probe": "tsx --conditions=@pf/source scripts/pdf-probe.ts"
+    "imports:pdf:probe": "tsx --conditions=@pf/source scripts/pdf-probe.ts",
+    "imports:pdf:sample": "tsx --conditions=@pf/source scripts/pdf-sample.ts"
   },
   "dependencies": {
     "@nestjs/common": "catalog:",

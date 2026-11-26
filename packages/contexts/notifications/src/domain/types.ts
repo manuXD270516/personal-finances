@@ -27,6 +27,12 @@ export const NOTIFICATION_TYPES = [
   // de REPORTING, D381) y digest periódico del Home por email (fila archivada desde su creación, no aparece en el centro).
   'CASH_FLOW_SHORTFALL_RISK',
   'HOME_DIGEST',
+  // Phase 9 (add-spending-anomaly-detection, FR-NOTIFY-004, D474): gastos atípicos detectados por la pasada diaria de FORECAST
+  // (entrega directa). Es el primer tipo desactivado por omisión en los dos canales (`defaultTypePreference`).
+  'SPENDING_ANOMALY',
+  // Phase 9 (add-budget-overrun-risk, FR-NOTIFY-004, D478): riesgo de exceder un presupuesto (entrega directa desde
+  // `reporting.cash-flow-watch`); desactivado por omisión en los dos canales (`defaultTypePreference`).
+  'BUDGET_OVERRUN_RISK',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -136,7 +142,18 @@ export type NotificationLink =
       readonly periodLabel: string;
     }
   | FxNotificationLink
-  | CashFlowNotificationLink;
+  | CashFlowNotificationLink
+  | SpendingAnomalyNotificationLink;
+
+/**
+ * Gastos atípicos (add-spending-anomaly-detection): la web abre `/gastos-atipicos`. `periodId` es el id del workspace y
+ * `periodLabel` el mes de la pasada (`YYYY-MM`): el contrato HTTP del enlace los exige en todos sus tipos.
+ */
+export type SpendingAnomalyNotificationLink = {
+  readonly kind: 'SPENDING_ANOMALIES';
+  readonly periodId: string;
+  readonly periodLabel: string;
+};
 
 /**
  * Riesgo de déficit (add-cash-flow-forecast): `CASH_FLOW_CALENDAR` abre el calendario de flujo de caja en la moneda y el

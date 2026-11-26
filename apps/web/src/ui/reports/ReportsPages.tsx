@@ -8,7 +8,8 @@ import { mutedStyle, pageStyle } from '../common/ui';
 import { problemOf, listAll, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { todayIn } from '../common/dates';
 import { BFF_API } from '../session-context';
-import { REPORT_CHART_CSS } from './ReportChart';
+import './report-chart.css';
+import './reports.css';
 import {
   AccountsView,
   ConversionsView,
@@ -20,7 +21,7 @@ import {
   TagsView,
   TrendsView,
 } from './ExtendedViews';
-import { ConversionBlock, DrillDownPanel, FiltersBar, REPORTS_CSS } from './ReportParts';
+import { ConversionBlock, DrillDownPanel, FiltersBar } from './ReportParts';
 import { SavedViewsPanel } from './SavedViewsPanel';
 import {
   AccountHistoryView,
@@ -72,7 +73,6 @@ function Catalog({ ctx }: { ctx: WorkspaceContext }) {
   }, [ctx.api, ctx.base]);
   return (
     <section style={pageStyle} aria-labelledby="reports-title" data-testid="reports-catalog">
-      <style>{REPORTS_CSS}</style>
       <header>
         <h1 id="reports-title">{f.t('title')}</h1>
         <p style={mutedStyle}>{f.t('subtitle')}</p>
@@ -268,7 +268,6 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
   const id = REPORT_SLUGS[slug].id;
   return (
     <section style={pageStyle} aria-labelledby="report-title" data-testid={`report-${slug}`}>
-      <style>{REPORTS_CSS + REPORT_CHART_CSS}</style>
       <header>
         <h1 id="report-title">{f.t(`names.${id}`)}</h1>
         <p style={mutedStyle}>{f.t(`purposes.${id}`)}</p>

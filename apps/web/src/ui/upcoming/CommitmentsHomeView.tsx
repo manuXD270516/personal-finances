@@ -3,7 +3,7 @@ import type { CashFlowHomeBlock } from '../cash-flow/types';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext, HomeQuestionStatus } from '../dashboard/types';
 import { homeSlice, amountText } from './logic';
-import { UPCOMING_CSS } from './styles';
+import './upcoming.css';
 import type { UpcomingPayments } from './types';
 import {
   CommittedSummary,
@@ -324,7 +324,6 @@ export function CommitmentsHomeView(props: CommitmentsHomeViewProps) {
   const { f } = props;
   return (
     <section data-testid="commitments" aria-labelledby="commitments-title" className="pf-home-group">
-      <style>{UPCOMING_CSS}</style>
       <div className="pf-home-group-head">
         <h2 id="commitments-title">{f.t('home.title')}</h2>
         <p className="pf-home-muted" style={{ margin: 0 }}>

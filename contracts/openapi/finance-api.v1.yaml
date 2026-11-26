@@ -5626,10 +5626,12 @@ paths:
       operationId: getFeesReport
       summary: Fees by type and month
       description: |
-        Spending on fees per month and type: conversion fee, transfer fee, loan payments (interest, charges, insurance and taxes) and
-        spending in the system fee categories. Every portion counts in exactly one type, in that order. `last12Months` adds the 12
-        complete periods before the one containing today. Interest charged by credit cards is not a portion in the ledger and is
-        therefore not part of the report (the card outstanding balance is in the debts report). Comparisons are not supported.
+        Spending on fees per month and type: conversion fee, transfer fee, loan payments (interest, charges, insurance and taxes),
+        card charges (`CARD`: the portions of the interest and charges registered on, or adopted by, a credit card) and spending in
+        the system fee categories. Every portion counts in exactly one type, in that order (a card charge in a fee category counts
+        as `CARD`). An ordinary card expense in the interest category that was never adopted as a charge is not counted (never
+        inferred from the category). `last12Months` adds the 12 complete periods before the one containing today. Comparisons are
+        not supported.
       x-openspec-capability: [reporting/financial-reports]
       x-required-role: VIEWER
       parameters:
@@ -5842,9 +5844,10 @@ paths:
       summary: Debt evolution by month
       description: |
         Per debt (loan or credit card account) and calendar month: outstanding balance at the month end according to the ledger and,
-        for loans, principal, interest and charges paid in the month from the breakdown of each payment. Consolidated in the reporting
-        currency with the rate of each closing for balances and of each payment date for what was paid. Always groups by calendar
-        month.
+        for loans, principal, interest and charges paid in the month from the breakdown of each payment and, for cards, the interest
+        and the other charges (fees, insurance, taxes) charged in the month by its active charges. Consolidated in the reporting
+        currency with the rate of each closing for balances and of each payment or charge date for what was paid or charged. Always
+        groups by calendar month.
       x-openspec-capability: [reporting/financial-reports]
       x-required-role: VIEWER
       parameters:
@@ -6770,6 +6773,50 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CloseChecklist' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/budget-risk:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Reporting]
+      operationId: getBudgetRisk
+      summary: Risk of exceeding each expense line of the plan of the current period (no side effects)
+      description: |
+        For each expense line of the plan whose target is a category or a group (tag and income lines are not
+        evaluated) of the period that contains today (workspace time zone), projects the spending at the end of the
+        period as `actual + knownPending + remaining variable spending` and compares it with the `reference` of the line
+        (the effective planned amount, or the maximum of a range). The remaining variable spending is the pace of the
+        period (`variableActual / elapsedDays × remainingDays`, today included in the elapsed days) or, with the forecasts
+        enabled and a current forecast of the category for the period (also a stale one), the expected value minus the
+        variable spending already made. `variableActual` excludes what the commitment occurrences already paid in the
+        period (they are not extrapolated) and `knownPending` adds the pending occurrences of the line categories that
+        fall due up to the end of the period (those in another currency converted with the current rate; without a rate
+        they are left out and `projectionComplete` is `false`). `level`: `EXCEEDED` when `actual` is over the reference,
+        `LIKELY` when `projected` is over it, `POSSIBLE` when only `projectedHigh` (with the upper limit of the 80 %
+        interval; only for a category line with a forecast) is over it, `UNLIKELY` otherwise, and `NOT_AVAILABLE` with a
+        `reason` for fixed and minimum lines (`LINE_TYPE`), a zero reference (`NO_REFERENCE`) and, without a forecast,
+        while fewer days than `REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS` (7) have elapsed (`TOO_EARLY`) unless the actual
+        plus the known payments already exceed the reference. `estimatedDate` is the first day on which the actual plus
+        the known payments due up to that day plus the remaining spending split in equal exact parts exceeds the
+        reference. A projection, never a certainty: it does not change any figure of the plan (planned, actual,
+        thresholds or the spendable amount). Any member can read it. Period of another workspace is `404`. HALF_EVEN only
+        when presenting. Response `status`: `NO_PLAN`, `NOT_CURRENT_PERIOD` and `DISABLED`
+        (`REPORTING_BUDGET_RISK_ENABLED=false`) come without lines.
+      x-openspec-capability: [reporting/predictive-insights]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Budget risk
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetRisk' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -10313,6 +10360,10 @@ paths:
           in: query
           description: Only the rows without a proposed or edited category (`true`) or only those with one (`false`).
           schema: { type: boolean }
+        - name: hasSuggestion
+          in: query
+          description: Only the rows that show a category suggestion from the history (`true`; add-category-suggestions).
+          schema: { type: boolean }
         - name: ruleId
           in: query
           description: Only the rows whose classification came from this rule.
@@ -10595,6 +10646,52 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'VALIDATION_FAILED, CATEGORY_KIND_MISMATCH or REFERENCE_NOT_FOUND.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/rows/accept-suggestions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: acceptImportCategorySuggestions
+      summary: Accept the category suggestions of the rows of an import in review
+      description: |
+        An explicit user action (a suggestion is never applied on its own): sets, for every row of the import that shows a category suggestion of level `minLevel` (`HIGH`, or `MEDIUM` for the `HIGH` and `MEDIUM` ones), the suggested category as a manual edit, in ONE new version of the import. `rowIds` limits it to those rows. A row without a suggestion, already edited (or classified by a rule) or whose suggested category was archived since does not change. The rows that are not accepted are created without a category on approval. Only an import in `AWAITING_REVIEW`. `If-Match` is the version of the import; the response ETag carries the new one. Audited on the import.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportSuggestionAcceptInput' }
+            examples:
+              high:
+                summary: Accept the high confidence suggestions
+                value: { minLevel: HIGH }
+      responses:
+        '200':
+          description: Suggestions accepted
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportSuggestionAcceptResult' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (unknown `minLevel` or more than 5 000 `rowIds`).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is not in review).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -12867,6 +12964,126 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/credit-cards/{cardId}/charges:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+    get:
+      tags: [Debt]
+      operationId: listCardCharges
+      summary: List the interest and charges of a card
+      description: Newest first (date, id), paginated by an opaque cursor (`nextCursor`, `after`).
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: VIEWER
+      parameters:
+        - name: accountId
+          in: query
+          description: Only the charges of this account of the card.
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: from
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ACTIVE, VOIDED] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: after
+          in: query
+          description: Opaque cursor from `nextCursor`. Valid only for the same filters.
+          schema: { type: string }
+      responses:
+        '200':
+          description: List the interest and charges of a card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardChargeList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Debt]
+      operationId: createCardCharge
+      summary: Register the interest and charges the bank billed to an account of the card
+      description: |
+        Creates a posted expense in the card account for the sum of the components, with one portion per positive component in its system category (interest, fees, insurance, taxes) marked as a card charge; the debt of the account grows by that sum and the charge counts in the purchases of the cycle of its date. With `adoptTransactionId` it declares an existing posted expense of the card a charge instead (a transaction revision; no new transaction and no balance change). A date in a closed period is rejected with `PERIOD_CLOSED`.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardChargeInput' }
+      responses:
+        '201':
+          description: Register the interest and charges the bank billed to an account of the card
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardCharge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CARD_CHARGE_INVALID, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/charges/{chargeId}/void:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+      - $ref: '#/components/parameters/CardChargeId'
+    post:
+      tags: [Debt]
+      operationId: voidCardCharge
+      summary: Void a card charge
+      description: Voids the transaction of the charge with the reversal of its entry (append-only ledger); the debt of the account returns to its previous value. Voiding a voided charge is idempotent; a charge dated in a closed period is rejected with `PERIOD_CLOSED`.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardChargeVoidInput' }
+      responses:
+        '200':
+          description: Void a card charge
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardCharge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/credit-cards/{cardId}/future-charges:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -13467,6 +13684,132 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/category-suggestions/query:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: queryCategorySuggestion
+      summary: Suggest a category for a transaction from the user's own history
+      description: |
+        Suggests the category the user chose most often for the same pattern, with its confidence and level. Two patterns are looked at: the counterparty and the normalized description key (the same key as the rule suggestions: no accents, lowercase, without words with digits or asterisks or of one character, up to 5 words, at least 3 letters). `confidence` is the transactions of the pattern in the winning category divided by all the transactions of the pattern of the same kind (4 decimals HALF_EVEN); a suggestion needs at least 2 transactions, a confidence of at least 0.7000 and a category that wins strictly (`HIGH` from 0.9000 with 5 or more transactions, `MEDIUM` otherwise). If both patterns agree the answer is one suggestion with `basis = BOTH` and the greater confidence; if they differ the one with the greater confidence wins and, on a tie, the counterparty.
+        Only what the user chose counts (manual origin, or unknown origin before the rule engine on transactions entered by hand or imported), in the last 365 days and up to the 5 000 most recent, with an active category of the right kind; what a rule set never counts. Before looking at the history the active rules with the manual-creation trigger are evaluated over the draft: if one would set the category the answer is `RULE_APPLIES` with the rule and no suggestion. Nothing is applied: the suggestion is shown and the user accepts it or picks another category.
+        `POST` and not `GET` because the description is personal data and must not travel in a URL or an access log. The index of the history is cached in the process per workspace (300 s by default), so an accepted suggestion can take up to that long to count. With the function disabled (`RULES_CATEGORY_SUGGEST_ENABLED=false`) the answer is `DISABLED`. A read: no side effects, no audit, no `Idempotency-Key`.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: VIEWER
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategorySuggestionQueryInput' }
+            examples:
+              description:
+                summary: A new expense typed in the manual form
+                value: { kind: EXPENSE, description: 'PEDIDOSYA *8812' }
+      responses:
+        '200':
+          description: The suggestion, or why there is none
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategorySuggestionResult' }
+              examples:
+                suggested:
+                  summary: 9 of 10 similar expenses are in Restaurants
+                  value:
+                    status: SUGGESTED
+                    suggestion:
+                      categoryId: '01928c4e-0000-7000-8000-0000000ca001'
+                      confidence: '0.9000'
+                      level: HIGH
+                      support: 10
+                      matches: 9
+                      basis: DESCRIPTION
+                      descriptionKey: pedidosya
+                      counterpartyId: null
+                    ruleId: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (neither `description` nor `counterpartyId`, an unknown `kind` or a description over 500 characters).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/category-suggestions/feedback:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Rules]
+      operationId: recordCategorySuggestionOutcome
+      summary: Record what the user did with a suggestion shown in the manual form
+      description: |
+        After saving a transaction for which a suggestion was shown, the form reports whether the user accepted it (`chosenCategoryId` equals `suggestedCategoryId`), chose another category (`CORRECTED`) or left the transaction without a category (`IGNORED`). It stores only the channel, the level, the outcome and the business date: never descriptions, amounts or categories. Product telemetry: not audited and not part of the workspace export. If the call is lost, only a metric is lost.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategorySuggestionFeedbackInput' }
+      responses:
+        '204':
+          description: Outcome recorded
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED.'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/category-suggestions/stats:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Rules]
+      operationId: getCategorySuggestionStats
+      summary: Acceptance rate of the category suggestions in a date range
+      description: |
+        Counts the suggestions shown and resolved between `from` and `to` (business dates in the workspace time zone): accepted, corrected and ignored, in total, by channel (manual form or import) and by level, and the acceptance rate (accepted divided by shown, 4 decimals HALF_EVEN; `null` without suggestions). A range that goes backwards or spans more than 366 days is `INVALID_FILTER`.
+      x-openspec-capability: [classification/auto-classification]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/LocalDate' }
+      responses:
+        '200':
+          description: Acceptance rate of the range
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategorySuggestionStats' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'INVALID_FILTER (a range that goes backwards or spans more than 366 days) or an invalid query.'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -15090,6 +15433,133 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Forecasts: gastos atípicos (openspec add-spending-anomaly-detection) ──
+  /workspaces/{workspaceId}/spending-anomalies:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Forecasts]
+      operationId: listSpendingAnomalies
+      summary: List the unusual expenses of the workspace
+      description: |
+        Unusual expenses (median and MAD, computed by the daily job without the forecast service), most recent transaction date first.
+        `status` is `OPEN` (default), `DISMISSED` or `ALL` (never the ones superseded by a newer version of the transaction). With
+        `transactionId` (up to 100 ids; used by the transaction list and detail to show the mark) the other filters are ignored and every
+        non-superseded state is returned. Anomalies of voided transactions are never returned; `transactionChanged` is true when the
+        transaction was edited after the detection. `featureStatus` is `DISABLED` when the detection is off in the installation
+        (what was already detected is still listed). The mark is not an error or a confirmed fraud: it only says the amount is unusual.
+      x-openspec-capability: [forecast/anomaly-detection]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, DISMISSED, ALL], default: OPEN }
+        - name: from
+          in: query
+          description: First transaction date (inclusive).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          description: Last transaction date (inclusive).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: transactionId
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 100
+            items: { $ref: '#/components/schemas/Uuid' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Page of unusual expenses
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpendingAnomalyPage' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'INVALID_FILTER or INVALID_CURSOR.'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/spending-anomalies/{anomalyId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SpendingAnomalyId'
+    post:
+      tags: [Forecasts]
+      operationId: dismissSpendingAnomaly
+      summary: Mark an unusual expense as not unusual
+      description: |
+        "It is not unusual": the expense leaves the open list and is not marked again for the same version of the transaction. Repeating the
+        dismissal is harmless (204, no new audit entry). An anomaly of another workspace, unknown or superseded answers 404. Audited
+        (entity `SpendingAnomaly`, previous and new value). It never changes the transaction.
+      x-openspec-capability: [forecast/anomaly-detection]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SpendingAnomalyDismissInput' }
+      responses:
+        '204':
+          description: Unusual expense dismissed
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/spending-anomalies/{anomalyId}/restore:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SpendingAnomalyId'
+    post:
+      tags: [Forecasts]
+      operationId: restoreSpendingAnomaly
+      summary: Restore a dismissed unusual expense
+      description: |
+        The expense is listed again among the open ones with its mark. Repeating the restoration is harmless (204, no new audit entry).
+        Audited (entity `SpendingAnomaly`).
+      x-openspec-capability: [forecast/anomaly-detection]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Unusual expense restored
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -15520,6 +15990,12 @@ components:
       required: true
       description: Forecast run UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
+    SpendingAnomalyId:
+      name: anomalyId
+      in: path
+      required: true
+      description: Unusual expense UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     DocumentId:
       name: documentId
       in: path
@@ -15567,6 +16043,12 @@ components:
       in: path
       required: true
       description: Card installment plan UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    CardChargeId:
+      name: chargeId
+      in: path
+      required: true
+      description: Card charge UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
   headers:
     ETag:
@@ -16008,11 +16490,12 @@ components:
         - DOCUMENT_CONTENT_CORRUPTED               # 422 (add-document-attachments: integrity check of the encrypted object failed; no unverified bytes were delivered)
         - ATTACHMENT_LIMIT_EXCEEDED                # 409 (add-document-attachments: DOCUMENT_MAX_LINKS_PER_TARGET reached)
         - PAYMENT_BREAKDOWN_MISMATCH             # 422 (add-loans: the breakdown does not add up to the amount; details.sum, details.amount)
-        - TRANSACTION_MANAGED_EXTERNALLY         # 409 (add-loans: the transaction is managed by a loan; details.managedBy, details.loanId)
+        - TRANSACTION_MANAGED_EXTERNALLY         # 409 (add-loans: the transaction is managed by a loan; details.managedBy, details.loanId; add-card-interest-ledger-portions: managed by a credit card, details.managedBy = CREDIT_CARD, details.cardId)
         - CREDIT_CARD_ACCOUNT_INVALID            # 422 (add-credit-cards: the account is not an active credit_card account, or two accounts share a currency)
         - CREDIT_CARD_ACCOUNT_IN_USE             # 409 (add-credit-cards: the account already belongs to another active card)
         - CARD_PAYMENT_PLAN_CONFLICT             # 409 (add-credit-cards: an active recurring transfer to the card exists; details.conflictingDefinitions)
         - INSTALLMENT_PLAN_INVALID               # 422 (add-credit-cards: the purchase cannot be paid in installments)
+        - CARD_CHARGE_INVALID                    # 422 (add-card-interest-ledger-portions: the charge has no positive component, a future date, a date before the account opening, an account that is not of the card, an archived card or an expense that cannot be adopted)
         - EARMARK_EXCEEDS_BALANCE                # 422 (add-savings-goals: the reservation exceeds the available balance of the account; details.balance, details.reserved, details.available)
         - GOAL_CLOSED                            # 409 (add-savings-goals: the goal is closed or cancelled and admits no new movements)
         - GOAL_ACCOUNT_NOT_ELIGIBLE              # 422 (add-savings-goals: the account is a liability account (only asset accounts can back a goal))
@@ -17628,6 +18111,18 @@ components:
           description: Breakdown of a LOAN_PAYMENT (principal reduces the debt; the rest is expense); null otherwise.
           oneOf:
             - $ref: '#/components/schemas/LoanPaymentBreakdown'
+            - type: 'null'
+        debtRole:
+          description: |
+            Role DEBT gives to an expense. `CARD_CHARGE` marks the interest and charges a bank bills to a credit card (one portion per component in its system category); the expense is managed by the card (only descriptive edits). Null otherwise.
+          oneOf:
+            - type: string
+              x-extensible-enum: [CARD_CHARGE]
+            - type: 'null'
+        debtCardId:
+          description: Credit card that manages the expense when `debtRole` is set; null otherwise.
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
             - type: 'null'
         revision:
           type: integer
@@ -22008,6 +22503,14 @@ components:
           oneOf:
             - $ref: '#/components/schemas/CashFlowHomeBlock'
             - type: 'null'
+        budgetRisk:
+          description: |
+            Lines of the plan of the current period at `LIKELY` risk of exceeding their limit (Home Q5,
+            add-budget-overrun-risk), from the same calculation as `getBudgetRisk`; it does not change the spendable amount.
+            Null without a plan, without lines at risk, with the feature disabled or when the summary is historical (`asOf`).
+          oneOf:
+            - $ref: '#/components/schemas/BudgetRiskHomeBlock'
+            - type: 'null'
         forecast:
           description: |
             Expected spending of the period (Home Q3, add-predicted-cash-flow-band): the forecast of the total expense for
@@ -22114,6 +22617,107 @@ components:
           uniqueItems: true
           description: Active expense categories (an income one is `CATEGORY_KIND_MISMATCH`, an archived one `CATEGORY_ARCHIVED`)
           items: { $ref: '#/components/schemas/Uuid' }
+    BudgetLineRisk:
+      type: object
+      additionalProperties: false
+      required: [budgetLineId, target, targetName, reference, actual, variableActual, knownPending, projected, projectedHigh, projectionComplete, level, reason, estimatedDate, basis]
+      description: Risk of exceeding one expense line of the plan (a projection, never a certainty).
+      properties:
+        budgetLineId: { $ref: '#/components/schemas/Uuid' }
+        target:
+          type: object
+          additionalProperties: false
+          required: [kind, id]
+          properties:
+            kind: { type: string, enum: [CATEGORY, GROUP] }
+            id: { $ref: '#/components/schemas/Uuid' }
+        targetName: { type: string, description: Name of the category or group }
+        reference: { $ref: '#/components/schemas/Money' }
+        actual: { $ref: '#/components/schemas/Money' }
+        variableActual:
+          $ref: '#/components/schemas/Money'
+          description: Spent minus what the commitment occurrences already paid in the period (never negative)
+        knownPending:
+          $ref: '#/components/schemas/Money'
+          description: Pending occurrences of the line categories that fall due up to the end of the period
+        projected:
+          description: Expected spending at the end of the period; null when it is not available or the line is exceeded
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        projectedHigh:
+          description: Projection with the upper limit of the 80 % interval of the forecast; null without a forecast
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        projectionComplete:
+          type: boolean
+          description: False when a known payment in another currency was left out for lack of a rate
+        level:
+          type: string
+          x-extensible-enum: [EXCEEDED, LIKELY, POSSIBLE, UNLIKELY, NOT_AVAILABLE]
+        reason:
+          description: Why the risk is not available (`NOT_AVAILABLE` only)
+          oneOf:
+            - type: string
+              x-extensible-enum: [LINE_TYPE, NO_REFERENCE, TOO_EARLY]
+            - type: 'null'
+        estimatedDate:
+          description: Estimated date of the overrun for `LIKELY` and `POSSIBLE` (null when there are no days ahead)
+          oneOf:
+            - { $ref: '#/components/schemas/LocalDate' }
+            - type: 'null'
+        basis:
+          description: Pace of the period or forecast; null when the risk is not available or the line is exceeded
+          oneOf:
+            - type: string
+              enum: [RUN_RATE, FORECAST]
+            - type: 'null'
+
+    BudgetRisk:
+      type: object
+      additionalProperties: false
+      required: [status, periodId, budgetId, asOf, currency, elapsedDays, remainingDays, forecastRunId, lines]
+      properties:
+        status:
+          type: string
+          x-extensible-enum: [AVAILABLE, NO_PLAN, NOT_CURRENT_PERIOD, DISABLED]
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        budgetId:
+          description: Plan of the period (null without a plan)
+          oneOf:
+            - { $ref: '#/components/schemas/Uuid' }
+            - type: 'null'
+        asOf: { $ref: '#/components/schemas/LocalDate' }
+        currency:
+          type: string
+          description: Currency of the plan (empty when there is no plan)
+        elapsedDays: { type: integer, minimum: 0, description: 'Days elapsed in the period, today included' }
+        remainingDays: { type: integer, minimum: 0, description: 'Days left in the period, today not included' }
+        forecastRunId:
+          description: Forecast run used by at least one line (null when every line uses the pace of the period)
+          oneOf:
+            - { $ref: '#/components/schemas/Uuid' }
+            - type: 'null'
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetLineRisk' }
+
+    BudgetRiskHomeBlock:
+      type: object
+      additionalProperties: false
+      required: [periodId, periodLabel, lines, moreCount]
+      description: Lines of the plan at `LIKELY` risk of exceeding their limit (Home Q5, add-budget-overrun-risk).
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        lines:
+          type: array
+          maxItems: 3
+          description: Up to 3 `LIKELY` lines by estimated date and then by name
+          items: { $ref: '#/components/schemas/BudgetLineRisk' }
+        moreCount: { type: integer, minimum: 0, description: 'LIKELY lines not listed' }
+
     CashFlowHomeBlock:
       type: object
       description: Q8 card block of the Home (30 days).
@@ -23503,7 +24107,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED, CASH_FLOW_SHORTFALL_RISK, HOME_DIGEST]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED, CASH_FLOW_SHORTFALL_RISK, HOME_DIGEST, SPENDING_ANOMALY, BUDGET_OVERRUN_RISK]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -23528,7 +24132,7 @@ components:
       properties:
         kind:
           type: string
-          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS, FX_FEED_STATUS, FX_RATE, CASH_FLOW_CALENDAR, HOME_DIGEST]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS, FX_FEED_STATUS, FX_RATE, CASH_FLOW_CALENDAR, HOME_DIGEST, SPENDING_ANOMALIES]
         currency:
           description: >-
             Currency of the shortfall (only `CASH_FLOW_CALENDAR`, add-cash-flow-forecast): the app opens the cash flow
@@ -23538,7 +24142,10 @@ components:
           type: string
           pattern: '^[A-Z0-9]{2,16}$'
         horizonDays:
-          description: Horizon of the cash flow calendar that raised the notice (only `CASH_FLOW_CALENDAR`).
+          description: >-
+            Horizon of the cash flow calendar that raised the notice (only `CASH_FLOW_CALENDAR`). `SPENDING_ANOMALIES`
+            (add-spending-anomaly-detection) opens the list of unusual expenses (`/gastos-atipicos`); there `periodId` is the
+            workspace id and `periodLabel` the month of the daily check.
           type: integer
           enum: [7, 30, 60, 90]
         fxRateId:
@@ -24750,6 +25357,12 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ImportRowConversion'
             - type: 'null'
+        suggestedCategory:
+          oneOf:
+            - $ref: '#/components/schemas/HistoryCategorySuggestion'
+            - type: 'null'
+          description: >-
+            Category suggested from the user's history for a row that has no category after the rules and the default category of the counterparty (add-category-suggestions). Never applied without an explicit action: accept it with `decideImportRow` (`acceptedSuggestion`) or in bulk with `acceptImportCategorySuggestions`.
     ImportPreview:
       type: object
       additionalProperties: false
@@ -24804,6 +25417,10 @@ components:
               properties:
                 occurrenceId: { $ref: '#/components/schemas/Uuid' }
             - type: 'null'
+        acceptedSuggestion:
+          type: boolean
+          description: >-
+            With `categoryId` equal to the `suggestedCategory` of the row, marks the category as an accepted suggestion (for the acceptance rate); any other `categoryId` with this flag is `VALIDATION_FAILED`.
     ImportRowDecisionResult:
       allOf:
         - $ref: '#/components/schemas/ImportPreviewRow'
@@ -25203,17 +25820,55 @@ components:
     ImportRowFieldOrigin:
       type: string
       x-extensible-enum: [ALIAS, RULE, DEFAULT, MANUAL]
-    ImportProposedField:
+    ImportProposedIdField:
       type: object
       additionalProperties: false
       required: [value, origin]
       properties:
         value:
-          description: The proposed value (an id, a list of ids or a text).
+          description: The proposed id.
           oneOf:
             - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        origin: { $ref: '#/components/schemas/ImportRowFieldOrigin' }
+        ruleId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        ruleVersion:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+    ImportProposedIdListField:
+      type: object
+      additionalProperties: false
+      required: [value, origin]
+      properties:
+        value:
+          description: The proposed list of ids.
+          oneOf:
             - type: array
               items: { $ref: '#/components/schemas/Uuid' }
+            - type: 'null'
+        origin: { $ref: '#/components/schemas/ImportRowFieldOrigin' }
+        ruleId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        ruleVersion:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+    ImportProposedTextField:
+      type: object
+      additionalProperties: false
+      required: [value, origin]
+      properties:
+        value:
+          description: The proposed text.
+          oneOf:
             - type: string
             - type: 'null'
         origin: { $ref: '#/components/schemas/ImportRowFieldOrigin' }
@@ -25234,10 +25889,10 @@ components:
         The classification proposed by the pipeline (alias, rules, default category) with the origin of each field. What
         applies is `edits` over `proposal`.
       properties:
-        categoryId: { $ref: '#/components/schemas/ImportProposedField' }
-        counterpartyId: { $ref: '#/components/schemas/ImportProposedField' }
-        tagIds: { $ref: '#/components/schemas/ImportProposedField' }
-        description: { $ref: '#/components/schemas/ImportProposedField' }
+        categoryId: { $ref: '#/components/schemas/ImportProposedIdField' }
+        counterpartyId: { $ref: '#/components/schemas/ImportProposedIdField' }
+        tagIds: { $ref: '#/components/schemas/ImportProposedIdListField' }
+        description: { $ref: '#/components/schemas/ImportProposedTextField' }
         excluded:
           type: boolean
           description: A rule proposed to exclude the row from the import (the user can revert it).
@@ -25360,6 +26015,153 @@ components:
               items: { $ref: '#/components/schemas/Uuid' }
             counterpartyId: { $ref: '#/components/schemas/Uuid' }
             decision: { $ref: '#/components/schemas/ImportRowDecision' }
+    HistoryCategorySuggestion:
+      type: object
+      additionalProperties: false
+      required: [categoryId, confidence, level, support, matches, basis, descriptionKey, counterpartyId]
+      description: >-
+        A category suggested from the user's own history. It is never applied without an explicit user action.
+      properties:
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        confidence:
+          type: string
+          pattern: '^\d\.\d{4}$'
+          description: '`matches` divided by `support`, 4 decimals HALF_EVEN (at least `0.7000`).'
+        level:
+          type: string
+          x-extensible-enum: [HIGH, MEDIUM]
+          description: '`HIGH` from `0.9000` with 5 or more transactions; `MEDIUM` otherwise.'
+        support: { type: integer, minimum: 1, description: 'Transactions of the pattern of the same kind, in any category.' }
+        matches: { type: integer, minimum: 1, description: Transactions of the pattern in the suggested category. }
+        basis:
+          type: string
+          x-extensible-enum: [COUNTERPARTY, DESCRIPTION, BOTH]
+        descriptionKey:
+          type: [string, 'null']
+          description: Normalized description key of the pattern (lowercase, no accents); null when the basis is the counterparty.
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    CategorySuggestionQueryInput:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      description: The draft of the transaction. At least one of `description` or `counterpartyId`.
+      properties:
+        kind:
+          type: string
+          x-extensible-enum: [INCOME, EXPENSE, REFUND]
+        description: { type: string, maxLength: 500, description: 'Untrusted text; travels in the body, never in the URL.' }
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        accountId:
+          allOf:
+            - $ref: '#/components/schemas/Uuid'
+          description: Account of the draft, for the rules with the manual-creation trigger.
+        date:
+          allOf:
+            - $ref: '#/components/schemas/LocalDate'
+          description: Business date of the draft (today in the workspace time zone by default).
+    CategorySuggestionResult:
+      type: object
+      additionalProperties: false
+      required: [status, suggestion, ruleId]
+      properties:
+        status:
+          type: string
+          x-extensible-enum: [SUGGESTED, RULE_APPLIES, NONE, DISABLED]
+          description: '`RULE_APPLIES`: an active rule with the manual-creation trigger will set the category (`ruleId`), so there is no suggestion. `DISABLED`: the function is turned off in the installation.'
+        suggestion:
+          oneOf:
+            - $ref: '#/components/schemas/HistoryCategorySuggestion'
+            - type: 'null'
+        ruleId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    CategorySuggestionFeedbackInput:
+      type: object
+      additionalProperties: false
+      required: [surface, level, suggestedCategoryId, chosenCategoryId]
+      properties:
+        surface:
+          type: string
+          enum: [MANUAL_ENTRY]
+        level:
+          type: string
+          x-extensible-enum: [HIGH, MEDIUM]
+        suggestedCategoryId: { $ref: '#/components/schemas/Uuid' }
+        chosenCategoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+          description: The category the transaction was saved with; `null` if it was left without one.
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+    CategorySuggestionSurfaceCounts:
+      type: object
+      additionalProperties: false
+      required: [surface, shown, accepted, corrected, ignored]
+      properties:
+        surface: { type: string, x-extensible-enum: [MANUAL_ENTRY, IMPORT] }
+        shown: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        corrected: { type: integer, minimum: 0 }
+        ignored: { type: integer, minimum: 0 }
+    CategorySuggestionLevelCounts:
+      type: object
+      additionalProperties: false
+      required: [level, shown, accepted, corrected, ignored]
+      properties:
+        level: { type: string, x-extensible-enum: [HIGH, MEDIUM] }
+        shown: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        corrected: { type: integer, minimum: 0 }
+        ignored: { type: integer, minimum: 0 }
+    CategorySuggestionStats:
+      type: object
+      additionalProperties: false
+      required: [from, to, shown, accepted, corrected, ignored, acceptanceRate, bySurface, byLevel]
+      properties:
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        shown: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        corrected: { type: integer, minimum: 0 }
+        ignored: { type: integer, minimum: 0 }
+        acceptanceRate:
+          type: [string, 'null']
+          pattern: '^\d\.\d{4}$'
+          description: '`accepted` divided by `shown`, 4 decimals HALF_EVEN; null without suggestions.'
+        bySurface:
+          type: array
+          items: { $ref: '#/components/schemas/CategorySuggestionSurfaceCounts' }
+        byLevel:
+          type: array
+          items: { $ref: '#/components/schemas/CategorySuggestionLevelCounts' }
+    ImportSuggestionAcceptInput:
+      type: object
+      additionalProperties: false
+      required: [minLevel]
+      properties:
+        minLevel:
+          type: string
+          enum: [HIGH, MEDIUM]
+          description: '`HIGH` accepts the high confidence suggestions; `MEDIUM` accepts the high and the medium ones.'
+        rowIds:
+          type: array
+          maxItems: 5000
+          items: { $ref: '#/components/schemas/Uuid' }
+          description: Limit the acceptance to these rows (all the rows by default).
+    ImportSuggestionAcceptResult:
+      type: object
+      additionalProperties: false
+      required: [accepted, version]
+      properties:
+        accepted: { type: integer, minimum: 0, maximum: 5000 }
+        version:
+          allOf:
+            - $ref: '#/components/schemas/Version'
+          description: Version of the import (the ETag of the response).
     ImportBulkEditResult:
       type: object
       additionalProperties: false
@@ -27196,6 +27998,116 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        charges:
+          description: Active charges of the card dated inside the cycle (interest, fees, insurance and taxes); voided charges are not listed. Only in the statement detail and list.
+          type: array
+          items: { $ref: '#/components/schemas/CardCharge' }
+        chargeProposal:
+          description: When the bank reported a billed balance above the recalculated one, the date and total of the charge the user may register to close the difference; never registered automatically. Null otherwise.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [businessDate, total]
+              properties:
+                businessDate: { $ref: '#/components/schemas/LocalDate' }
+                total: { $ref: '#/components/schemas/Money' }
+            - type: 'null'
+    CardChargeInput:
+      type: object
+      additionalProperties: false
+      required: [accountId]
+      description: |
+        Interest and charges the bank bills to an account of the card. Components are decimals in the currency of the account with at least one positive. With `adoptTransactionId` an existing posted expense of the card is declared a charge (its components must add up to its amount; no new transaction); `businessDate` is then not accepted.
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        businessDate:
+          description: Defaults to the closing date of the last issued statement of the account.
+          $ref: '#/components/schemas/LocalDate'
+        interest: { $ref: '#/components/schemas/DecimalString' }
+        fees: { $ref: '#/components/schemas/DecimalString' }
+        insurance: { $ref: '#/components/schemas/DecimalString' }
+        taxes: { $ref: '#/components/schemas/DecimalString' }
+        adoptTransactionId: { $ref: '#/components/schemas/Uuid' }
+        description: { type: string, maxLength: 200 }
+      examples:
+        - accountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d8e
+          businessDate: '2026-10-25'
+          interest: '4.00'
+          insurance: '0.80'
+    CardChargeVoidInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    CardCharge:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - cardId
+        - accountId
+        - currency
+        - businessDate
+        - interest
+        - fees
+        - insurance
+        - taxes
+        - total
+        - origin
+        - status
+        - transactionId
+        - voidReason
+        - createdAt
+        - version
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        cardId: { $ref: '#/components/schemas/Uuid' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        interest: { $ref: '#/components/schemas/Money' }
+        fees: { $ref: '#/components/schemas/Money' }
+        insurance: { $ref: '#/components/schemas/Money' }
+        taxes: { $ref: '#/components/schemas/Money' }
+        total: { $ref: '#/components/schemas/Money' }
+        origin:
+          type: string
+          description: RECORDED when DEBT created the expense; ADOPTED when an existing expense was declared a charge.
+          x-extensible-enum: [RECORDED, ADOPTED]
+        status:
+          type: string
+          x-extensible-enum: [ACTIVE, VOIDED]
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        voidReason: { type: [string, 'null'] }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        version: { $ref: '#/components/schemas/Version' }
+      examples:
+        - id: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d8e
+          cardId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d8f
+          accountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d90
+          currency: BOB
+          businessDate: '2026-10-25'
+          interest: { amount: '4.00', currency: BOB }
+          fees: { amount: '0.00', currency: BOB }
+          insurance: { amount: '0.80', currency: BOB }
+          taxes: { amount: '0.00', currency: BOB }
+          total: { amount: '4.80', currency: BOB }
+          origin: RECORDED
+          status: ACTIVE
+          transactionId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d91
+          voidReason: null
+          createdAt: '2026-10-28T16:00:00Z'
+          version: 1
+    CardChargeList:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CardCharge' }
+        nextCursor: { type: [string, 'null'] }
     CardStatementList:
       type: object
       additionalProperties: false
@@ -27956,7 +28868,7 @@ components:
                   properties:
                     type:
                       type: string
-                      x-extensible-enum: [CONVERSION, TRANSFER, LOAN, FEE_CATEGORY]
+                      x-extensible-enum: [CONVERSION, TRANSFER, LOAN, CARD, FEE_CATEGORY]
                     amount: { $ref: '#/components/schemas/ReportAmount' }
               total: { $ref: '#/components/schemas/ReportAmount' }
         last12Months: { $ref: '#/components/schemas/ReportAmount' }
@@ -28036,6 +28948,12 @@ components:
                       oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
                     chargesPaid:
                       oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+                    interestCharged:
+                      description: Interest charged to a card in the month by its active charges; null in loans.
+                      oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+                    chargesCharged:
+                      description: Other charges (fees, insurance, taxes) charged to a card in the month; null in loans.
+                      oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
         consolidated:
           type: array
           items:
@@ -28047,6 +28965,9 @@ components:
               outstanding: { $ref: '#/components/schemas/ReportAmount' }
               principalPaid: { $ref: '#/components/schemas/ReportAmount' }
               interestPaid: { $ref: '#/components/schemas/ReportAmount' }
+              interestCharged:
+                description: Interest charged to the cards in the month, at the rate of the date of each charge.
+                $ref: '#/components/schemas/ReportAmount'
     RecurringCostsReport:
       type: object
       additionalProperties: false
@@ -28598,6 +29519,99 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/ForecastRunSummary' }
+        nextCursor: { type: [string, 'null'] }
+    SpendingAnomalyReason:
+      type: object
+      required: [kind, categoryId, counterpartyId, reference, ratio, robustScore, sampleSize]
+      properties:
+        kind:
+          type: string
+          description: 'Open set. CATEGORY_OUTLIER and COUNTERPARTY_OUTLIER: robust score of at least 3.5 and at least 3 times the median of the previous 365 days (with at least 8 expenses); NEW_COUNTERPARTY_HIGH_AMOUNT: a counterparty without expenses in the previous 365 days and an amount at or above the 95th percentile of the workspace.'
+          x-extensible-enum: [CATEGORY_OUTLIER, COUNTERPARTY_OUTLIER, NEW_COUNTERPARTY_HIGH_AMOUNT]
+        categoryId:
+          description: Category compared (only CATEGORY_OUTLIER).
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        counterpartyId:
+          description: Counterparty compared (COUNTERPARTY_OUTLIER and NEW_COUNTERPARTY_HIGH_AMOUNT).
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        reference:
+          description: Median (category and counterparty) or 95th percentile (new counterparty) in the reporting currency.
+          $ref: '#/components/schemas/Money'
+        ratio:
+          description: Amount divided by the median with 1 decimal (HALF_EVEN); null for a new counterparty.
+          type: [string, 'null']
+          pattern: '^[0-9]+\.[0-9]$'
+        robustScore:
+          description: Robust score with 2 decimals; null when the MAD is zero and for a new counterparty.
+          type: [string, 'null']
+          pattern: '^[0-9]+\.[0-9]{2}$'
+        sampleSize: { type: integer, minimum: 0 }
+    SpendingAnomaly:
+      type: object
+      required:
+        - id
+        - transactionId
+        - transactionVersion
+        - transactionDate
+        - transactionChanged
+        - amount
+        - reportingAmount
+        - categoryIds
+        - counterpartyId
+        - reasons
+        - status
+        - detectedAt
+        - decidedAt
+        - decidedBy
+        - dismissReason
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        transactionVersion: { type: integer, minimum: 1 }
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        transactionChanged:
+          type: boolean
+          description: True when the transaction was edited outside the evaluation window after the detection.
+        amount: { $ref: '#/components/schemas/Money' }
+        reportingAmount: { $ref: '#/components/schemas/Money' }
+        categoryIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        counterpartyId:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        reasons:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/SpendingAnomalyReason' }
+        status: { type: string, enum: [OPEN, DISMISSED] }
+        detectedAt: { $ref: '#/components/schemas/Instant' }
+        decidedAt:
+          oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }]
+        decidedBy:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        dismissReason:
+          oneOf: [{ $ref: '#/components/schemas/SpendingAnomalyDismissReason' }, { type: 'null' }]
+    SpendingAnomalyDismissReason:
+      type: string
+      description: Open set.
+      x-extensible-enum: [EXPECTED_ONE_OFF, NOT_UNUSUAL, OTHER]
+    SpendingAnomalyDismissInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { $ref: '#/components/schemas/SpendingAnomalyDismissReason' }
+        note: { type: string, maxLength: 200 }
+    SpendingAnomalyPage:
+      type: object
+      required: [featureStatus, items, nextCursor]
+      properties:
+        featureStatus:
+          type: string
+          description: DISABLED when the detection is off in the installation (the list keeps what was already detected).
+          enum: [ENABLED, DISABLED]
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SpendingAnomaly' }
         nextCursor: { type: [string, 'null'] }
     ForecastReadinessReason:
       type: object

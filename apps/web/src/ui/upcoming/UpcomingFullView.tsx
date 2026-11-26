@@ -2,7 +2,7 @@ import { formatDecimal } from '../AuditHistory';
 import { formatInstant, formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext, ResolvedRate } from '../dashboard/types';
 import { DAY_OPTIONS, RECURRING_PATH, amountText, joinMoney } from './logic';
-import { UPCOMING_CSS } from './styles';
+import './upcoming.css';
 import type { SurprisePayments, UpcomingPayments } from './types';
 import {
   CommittedSummary,
@@ -270,7 +270,6 @@ export function UpcomingFullView({
     : [...DAY_OPTIONS, days].sort((a, b) => a - b);
   return (
     <div className="pf-home" data-testid="upcoming-page">
-      <style>{UPCOMING_CSS}</style>
       <div className="pf-home-group-head">
         <h1 style={{ margin: 0 }}>{f.t('page.title')}</h1>
         <p className="pf-home-muted" style={{ margin: 0 }}>

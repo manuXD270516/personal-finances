@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../../bff/finance-api-client';
 import { ProblemMessage } from '../../../errors/ProblemMessage';
+import { ErrorSummary } from '../../common/ErrorSummary';
+import { useFocusFirstError } from '../../common/forms';
 import { Tabs } from '../../common/Tabs';
 import type { Account } from '../../common/types';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cardStyle,
   formStyle,
@@ -20,6 +23,7 @@ import { formatMoney } from '../../dashboard/format';
 import type { FormatContext } from '../../dashboard/types';
 import { formatBusinessDate } from '../../planning/logic';
 import { useCatalogs } from '../../transactions/catalogs';
+import { cardErrorItems } from './CardForm';
 import { FuturePanel, InstallmentsPanel, PlanPanel, StatementsPanel, FiguresTable } from './CardPanels';
 import {
   buildCardPatch,
@@ -217,12 +221,23 @@ export function TermsEditor({
   const setAcc = (id: string, patch: Partial<CardAccountTerms>) =>
     setForm((p) => ({ ...p, accounts: { ...p.accounts, [id]: { ...p.accounts[id]!, ...patch } } }));
   const err = (k: string) => errors[k];
+  const formRef = useRef<HTMLFormElement>(null);
+  const tForms = useTranslations('Forms');
+  const [attempt, setAttempt] = useState(0);
+  useFocusFirstError(formRef, attempt);
+  const errorItems = cardErrorItems(
+    f,
+    errors,
+    (id) => card.accounts.find((a) => a.accountId === id)?.currency ?? '',
+    (message) => message,
+  );
 
   async function save() {
     setProblem(undefined);
     const built = buildCardPatch(card, form, { locale: ctx.formatLocale, scales: ctx.scales });
     if (!built.ok) {
       setErrors(Object.fromEntries(Object.entries(built.errors).map(([k, v]) => [k, f.t(`errors.${v}`)])));
+      setAttempt((n) => n + 1);
       return;
     }
     setErrors({});
@@ -245,6 +260,7 @@ export function TermsEditor({
 
   return (
     <form
+      ref={formRef}
       style={formStyle}
       noValidate
       aria-labelledby="terms-title"
@@ -257,8 +273,13 @@ export function TermsEditor({
       <h2 id="terms-title" style={{ margin: 0 }}>
         {f.t('terms.title')}
       </h2>
+      <ErrorSummary
+        title={tForms('errorSummary.title', { count: errorItems.length })}
+        items={errorItems}
+        testId="terms-error-summary"
+      />
       <div style={rowStyle}>
-        <Field label={f.t('form.name')} error={err('name')}>
+        <Field anchor="name" label={f.t('form.name')} error={err('name')}>
           {(p) => (
             <input
               {...p}
@@ -270,7 +291,7 @@ export function TermsEditor({
             />
           )}
         </Field>
-        <Field label={f.t('form.statementDay')} error={err('statementDay')}>
+        <Field anchor="statementDay" label={f.t('form.statementDay')} error={err('statementDay')}>
           {(p) => (
             <input
               {...p}
@@ -282,7 +303,7 @@ export function TermsEditor({
             />
           )}
         </Field>
-        <Field label={f.t('form.dueDay')} error={err('dueDay')}>
+        <Field anchor="dueDay" label={f.t('form.dueDay')} error={err('dueDay')}>
           {(p) => (
             <input
               {...p}
@@ -313,7 +334,12 @@ export function TermsEditor({
       </div>
       <p style={{ ...mutedStyle, margin: 0 }}>{f.t('terms.calendarNote')}</p>
       <div style={rowStyle}>
-        <Field label={f.t('form.annualRate')} error={err('annualRate')} hint={f.t('form.annualRateHint')}>
+        <Field
+          anchor="annualRate"
+          label={f.t('form.annualRate')}
+          error={err('annualRate')}
+          hint={f.t('form.annualRateHint')}
+        >
           {(p) => (
             <input
               {...p}
@@ -324,7 +350,12 @@ export function TermsEditor({
             />
           )}
         </Field>
-        <Field label={f.t('form.thresholds')} error={err('thresholds')} hint={f.t('form.thresholdsHint')}>
+        <Field
+          anchor="thresholds"
+          label={f.t('form.thresholds')}
+          error={err('thresholds')}
+          hint={f.t('form.thresholdsHint')}
+        >
           {(p) => (
             <input
               {...p}
@@ -334,7 +365,7 @@ export function TermsEditor({
             />
           )}
         </Field>
-        <Field label={f.t('form.reminderDays')} error={err('reminderDays')}>
+        <Field anchor="reminderDays" label={f.t('form.reminderDays')} error={err('reminderDays')}>
           {(p) => (
             <input
               {...p}
@@ -348,6 +379,7 @@ export function TermsEditor({
       </div>
       {card.limitMode === 'SHARED' && card.sharedLimit ? (
         <Field
+          anchor="sharedLimit"
           label={f.t('terms.sharedLimit', { currency: card.sharedLimit.currency })}
           error={err('sharedLimit')}
           style={{ maxWidth: '16rem' }}
@@ -378,6 +410,7 @@ export function TermsEditor({
             <div style={rowStyle}>
               {card.limitMode === 'SEPARATE' ? (
                 <Field
+                  anchor={`${key2}.creditLimit`}
                   label={f.t('form.creditLimit', { currency: a.currency })}
                   error={err(`${key2}.creditLimit`)}
                 >
@@ -410,7 +443,11 @@ export function TermsEditor({
               </Field>
               {t.minimumType === 'PERCENT' ? (
                 <>
-                  <Field label={f.t('form.minPercent')} error={err(`${key2}.percent`)}>
+                  <Field
+                    anchor={`${key2}.percent`}
+                    label={f.t('form.minPercent')}
+                    error={err(`${key2}.percent`)}
+                  >
                     {(p) => (
                       <input
                         {...p}
@@ -421,7 +458,11 @@ export function TermsEditor({
                       />
                     )}
                   </Field>
-                  <Field label={f.t('form.minFloor', { currency: a.currency })} error={err(`${key2}.floor`)}>
+                  <Field
+                    anchor={`${key2}.floor`}
+                    label={f.t('form.minFloor', { currency: a.currency })}
+                    error={err(`${key2}.floor`)}
+                  >
                     {(p) => (
                       <input
                         {...p}
@@ -434,7 +475,11 @@ export function TermsEditor({
                   </Field>
                 </>
               ) : (
-                <Field label={f.t('form.minFixed', { currency: a.currency })} error={err(`${key2}.fixed`)}>
+                <Field
+                  anchor={`${key2}.fixed`}
+                  label={f.t('form.minFixed', { currency: a.currency })}
+                  error={err(`${key2}.fixed`)}
+                >
                   {(p) => (
                     <input
                       {...p}
@@ -590,7 +635,7 @@ function CardDetail({
         </div>
       ) : null}
       {archiving ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="archive-panel"
           title={f.t('archive.title', { name: card.name })}
           description={f.t('archive.description')}

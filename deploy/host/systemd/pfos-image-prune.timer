@@ -1,0 +1,12 @@
+# PFOS — limpieza semanal de imágenes de contenedor (sábado 11:00 UTC = 07:00 La Paz). Instalado y habilitado por deploy/host/pfos-deploy.sh.
+[Unit]
+Description=PFOS limpieza semanal de imágenes (conserva el release actual y el anterior)
+
+[Timer]
+OnCalendar=Sat *-*-* 11:00:00 UTC
+Unit=pfos-image-prune.service
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
