@@ -1027,26 +1027,26 @@ export const VARIABLES = {
   FORECASTING_ANOMALY_ROBUST_Z: variable(z.coerce.number().gt(0), {
     group: 'Forecasting',
     description:
-      'Puntaje robusto mínimo (0.6745 × (monto − mediana) / MAD) para marcar un gasto atípico por categoría o contraparte; se exige además `FORECASTING_ANOMALY_MIN_RATIO`. Con MAD igual a cero alcanza la razón.',
-    default: '3.5',
+      'Puntaje robusto mínimo (0.6745 × (monto − mediana) / MAD) para marcar un gasto atípico por categoría o por contraparte dentro de su categoría principal; se exige además `FORECASTING_ANOMALY_MIN_RATIO`. Con MAD igual a cero alcanza la razón. El valor 15 (D513) equivale, con el Large Seed, a unas 9.5 a 14 veces la mediana de la categoría; 3.5 devuelve el umbral de D473.',
+    default: '15',
   }),
   FORECASTING_ANOMALY_MIN_RATIO: variable(z.coerce.number().gt(0), {
     group: 'Forecasting',
     description:
-      'Veces la mediana que debe alcanzar el monto de un gasto para marcarse como atípico por categoría o contraparte.',
+      'Veces la mediana que debe alcanzar el monto de un gasto para marcarse como atípico por categoría o por contraparte dentro de su categoría principal.',
     default: '3.0',
   }),
   FORECASTING_ANOMALY_MIN_SAMPLE: variable(positiveInt, {
     group: 'Forecasting',
     description:
-      'Gastos de historia (365 días anteriores) mínimos por categoría, por contraparte y en el workspace (percentil de contraparte nueva) para evaluar un gasto.',
+      'Gastos de historia (365 días anteriores) mínimos por categoría, por contraparte dentro de su categoría principal y en el workspace (percentil de contraparte nueva) para evaluar un gasto.',
     default: '8',
   }),
   FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE: variable(z.coerce.number().gt(0).lte(100), {
     group: 'Forecasting',
     description:
-      'Percentil (por rango más cercano) de los gastos del workspace de los 365 días anteriores desde el cual un gasto con una contraparte sin gastos previos se marca como atípico.',
-    default: '95',
+      'Percentil (por rango más cercano) de los gastos del workspace de los 365 días anteriores desde el cual un gasto con una contraparte sin gastos previos se marca como atípico (`99.5`, D513; 95 devuelve el umbral de D473).',
+    default: '99.5',
   }),
   COMMITMENTS_SCHEDULER_CRON: variable(
     z

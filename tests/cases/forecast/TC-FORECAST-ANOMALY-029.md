@@ -5,16 +5,18 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Gastos atípicos para su contraparte"
 scenario: "Gasto con varias porciones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/spending-anomaly-detector.test.ts
+  - packages/contexts/forecasting/src/domain/expense-history-index.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies", "calibration", "counterparty", "splits"]
@@ -29,7 +31,7 @@ expected_result:
   - "el criterio de contraparte usa la historia de \"Hipermaxi\" en \"Supermercado\""
   - "un motivo COUNTERPARTY_OUTLIER, si lo hay, informa categoryId de \"Supermercado\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-029 — Un gasto con varias porciones se evalúa por contraparte en la categoría de su porción mayor

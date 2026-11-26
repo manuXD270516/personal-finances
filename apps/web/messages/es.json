@@ -7349,8 +7349,9 @@
     "reportingAmount": "Equivale a {amount}",
     "reason": {
       "CATEGORY_OUTLIER": "{ratio} veces la mediana de \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
-      "COUNTERPARTY_OUTLIER": "{ratio} veces la mediana de tus gastos con \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
-      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nueva \"{name}\", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil 95 de tus gastos ({reference}, {count} gastos)"
+      "COUNTERPARTY_OUTLIER": "{ratio} veces la mediana de \"{name}\" en \"{category}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "COUNTERPARTY_OUTLIER_LEGACY": "{ratio} veces la mediana de tus gastos con \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nueva \"{name}\", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil alto de tus gastos ({reference}, {count} gastos)"
     },
     "dismiss": {
       "label": "No es atípico",

@@ -6,10 +6,12 @@ describe('forecast:anomalies:backtest (argumentos y etiquetas)', () => {
     expect(parseBacktestArgs(['--', '--workspace', 'w1', '--labels', 'a.jsonl'])).toEqual({
       workspace: 'w1',
       labels: 'a.jsonl',
+      thresholds: {},
     });
     expect(parseBacktestArgs(['--workspace=w1', '--labels=b.jsonl'])).toEqual({
       workspace: 'w1',
       labels: 'b.jsonl',
+      thresholds: {},
     });
   });
 
@@ -31,5 +33,42 @@ describe('forecast:anomalies:backtest (argumentos y etiquetas)', () => {
       { transactionId: 't1', kind: 'OUTLIER' },
       { transactionId: 't3', kind: 'NEW_COUNTERPARTY_FRAUD' },
     ]);
+  });
+});
+
+describe('forecast:anomalies:backtest (umbrales por argumento)', () => {
+  const base = ['--workspace', 'w1', '--labels', 'a.jsonl'];
+
+  it('[TC-FORECAST-ANOMALY-032] sin umbrales por argumento no hay reemplazos', () => {
+    expect(parseBacktestArgs(base).thresholds).toEqual({});
+  });
+
+  it('[TC-FORECAST-ANOMALY-032] --robust-z 10 y --new-counterparty-percentile 99.5 reemplazan solo esos dos umbrales', () => {
+    const { thresholds } = parseBacktestArgs([
+      '--',
+      ...base,
+      '--robust-z',
+      '10',
+      '--new-counterparty-percentile=99.5',
+    ]);
+    expect(Object.keys(thresholds).sort()).toEqual(['newCounterpartyPercentile', 'robustZ']);
+    expect(thresholds.robustZ?.toString()).toBe('10');
+    expect(thresholds.newCounterpartyPercentile).toBe(99.5);
+  });
+
+  it('[TC-FORECAST-ANOMALY-032] --min-ratio y --min-sample se aceptan con los rangos de la configuración', () => {
+    const { thresholds } = parseBacktestArgs([...base, '--min-ratio', '4.5', '--min-sample', '12']);
+    expect(thresholds.minRatio?.toString()).toBe('4.5');
+    expect(thresholds.minSample).toBe(12);
+  });
+
+  it('[TC-FORECAST-ANOMALY-032] rechaza valores fuera de rango o no numéricos', () => {
+    expect(() => parseBacktestArgs([...base, '--robust-z', '0'])).toThrow(/--robust-z/);
+    expect(() => parseBacktestArgs([...base, '--robust-z', 'abc'])).toThrow(/--robust-z/);
+    expect(() => parseBacktestArgs([...base, '--min-ratio', '-1'])).toThrow(/--min-ratio/);
+    expect(() => parseBacktestArgs([...base, '--min-sample', '2.5'])).toThrow(/--min-sample/);
+    expect(() => parseBacktestArgs([...base, '--new-counterparty-percentile', '100.5'])).toThrow(
+      /--new-counterparty-percentile/,
+    );
   });
 });

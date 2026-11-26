@@ -2,8 +2,10 @@
 // decisión 11; D483): evalúa la detección de gastos atípicos sobre TODA la historia de un workspace (cada gasto con sus 365
 // días anteriores) y la compara con las etiquetas `OUTLIER` y `NEW_COUNTERPARTY_FRAUD` del Large Seed exportadas con
 // `pnpm db:seed -- --profile=large --labels-out=<ruta.jsonl>`. No persiste nada y su informe no lleva montos ni descripciones.
-// Uso: `pnpm forecast:anomalies:backtest -- --workspace <id> --labels <ruta.jsonl>`; sale con código distinto de cero si la
-// precisión es menor que 0.60 o el recall menor que 0.70.
+// Uso: `pnpm forecast:anomalies:backtest -- --workspace <id> --labels <ruta.jsonl> [--robust-z N] [--min-ratio N]
+// [--min-sample N] [--new-counterparty-percentile N]` (los umbrales reemplazan a los configurados solo en esa corrida,
+// change refine-spending-anomaly-calibration, D514); sale con código distinto de cero si la precisión es menor que 0.80 o el
+// recall menor que 0.85.
 import { readFileSync } from 'node:fs';
 import { createAuditRuntime } from '@pf/audit/interface/audit.module';
 import { formatBacktestReport } from '@pf/forecasting/interface/forecasting.module';
@@ -54,7 +56,7 @@ try {
   });
   const report = await runWithRequestContext(
     { actor: { type: 'WORKER', process: 'forecast-anomalies-backtest' }, origin: 'recurring' },
-    () => finance.forecasting.anomalies.backtest.report(args.workspace, labels),
+    () => finance.forecasting.anomalies.backtest.report(args.workspace, labels, args.thresholds),
   );
   process.stdout.write(`${formatBacktestReport(report)}\n`);
   if (!report.passes) process.exitCode = 1;

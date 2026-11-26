@@ -82,9 +82,13 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
     expect(suite).toMatch(/const PASS_BUDGET_MS = 10_000;/u);
     expect(suite).toContain('[TC-FORECAST-ANOMALY-026]');
     expect(suite).toContain('[TC-FORECAST-ANOMALY-025]');
-    // Fila informativa (D488): mide y publica la evaluación sin fallar el job; etiquetas exportadas por el seed del nightly.
-    expect(suite).toContain('fila informativa, D488');
+    // Fila BLOQUEANTE (D514, que levanta la fila informativa de D488): precisión ≥ 0.80 y recall ≥ 0.85 a escala completa;
+    // etiquetas exportadas por el seed del nightly e informe publicado siempre.
+    expect(suite).toContain('fila bloqueante, D514');
     expect(suite).toMatch(/join\(perfOutDir\(\), 'anomalies\.json'\)/u);
+    expect(suite).toMatch(/toBeGreaterThanOrEqual\(0\.8\)/u);
+    expect(suite).toMatch(/toBeGreaterThanOrEqual\(0\.85\)/u);
+    expect(suite).not.toContain('fila informativa');
     expect(suite).not.toMatch(/toBeGreaterThanOrEqual\(0\.6\)/u);
     expect(readFileSync(`${dir}nightly.perf.ts`, 'utf8')).toContain('labelsOut: anomalyLabelsPath()');
   });

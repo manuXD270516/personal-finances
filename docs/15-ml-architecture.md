@@ -260,6 +260,8 @@ para cada scope:
 | **Auto-classification** | Clasificador (TF-IDF de descripción normalizada + monto + cuenta + día → categoría) entrenado por workspace; complementa Rules (las reglas explícitas siempre ganan) | Se expone como sugerencia en el preview de imports (13-import-architecture.md §4, etapa Rules) y en quick-add; precisión mínima 85 % top-1 en validación para activarse; el usuario confirma | **As-built (Phase 9, change 73, D476):** el primer enfoque es por historial en TypeScript (contraparte y clave de descripción normalizada, sin ML ni servicio Python), con confianza y motivo por plantilla; el clasificador de este renglón queda como mejora si el backtesting temporal no alcanza el 85 % top-1 (D477).
 | **Predictive insights** | "Con la tendencia actual excederás *Restaurantes* el día 22", "tu meta *Viaje* se retrasa 2 meses" | Combina budgets (Planning) + forecasts; textos generados por plantillas, no por LLM |
 
+> **As-built de la calibración (change 85, 2026-11-25; D513–D515):** el criterio por contraparte compara el monto con los gastos de la misma contraparte **en su categoría principal** (la de la porción de mayor monto); la contraparte nueva sigue usando la historia en todas sus categorías. Valores por omisión: puntaje robusto 15, razón 3, historia 8 y percentil 99.5 (configurables). Con el Large Seed a escala completa el criterio de salida del nightly es precisión ≥ 0.80 y recall ≥ 0.85 (bloqueante). Detalle en [docs/81](81-anomaly-calibration-decisions.md).
+
 ## 13. API (resumen)
 
 finance-api: `POST /api/v1/workspaces/{ws}/forecasts` (Idempotency-Key), `GET /forecasts?scope=&status=`, `GET /forecasts/{runId}`, `GET /forecasts/latest?scope=&horizon=`, `GET /forecasts/accuracy`.

@@ -29373,16 +29373,16 @@ components:
       properties:
         kind:
           type: string
-          description: 'Open set. CATEGORY_OUTLIER and COUNTERPARTY_OUTLIER: robust score of at least 3.5 and at least 3 times the median of the previous 365 days (with at least 8 expenses); NEW_COUNTERPARTY_HIGH_AMOUNT: a counterparty without expenses in the previous 365 days and an amount at or above the 95th percentile of the workspace.'
+          description: 'Open set. CATEGORY_OUTLIER: robust score at or above the configured threshold (15 by default) and at least 3 times the median of the category in the previous 365 days (with at least 8 expenses). COUNTERPARTY_OUTLIER: the same criterion for the total amount against the expenses with that counterparty in the expense main category (the category of its largest portion). NEW_COUNTERPARTY_HIGH_AMOUNT: a counterparty without expenses in any category in the previous 365 days and an amount at or above the configured percentile (99.5 by default) of the workspace.'
           x-extensible-enum: [CATEGORY_OUTLIER, COUNTERPARTY_OUTLIER, NEW_COUNTERPARTY_HIGH_AMOUNT]
         categoryId:
-          description: Category compared (only CATEGORY_OUTLIER).
+          description: 'Category compared: the category in CATEGORY_OUTLIER and the main category of the expense (largest portion) in COUNTERPARTY_OUTLIER. Null in NEW_COUNTERPARTY_HIGH_AMOUNT and in marks created before the calibration, which are not recomputed.'
           oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
         counterpartyId:
           description: Counterparty compared (COUNTERPARTY_OUTLIER and NEW_COUNTERPARTY_HIGH_AMOUNT).
           oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
         reference:
-          description: Median (category and counterparty) or 95th percentile (new counterparty) in the reporting currency.
+          description: Median (category and counterparty in its main category) or configured percentile (new counterparty) in the reporting currency.
           $ref: '#/components/schemas/Money'
         ratio:
           description: Amount divided by the median with 1 decimal (HALF_EVEN); null for a new counterparty.
