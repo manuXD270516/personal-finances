@@ -20,7 +20,7 @@ phase: 9
 tags: ["e2e","webkit","session"]
 error_code: null
 preconditions:
-  - "el stack de E2E levantado con PF_E2E_PROJECT=pfos-e2e-<nombre> y puertos con prefijo 3 o 4"
+  - "el stack de E2E servido por HTTPS (D516), levantado con PF_E2E_PROJECT=pfos-e2e-<nombre> y puertos con prefijo 3 o 4"
   - "el proyecto webkit de Playwright"
 input: {}
 steps:
@@ -43,7 +43,7 @@ Es el spike de D509 convertido en prueba: confirma que WebKit no obliga a relaja
 ## Escenario
 
 ```gherkin
-Dado el stack de E2E levantado con PF_E2E_PROJECT=pfos-e2e-<nombre> y puertos con prefijo 3 o 4
+Dado el stack de E2E servido por HTTPS (D516), levantado con PF_E2E_PROJECT=pfos-e2e-<nombre> y puertos con prefijo 3 o 4
   Y el proyecto webkit de Playwright
 Cuando el usuario de prueba inicia sesión en WebKit
   Y navega a dos páginas de la aplicación
@@ -55,3 +55,4 @@ Entonces la sesión persiste entre páginas
 ## Notas
 
 - Change `refine-web-accessibility-foundations` (lote L1, docs/78; decisiones en docs/79). Datos ficticios; ningún dato real del owner. Si el spike falla, no se cambia ningún atributo: la pregunta vuelve al owner (excepción de P10).
+- El spike de D509 falló (la cookie `Secure` no viaja sobre `http://localhost` en WebKit, ni en Windows ni en Linux). El owner eligió servir el E2E por HTTPS (D516, [docs/84](../../../docs/84-webkit-e2e-questions.md)); lo automatiza el change `add-e2e-https`.

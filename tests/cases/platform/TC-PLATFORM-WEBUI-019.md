@@ -20,7 +20,7 @@ phase: 9
 tags: ["e2e","webkit","ci"]
 error_code: null
 preconditions:
-  - "el spike de WebKit pasó (D509)"
+  - "el stack de E2E servido por HTTPS (D516, change add-e2e-https)"
   - "el proyecto webkit está en tests/e2e/playwright.config.ts"
 input: {}
 steps:
@@ -41,7 +41,7 @@ Cubre Safari/iOS, donde más fallan las funciones Newly available que D500 admit
 ## Escenario
 
 ```gherkin
-Dado el spike de WebKit pasó (D509)
+Dado el stack de E2E servido por HTTPS (D516, change add-e2e-https)
   Y el proyecto webkit está en tests/e2e/playwright.config.ts
 Cuando corre el job e2e de un pull request
 Entonces app-shell, a11y, transactions, auth y content-security-policy corren en webkit además de chromium
@@ -51,3 +51,4 @@ Entonces app-shell, a11y, transactions, auth y content-security-policy corren en
 ## Notas
 
 - Change `refine-web-accessibility-foundations` (lote L1, docs/78; decisiones en docs/79). Datos ficticios; ningún dato real del owner. Condicionado al spike de D509: si falla, queda en draft y la decisión vuelve al owner.
+- El spike de D509 falló (la cookie `Secure` no viaja sobre `http://localhost` en WebKit, ni en Windows ni en Linux). El owner eligió servir el E2E por HTTPS (D516, [docs/84](../../../docs/84-webkit-e2e-questions.md)); lo automatiza el change `add-e2e-https`.
