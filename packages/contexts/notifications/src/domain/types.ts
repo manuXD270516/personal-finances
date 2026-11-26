@@ -30,6 +30,9 @@ export const NOTIFICATION_TYPES = [
   // Phase 9 (add-spending-anomaly-detection, FR-NOTIFY-004, D474): gastos atípicos detectados por la pasada diaria de FORECAST
   // (entrega directa). Es el primer tipo desactivado por omisión en los dos canales (`defaultTypePreference`).
   'SPENDING_ANOMALY',
+  // Phase 9 (add-budget-overrun-risk, FR-NOTIFY-004, D478): riesgo de exceder un presupuesto (entrega directa desde
+  // `reporting.cash-flow-watch`); desactivado por omisión en los dos canales (`defaultTypePreference`).
+  'BUDGET_OVERRUN_RISK',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

@@ -21,6 +21,7 @@ export interface TypePreference {
  */
 export const TYPES_OFF_BY_DEFAULT: ReadonlySet<NotificationType> = new Set<NotificationType>([
   'SPENDING_ANOMALY',
+  'BUDGET_OVERRUN_RISK',
 ]);
 
 export function defaultTypePreference(type: NotificationType): TypePreference {
