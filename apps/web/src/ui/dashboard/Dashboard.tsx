@@ -7,6 +7,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { localized, useSession } from '../session-context';
 import { DebtSummaryCard } from '../debt/summary/DebtSummaryCard';
 import { NetWorthEvolutionCard } from '../networth/NetWorthEvolution';
+import { BudgetRiskHomeCard } from '../budget-risk/BudgetRiskView';
 import { BudgetProgressWidget } from '../planning/BudgetProgressWidget';
 import { BUDGETS_PATH, SPENDABLE_PATH, SPENDABLE_SETTINGS_PATH, UPCOMING_PATH } from '../spendable/logic';
 import { HomeCommitments } from '../upcoming/UpcomingPage';
@@ -29,6 +30,7 @@ interface Loaded {
  */
 export function Dashboard() {
   const t = useTranslations('Dashboard');
+  const tr = useTranslations('BudgetRisk');
   const uiLocale = useLocale();
   const { state } = useSession();
   const [loaded, setLoaded] = useState<Loaded | undefined>();
@@ -86,6 +88,18 @@ export function Dashboard() {
       goalsHref={localized(uiLocale, '/goals')}
       createGoalHref={localized(uiLocale, '/goals/nuevo')}
       goalHref={(goalId) => localized(uiLocale, `/goals/${goalId}`)}
+      budgetRiskCard={
+        <BudgetRiskHomeCard
+          block={loaded.summary.budgetRisk}
+          f={{
+            locale: loaded.formatLocale,
+            timeZone: loaded.summary.meta.timeZone || DEFAULT_TIME_ZONE,
+            t: (key, values) => tr(key, values),
+            has: (key) => tr.has(key),
+          }}
+          href={(path) => localized(uiLocale, path)}
+        />
+      }
       evolutionCard={
         <NetWorthEvolutionCard
           locale={loaded.formatLocale}

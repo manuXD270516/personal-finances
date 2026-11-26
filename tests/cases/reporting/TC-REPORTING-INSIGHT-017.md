@@ -5,16 +5,18 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Rendimiento del riesgo"
 scenario: "Plan grande"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020"]
 nfr: ["NFR-PERF-004"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/budget-risk.perf.ts
+  - apps/api/test/perf/suite-order.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk","perf"]

@@ -801,6 +801,20 @@ export const VARIABLES = {
     },
   ),
 
+  // ── REPORTING: riesgo de exceder un presupuesto (openspec add-budget-overrun-risk, design.md decisiones 2 y 7; D478) ──
+  REPORTING_BUDGET_RISK_ENABLED: variable(bool, {
+    group: 'Reporting',
+    description:
+      'Habilita el riesgo de exceder un presupuesto (API y worker): la consulta `getBudgetRisk`, el bloque del Home y el paso de avisos dentro de `reporting.cash-flow-watch`, sin consumidores ni conexiones nuevas. Deshabilitado, la consulta responde `DISABLED` y el paso no corre. El aviso por notificación está apagado por omisión para cada usuario.',
+    default: 'true',
+  }),
+  REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS: variable(positiveInt, {
+    group: 'Reporting',
+    description:
+      'Días transcurridos del periodo (con hoy) desde los cuales el riesgo de una línea se proyecta por el ritmo del periodo cuando no hay pronóstico; antes, el riesgo no está disponible (`TOO_EARLY`), salvo que el gastado más los pagos conocidos ya superen la referencia.',
+    default: '7',
+  }),
+
   // ── Planning: periodos financieros (openspec add-financial-periods, design.md decisiones 5 y 6; docs/33 D63) ──
   PLANNING_PERIOD_LOOKAHEAD: variable(
     positiveInt.refine((n) => n <= 24, 'entre 1 y 24 periodos'),
@@ -1846,6 +1860,8 @@ export const APP_VARIABLES = {
     'FORECASTING_COHERENCE_GAP_RATIO',
     'FORECASTING_ANOMALIES_ENABLED',
     'REPORTING_RATE_VALIDITY_WINDOW',
+    'REPORTING_BUDGET_RISK_ENABLED',
+    'REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS',
     'PLANNING_PERIOD_LOOKAHEAD',
     'PLANNING_HISTORY_DEFAULT_PERIODS',
     'PLANNING_HISTORY_MAX_PERIODS',
@@ -1985,6 +2001,9 @@ export const APP_VARIABLES = {
     // add-cash-flow-forecast: job que detecta el riesgo de déficit de cada workspace.
     'REPORTING_CASH_FLOW_WATCH_CRON',
     'REPORTING_SHORTFALL_ALERT_HORIZON_DAYS',
+    // add-budget-overrun-risk: el paso de avisos corre en el worker dentro de `reporting.cash-flow-watch`.
+    'REPORTING_BUDGET_RISK_ENABLED',
+    'REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).
     'EMAIL_DRIVER',
     'SMTP_HOST',

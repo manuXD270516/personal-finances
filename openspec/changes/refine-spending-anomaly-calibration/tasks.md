@@ -26,8 +26,8 @@
 ## 5. API y nightly
 
 - [x] 5.1 `contracts/openapi/finance-api.v1.yaml`: descripción de `SpendingAnomalyReason.categoryId` (en `COUNTERPARTY_OUTLIER`, la categoría principal); `pnpm contract:breaking` limpio _Descripciones de `SpendingAnomalyReason` (`kind`, `categoryId`, `reference`) actualizadas en `finance-api.v1.yaml`; `pnpm contract:breaking` limpio (2026-11-26)._
-- [ ] 5.2 (bloqueado por la pregunta 2 de docs/80) `apps/api/test/perf/anomalies.perf.ts`: la fila de TC-FORECAST-ANOMALY-025 vuelve a **bloqueante** con los umbrales que fije el owner (hoy informativa por D488) y publica el informe por criterio en `reports/perf/anomalies.json`; correr la suite con el Large Seed a escala completa y registrar precisión y recall en el design
-- [ ] 5.3 TC-FORECAST-ANOMALY-026 en verde: la pasada diaria con el índice por par sigue en ≤ 10 s
+- [x] 5.2 (bloqueado por la pregunta 2 de docs/80) `apps/api/test/perf/anomalies.perf.ts`: la fila de TC-FORECAST-ANOMALY-025 vuelve a **bloqueante** con los umbrales que fije el owner (hoy informativa por D488) y publica el informe por criterio en `reports/perf/anomalies.json`; correr la suite con el Large Seed a escala completa y registrar precisión y recall en el design _Fila bloqueante con 0.80 y 0.85 (escala completa; a escala menor solo se publica) y `anomalies.json` con el informe por criterio; medición a escala completa en el design (precisión 0.9355, recall 0.9431), 2026-11-26._
+- [x] 5.3 TC-FORECAST-ANOMALY-026 en verde: la pasada diaria con el índice por par sigue en ≤ 10 s _TC-026 en verde en la misma suite: la pasada diaria con el índice por par cumple el presupuesto de 10 s (suite `anomalies.perf.ts` a escala completa, 2026-11-26)._
 
 ## 6. UI
 
@@ -36,9 +36,9 @@
 ## 7. AUTOMATED TESTS y E2E
 
 - [x] 7.1 Automatizar TC-FORECAST-ANOMALY-027..032 con el TC-id en el nombre del test, actualizar los tests de -005, -006, -007 y -025 y el front matter de todos _TC-027..032 automatizados con su TC-id en el nombre y el front matter de los diez TC al día (2026-11-26)._
-- [ ] 7.2 Regresión en verde: TC-FORECAST-ANOMALY-001..026 y TC-NOTIFICATIONS-ANOMALY-001..005
+- [x] 7.2 Regresión en verde: TC-FORECAST-ANOMALY-001..026 y TC-NOTIFICATIONS-ANOMALY-001..005 _Regresión en verde: todos los tests de @pf/forecasting, @pf/notifications y apps/api (unit e integración) pasan; CI en verde (2026-11-26)._
 
 ## 8. DOCUMENTATION
 
 - [x] 8.1 Aplicar design.md § «Cambios a docs compartidos» (docs/15 §12, config-reference, docs/23, docs/17 y docs/38) _docs/81, docs/80 (enlace), docs/38, docs/03 §7, docs/15 §12, docs/17 y docs/23 actualizados (2026-11-26); docs/config-reference ya regenerado._
-- [ ] 8.2 Actualizar la matriz de trazabilidad; `pnpm spec:validate`, `pnpm traceability:check` y `pnpm format:check`
+- [x] 8.2 Actualizar la matriz de trazabilidad; `pnpm spec:validate`, `pnpm traceability:check` y `pnpm format:check` _Matriz actualizada; `spec:validate`, `traceability:check` y `format:check` en verde (2026-11-26)._

@@ -2665,7 +2665,8 @@
         "FX_RATE_ANOMALY_RETAINED": "Rate held for an abnormal change",
         "CASH_FLOW_SHORTFALL_RISK": "Cash flow shortfall risk",
         "HOME_DIGEST": "Periodic home summary (email)",
-        "SPENDING_ANOMALY": "Unusual expenses detected (off by default)"
+        "SPENDING_ANOMALY": "Unusual expenses detected (off by default)",
+        "BUDGET_OVERRUN_RISK": "Budget overrun risk (off by default)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
@@ -7311,6 +7312,52 @@
       },
       "bySurface": "By channel",
       "failed": "The acceptance rate could not be read."
+    }
+  },
+  "BudgetRisk": {
+    "none": "No risk calculated",
+    "level": {
+      "EXCEEDED": "Exceeded",
+      "LIKELY": "Likely",
+      "POSSIBLE": "Possible",
+      "UNLIKELY": "Unlikely",
+      "NOT_AVAILABLE": "Not available"
+    },
+    "reason": {
+      "LINE_TYPE": "Fixed and minimum lines are not projected",
+      "NO_REFERENCE": "The line has no planned amount",
+      "TOO_EARLY": "Not enough data from the period yet"
+    },
+    "basis": {
+      "RUN_RATE": "based on the period pace",
+      "FORECAST": "based on the forecast"
+    },
+    "detail": {
+      "projected": "Projection {amount}",
+      "projectedHigh": "high {amount}",
+      "date": "estimated overrun around {date}"
+    },
+    "incomplete": "A known payment is missing its rate: the projection is incomplete",
+    "column": "Overrun risk",
+    "legend": {
+      "intro": "The risk is a projection from the pace of the period or the forecast, not a certainty; it does not change any figure of the plan.",
+      "possible": "\"Possible\" means it would only happen if spending gets close to the high end of the usual range (upper limit of the 80 % forecast interval)."
+    },
+    "sentence": {
+      "likely": "At the current pace, {name} would exceed its limit around {date}.",
+      "likelyNoDate": "At the current pace, {name} would exceed its limit before the period ends.",
+      "likelyForecast": "According to the forecast, {name} would exceed its limit around {date}.",
+      "likelyForecastNoDate": "According to the forecast, {name} would exceed its limit before the period ends.",
+      "possible": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit around {date}.",
+      "possibleNoDate": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit before the period ends.",
+      "possibleForecast": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit around {date}.",
+      "possibleForecastNoDate": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit before the period ends."
+    },
+    "home": {
+      "title": "Budgets at risk",
+      "subtitle": "{period} plan",
+      "figures": "Projection {projected} of {reference}",
+      "more": "and {count, plural, one {# more line} other {# more lines}} at risk in the plan"
     }
   },
   "SpendingAnomalies": {

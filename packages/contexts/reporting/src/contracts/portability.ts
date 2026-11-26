@@ -41,4 +41,9 @@ export const REPORTING_PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] =
     reason:
       'Dato derivado y reconstruible: el job reporting.cash-flow-watch vuelve a abrir el episodio si el riesgo persiste (D381).',
   },
+  {
+    table: 'reporting.budget_overrun_notice',
+    reason:
+      'Registro técnico de avisos ya emitidos (idempotencia del paso de riesgo de presupuesto de reporting.cash-flow-watch): tras importar, una línea en riesgo puede avisarse otra vez una sola vez (add-budget-overrun-risk).',
+  },
 ];

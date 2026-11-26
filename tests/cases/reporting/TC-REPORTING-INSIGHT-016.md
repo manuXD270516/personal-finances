@@ -5,16 +5,18 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Permisos y aislamiento del riesgo"
 scenario: "Periodo de otro workspace"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020","FR-IDENTITY-006"]
 nfr: ["NFR-SEC-003","NFR-SEC-004"]
 invariants: []
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/budget-risk.int.test.ts
+  - packages/contexts/reporting/src/application/budget-risk.queries.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk","rls"]

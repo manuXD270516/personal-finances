@@ -468,7 +468,7 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
     }
   }, 120_000);
 
-  it('[TC-PLATFORM-THROUGHPUT-009] el worker con la plantilla del host arranca con 28 consumidores de concurrencia 1: 28 + 4 reservadas = 32 de 34, sin consumidores ni conexiones nuevas (D249)', async () => {
+  it('[TC-PLATFORM-THROUGHPUT-009] [TC-REPORTING-INSIGHT-015] el worker con la plantilla del host y el riesgo de presupuesto habilitado arranca con 28 consumidores de concurrencia 1: 28 + 4 reservadas = 32 de 34, sin consumidores ni conexiones nuevas (D249)', async () => {
     const env = readFileSync(
       fileURLToPath(new URL('../../../../deploy/host/etc-pfos/pfos.env.example', import.meta.url)),
       'utf8',
@@ -488,6 +488,8 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
           EVENT_CONSUMER_CONCURRENCY: String(defaults.concurrency),
           EVENT_CONSUMER_BATCH_SIZE: String(defaults.batchSize),
           DATABASE_POOL_MAX: value('DATABASE_POOL_MAX'),
+          // add-budget-overrun-risk: el paso de avisos vive dentro de `reporting.cash-flow-watch`, sin consumidores nuevos.
+          REPORTING_BUDGET_RISK_ENABLED: 'true',
         }),
       ),
       quiet,
