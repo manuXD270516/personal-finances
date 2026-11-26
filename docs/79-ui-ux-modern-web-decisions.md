@@ -6,7 +6,7 @@ El owner contestó el 2026-11-25, en el chat: adopta **todas las recomendaciones
 
 ## Numeración
 
-Los ids siguen al último usado en `origin/main` (D483, docs/77). En paralelo, otro change de diseño agrega ids a docs/77 (D484–D487 en su rama, con posibilidad de sumar más). Para no chocar, este documento arranca en **D500** y deja **D488–D499 reservados para docs/77**. Si docs/77 llegara a necesitar más de doce ids, sigue después de D512.
+Los ids siguen al último usado en `origin/main` (D483, docs/77). En paralelo, otro change de diseño agrega ids a docs/77 (D484–D487 en su rama, con posibilidad de sumar más). Para no chocar, este documento arranca en **D500** y deja **D488–D499 reservados para docs/77**. Si docs/77 llegara a necesitar más de doce ids, sigue después de D512. D516, agregado después con la respuesta al spike de WebKit, salta D513–D515, que toma la calibración de anomalías (docs/81, PR #293).
 
 ## Decisiones
 
@@ -25,6 +25,7 @@ Los ids siguen al último usado en `origin/main` (D483, docs/77). En paralelo, o
 | D510 | P11: dónde se guarda la última cuenta usada | (B) `localStorage` por usuario y workspace (por dispositivo, sin auditoría y sin tocar `Me.version`). | Lote L2. Si más adelante el owner quiere que viaje entre dispositivos, se pasa a `preferences` de `/me` con escritura solo al cambiar (opción A). |
 | D511 | P12: navegación del cliente o por documento completo | (B) Change aparte `adopt-client-navigation`, después de medir INP y navegación (M-30, lote L5). Mientras tanto se mantiene la navegación por documento completo **sin** construir M-29 (`@view-transition`), porque las dos vías se excluyen. | Fila propia en docs/03 §7, después de L5. M-29 sale del lote L7 hasta que se resuelva `adopt-client-navigation`. |
 | D512 | Pedido del owner: quién implementa | Los lotes L1–L7 y `adopt-client-navigation` los implementa el agente **`frontend`**. El agente `arquitecto` redacta los changes y el `implementador` puede archivar y cerrar los PR, como en el resto del proyecto. | Cada tarea de implementación de L1 y L2 está escrita para que la ejecute `frontend`, con criterios comprobables (E2E de Playwright, axe, i18n es/en/pt y la CSP de `apps/web/proxy.ts`). |
+| D516 | Respuesta a la excepción de D509 ([docs/84](84-webkit-e2e-questions.md), P1), contestada el 2026-11-25 en el chat tras el spike fallido | (B) **El stack de E2E se sirve por HTTPS** con un certificado de prueba. La cookie de sesión **no se toca**: ni su nombre `__Host-`, ni `Secure`, ni ningún otro atributo, ni `bff.ts`. Se descartan (A) posponer WebKit y (C) relajar la cookie en pruebas. | Change aparte `add-e2e-https` (fila 86 de docs/03 §7) que sirve el stack por HTTPS y agrega el subconjunto de ≈ 5 specs en WebKit dentro del job `e2e` (la forma de D509). Spike en Linux del 2026-11-25: WebKit no envía la cookie `Secure` sobre `http://localhost` pero sí sobre HTTPS con certificado autofirmado (docs/84). Ningún check obligatorio nuevo. |
 
 ## Decisiones de diseño derivadas (del arquitecto, no del owner)
 
@@ -40,4 +41,4 @@ Estas no son decisiones del owner: las toma el diseño de los changes para aplic
 - **L3–L7 y `adopt-client-navigation`** quedan como filas de docs/03 §7 con su dependencia y su orden. Se redactan cuando toque implementarlos.
 - **`CLAUDE.md`** gana la línea «Soporte de navegadores» (D500).
 - **docs/28** se actualiza en el lote L1: as-built sin Tailwind, shadcn/ui ni ECharts (D506), fuentes del sistema (D505) y «Deshacer» persistente (D508).
-- **Pendiente del owner:** solo el resultado del spike de WebKit, si falla (D509).
+- **Pendiente del owner:** solo el resultado del spike de WebKit, si falla (D509). **Resuelto por D516:** el spike falló y el owner eligió servir el E2E por HTTPS (change `add-e2e-https`).
