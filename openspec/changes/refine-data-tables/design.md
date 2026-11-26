@@ -80,7 +80,9 @@ Capa afectada: solo **interface** de `apps/web`. Sin contextos, agregados, puert
 
 12. **Sin `content-visibility` en filas (§ 11.1 punto 8).** La contención de tamaño y de diseño no se aplica a `display: table-row` ni a `table-row-group`, así que `content-visibility: auto` sobre `tr` o `tbody` se ignora. Un test estático (`tables.test.ts`, TC-PLATFORM-TABLES-022) falla si una regla con selector de `tr`, `tbody` o `thead` o un `style` de esos elementos declara `content-visibility` o `contain`. El supuesto de especificación se confirma de paso con la medición de la decisión 10 (con y sin la regla, una sola corrida local), y el resultado se anota en la tarea 7.6.
 
-13. **i18n y CSP.** Claves nuevas (`Tables.*`, `Imports.review.position`, `Imports.review.previous`, `Imports.review.next`) en es, en y pt; los `caption` nuevos también. Probadas a 360 px. Sin `<style>` ni `<script>` en línea, sin dependencias nuevas.
+13. **Detalle de préstamo sin desbordamiento (hallazgo del change 77).** A 360 px, `debt/LoanDetail.tsx` (`LoanBalances`, `data-testid="loan-balances"`) desborda ~250 px a lo ancho. `frontend` diagnostica la causa con el inspector antes de corregir (candidatos: un `dd` con montos largos que no se parten, un hijo de `grid` o `flex` sin `min-inline-size: 0`, o un `white-space: nowrap` heredado) y la anota en la tarea 5.8. La corrección mueve los estilos en línea de la sección a clases en `globals.css`, conserva `nowrap` solo dentro de cada monto (no en el rótulo ni en el contenedor) y no reduce el tamaño de letra. Se prueba con `document.documentElement.scrollWidth ≤ 360` y una captura (TC-PLATFORM-TABLES-023).
+
+14. **i18n y CSP.** Claves nuevas (`Tables.*`, `Imports.review.position`, `Imports.review.previous`, `Imports.review.next`) en es, en y pt; los `caption` nuevos también. Probadas a 360 px. Sin `<style>` ni `<script>` en línea, sin dependencias nuevas.
 
 ## Riesgos / Trade-offs
 

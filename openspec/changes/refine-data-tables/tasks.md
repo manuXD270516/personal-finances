@@ -5,7 +5,7 @@
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar el delta de `platform/web-interface` contra docs/78 § 11.1 (puntos 7, 8 y 9); `openspec validate refine-data-tables --strict`
-- [ ] 1.2 Revisar TC-PLATFORM-TABLES-001..022 contra los scenarios y pasarlos a `ready` (019 a 021 siguen en `draft` hasta el resultado de la tarea 6.1)
+- [ ] 1.2 Revisar TC-PLATFORM-TABLES-001..023 contra los scenarios y pasarlos a `ready` (019 a 021 siguen en `draft` hasta el resultado de la tarea 6.1)
 
 ## 2. DOMAIN
 
@@ -31,6 +31,8 @@
 - [ ] 5.6 Orden por columna (decisión 8, Could): `SortableHeader` en los reportes con tabla, el presupuesto contra real y el costo de suscripciones; `aria-sort` solo en la activa; anuncio único en un `role="status"` con `Tables.sortedBy` en es/en/pt; foco en el botón. Criterio: E2E de 7.6
 - [ ] 5.7 Medidas y procesos (decisión 9, Could): `<meter>` en `debt/cards/parts.tsx`, `goals/parts.tsx` y `dashboard/GoalsCard.tsx`; `<progress>` en `imports/ProcessingPanel.tsx`; actualizar `cards.test.tsx` y `goals.test.tsx`. Criterio: tests de marcado y E2E de 7.7
 
+- [ ] 5.8 Detalle de préstamo a 360 px (decisión 13): diagnosticar y anotar la causa del desbordamiento de ~250 px de `loan-balances` (`debt/LoanDetail.tsx`) y corregirla con clases en `globals.css`. Criterio: E2E de 7.10
+
 ## 6. Vista previa por páginas (condicionado a la medición)
 
 - [ ] 6.1 Medir con `inp.spec.ts` (tarea 7.8) en local, 3 corridas, el INP de «abrir fila» y «filtrar» con las 2 000 filas cargadas con «Cargar más». Anotar la mediana. **Si supera 200 ms:** seguir con 6.2 y 6.3. **Si no:** no paginar, dejar TC-PLATFORM-TABLES-019..021 en `draft`, marcar 6.2 y 6.3 con la nota «la medición no lo confirma» y llevar la pregunta 7 de docs/82 al owner antes de archivar
@@ -50,7 +52,8 @@ Spec nuevo `tests/e2e/specs/data-tables.spec.ts` y spec de medición `tests/e2e/
 - [ ] 7.7 `meter` de la tarjeta (850.00 de 1000.00 BOB) y de la meta (5000.00 de 15000.00 BOB) y `progress` del procesamiento del import: TC-PLATFORM-TABLES-014, -015, -016
 - [ ] 7.8 Medición de INP de los cuatro flujos con el extracto sintético de 2 000 filas; informe adjunto con `testInfo.attach`; anotar en la tarea los valores de la primera corrida en CI y de las 3 locales, y el resultado de la comprobación con y sin `content-visibility` en `tbody` (decisión 12): TC-PLATFORM-TABLES-017
 - [ ] 7.9 Si 6.1 confirma: páginas de la vista previa con 450 filas, decisión conservada en la fila 10 y filtro que vuelve a la página 1: TC-PLATFORM-TABLES-019, -020, -021
-- [ ] 7.10 Suite E2E completa en verde dos veces con `PF_E2E_PROJECT=pfos-e2e-<nombre>`; actualizar el front matter de los TC automatizados (`automated_tests`, `status: automated`, `automation_status: automated`)
+- [ ] 7.10 Detalle de un préstamo de 12000.00 BOB con diferencia de 150.00 BOB a 360 px: `scrollWidth` de la página ≤ 360 y montos de `loan-balances` completos, con captura: TC-PLATFORM-TABLES-023
+- [ ] 7.11 Suite E2E completa en verde dos veces con `PF_E2E_PROJECT=pfos-e2e-<nombre>`; actualizar el front matter de los TC automatizados (`automated_tests`, `status: automated`, `automation_status: automated`)
 
 ## 8. DOCUMENTATION
 
