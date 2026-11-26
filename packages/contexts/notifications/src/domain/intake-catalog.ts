@@ -1,6 +1,7 @@
 import { DomainError } from '@pf/shared-kernel';
 import { CASH_FLOW_INTAKE_CATALOG } from './cash-flow-notifications.js';
 import { SPENDING_ANOMALY_INTAKE_CATALOG } from './spending-anomaly-notifications.js';
+import { BUDGET_RISK_INTAKE_CATALOG } from './budget-risk-notifications.js';
 import { FX_INTAKE_CATALOG, type IntakeTypeDefinition } from './fx-rate-notifications.js';
 
 /**
@@ -12,6 +13,7 @@ export const NOTIFICATION_INTAKE_CATALOG: readonly IntakeTypeDefinition[] = [
   ...FX_INTAKE_CATALOG,
   ...CASH_FLOW_INTAKE_CATALOG,
   ...SPENDING_ANOMALY_INTAKE_CATALOG,
+  ...BUDGET_RISK_INTAKE_CATALOG,
 ];
 
 export function intakeDefinitionOf(type: string): IntakeTypeDefinition {

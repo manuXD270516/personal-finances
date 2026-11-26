@@ -74,7 +74,8 @@ export type NotificationIntakeType =
   | 'FX_RATE_FEED_RECOVERED'
   | 'FX_RATE_ANOMALY_RETAINED'
   | 'CASH_FLOW_SHORTFALL_RISK'
-  | 'SPENDING_ANOMALY';
+  | 'SPENDING_ANOMALY'
+  | 'BUDGET_OVERRUN_RISK';
 
 /**
  * `CASH_FLOW_SHORTFALL_RISK` (add-cash-flow-forecast, D381/D382): se abrió un episodio de riesgo de déficit (`HIGH`) en una
@@ -115,6 +116,29 @@ export interface SpendingAnomaliesDetectedFact {
     readonly reportingAmount: { readonly amount: string; readonly currency: string };
     readonly reasons: readonly ('CATEGORY_OUTLIER' | 'COUNTERPARTY_OUTLIER' | 'NEW_COUNTERPARTY_HIGH_AMOUNT')[];
   };
+  readonly timeZone: string;
+}
+
+/**
+ * `BUDGET_OVERRUN_RISK` (add-budget-overrun-risk, D478 y D484): una línea del plan pasó por primera vez a riesgo «probable» de
+ * exceder su tope (sin haber cruzado el 100 %). `factKey` = `budget-risk:<periodId>:<budgetLineId>`: una notificación por
+ * línea y periodo y destinatario (todo miembro activo que activó el tipo, apagado por omisión). El riesgo «posible» no avisa.
+ * El email sin opt-in no lleva montos ni nombres.
+ */
+export interface BudgetOverrunRiskFact {
+  readonly periodId: string;
+  /** Etiqueta del periodo (`YYYY-MM`). */
+  readonly periodLabel: string;
+  readonly budgetId: string;
+  readonly budgetLineId: string;
+  readonly target: { readonly kind: 'CATEGORY' | 'GROUP'; readonly id: string; readonly name: string };
+  /** Proyección esperada al fin del periodo y referencia de la línea, en la moneda del plan. */
+  readonly projected: { readonly amount: string; readonly currency: string };
+  readonly reference: { readonly amount: string; readonly currency: string };
+  /** Fecha estimada del exceso (`YYYY-MM-DD`, zona del workspace); `null` si no hay días por delante. */
+  readonly estimatedDate: string | null;
+  readonly basis: 'RUN_RATE' | 'FORECAST';
+  readonly detectedAt: string;
   readonly timeZone: string;
 }
 
@@ -209,6 +233,10 @@ export type NotificationIntakeFact =
   | (IntakeFactBase & {
       readonly type: 'SPENDING_ANOMALY';
       readonly payload: SpendingAnomaliesDetectedFact;
+    })
+  | (IntakeFactBase & {
+      readonly type: 'BUDGET_OVERRUN_RISK';
+      readonly payload: BudgetOverrunRiskFact;
     });
 
 export interface NotificationIntakeOutcome {

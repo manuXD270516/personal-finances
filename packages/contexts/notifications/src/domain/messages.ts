@@ -177,6 +177,25 @@ const es: MessageCatalog = {
     'El {date} se detectó 1 gasto atípico nuevo: {amount} el {transactionDate}, {reason}. Revísalo en la app.',
   'email.spending_anomaly.detailed_other':
     'El {date} se detectaron {count} gastos atípicos nuevos; el de mayor monto es {amount} el {transactionDate}, {reason}. Revísalos en la app.',
+  // riesgo de exceder un presupuesto (add-budget-overrun-risk): hablan de ritmo y de fecha estimada, nunca de certeza; el
+  // email basic no lleva montos ni nombres.
+  'inapp.budget_overrun_risk.title': 'Posible exceso en {target} alrededor del {date}',
+  'inapp.budget_overrun_risk.title_nodate': 'Posible exceso en {target} antes de que termine {period}',
+  'inapp.budget_overrun_risk.body':
+    'Con el ritmo actual ({basis}), {target} superaría su tope alrededor del {date} (proyección {projected} de {reference} {currency}). Es una estimación: revísalo en el plan de {period}.',
+  'inapp.budget_overrun_risk.body_nodate':
+    'Con el ritmo actual ({basis}), {target} superaría su tope en {period} (proyección {projected} de {reference} {currency}). Es una estimación: revísalo en el plan.',
+  'inapp.budget_overrun_risk.basis.RUN_RATE': 'según el ritmo del periodo',
+  'inapp.budget_overrun_risk.basis.FORECAST': 'según el pronóstico',
+  'email.budget_overrun_risk.subject': 'Un presupuesto podría excederse',
+  'email.budget_overrun_risk.basic':
+    'Un presupuesto de {period} podría excederse alrededor del {date} si sigue el ritmo actual. Revisa el plan en la app.',
+  'email.budget_overrun_risk.basic_nodate':
+    'Un presupuesto de {period} podría excederse antes de que termine el periodo si sigue el ritmo actual. Revisa el plan en la app.',
+  'email.budget_overrun_risk.detailed':
+    'Con el ritmo actual ({basis}), {target} superaría su tope de {period} alrededor del {date} (proyección {projected} de {reference} {currency}). Es una estimación: revisa el plan en la app.',
+  'email.budget_overrun_risk.detailed_nodate':
+    'Con el ritmo actual ({basis}), {target} superaría su tope de {period} (proyección {projected} de {reference} {currency}). Es una estimación: revisa el plan en la app.',
   'inapp.home_digest.title': 'Tu resumen financiero',
   'inapp.home_digest.body': 'Resumen del Home generado el {date}.',
   'email.home_digest.subject': 'Tu resumen financiero de PFOS',
@@ -383,6 +402,25 @@ const en: MessageCatalog = {
     'On {date} 1 new unusual expense was detected: {amount} on {transactionDate}, {reason}. Review it in the app.',
   'email.spending_anomaly.detailed_other':
     'On {date} {count} new unusual expenses were detected; the largest is {amount} on {transactionDate}, {reason}. Review them in the app.',
+  // budget overrun risk (add-budget-overrun-risk): they talk about pace and an estimated date, never certainty; the basic
+  // email carries no amounts or names.
+  'inapp.budget_overrun_risk.title': 'Possible overrun in {target} around {date}',
+  'inapp.budget_overrun_risk.title_nodate': 'Possible overrun in {target} before {period} ends',
+  'inapp.budget_overrun_risk.body':
+    'At the current pace ({basis}), {target} would exceed its limit around {date} (projection {projected} of {reference} {currency}). This is an estimate: review it in the {period} plan.',
+  'inapp.budget_overrun_risk.body_nodate':
+    'At the current pace ({basis}), {target} would exceed its limit in {period} (projection {projected} of {reference} {currency}). This is an estimate: review it in the plan.',
+  'inapp.budget_overrun_risk.basis.RUN_RATE': 'based on the period pace',
+  'inapp.budget_overrun_risk.basis.FORECAST': 'based on the forecast',
+  'email.budget_overrun_risk.subject': 'A budget could be exceeded',
+  'email.budget_overrun_risk.basic':
+    'A {period} budget could be exceeded around {date} if the current pace continues. Review the plan in the app.',
+  'email.budget_overrun_risk.basic_nodate':
+    'A {period} budget could be exceeded before the period ends if the current pace continues. Review the plan in the app.',
+  'email.budget_overrun_risk.detailed':
+    'At the current pace ({basis}), {target} would exceed its {period} limit around {date} (projection {projected} of {reference} {currency}). This is an estimate: review the plan in the app.',
+  'email.budget_overrun_risk.detailed_nodate':
+    'At the current pace ({basis}), {target} would exceed its {period} limit (projection {projected} of {reference} {currency}). This is an estimate: review the plan in the app.',
   'inapp.home_digest.title': 'Your financial summary',
   'inapp.home_digest.body': 'Home summary generated on {date}.',
   'email.home_digest.subject': 'Your PFOS financial summary',
@@ -588,6 +626,25 @@ const pt: MessageCatalog = {
     'Em {date} foi detectada 1 despesa atípica nova: {amount} em {transactionDate}, {reason}. Revise-a no app.',
   'email.spending_anomaly.detailed_other':
     'Em {date} foram detectadas {count} despesas atípicas novas; a de maior valor é {amount} em {transactionDate}, {reason}. Revise-as no app.',
+  // risco de estourar um orçamento (add-budget-overrun-risk): falam de ritmo e de data estimada, nunca de certeza; o email
+  // basic não leva valores nem nomes.
+  'inapp.budget_overrun_risk.title': 'Possível estouro em {target} por volta de {date}',
+  'inapp.budget_overrun_risk.title_nodate': 'Possível estouro em {target} antes do fim de {period}',
+  'inapp.budget_overrun_risk.body':
+    'No ritmo atual ({basis}), {target} ultrapassaria o limite por volta de {date} (projeção {projected} de {reference} {currency}). É uma estimativa: revise no plano de {period}.',
+  'inapp.budget_overrun_risk.body_nodate':
+    'No ritmo atual ({basis}), {target} ultrapassaria o limite em {period} (projeção {projected} de {reference} {currency}). É uma estimativa: revise no plano.',
+  'inapp.budget_overrun_risk.basis.RUN_RATE': 'com base no ritmo do período',
+  'inapp.budget_overrun_risk.basis.FORECAST': 'com base na previsão',
+  'email.budget_overrun_risk.subject': 'Um orçamento pode ser ultrapassado',
+  'email.budget_overrun_risk.basic':
+    'Um orçamento de {period} pode ser ultrapassado por volta de {date} se o ritmo atual continuar. Revise o plano no app.',
+  'email.budget_overrun_risk.basic_nodate':
+    'Um orçamento de {period} pode ser ultrapassado antes do fim do período se o ritmo atual continuar. Revise o plano no app.',
+  'email.budget_overrun_risk.detailed':
+    'No ritmo atual ({basis}), {target} ultrapassaria o limite de {period} por volta de {date} (projeção {projected} de {reference} {currency}). É uma estimativa: revise o plano no app.',
+  'email.budget_overrun_risk.detailed_nodate':
+    'No ritmo atual ({basis}), {target} ultrapassaria o limite de {period} (projeção {projected} de {reference} {currency}). É uma estimativa: revise o plano no app.',
   'inapp.home_digest.title': 'Seu resumo financeiro',
   'inapp.home_digest.body': 'Resumo do Início gerado em {date}.',
   'email.home_digest.subject': 'Seu resumo financeiro do PFOS',

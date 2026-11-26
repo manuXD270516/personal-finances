@@ -8,6 +8,7 @@ import {
   type ApiResponse,
 } from '@pf/platform/nest';
 import type { CompareMode } from '../domain/index.js';
+import type { BudgetRiskQueries } from '../application/budget-risk.queries.js';
 import type { CashFlowCalendarQueries } from '../application/cash-flow-calendar.queries.js';
 import type { SpendableSettingsService } from '../application/spendable-settings.use-cases.js';
 import type { ConversionCostQueries } from '../application/conversion-cost.queries.js';
@@ -16,6 +17,7 @@ import type { ReportSummaryQueries } from '../application/report-summary.queries
 import type { SpendableQueries } from '../application/spendable.queries.js';
 import type { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
 import type {
+  BudgetRiskDto,
   CashFlowCalendarDto,
   ConversionCostAnalysisDto,
   ConversionCostGroupingDto,
@@ -34,6 +36,7 @@ export const SPENDABLE_QUERIES = Symbol('SPENDABLE_QUERIES');
 export const CONVERSION_COST_QUERIES = Symbol('CONVERSION_COST_QUERIES');
 export const CASH_FLOW_QUERIES = Symbol('CASH_FLOW_QUERIES');
 export const SPENDABLE_SETTINGS_SERVICE = Symbol('SPENDABLE_SETTINGS_SERVICE');
+export const BUDGET_RISK_QUERIES = Symbol('BUDGET_RISK_QUERIES');
 
 type Json = Record<string, unknown>;
 const str = (q: Json, k: string): string | undefined =>
@@ -130,6 +133,7 @@ export class ReportingController {
     @Inject(CONVERSION_COST_QUERIES) private readonly conversionCosts: ConversionCostQueries,
     @Inject(CASH_FLOW_QUERIES) private readonly cashFlow: CashFlowCalendarQueries,
     @Inject(SPENDABLE_SETTINGS_SERVICE) private readonly spendableSettings: SpendableSettingsService,
+    @Inject(BUDGET_RISK_QUERIES) private readonly budgetRisk: BudgetRiskQueries,
   ) {}
 
   @Get('workspaces/:workspaceId/reports/summary')
@@ -255,6 +259,27 @@ export class ReportingController {
     res.setHeader('etag', cashFlowEtag(calendar, dataVersion));
     res.setHeader('cache-control', 'private, no-cache');
     return calendar;
+  }
+
+  /**
+   * `GET /api/v1/workspaces/{workspaceId}/periods/{periodId}/budget-risk` (`getBudgetRisk`, VIEWER): riesgo de exceder cada
+   * línea de gasto del plan del periodo en curso, con proyección, nivel y fecha estimada (add-budget-overrun-risk). Un
+   * periodo inexistente o de otro workspace ⇒ 404 `RESOURCE_NOT_FOUND`. Solo lectura: no cambia ninguna cifra del plan.
+   */
+  @Get('workspaces/:workspaceId/periods/:periodId/budget-risk')
+  async getBudgetRisk(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('periodId') periodId: string,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ): Promise<BudgetRiskDto> {
+    const risk = await this.budgetRisk.getBudgetRisk({
+      userId: principalOf(req)?.userId ?? null,
+      workspaceId,
+      periodId,
+    });
+    res.setHeader('cache-control', 'private, no-cache');
+    return risk;
   }
 
   /** `GET …/reports/spendable/settings` (`getSpendableSettings`, VIEWER): modo de horizonte y esenciales del disponible. */

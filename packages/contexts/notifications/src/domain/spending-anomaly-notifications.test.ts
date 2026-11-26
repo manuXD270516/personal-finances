@@ -25,7 +25,9 @@ describe('Catálogo del aviso de gastos atípicos (entrega directa, desactivado 
   it('[TC-NOTIFICATIONS-ANOMALY-001] es el único tipo apagado por omisión y los demás siguen activos', () => {
     expect(NOTIFICATION_TYPES).toContain('SPENDING_ANOMALY');
     expect(defaultTypePreference('SPENDING_ANOMALY')).toEqual({ inApp: false, email: false });
-    for (const type of NOTIFICATION_TYPES.filter((t) => t !== 'SPENDING_ANOMALY')) {
+    for (const type of NOTIFICATION_TYPES.filter(
+      (t) => t !== 'SPENDING_ANOMALY' && t !== 'BUDGET_OVERRUN_RISK',
+    )) {
       expect(defaultTypePreference(type), type).toEqual({ inApp: true, email: true });
     }
   });

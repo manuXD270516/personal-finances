@@ -69,9 +69,11 @@ describe('NotificationIntake: gastos atípicos (desactivado por omisión)', () =
       inApp: false,
       email: false,
     });
-    expect(view.types.filter((t) => t.type !== 'SPENDING_ANOMALY').every((t) => t.inApp && t.email)).toBe(
-      true,
-    );
+    expect(
+      view.types
+        .filter((t) => t.type !== 'SPENDING_ANOMALY' && t.type !== 'BUDGET_OVERRUN_RISK')
+        .every((t) => t.inApp && t.email),
+    ).toBe(true);
   });
 
   it('[TC-NOTIFICATIONS-ANOMALY-002] con el tipo activado OWNER y EDITOR reciben una sola notificación; el VIEWER no', async () => {

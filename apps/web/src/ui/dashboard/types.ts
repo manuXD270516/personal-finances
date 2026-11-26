@@ -6,6 +6,7 @@
 import type { GoalContributionsNet, GoalsHomeBlock } from '../goals/types';
 import type { Money, RateAttribution, ResolvedRate } from '../common/fx-types';
 import type { CashFlowHomeBlock, CategoryVariation } from '../cash-flow/types';
+import type { BudgetRiskHome } from '../budget-risk/types';
 import type { SpendableSummary } from '../spendable/types';
 
 export type {
@@ -148,6 +149,8 @@ export interface ReportSummary {
   readonly spendable?: SpendableSummary | null;
   /** Q8 (add-cash-flow-forecast): saldo más bajo esperado y riesgo de 30 días; `null` sin cuentas líquidas. */
   readonly cashFlow?: CashFlowHomeBlock | null;
+  /** Q5 (add-budget-overrun-risk): líneas del plan en riesgo «probable» de excederse; `null` sin plan o sin líneas en riesgo. */
+  readonly budgetRisk?: BudgetRiskHome | null;
   /** Q3 (add-predicted-cash-flow-band): gasto esperado del periodo con su rango probable; `null` sin pronóstico del periodo. */
   readonly forecast?: {
     readonly expectedSpending: {
