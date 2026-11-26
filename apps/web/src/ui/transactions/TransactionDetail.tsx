@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
@@ -33,6 +33,7 @@ import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { MatchSuggestionsNotice } from '../recurring/MatchSuggestionsPanel';
 import { useCatalogs } from './catalogs';
 import { availableActions } from './logic';
+import { initialAccount, readLastAccount } from './last-account';
 import { TransactionForm, type RecordKind } from './TransactionForm';
 import { isWithoutStatement } from '../reconciliation/logic';
 import type { TransactionLifecycle } from '../lifecycle/types';
@@ -95,6 +96,18 @@ function NewTransaction({
       .then((r) => setSource(r.data ?? null))
       .catch(() => setSource(null));
   }, [ctx.api, ctx.base, duplicateOf]);
+  // Cuenta inicial (add-quick-capture, D510): `?cuenta=`, luego la última usada en este dispositivo si sigue activa.
+  const startAccount = useMemo(
+    () =>
+      catalogs.loaded
+        ? initialAccount({
+            linkAccountId: accountId,
+            remembered: readLastAccount(ctx.me.id, ctx.ws.id),
+            activeAccounts: catalogs.activeAccounts,
+          })
+        : '',
+    [catalogs.loaded, catalogs.activeAccounts, accountId, ctx.me.id, ctx.ws.id],
+  );
   if (!catalogs.loaded || source === undefined) return <p aria-busy="true">{t('list.loading')}</p>;
   return (
     <section style={pageStyle}>
@@ -106,7 +119,9 @@ function NewTransaction({
         ctx={ctx}
         catalogs={catalogs}
         {...(source ? { duplicateOf: source } : {})}
-        {...(accountId ? { presetAccountId: accountId } : {})}
+        {...(startAccount ? { presetAccountId: startAccount } : {})}
+        afterSave="stay"
+        autoFocusAmount
         {...(kind && RECORD.includes(kind) ? { presetKind: kind as RecordKind } : {})}
         onSaved={(tx) => {
           const warn = tx.warnings?.some((w) => w.code === 'POSSIBLE_DUPLICATE');

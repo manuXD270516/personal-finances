@@ -54,7 +54,13 @@
     "reports": "Reportes",
     "cashFlow": "Flujo de caja",
     "forecasts": "Pronósticos",
-    "spendingAnomalies": "Gastos atípicos"
+    "spendingAnomalies": "Gastos atípicos",
+    "notices": {
+      "label": "Avisos",
+      "close": "Cerrar",
+      "actionsAvailable": "Acciones disponibles"
+    },
+    "quickAdd": "Registrar"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -1201,6 +1207,19 @@
       "DEBT": "Deudas",
       "GOAL": "Meta de ahorro",
       "SYSTEM": "Sistema"
+    },
+    "quick": {
+      "saved": {
+        "EXPENSE": "Gasto de {amount} registrado",
+        "INCOME": "Ingreso de {amount} registrado",
+        "REFUND": "Reembolso de {amount} registrado",
+        "ADJUSTMENT": "Ajuste de {amount} registrado"
+      },
+      "undo": "Deshacer",
+      "view": "Ver",
+      "voided": "Registro anulado",
+      "undoReason": "Deshecho desde el aviso de registro",
+      "recordAndDetail": "Registrar e ir al detalle"
     }
   },
   "Fx": {
