@@ -667,7 +667,7 @@ html {
   .pf-topbar {
     flex-wrap: wrap;
     /* Con el acceso «＋ Registrar» la fila de 360 px queda justa: menos separación horizontal para que el menú de usuario no baje. */
-    column-gap: var(--pf-space-2);
+    column-gap: var(--pf-space-1);
   }
   .pf-ws {
     order: 10;
