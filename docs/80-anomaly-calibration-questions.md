@@ -48,4 +48,4 @@ El Large Seed solo inyecta anomalías de 5 a 20 veces el monto máximo de la cat
 
 ## Respuestas
 
-Se registran en el siguiente `…-decisions.md` con ids D nuevos.
+Contestadas el 2026-11-25 y registradas en [docs/81](81-anomaly-calibration-decisions.md) con los ids D513 (pregunta 1, opción a), D514 (pregunta 2, opción b) y D515 (pregunta 3, sin respuesta: sigue la recomendación a).

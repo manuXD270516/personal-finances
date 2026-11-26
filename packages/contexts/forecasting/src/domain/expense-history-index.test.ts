@@ -24,6 +24,37 @@ describe('ExpenseHistoryIndex', () => {
     expect(h.category('cat').map((v) => v.toFixed(0))).toEqual(['20', '30']);
     expect(h.counterparty('cp').map((v) => v.toFixed(0))).toEqual(['20', '30']);
     expect(h.workspace().map((v) => v.toFixed(0))).toEqual(['20', '30']);
+    expect(h.counterpartyInCategory('cp', 'cat').map((v) => v.toFixed(0))).toEqual(['20', '30']);
+  });
+
+  it('[TC-FORECAST-ANOMALY-028] [TC-FORECAST-ANOMALY-029] el índice por par cuenta solo los gastos cuya categoría principal es esa', () => {
+    const multi = new ExpenseHistoryIndex([
+      {
+        transactionId: 'm1',
+        date: '2026-10-01',
+        counterpartyId: 'cp',
+        portions: [
+          { categoryId: 'cat-a', value: dec('30') },
+          { categoryId: 'cat-b', value: dec('70') },
+        ],
+        total: dec('100'),
+      },
+      expense('m2', '2026-10-02', '10', 'cp'),
+      {
+        transactionId: 'm3',
+        date: '2026-10-03',
+        counterpartyId: 'cp',
+        portions: [{ categoryId: null, value: dec('500') }],
+        total: dec('500'),
+      },
+    ]);
+    const h = multi.historyFor('2026-11-12');
+    expect(h.counterpartyInCategory('cp', 'cat-b').map((v) => v.toFixed(0))).toEqual(['100']);
+    expect(h.counterpartyInCategory('cp', 'cat-a')).toEqual([]);
+    expect(h.counterpartyInCategory('cp', 'cat').map((v) => v.toFixed(0))).toEqual(['10']);
+    // La historia de la contraparte en todas sus categorías sí cuenta los tres (define si es nueva).
+    expect(h.counterparty('cp')).toHaveLength(3);
+    expect(h.counterpartyInCategory('otra', 'cat-b')).toEqual([]);
   });
 
   it('[TC-FORECAST-ANOMALY-006] una contraparte o categoría desconocida no tiene historia', () => {

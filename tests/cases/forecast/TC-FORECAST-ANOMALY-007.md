@@ -5,7 +5,7 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Contraparte nueva con monto alto"
 scenario: "Contraparte nueva con monto común"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ steps:
 expected_result:
   - "el gasto no se marca"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-007 — Una contraparte nueva con un monto común no se marca

@@ -5,7 +5,7 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Evaluación contra las anomalías etiquetadas del Large Seed"
 scenario: "Umbrales cumplidos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010","FR-FORECAST-007"]
 nfr: []
 invariants: []
@@ -17,6 +17,7 @@ automated_tests:
   - apps/api/test/perf/anomalies.perf.ts
   - apps/api/src/forecasting/anomaly-backtest-cli.test.ts
   - packages/contexts/forecasting/src/application/backtest-spending-anomalies.test.ts
+  - apps/api/test/perf/suite-order.test.ts
 status: automated
 regression_suite: false
 phase: 9
@@ -34,7 +35,7 @@ expected_result:
   - "la fila del nightly pasa (umbrales 0.80 y 0.85)"
   - "el informe no contiene montos ni descripciones"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-025 — El backtesting calcula precisión y recall sin contar otras etiquetas

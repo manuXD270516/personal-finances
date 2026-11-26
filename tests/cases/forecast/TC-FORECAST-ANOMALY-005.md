@@ -5,7 +5,7 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Gastos atípicos para su contraparte"
 scenario: "Atípico por contraparte y por categoría"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ steps:
 expected_result:
   - "hay un solo gasto atípico con los motivos CATEGORY_OUTLIER (razón 3.8) y COUNTERPARTY_OUTLIER (razón 3.2)"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-005 — Un gasto atípico por categoría y por contraparte es uno solo con dos motivos

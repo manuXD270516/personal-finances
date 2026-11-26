@@ -333,10 +333,10 @@ export function forecastingAnomalyPorts(input: {
       enabled: config.FORECASTING_ANOMALIES_ENABLED ?? true,
       lookbackDays: config.FORECASTING_ANOMALY_LOOKBACK_DAYS ?? 7,
       thresholds: {
-        robustZ: dec(String(config.FORECASTING_ANOMALY_ROBUST_Z ?? 3.5)),
+        robustZ: dec(String(config.FORECASTING_ANOMALY_ROBUST_Z ?? 15)),
         minRatio: dec(String(config.FORECASTING_ANOMALY_MIN_RATIO ?? 3)),
         minSample: config.FORECASTING_ANOMALY_MIN_SAMPLE ?? 8,
-        newCounterpartyPercentile: config.FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE ?? 95,
+        newCounterpartyPercentile: config.FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE ?? 99.5,
       },
       rateValidityWindowDays: input.rateValidityWindowDays,
     },
