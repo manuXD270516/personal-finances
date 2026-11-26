@@ -3,28 +3,28 @@ import { RobustStats } from './robust-stats.js';
 
 /**
  * `SpendingAnomalyDetector` (openspec add-spending-anomaly-detection, decisiones 4 y 5; D473): estadística robusta
- * (mediana y MAD) por categoría, por contraparte y por contraparte nueva con monto alto. Dominio puro: recibe los montos
+ * (mediana y MAD) por categoría, por contraparte dentro de su categoría principal y por contraparte nueva con monto alto. Dominio puro: recibe los montos
  * ya llevados a la moneda de reporte con la tasa de su fecha y las muestras de los 365 días anteriores, y devuelve los
  * motivos explicables. No lee nada ni decide qué gastos se evalúan (eso es de la aplicación).
  */
 export type AnomalyReasonKind = 'CATEGORY_OUTLIER' | 'COUNTERPARTY_OUTLIER' | 'NEW_COUNTERPARTY_HIGH_AMOUNT';
 
 export interface AnomalyThresholds {
-  /** `FORECASTING_ANOMALY_ROBUST_Z` (3.5). */
+  /** `FORECASTING_ANOMALY_ROBUST_Z` (15, D513). */
   readonly robustZ: Decimal;
   /** `FORECASTING_ANOMALY_MIN_RATIO` (3.0): el monto debe ser al menos esta cantidad de veces la mediana. */
   readonly minRatio: Decimal;
   /** `FORECASTING_ANOMALY_MIN_SAMPLE` (8): gastos de historia mínimos por categoría, contraparte y workspace. */
   readonly minSample: number;
-  /** `FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE` (95). */
+  /** `FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE` (99.5, D513). */
   readonly newCounterpartyPercentile: number;
 }
 
 export const DEFAULT_ANOMALY_THRESHOLDS: AnomalyThresholds = {
-  robustZ: dec('3.5'),
+  robustZ: dec('15'),
   minRatio: dec('3'),
   minSample: 8,
-  newCounterpartyPercentile: 95,
+  newCounterpartyPercentile: 99.5,
 };
 
 /** Un gasto a evaluar, en la moneda de reporte. */
@@ -39,7 +39,10 @@ export interface ExpenseSubject {
 /** Muestras de los 365 días anteriores a la fecha del gasto, sin el gasto mismo (pedidas de forma perezosa). */
 export interface ExpenseHistory {
   category(categoryId: string): readonly Decimal[];
+  /** Gastos de la contraparte en todas sus categorías (define si es nueva). */
   counterparty(counterpartyId: string): readonly Decimal[];
+  /** Gastos de la contraparte cuya categoría principal es `categoryId` (criterio por contraparte, D513). */
+  counterpartyInCategory(counterpartyId: string, categoryId: string): readonly Decimal[];
   workspace(): readonly Decimal[];
 }
 
@@ -54,6 +57,21 @@ export interface AnomalyReason {
   /** Puntaje robusto con 2 decimales; `null` con MAD igual a cero y en la contraparte nueva. */
   readonly robustScore: string | null;
   readonly sampleSize: number;
+}
+
+/**
+ * Categoría principal de un gasto (D513): la de su porción de mayor monto en la moneda de reporte, sin contar las porciones
+ * «sin categoría» (`categoryId = null`); con empate, la de la primera porción. `null` si ninguna porción está categorizada.
+ */
+export function mainCategoryOf(
+  portions: readonly { readonly categoryId: string | null; readonly value: Decimal }[],
+): string | null {
+  let best: { categoryId: string; value: Decimal } | null = null;
+  for (const p of portions) {
+    if (p.categoryId === null) continue;
+    if (best === null || p.value.gt(best.value)) best = { categoryId: p.categoryId, value: p.value };
+  }
+  return best === null ? null : best.categoryId;
 }
 
 const present = (value: Decimal, places: number): string =>
@@ -130,8 +148,18 @@ export const SpendingAnomalyDetector = {
           }
         }
       } else {
-        const hit = outlierOf(subject.total, sample, thresholds, scale);
-        if (hit) reasons.push({ kind: 'COUNTERPARTY_OUTLIER', categoryId: null, counterpartyId, ...hit });
+        // Contraparte conocida: el monto total se compara con sus gastos en la categoría principal (D513); sin porciones
+        // categorizadas o con poca historia en esa categoría no se evalúa por contraparte (ni es nueva).
+        const main = mainCategoryOf(subject.portions);
+        if (main !== null) {
+          const hit = outlierOf(
+            subject.total,
+            history.counterpartyInCategory(counterpartyId, main),
+            thresholds,
+            scale,
+          );
+          if (hit) reasons.push({ kind: 'COUNTERPARTY_OUTLIER', categoryId: main, counterpartyId, ...hit });
+        }
       }
     }
     return reasons;

@@ -12,7 +12,7 @@ export interface SpendingAnomalyReason {
   readonly kind: SpendingAnomalyReasonKind;
   readonly categoryId: string | null;
   readonly counterpartyId: string | null;
-  /** Mediana (categoría y contraparte) o percentil 95 (contraparte nueva) en la moneda de reporte. */
+  /** Mediana (categoría y contraparte) o percentil configurado (contraparte nueva) en la moneda de reporte. */
   readonly reference: Money;
   /** Monto ÷ mediana con 1 decimal; `null` en la contraparte nueva. */
   readonly ratio: string | null;

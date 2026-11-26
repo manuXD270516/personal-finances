@@ -5,16 +5,17 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Evaluación contra las anomalías etiquetadas del Large Seed"
 scenario: "Umbrales no cumplidos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010", "FR-FORECAST-007"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/backtest-spending-anomalies.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies", "calibration", "nightly"]
@@ -29,7 +30,7 @@ expected_result:
   - "el resultado es FAIL"
   - "el informe reparte los 30 marcados sin etiqueta por criterio y muestra los umbrales, sin montos ni descripciones"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-031 — La fila del nightly falla con precisión 0.7692 y recall 0.8000 e informa los marcados sin etiqueta por criterio

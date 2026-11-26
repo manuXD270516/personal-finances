@@ -77,8 +77,15 @@ export function reasonText(reason: SpendingAnomalyReason, f: FormatContext, name
     (reason.kind === 'CATEGORY_OUTLIER'
       ? reason.categoryId && names.category(reason.categoryId)
       : reason.counterpartyId && names.counterparty(reason.counterpartyId)) || f.t('noName');
-  const key = f.has(`reason.${reason.kind}`) ? reason.kind : 'CATEGORY_OUTLIER';
+  // Contraparte (D513): el motivo nombra la categoría principal. Las marcas anteriores al change 85 no la traen y no se
+  // recalculan: usan la plantilla sin categoría.
+  const category =
+    reason.kind === 'COUNTERPARTY_OUTLIER' ? names.category(reason.categoryId ?? '') : undefined;
+  const wanted =
+    reason.kind === 'COUNTERPARTY_OUTLIER' && !category ? 'COUNTERPARTY_OUTLIER_LEGACY' : reason.kind;
+  const key = f.has(`reason.${wanted}`) ? wanted : 'CATEGORY_OUTLIER';
   return f.t(`reason.${key}`, {
+    category: category ?? '',
     ratio: reason.ratio === null ? '' : formatDecimal(reason.ratio, f.locale),
     name,
     reference: formatMoney(reason.reference, f.locale),

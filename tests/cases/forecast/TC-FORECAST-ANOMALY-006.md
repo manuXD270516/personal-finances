@@ -5,7 +5,7 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Contraparte nueva con monto alto"
 scenario: "Compra grande con una tienda desconocida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
@@ -33,7 +33,7 @@ steps:
 expected_result:
   - "el gasto queda marcado con el motivo NEW_COUNTERPARTY_HIGH_AMOUNT y referencia 900.00 BOB"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-006 — Una contraparte sin gastos previos con monto sobre el percentil 99.5 se marca

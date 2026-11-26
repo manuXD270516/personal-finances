@@ -7415,8 +7415,9 @@
     "reportingAmount": "Equivalent to {amount}",
     "reason": {
       "CATEGORY_OUTLIER": "{ratio} times the median of \"{name}\" ({reference} over the last 12 months, {count} expenses)",
-      "COUNTERPARTY_OUTLIER": "{ratio} times the median of your expenses with \"{name}\" ({reference} over the last 12 months, {count} expenses)",
-      "NEW_COUNTERPARTY_HIGH_AMOUNT": "New counterparty \"{name}\", with no expenses in the last 12 months, at or above the 95th percentile of your expenses ({reference}, {count} expenses)"
+      "COUNTERPARTY_OUTLIER": "{ratio} times the median of \"{name}\" in \"{category}\" ({reference} over the last 12 months, {count} expenses)",
+      "COUNTERPARTY_OUTLIER_LEGACY": "{ratio} times the median of your expenses with \"{name}\" ({reference} over the last 12 months, {count} expenses)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "New counterparty \"{name}\", with no expenses in the last 12 months, at or above the high percentile of your expenses ({reference}, {count} expenses)"
     },
     "dismiss": {
       "label": "Not unusual",

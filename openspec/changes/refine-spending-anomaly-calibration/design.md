@@ -116,3 +116,8 @@ En [docs/80](../../../docs/80-anomaly-calibration-questions.md):
 1. **[B para los grupos 2 y 3]** Método y parámetros por omisión (recomendación: contraparte dentro de su categoría principal, z ≥ 15, percentil 99.5).
 2. **[B para la tarea 5.2]** Criterio de salida revisado de D483 (recomendación: precisión ≥ 0.80 y recall ≥ 0.85 a escala completa, bloqueante).
 3. Anomalías moderadas en el Large Seed (no bloquea).
+
+## Medición de la implementación (2026-11-26)
+
+`apps/api/test/perf/anomalies.perf.ts` con el Large Seed a **escala completa** (`PF_PERF_SCALE=1`, Testcontainers, la evaluación tardó 56 s) y los umbrales por omisión del código (15, 3, 8 y 99.5): 92 146 gastos evaluados, 124 marcados, 116 positivos (113 `OUTLIER` y 3 `NEW_COUNTERPARTY_FRAUD`), 8 sin etiqueta y 0 con otra etiqueta; 123 esperados. **Precisión 0.9355 y recall 0.9431**, iguales a la réplica de la rejilla (fila 10); la fila bloqueante (0.80 y 0.85) pasa. Marcados sin etiqueta por criterio: contraparte nueva 7 y categoría 1 (contraparte 0). Por criterio, sobre todos los marcados: categoría 117, contraparte nueva 11 y contraparte 1.
+
