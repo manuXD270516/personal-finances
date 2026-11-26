@@ -5,16 +5,18 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Evaluación periódica del riesgo sin consumidores nuevos"
 scenario: "Servicio de pronósticos apagado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020","FR-FORECAST-006"]
 nfr: ["NFR-REL-010"]
 invariants: []
 priority: medium
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/budget-risk.int.test.ts
+  - packages/contexts/reporting/src/application/budget-risk.queries.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk"]

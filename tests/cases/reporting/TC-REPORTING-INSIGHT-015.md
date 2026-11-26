@@ -5,16 +5,19 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Evaluación periódica del riesgo sin consumidores nuevos"
 scenario: "Presupuesto de conexiones intacto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020"]
 nfr: ["NFR-REL-010"]
 invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/src/worker/reporting-jobs.test.ts
+  - apps/api/test/events/event-throughput.int.test.ts
+  - packages/contexts/reporting/src/application/budget-risk.queries.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk","connections"]

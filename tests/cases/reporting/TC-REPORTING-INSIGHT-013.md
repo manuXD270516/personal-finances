@@ -5,16 +5,17 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Textos del riesgo por plantilla y sin certeza"
 scenario: "Texto del riesgo probable"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020","FR-FORECAST-004"]
 nfr: ["NFR-USAB-001","NFR-USAB-002"]
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/budget-risk/budget-risk.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk"]

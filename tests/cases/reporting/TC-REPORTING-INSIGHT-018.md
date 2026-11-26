@@ -5,16 +5,21 @@ spec: reporting/dashboard
 related_specs: []
 requirement: "Líneas en riesgo de exceder en el Home"
 scenario: "Dos líneas en riesgo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020","FR-REPORTING-001"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/budget-risk.int.test.ts
+  - apps/web/src/ui/budget-risk/budget-risk.test.tsx
+  - packages/contexts/reporting/src/application/budget-risk.queries.test.ts
+  - packages/contexts/reporting/src/application/report-summary.budget-risk.test.ts
+  - tests/e2e/specs/budget-overrun-risk.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk"]

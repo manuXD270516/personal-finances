@@ -5,16 +5,19 @@ spec: reporting/predictive-insights
 related_specs: []
 requirement: "Riesgo de exceder una línea de gasto"
 scenario: "Restaurantes al ritmo del periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-020","FR-PLANNING-024"]
 nfr: ["NFR-DATA-001","NFR-DATA-002"]
 invariants: ["INV-001","INV-020"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/budget-risk.int.test.ts
+  - packages/contexts/reporting/src/application/budget-risk.queries.test.ts
+  - packages/contexts/reporting/src/domain/budget-overrun-projector.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["budget-risk"]

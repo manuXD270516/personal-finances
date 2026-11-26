@@ -2,6 +2,8 @@ import { cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle, warnin
 import { formatMoney, formatSignedMoney } from '../dashboard/format';
 import { formatDecimal } from '../AuditHistory';
 import type { FormatContext } from '../dashboard/types';
+import { BudgetRiskCell, BudgetRiskLegend } from '../budget-risk/BudgetRiskView';
+import type { BudgetLineRisk } from '../budget-risk/types';
 import { BudgetStatusBadge } from './BudgetStatus';
 import {
   barValue,
@@ -114,6 +116,8 @@ export function BudgetLinesTable({
   busyId,
   onEdit,
   onRemove,
+  risk,
+  riskFormat,
 }: {
   budget: Budget;
   names: TargetNames;
@@ -125,7 +129,12 @@ export function BudgetLinesTable({
   busyId?: string | undefined;
   onEdit?: (line: BudgetLine) => void;
   onRemove?: (line: BudgetLine) => void;
+  /** Riesgo de exceder por línea del periodo en curso (add-budget-overrun-risk); sin él no hay columna de riesgo. */
+  risk?: ReadonlyMap<string, BudgetLineRisk> | undefined;
+  /** Formato del namespace `BudgetRisk` (textos del indicador). */
+  riskFormat?: FormatContext | undefined;
 }) {
+  const withRisk = risk !== undefined && riskFormat !== undefined;
   if (budget.lines.length === 0) {
     return (
       <p data-testid="budget-lines-empty" style={mutedStyle}>
@@ -164,6 +173,11 @@ export function BudgetLinesTable({
             <th scope="col" style={cellStyle}>
               {f.t('lines.columns.status')}
             </th>
+            {withRisk ? (
+              <th scope="col" style={cellStyle}>
+                {riskFormat.t('column')}
+              </th>
+            ) : null}
             <th scope="col" style={cellStyle}>
               {f.t('lines.columns.thresholds')}
             </th>
@@ -270,6 +284,11 @@ export function BudgetLinesTable({
                 <td style={cellStyle}>
                   <BudgetStatusBadge status={p.status} f={f} />
                 </td>
+                {withRisk ? (
+                  <td style={cellStyle} data-testid="line-risk-cell">
+                    <BudgetRiskCell risk={risk.get(line.id)} f={riskFormat} />
+                  </td>
+                ) : null}
                 <td style={cellStyle} data-testid="line-thresholds">
                   {line.thresholds.length === 0 ? (
                     <span aria-label={f.t('lines.noThresholds')}>—</span>
@@ -326,6 +345,7 @@ export function BudgetLinesTable({
           })}
         </tbody>
       </table>
+      {withRisk ? <BudgetRiskLegend lines={[...risk.values()]} f={riskFormat} /> : null}
     </div>
   );
 }
