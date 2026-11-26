@@ -35,8 +35,8 @@ describe('Catálogo de alertas de tasas (sin consumidor de eventos)', () => {
       expect(NOTIFICATION_TYPES).toContain(type);
       expect(intakeDefinitionOf(type).recipients).toEqual(['OWNER', 'EDITOR']);
     }
-    // 3 de FX + el riesgo de déficit de REPORTING (add-cash-flow-forecast).
-    expect(NOTIFICATION_INTAKE_CATALOG.map((d) => d.type)).toHaveLength(4);
+    // 3 de FX + el riesgo de déficit de REPORTING (add-cash-flow-forecast) + los gastos atípicos de FORECAST + el riesgo de presupuesto de REPORTING.
+    expect(NOTIFICATION_INTAKE_CATALOG.map((d) => d.type)).toHaveLength(6);
     // Ningún tipo de entrega directa tiene consumidor ni evento: NOTIFY no suscribe colas nuevas (D249).
     for (const d of NOTIFICATION_INTAKE_CATALOG) {
       expect(d).not.toHaveProperty('consumer');

@@ -427,12 +427,13 @@ describe('tablas append-only y versiones de los términos', () => {
 });
 
 describe('purga demo', () => {
-  it('las nueve tablas de tarjetas están registradas con hijas antes que padres', async () => {
+  it('las diez tablas de tarjetas están registradas con hijas antes que padres', async () => {
     const { rows } = await migrator.query<{ table_name: string; purge_order: number }>(
       `SELECT table_name, purge_order FROM platform.workspace_scoped_table WHERE schema_name = 'debt' AND table_name LIKE ANY (ARRAY['card\\_%', 'credit\\_card%'])`,
     );
     const order = Object.fromEntries(rows.map((r) => [r.table_name, Number(r.purge_order)]));
     expect(Object.keys(order).sort()).toEqual([
+      'card_charge',
       'card_installment',
       'card_installment_plan',
       'card_reminder',
@@ -448,6 +449,7 @@ describe('purga demo', () => {
     before('card_installment_plan', 'credit_card_account');
     before('card_statement', 'credit_card_account');
     before('card_reminder', 'credit_card_account');
+    before('card_charge', 'credit_card_account');
     before('credit_card_account', 'credit_card');
     before('credit_card_terms', 'credit_card');
     before('card_utilization_state', 'credit_card');

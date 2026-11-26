@@ -4,7 +4,9 @@ import type { Transaction } from '../common/types';
 import { badgeStyle, mutedStyle } from '../common/ui';
 import { displayValue, valuesOf, type CustomFieldDefinition } from '../custom-fields/logic';
 import { isWithoutStatement } from '../reconciliation/logic';
+import { CardChargeBadge } from '../debt/cards/CardChargeTransaction';
 import { NeedsReviewBadge } from '../rules/TransactionRules';
+import { AnomalyBadge, type AnomalyMarks } from '../spending-anomalies/AnomalyMarks';
 import { amountFor } from './logic';
 import type { NameResolver } from './TransactionTimeline';
 
@@ -85,6 +87,7 @@ export function TransactionsListView({
   onToggle,
   selectable,
   customFields,
+  anomalies,
 }: {
   transactions: readonly Transaction[];
   names: NameResolver;
@@ -96,6 +99,8 @@ export function TransactionsListView({
   selectable: boolean;
   /** Definiciones (activas y archivadas) para mostrar los custom fields de los splits; `cf` es del namespace `CustomFields`. */
   customFields?: { readonly definitions: readonly CustomFieldDefinition[]; readonly cf: FormatContext };
+  /** Marcas de gasto atípico abiertas por transacción (add-spending-anomaly-detection); `f` es del namespace `SpendingAnomalies`. */
+  anomalies?: { readonly marks: AnomalyMarks; readonly f: FormatContext };
 }) {
   const { t, locale } = f;
   if (transactions.length === 0) return <p data-testid="transactions-empty">{t('list.empty')}</p>;
@@ -153,6 +158,10 @@ export function TransactionsListView({
             <StatusBadge status={tx.status} f={f} />
             <WithoutStatementBadge tx={tx} f={f} />
             {tx.needsReview ? <NeedsReviewBadge f={f} /> : null}
+            {anomalies?.marks.get(tx.id) ? (
+              <AnomalyBadge anomaly={anomalies.marks.get(tx.id)!} f={anomalies.f} names={names} href={href} />
+            ) : null}
+            {tx.debtRole === 'CARD_CHARGE' ? <CardChargeBadge label={f.t('list.cardCharge')} /> : null}
             <span style={{ ...mutedStyle, flexBasis: '100%' }}>
               {t(`kinds.${tx.kind}`)}
               {tx.source !== 'MANUAL' && f.has(`sources.${tx.source}`) ? (

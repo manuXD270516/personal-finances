@@ -548,6 +548,19 @@ export const DEBT_AUDIT_POLICY = {
     reportedBilledBalance: 'money',
     reportedMinimumDue: 'money',
   },
+  // add-card-interest-ledger-portions: cargos de tarjeta (registrar, adoptar y anular; sin descripciones del usuario).
+  CardCharge: {
+    cardId: 'plain',
+    accountId: 'plain',
+    businessDate: 'plain',
+    interest: 'money',
+    fees: 'money',
+    insurance: 'money',
+    taxes: 'money',
+    origin: 'plain',
+    transactionId: 'plain',
+    status: 'plain',
+  },
   CardInstallmentPlan: {
     cardAccountId: 'plain',
     purchaseTransactionId: 'plain',

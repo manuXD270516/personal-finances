@@ -1,0 +1,99 @@
+/* Hoja de /gastos-atipicos (docs/28): solo tokens de app/globals.css, mobile-first y sin animaciones. Todo cuelga de .pf-sa. */
+.pf-sa {
+  display: grid;
+  gap: var(--pf-space-4);
+  min-width: 0;
+}
+.pf-sa h1 {
+  margin: 0;
+  font-size: var(--pf-text-2xl);
+}
+.pf-sa-muted {
+  color: var(--pf-fg-muted);
+  font-size: var(--pf-text-sm);
+  margin: 0;
+}
+.pf-sa-notice {
+  border-left: 4px solid var(--pf-warning-border);
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-warning-bg);
+  color: var(--pf-warning-fg);
+  padding: var(--pf-space-2) var(--pf-space-3);
+  margin: 0;
+}
+.pf-sa-label {
+  display: block;
+  font-size: var(--pf-text-sm);
+  color: var(--pf-fg-muted);
+}
+.pf-sa-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-3);
+}
+.pf-sa-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pf-sa-table th,
+.pf-sa-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  border-bottom: 1px solid var(--pf-border);
+  overflow-wrap: anywhere;
+}
+.pf-sa-table th {
+  color: var(--pf-fg-muted);
+  font-size: var(--pf-text-sm);
+  font-weight: 600;
+}
+.pf-sa-amount {
+  font-variant-numeric: tabular-nums;
+}
+.pf-sa-reasons {
+  list-style: disc;
+  margin: 0 0 var(--pf-space-2);
+  padding-left: 1.25rem;
+}
+.pf-sa-status {
+  display: inline-block;
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius-full);
+  padding: 0 var(--pf-space-2);
+  font-size: var(--pf-text-xs);
+  line-height: 1.6;
+}
+.pf-sa-dismiss {
+  display: grid;
+  gap: var(--pf-space-1);
+  justify-items: start;
+}
+/* Pantallas angostas (360 px): cada fila es una tarjeta con la etiqueta de cada celda, sin scroll horizontal. */
+@media (max-width: 47.99rem) {
+  .pf-sa-table thead {
+    position: absolute;
+    left: -10000px;
+  }
+  .pf-sa-table,
+  .pf-sa-table tbody,
+  .pf-sa-table tr,
+  .pf-sa-table td {
+    display: block;
+  }
+  .pf-sa-table tr {
+    border: 1px solid var(--pf-border);
+    border-radius: var(--pf-radius-md);
+    margin-bottom: var(--pf-space-3);
+    background: var(--pf-surface-raised);
+  }
+  .pf-sa-table td {
+    border-bottom: none;
+  }
+  .pf-sa-table td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--pf-fg-muted);
+    font-size: var(--pf-text-xs);
+  }
+}

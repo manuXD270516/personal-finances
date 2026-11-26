@@ -613,7 +613,7 @@
     },
     {
       "pregunta": 13,
-      "hecho": "18 checks obligatorios en main (unit, integración con Testcontainers, e2e Playwright, stack-smoke, Trivy por imagen, gitleaks, contrato, ml); nightly con Large Seed y benchmarks",
+      "hecho": "19 checks obligatorios en main (unit, integración con Testcontainers, e2e Playwright, stack-smoke, Trivy por imagen, gitleaks, contrato, ml); nightly con Large Seed y benchmarks",
       "evidencia": ".github/workflows/pr.yml, nightly.yml; protección de main"
     },
     {
@@ -635,6 +635,36 @@
       "pregunta": 17,
       "hecho": "Desde ADR-0027 se sumaron: servicio ml-forecasting (ADR-0033, +320m, perfil ml apagado por omisión, cloud-init debe aceptar un 5.º digest y eso reemplaza la instancia), clave privada de conexiones montada como archivo 0400 (volumen pendiente en compose.prod.yaml)",
       "evidencia": "docs/adr/0033-*; docs/38 §4"
+    },
+    {
+      "pregunta": 11,
+      "hecho": "La persistencia del import CSV de 5 000 filas es mayormente CPU de un solo hilo: en el nightly la fila del host varió de 9,9 s a 18,6 s según el runner (Intel Xeon 6975P-C contra AMD EPYC 7763), con el mismo commit",
+      "evidencia": "docs/67-import-persist-perf-findings.md; nightlies 44803372807, 45032465801 y 45231166087 (TC-IMPORTS-CSV-029, configuración host)"
+    },
+    {
+      "pregunta": 11,
+      "hecho": "Los reportes largos son CPU de Node en un solo hilo (~80 % del tiempo); tras fix-trends-report-perf el de tendencias a 24 meses quedó en p95 257 ms en un EPYC 9V45 (antes 845 ms en un EPYC 7763)",
+      "evidencia": "openspec/changes/fix-trends-report-perf/design.md; PR #258; nightly 45306102902"
+    },
+    {
+      "pregunta": 6,
+      "hecho": "ADR-0034 agregó 4 tablas UNLOGGED de colas por transacción (ledger.pending_entry_check, ledger.pending_check_sentinel, txn.pending_splits_check, txn.pending_check_sentinel): no se escriben en WAL, quedan vacías tras cada COMMIT y un restore PITR las deja vacías, que es su estado correcto",
+      "evidencia": "apps/api/db/migrations/20261120100000_ledger_statement_validation.sql:25-123"
+    },
+    {
+      "pregunta": 13,
+      "hecho": "El job resolve de deploy.yml ya envía el digest de finance-ml al host (arreglado en #234); el cloud-init del comando forzado (C1) sigue pendiente según cambios-de-codigo.md",
+      "evidencia": "commit 21439318 (#234); docs/despliegue/cambios-de-codigo.md C1"
+    },
+    {
+      "pregunta": 13,
+      "hecho": "main exige 18 checks (se sumó ml) con strict y enforce_admins; el nightly corre a las 06:00 UTC",
+      "evidencia": "docs/23-ci-cd.md §16; .github/workflows/nightly.yml"
+    },
+    {
+      "pregunta": 11,
+      "hecho": "Techos de CPU de compose.prod.yaml: 0,5 a 1,5 cpus por servicio (Keycloak 1,5 y 704m); PostgreSQL con max_connections=70 y presupuesto API 22 + worker 34",
+      "evidencia": "deploy/compose/compose.prod.yaml:70-231 y :79-94"
     }
   ],
   "supuestos": [
@@ -669,6 +699,18 @@
       "que": "Imagen finance-ml en reposo y con 400 series × 60 periodos",
       "valor": "48 MiB y 56 MiB",
       "como": "medición del change 64 (ADR-0033)"
+    },
+    {
+      "que": "Persistencia del import CSV de 5 000 filas (fila host)",
+      "valor": "9,9–18,6 s según CPU (umbral 20 s)",
+      "entorno": "ci",
+      "como": "nightly perf, runners de 4 vCPU de GitHub"
+    },
+    {
+      "que": "GET /reports/trends 24 meses, p95",
+      "valor": "257 ms (EPYC 9V45) tras el fix; 314 ms local",
+      "entorno": "ci",
+      "como": "nightly 45306102902 y medición local del change fix-trends-report-perf"
     }
   ],
   "restricciones": [
@@ -681,8 +723,41 @@
     "Mismas imágenes por digest que CI (paridad local ↔ prod)"
   ],
   "pendientesDelOwner": [
-    "Dominio definitivo",
-    "Aceptar el 5.º digest en cloud-init (servicio ml) cuando quiera encenderlo",
-    "Ejecutar el despliegue N1 (fases del owner del runbook)"
-  ]
+    "Dominio propio o subdominio",
+    "Salida si falla el PoC por memoria: N2 (ampliar presupuesto) o plan B Oracle A1",
+    "Salida si falla el PoC por CPU (C14): solo plan B Oracle A1, porque N2 no suma CPU sostenida; y si C12a/C12b se preparan antes del PoC",
+    "Retención de los mensuales: bucket o lock aparte, u Object Lock",
+    "Formato del drill de restore programado"
+  ],
+  "actualizado": "2026-11-24 (ratificación rápida)",
+  "contexto": {
+    "vigente": {
+      "plataforma": "lightsail-n1 decidido, sin desplegar",
+      "desde": "2026-11-14 (DECISION-DESPLIEGUE.md, ratifica ADR-0027)",
+      "costoUsdMes": 16.5,
+      "costoNota": "≈ USD 16,5 con el recargo de la tarjeta (≈ 15 sin él)",
+      "fuente": "docs/despliegue/DECISION-DESPLIEGUE.md"
+    },
+    "descartadas": [
+      {
+        "plataforma": "fly",
+        "por": "panel 2026-11-14: costo USD 37–42 contra tope 20"
+      },
+      {
+        "plataforma": "supabase / Fly Managed Postgres",
+        "por": "ADR-0027: sin PostgreSQL 18"
+      }
+    ],
+    "congelaciones": [
+      "Ninguna congelación de main; trunk con PR, auto-merge squash y 19 checks"
+    ],
+    "enCurso": [
+      "Change 63 stabilize-import-persist-perf: solo espera el 5.º nightly programado",
+      "fix-trends-report-perf: fusionado, espera 7 nightlies",
+      "Change 67 add-forecast-accuracy: espera 3 periodos reales"
+    ],
+    "cdPathsIgnore": [
+      "deploy.yml es workflow_dispatch manual por digest con aprobación del environment production: ningún archivo dispara un despliegue"
+    ]
+  }
 }

@@ -4,6 +4,8 @@ import { DomainError } from '@pf/shared-kernel';
 import { sql } from 'kysely';
 import type { Pool } from 'pg';
 import type {
+  CategorySuggestionOutcomeRecord,
+  CategorySuggestionOutcomeRepository,
   IdGenerator,
   RuleNameRecord,
   RuleProposalDecisionRecord,
@@ -327,5 +329,48 @@ export class PgRuleProposalDecisionRepository implements RuleProposalDecisionRep
       db(),
     );
     return new Map(rows.map((r) => [r.rule_id, { suggestionId: r.suggestion_id, acceptedAt: r.decided_at }]));
+  }
+}
+
+/** Resultados de sugerencias de categoría (`rules.category_suggestion_outcome`, RLS forzada por workspace). */
+export class PgCategorySuggestionOutcomeRepository implements CategorySuggestionOutcomeRepository {
+  async insertMany(workspaceId: string, records: readonly CategorySuggestionOutcomeRecord[]): Promise<void> {
+    const CHUNK = 2000;
+    for (let i = 0; i < records.length; i += CHUNK) {
+      const part = records.slice(i, i + CHUNK).map((r) => ({
+        id: r.id,
+        surface: r.surface,
+        level: r.level,
+        outcome: r.outcome,
+        occurredOn: r.occurredOn,
+        importJobId: r.importJobId,
+        transactionId: r.transactionId,
+      }));
+      await sql`
+        INSERT INTO rules.category_suggestion_outcome
+          (id, workspace_id, surface, level, outcome, occurred_on, import_job_id, transaction_id)
+        SELECT (e->>'id')::uuid, ${workspaceId}::uuid, e->>'surface', e->>'level', e->>'outcome',
+               (e->>'occurredOn')::date, (e->>'importJobId')::uuid, (e->>'transactionId')::uuid
+          FROM jsonb_array_elements(${JSON.stringify(part)}::jsonb) e`.execute(db());
+    }
+  }
+
+  async aggregate(workspaceId: string, from: string, to: string) {
+    const { rows } = await sql<{
+      surface: CategorySuggestionOutcomeRecord['surface'];
+      level: CategorySuggestionOutcomeRecord['level'];
+      outcome: CategorySuggestionOutcomeRecord['outcome'];
+      n: string;
+    }>`
+      SELECT surface, level, outcome, count(*) AS n
+        FROM rules.category_suggestion_outcome
+       WHERE workspace_id = ${workspaceId} AND occurred_on BETWEEN ${from}::date AND ${to}::date
+       GROUP BY surface, level, outcome`.execute(db());
+    return rows.map((r) => ({
+      surface: r.surface,
+      level: r.level,
+      outcome: r.outcome,
+      count: Number(r.n),
+    }));
   }
 }

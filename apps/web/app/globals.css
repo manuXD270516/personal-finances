@@ -214,9 +214,14 @@ body {
   padding: var(--pf-space-2) var(--pf-space-4);
   min-height: var(--pf-control-h);
   cursor: pointer;
-  transition:
-    background-color var(--pf-duration) ease,
-    border-color var(--pf-duration) ease;
+}
+/* Transición de color de los botones: solo sin preferencia de movimiento reducido (decisión 8 del change, NFR-USAB-107). */
+@media (prefers-reduced-motion: no-preference) {
+  :where(button) {
+    transition:
+      background-color var(--pf-duration) ease,
+      border-color var(--pf-duration) ease;
+  }
 }
 :where(button:hover:not(:disabled)) {
   background: var(--pf-surface-sunken);
@@ -563,7 +568,10 @@ body {
   background: var(--pf-primary-soft);
   color: var(--pf-primary);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--pf-primary);
+  /* Borde con `currentColor`: sobrevive a los colores forzados, donde el fondo y las sombras desaparecen (decisión 9 del change). El
+     relleno se compensa para que el texto no salte respecto de los demás ítems. */
+  border-inline-start: 0.25rem solid currentColor;
+  padding-inline-start: calc(var(--pf-space-3) - 0.25rem);
 }
 
 .pf-main {
@@ -658,6 +666,8 @@ html {
 @media (max-width: 639.98px) {
   .pf-topbar {
     flex-wrap: wrap;
+    /* Con el acceso «＋ Registrar» la fila de 360 px queda justa: menos separación horizontal para que el menú de usuario no baje. */
+    column-gap: var(--pf-space-1);
   }
   .pf-ws {
     order: 10;
@@ -698,14 +708,232 @@ html {
   }
 }
 
-/* Movimiento reducido (docs/28 §10): sin transiciones ni animaciones. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+/* ---------- Confirmación modal (ConfirmDialog, <dialog> + showModal) ---------- */
+
+.pf-confirm-dialog {
+  width: min(32rem, calc(100vw - 2 * var(--pf-space-4)));
+  max-height: calc(100dvh - 2 * var(--pf-space-4));
+  padding: var(--pf-space-4);
+  border: 1px solid var(--pf-warning-border);
+  border-left-width: 4px;
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-warning-bg);
+  color: var(--pf-warning-fg);
+  box-shadow: var(--pf-shadow-overlay);
+  overflow-wrap: anywhere;
+  /* Mejora progresiva: sin efecto donde el diálogo no desborda (D500). */
+  overscroll-behavior: contain;
+}
+.pf-confirm-dialog[open] {
+  display: grid;
+  gap: var(--pf-space-2);
+}
+.pf-confirm-dialog::backdrop {
+  background: rgb(15 23 42 / 0.5);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* ---------- Resumen de errores de un formulario ---------- */
+
+.pf-error-summary {
+  border: 1px solid var(--pf-error);
+  border-left-width: 4px;
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-raised);
+  padding: var(--pf-space-3) var(--pf-space-4);
+  display: grid;
+  gap: var(--pf-space-2);
+}
+.pf-error-summary-title {
+  font-size: var(--pf-text-base);
+  color: var(--pf-error);
+}
+.pf-error-summary ul {
+  margin: 0;
+  padding-inline-start: var(--pf-space-4);
+}
+
+/* ---------- Pestañas (common/Tabs) ---------- */
+
+.pf-tabs-root {
+  /* Como ítem de una rejilla, sin esto la fila de pestañas ensancharía la página en vez de desplazarse. */
+  min-width: 0;
+}
+.pf-tabs {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  gap: var(--pf-space-1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 1px solid var(--pf-border);
+}
+.pf-tab {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  min-height: 2.75rem;
+  border: 0;
+  border-block-end: 0.1875rem solid transparent;
+  border-radius: var(--pf-radius-sm) var(--pf-radius-sm) 0 0;
+  background: none;
+  color: var(--pf-fg-muted);
+  cursor: pointer;
+}
+/* Mismo peso en todas las pestañas: seleccionar una no cambia el ancho de ninguna. El indicador es un borde. */
+.pf-tab[aria-selected='true'] {
+  color: var(--pf-primary);
+  border-block-end-color: var(--pf-primary);
+}
+
+/* ---------- Región de avisos (add-quick-capture; guía persistent-toast-notifications) ---------- */
+
+/* La región (`role="region"`) no ocupa lugar: solo contiene el respaldo `role="status"` y el grupo de avisos. */
+.pf-notices {
+  margin: 0;
+}
+/* Grupo de avisos: `popover="manual"` los pasa a la capa superior; sin soporte se ven igual, fijos abajo. */
+.pf-notices-list {
+  position: fixed;
+  inset: auto var(--pf-space-4) var(--pf-space-4) var(--pf-space-4);
+  z-index: 40;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+  width: auto;
+  max-height: none;
+  display: grid;
+  gap: var(--pf-space-2);
+}
+@media (min-width: 40rem) {
+  .pf-notices-list {
+    inset: auto var(--pf-space-4) var(--pf-space-4) auto;
+    width: min(26rem, calc(100vw - 2 * var(--pf-space-4)));
   }
+}
+.pf-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pf-space-1) var(--pf-space-3);
+  padding: var(--pf-space-2) var(--pf-space-3);
+  background: var(--pf-surface-raised);
+  color: var(--pf-fg);
+  border: 1px solid var(--pf-border-strong);
+  border-inline-start: 0.25rem solid var(--pf-fin-ok);
+  border-radius: var(--pf-radius-md);
+  box-shadow: var(--pf-shadow-overlay);
+}
+.pf-notice[data-tone='info'] {
+  border-inline-start-color: var(--pf-primary);
+}
+.pf-notice[data-tone='warning'] {
+  border-inline-start-color: var(--pf-fin-warning);
+}
+.pf-notice[data-tone='error'] {
+  border-inline-start-color: var(--pf-error);
+}
+.pf-notice-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.pf-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-2);
+}
+/* Botones y enlaces de los avisos con la misma forma y un objetivo táctil de al menos 44 px. */
+.pf-notice-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: var(--pf-space-1) var(--pf-space-3);
+  font: inherit;
+  font-weight: 500;
+  color: var(--pf-primary);
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-control-border);
+  border-radius: var(--pf-radius-md);
+  text-decoration: none;
+  cursor: pointer;
+}
+.pf-notice-action:hover:not([aria-disabled='true']) {
+  background: var(--pf-primary-soft);
+  color: var(--pf-primary-hover);
+}
+.pf-notice-action[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Con avisos visibles, el contenido deja espacio abajo para que no tapen el formulario ni el botón de enviar. */
+.pf-shell:has(.pf-notice) .pf-main {
+  padding-bottom: 15rem;
+  scroll-padding-bottom: 15rem;
+}
+
+/* Acceso «＋ Registrar» de la barra superior (add-quick-capture, decisión 5): enlace con forma de botón principal. */
+.pf-quick-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pf-space-1);
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  font-weight: 600;
+  color: var(--pf-primary-fg);
+  background: var(--pf-primary);
+  border: 1px solid var(--pf-primary);
+  border-radius: var(--pf-radius-md);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pf-quick-add:hover {
+  background: var(--pf-primary-hover);
+  border-color: var(--pf-primary-hover);
+  color: var(--pf-primary-fg);
+}
+/* En pantallas angostas solo se ve el «＋»; el nombre accesible «Registrar» queda para lectores de pantalla. */
+.pf-quick-add-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (min-width: 640px) {
+  .pf-quick-add-label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+  }
+}
+
+/* Envío secundario (p. ej. «Registrar e ir al detalle»): mismo tamaño que el principal, sin relleno. */
+.pf-button-secondary {
+  background: var(--pf-bg);
+  border-color: var(--pf-control-border);
+  color: var(--pf-fg);
+}
+.pf-button-secondary:hover:not(:disabled) {
+  background: var(--pf-surface-sunken);
+  border-color: var(--pf-control-border);
 }

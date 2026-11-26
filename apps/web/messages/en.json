@@ -3,6 +3,11 @@
     "title": "PFOS — Personal finances",
     "description": "Personal finance operating system"
   },
+  "NotFound": {
+    "title": "Page not found",
+    "body": "The address you opened does not exist or is no longer available.",
+    "home": "Back to home"
+  },
   "Home": {
     "title": "Home",
     "subtitle": "Your money today, how the month is going and your net worth.",
@@ -48,7 +53,14 @@
     "rules": "Rules",
     "reports": "Reports",
     "cashFlow": "Cash flow",
-    "forecasts": "Forecasts"
+    "forecasts": "Forecasts",
+    "spendingAnomalies": "Unusual expenses",
+    "notices": {
+      "label": "Notices",
+      "close": "Close",
+      "actionsAvailable": "Actions available"
+    },
+    "quickAdd": "Record"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -587,6 +599,11 @@
     "noWorkspace": "Select or create a workspace.",
     "loading": "Loading…"
   },
+  "Forms": {
+    "errorSummary": {
+      "title": "There {count, plural, one {is # error} other {are # errors}}"
+    }
+  },
   "Accounts": {
     "title": "Accounts",
     "actions": "Account actions",
@@ -950,6 +967,7 @@
       "remaining": "Left to assign: {amount}"
     },
     "list": {
+      "cardCharge": "Card charge",
       "title": "Transactions",
       "newActions": "Record",
       "new": "New movement",
@@ -1189,6 +1207,19 @@
       "DEBT": "Debts",
       "GOAL": "Savings goal",
       "SYSTEM": "System"
+    },
+    "quick": {
+      "saved": {
+        "EXPENSE": "Expense of {amount} recorded",
+        "INCOME": "Income of {amount} recorded",
+        "REFUND": "Refund of {amount} recorded",
+        "ADJUSTMENT": "Adjustment of {amount} recorded"
+      },
+      "undo": "Undo",
+      "view": "View",
+      "voided": "Entry voided",
+      "undoReason": "Undone from the recording notice",
+      "recordAndDetail": "Record and go to details"
     }
   },
   "Fx": {
@@ -2618,7 +2649,8 @@
       "openFxFeedStatus": "View the status of the automatic rates",
       "openFxRate": "Review the held rate",
       "openCashFlowCalendar": "View the cash flow calendar",
-      "openHome": "Go to the home page"
+      "openHome": "Go to the home page",
+      "openSpendingAnomalies": "Open unusual expenses"
     },
     "prefs": {
       "title": "Notifications",
@@ -2651,7 +2683,9 @@
         "FX_RATE_FEED_RECOVERED": "Automatic rate recovered",
         "FX_RATE_ANOMALY_RETAINED": "Rate held for an abnormal change",
         "CASH_FLOW_SHORTFALL_RISK": "Cash flow shortfall risk",
-        "HOME_DIGEST": "Periodic home summary (email)"
+        "HOME_DIGEST": "Periodic home summary (email)",
+        "SPENDING_ANOMALY": "Unusual expenses detected (off by default)",
+        "BUDGET_OVERRUN_RISK": "Budget overrun risk (off by default)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
@@ -3772,7 +3806,7 @@
         "credit": "Credit"
       },
       "formLabel": "Column assignment",
-      "errorsTitle": "Fix these items to continue:",
+      "errorsTitle": "There {count, plural, one {is # error} other {are # errors}}",
       "hasHeader": "The first row (after the skipped ones) is a header",
       "skipRows": "Rows to skip at the start",
       "skipRowsHint": "Bank text before the header; between 0 and 50.",
@@ -5073,6 +5107,66 @@
       "description": "It ends its payment plans and stops issuing statements and reminders. Statements and installment plans stay available; the accounts keep their balance.",
       "done": "Card archived.",
       "archivedNotice": "This card is archived: you can only view it."
+    },
+    "charges": {
+      "title": "Interest and charges",
+      "caption": "Interest and charges of the cycle closing on {closing}",
+      "empty": "No interest or charges registered in this cycle.",
+      "register": "Register interest and charges",
+      "hint": "Register what the bank billed: it creates a card expense with one portion per component and raises what you owe.",
+      "fields": {
+        "date": "Charge date",
+        "interest": "Interest ({currency})",
+        "fees": "Fees ({currency})",
+        "insurance": "Insurance ({currency})",
+        "taxes": "Taxes ({currency})"
+      },
+      "components": {
+        "interest": "Interest",
+        "fees": "Fees",
+        "insurance": "Insurance",
+        "taxes": "Taxes"
+      },
+      "totalShort": "Total",
+      "originShort": "Origin",
+      "actions": "Actions",
+      "origin": {
+        "RECORDED": "Registered",
+        "ADOPTED": "Adopted from an expense"
+      },
+      "total": "Charge total: {amount}",
+      "totalPending": "Charge total: complete the amounts in a valid format.",
+      "save": "Register charge",
+      "saved": "Charge registered.",
+      "cancel": "Cancel",
+      "void": "Void",
+      "voidTitle": "Void the charge of {amount}",
+      "voidDescription": "Its transaction is voided with the reversal of its entry and the debt returns to its previous value.",
+      "voidReason": "Reason for voiding",
+      "voidConfirm": "Void charge",
+      "voided": "Charge voided.",
+      "proposal": "The bank reported {amount} more than the system calculation. If it is interest or charges, register them.",
+      "useProposal": "Register the difference as a charge",
+      "duplicateWarning": "There are {count} expense(s) in this cycle under \"Interest paid\" or \"Fees\" that are not charges. If it is the same billing, adopt it from its detail so it is not registered twice:",
+      "errors": {
+        "INVALID": "Enter a valid amount.",
+        "SCALE": "The amount has more decimals than the currency allows.",
+        "NEGATIVE": "The amount cannot be negative.",
+        "NO_COMPONENT": "Enter at least one component greater than zero.",
+        "REQUIRED_DATE": "Enter the charge date."
+      },
+      "adopt": {
+        "title": "It is a card charge",
+        "hint": "Split the amount of the expense into components (they must add up to its amount). It creates no other transaction and does not change the balance.",
+        "prompt": "This expense belongs to an account of {card}. If it is interest or a bank charge, mark it as a charge so it counts in the fees and debts reports.",
+        "action": "It is a card charge",
+        "save": "Adopt as charge",
+        "done": "The expense is now a card charge."
+      }
+    },
+    "transaction": {
+      "badge": "Card charge",
+      "viewCard": "View the card"
     },
     "statements": {
       "accountTitle": "Statements in {currency}",
@@ -6577,10 +6671,11 @@
       "CONVERSION": "Conversion fee",
       "TRANSFER": "Transfer fee",
       "LOAN": "Loan interest and charges",
+      "CARD": "Card interest and charges",
       "FEE_CATEGORY": "Fee categories",
       "total": "Total",
       "last12": "Last 12 complete periods: {amount}",
-      "cardNote": "Credit card interest is not recorded as spending and is not listed here; the card balance is in the debt evolution report.",
+      "cardNote": "Cards count here only the interest and charges registered as a card charge (or adopted from an expense); an ordinary expense under \"Interest paid\" is not inferred.",
       "chartTitle": "Total fees per period",
       "chartDesc": "Bars of {n} periods in {currency}; the table below separates each type."
     },
@@ -6612,6 +6707,8 @@
       "principalPaid": "Principal paid",
       "interestPaid": "Interest paid",
       "chargesPaid": "Charges paid",
+      "interestCharged": "Interest charged",
+      "chargesCharged": "Other charges billed",
       "kind": {
         "LOAN": "Loan",
         "CARD": "Card"
@@ -6619,7 +6716,7 @@
       "consolidated": "Consolidated in {currency}",
       "chartTitle": "Outstanding balance of {name}",
       "chartDesc": "Line of {n} months in {currency}; the table below has the payments.",
-      "cardNote": "Cards show only the outstanding balance."
+      "cardNote": "Cards show the outstanding balance and the interest and charges registered on the card; what was paid is not reported."
     },
     "recurring": {
       "caption": "Monthly and annual cost of the active recurring commitments",
@@ -7182,6 +7279,170 @@
       "lowCategorization": "Some spending has no category, which prevents forecasting by category.",
       "link": "See the transactions",
       "gap": "A gap of periods without activity shortened the history used."
+    }
+  },
+  "CategorySuggestions": {
+    "level": {
+      "HIGH": "high",
+      "MEDIUM": "medium"
+    },
+    "chip": {
+      "suggestedLevel": "Suggested: {category} · {level} confidence",
+      "default": "Default category of the counterparty: {category}",
+      "lastUsed": "Last category used with this counterparty: {category}",
+      "accepted": "Suggested category accepted: {category}",
+      "accept": "Accept",
+      "other": "Other",
+      "acceptAria": "Accept the suggested category {category}",
+      "otherAria": "Choose another category",
+      "ruleApplies": "A rule will classify this transaction when it is saved, so no category is suggested."
+    },
+    "reason": {
+      "kind": {
+        "EXPENSE": "expenses",
+        "INCOME": "incomes",
+        "REFUND": "refunds"
+      },
+      "description": "You chose \"{category}\" for {matches} of {support} {kind} similar to \"{key}\"",
+      "counterparty": "You chose \"{category}\" for {matches} of {support} {kind} with \"{counterparty}\"",
+      "both": "You chose \"{category}\" for {matches} of {support} {kind} similar to \"{key}\" and with the same counterparty"
+    },
+    "import": {
+      "column": "Suggestion",
+      "suggestedLevel": "Suggested: {category} · {level} confidence",
+      "accept": "Accept",
+      "acceptAria": "Accept the suggested category {category} on line {line}",
+      "acceptHigh": "Accept high confidence suggestions",
+      "acceptMedium": "Accept high and medium confidence suggestions",
+      "hint": "Suggestions come from your own history and are never applied on their own: the rows you do not accept are created without a category.",
+      "done": "{count} category suggestions accepted.",
+      "filter": "With suggestion"
+    },
+    "rate": {
+      "title": "Category suggestions",
+      "intro": "What you did with the category suggestions this month.",
+      "loading": "Loading…",
+      "rate": "Acceptance rate",
+      "empty": "No suggestions resolved this month yet.",
+      "summary": "{shown} shown · {accepted} accepted · {corrected} corrected · {ignored} ignored",
+      "surface": {
+        "MANUAL_ENTRY": "Manual entry",
+        "IMPORT": "Import"
+      },
+      "bySurface": "By channel",
+      "failed": "The acceptance rate could not be read."
+    }
+  },
+  "BudgetRisk": {
+    "none": "No risk calculated",
+    "level": {
+      "EXCEEDED": "Exceeded",
+      "LIKELY": "Likely",
+      "POSSIBLE": "Possible",
+      "UNLIKELY": "Unlikely",
+      "NOT_AVAILABLE": "Not available"
+    },
+    "reason": {
+      "LINE_TYPE": "Fixed and minimum lines are not projected",
+      "NO_REFERENCE": "The line has no planned amount",
+      "TOO_EARLY": "Not enough data from the period yet"
+    },
+    "basis": {
+      "RUN_RATE": "based on the period pace",
+      "FORECAST": "based on the forecast"
+    },
+    "detail": {
+      "projected": "Projection {amount}",
+      "projectedHigh": "high {amount}",
+      "date": "estimated overrun around {date}"
+    },
+    "incomplete": "A known payment is missing its rate: the projection is incomplete",
+    "column": "Overrun risk",
+    "legend": {
+      "intro": "The risk is a projection from the pace of the period or the forecast, not a certainty; it does not change any figure of the plan.",
+      "possible": "\"Possible\" means it would only happen if spending gets close to the high end of the usual range (upper limit of the 80 % forecast interval)."
+    },
+    "sentence": {
+      "likely": "At the current pace, {name} would exceed its limit around {date}.",
+      "likelyNoDate": "At the current pace, {name} would exceed its limit before the period ends.",
+      "likelyForecast": "According to the forecast, {name} would exceed its limit around {date}.",
+      "likelyForecastNoDate": "According to the forecast, {name} would exceed its limit before the period ends.",
+      "possible": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit around {date}.",
+      "possibleNoDate": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit before the period ends.",
+      "possibleForecast": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit around {date}.",
+      "possibleForecastNoDate": "If spending on {name} gets close to the high end of the usual range, it could exceed its limit before the period ends."
+    },
+    "home": {
+      "title": "Budgets at risk",
+      "subtitle": "{period} plan",
+      "figures": "Projection {projected} of {reference}",
+      "more": "and {count, plural, one {# more line} other {# more lines}} at risk in the plan"
+    }
+  },
+  "SpendingAnomalies": {
+    "title": "Unusual expenses",
+    "subtitle": "Expenses that stand out from what is usual for their category or counterparty, with the reason. It is only a notice: it changes no transaction and no figure.",
+    "disclaimer": "The mark only says the amount is away from what is usual. If it was expected, dismiss it with \"Not unusual\"; you can restore it any time.",
+    "loading": "Loading unusual expenses…",
+    "disabled": "Unusual expense detection is disabled in this installation. What was already detected is still shown.",
+    "empty": "There are no open unusual expenses in this range.",
+    "emptyFiltered": "There are no unusual expenses with these filters.",
+    "more": "Load more",
+    "noName": "unnamed",
+    "filters": {
+      "label": "Unusual expense filters",
+      "status": "Status",
+      "from": "From",
+      "to": "To",
+      "OPEN": "Open",
+      "DISMISSED": "Dismissed",
+      "ALL": "All"
+    },
+    "table": {
+      "caption": "Unusual expenses of the workspace, most recent first",
+      "date": "Date",
+      "amount": "Amount",
+      "category": "Category",
+      "counterparty": "Counterparty",
+      "reasons": "Reason",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "OPEN": "Open",
+      "DISMISSED": "Dismissed"
+    },
+    "reportingAmount": "Equivalent to {amount}",
+    "reason": {
+      "CATEGORY_OUTLIER": "{ratio} times the median of \"{name}\" ({reference} over the last 12 months, {count} expenses)",
+      "COUNTERPARTY_OUTLIER": "{ratio} times the median of your expenses with \"{name}\" ({reference} over the last 12 months, {count} expenses)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "New counterparty \"{name}\", with no expenses in the last 12 months, at or above the 95th percentile of your expenses ({reference}, {count} expenses)"
+    },
+    "dismiss": {
+      "label": "Not unusual",
+      "reasonLabel": "Reason (optional)",
+      "none": "No reason",
+      "EXPECTED_ONE_OFF": "Expected one-off expense",
+      "NOT_UNUSUAL": "It is normal for me",
+      "OTHER": "Other reason",
+      "done": "Expense marked as not unusual."
+    },
+    "restore": {
+      "label": "Restore",
+      "done": "Expense restored to the unusual ones."
+    },
+    "decided": "Dismissed on {at}",
+    "decidedReason": "Dismissed on {at}: {reason}",
+    "changed": "The transaction changed since it was detected.",
+    "openTransaction": "View transaction",
+    "mark": {
+      "label": "Unusual",
+      "hint": "Unusual expense: {reasons}"
+    },
+    "detail": {
+      "title": "Unusual expense",
+      "intro": "This amount is away from what is usual. It changes neither the transaction nor any figure.",
+      "open": "View unusual expenses"
     }
   }
 }

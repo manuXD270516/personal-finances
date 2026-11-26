@@ -6,7 +6,7 @@ import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { Tabs } from '../common/Tabs';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   badgeStyle,
   cellStyle,
   mutedStyle,
@@ -20,6 +20,7 @@ import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../c
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { useCatalogs } from '../transactions/catalogs';
+import { AcceptanceRateCard } from '../category-suggestions/AcceptanceRateCard';
 import { CoveragePanel } from './Coverage';
 import { DryRunPanel } from './DryRun';
 import { actionTarget, moveId, rulesPath, type NameResolver } from './logic';
@@ -228,7 +229,16 @@ function RulesHome({ ctx }: { ctx: WorkspaceContext }) {
             label: f.t('tabs.run'),
             content: <DryRunPanel ctx={ctx} {...(applyRuleId ? { onlyRuleId: applyRuleId } : {})} />,
           },
-          { id: 'coverage', label: f.t('tabs.coverage'), content: <CoveragePanel ctx={ctx} /> },
+          {
+            id: 'coverage',
+            label: f.t('tabs.coverage'),
+            content: (
+              <div style={{ display: 'grid', gap: 'var(--pf-space-4)' }}>
+                <CoveragePanel ctx={ctx} />
+                <AcceptanceRateCard ctx={ctx} />
+              </div>
+            ),
+          },
         ]}
       />
     </section>
@@ -341,7 +351,7 @@ function RulesTab({ ctx }: { ctx: WorkspaceContext }) {
       </div>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {archiving ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={f.t('list.archiveTitle', { name: archiving.name })}
           description={f.t('list.archiveBody')}
           confirmLabel={f.t('list.archive')}

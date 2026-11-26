@@ -8,6 +8,7 @@ import {
   type ApiResponse,
 } from '@pf/platform/nest';
 import { isDomainError } from '@pf/shared-kernel';
+import type { CategorySuggestionService } from '../application/category-suggestions.js';
 import type { DryRunChange, RuleDryRunService } from '../application/dry-run.service.js';
 import type { RuleVersionRecord } from '../application/ports/index.js';
 import type { RuleProposalsService } from '../application/rule-proposals.service.js';
@@ -19,6 +20,7 @@ export const RULES_SERVICE = Symbol('RULES_SERVICE');
 export const RULES_QUERIES = Symbol('RULES_QUERIES');
 export const RULES_DRY_RUN = Symbol('RULES_DRY_RUN');
 export const RULES_PROPOSALS = Symbol('RULES_PROPOSALS');
+export const RULES_CATEGORY_SUGGESTIONS = Symbol('RULES_CATEGORY_SUGGESTIONS');
 
 type Json = Record<string, unknown>;
 const body = (b: unknown): Json => (b && typeof b === 'object' && !Array.isArray(b) ? (b as Json) : {});
@@ -113,6 +115,7 @@ export class RulesController {
     @Inject(RULES_QUERIES) private readonly queries: RulesQueries,
     @Inject(RULES_DRY_RUN) private readonly dryRuns: RuleDryRunService,
     @Inject(RULES_PROPOSALS) private readonly proposals: RuleProposalsService,
+    @Inject(RULES_CATEGORY_SUGGESTIONS) private readonly categorySuggestions: CategorySuggestionService,
   ) {}
 
   @Get('workspaces/:workspaceId/rules')
@@ -269,6 +272,43 @@ export class RulesController {
     @Param('suggestionId') suggestionId: string,
   ): Promise<void> {
     await this.proposals.restore(userIdOf(req), workspaceId, suggestionId);
+  }
+
+  // ----------------------------------------------------------- sugerencias de categoría (add-category-suggestions)
+
+  /** `POST` y no `GET`: la descripción es un dato personal y no debe quedar en la URL ni en los logs de acceso. */
+  @Post('workspaces/:workspaceId/category-suggestions/query')
+  @HttpCode(200)
+  async queryCategorySuggestion(@Param('workspaceId') workspaceId: string, @Body() raw: unknown) {
+    const b = body(raw);
+    return this.categorySuggestions.query(workspaceId, {
+      kind: b['kind'],
+      description: b['description'],
+      counterpartyId: b['counterpartyId'],
+      accountId: b['accountId'],
+      date: b['date'],
+    });
+  }
+
+  @Post('workspaces/:workspaceId/category-suggestions/feedback')
+  @HttpCode(204)
+  async recordCategorySuggestionOutcome(
+    @Param('workspaceId') workspaceId: string,
+    @Body() raw: unknown,
+  ): Promise<void> {
+    const b = body(raw);
+    await this.categorySuggestions.recordManualOutcome(workspaceId, {
+      surface: b['surface'],
+      level: b['level'],
+      suggestedCategoryId: b['suggestedCategoryId'],
+      chosenCategoryId: b['chosenCategoryId'],
+      transactionId: b['transactionId'],
+    });
+  }
+
+  @Get('workspaces/:workspaceId/category-suggestions/stats')
+  async getCategorySuggestionStats(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
+    return this.categorySuggestions.stats(workspaceId, query['from'], query['to']);
   }
 
   @Get('workspaces/:workspaceId/rules/coverage')

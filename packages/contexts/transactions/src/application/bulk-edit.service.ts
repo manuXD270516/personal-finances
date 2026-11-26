@@ -827,8 +827,8 @@ function bulkError(problems: readonly Problem[]): DomainError {
 }
 
 /** Transacciones que administra otro contexto (préstamos, metas): la clasificación por reglas no las toca. */
-const isManagedSource = (s: Pick<TransactionState, 'source' | 'kind'>): boolean =>
-  s.source === 'DEBT' || s.source === 'GOAL';
+const isManagedSource = (s: Pick<TransactionState, 'source' | 'kind' | 'debtRole'>): boolean =>
+  s.source === 'DEBT' || s.source === 'GOAL' || (s.debtRole !== undefined && s.debtRole !== null);
 
 /**
  * Split final de una transacción de un solo split tras aplicar lo que propuso la regla: categoría con origen `RULE`,

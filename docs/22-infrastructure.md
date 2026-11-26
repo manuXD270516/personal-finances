@@ -434,7 +434,7 @@ infra/
 │  ├─ lightsail-host/   # aws_lightsail_instance (Ubuntu 24.04, small_3_0 = 2 GB) + IP estática + firewall (80/443; 22 solo
 │  │                    # alias lightsail-connect) + snapshots diarios; cloud-init: Docker, Tailscale, ufw, unattended-upgrades,
 │  │                    # swap 2 GiB, usuario pfos-deploy con comando forzado
-│  └─ b2-backups/       # bucket B2 (SSE-B2, Object Lock governance 21 d, lifecycle por prefijo) + clave del host
+│  └─ b2-backups/       # buckets B2 (SSE-B2, Object Lock governance: principal 21 d y mensuales 395 d, lifecycle por prefijo) + clave del host
 │                       # (sin bypassGovernance) + clave de solo lectura para restore drills
 └─ environments/
    └─ prod/             # composición + AWS Budgets (USD 20) + VM de drill opcional (drill_enabled); backend S3 parcial

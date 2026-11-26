@@ -2,16 +2,13 @@ import type { ReactNode } from 'react';
 import { formatInstant, formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { badgeStyle, cardStyle, mutedStyle, warningStyle } from '../common/ui';
+import './lifecycle.css';
 import { LifecycleDiagram } from './LifecycleDiagram';
 import { buildDiagramModel, layoutFor, timelineRows, type ActorView, type TimelineRow } from './logic';
 import type { Lifecycle, LifecycleRevision, TransactionLifecycle } from './types';
 
 const hasRevisions = (l: Lifecycle | TransactionLifecycle): l is TransactionLifecycle =>
   Array.isArray((l as TransactionLifecycle).revisions);
-
-/** Muestra la orientación horizontal o la vertical (bajo 768 px) del diagrama; ambas son layouts fijos. */
-const RESPONSIVE_CSS =
-  '.pf-lifecycle-v{display:none}@media (max-width: 767.98px){.pf-lifecycle-h{display:none}.pf-lifecycle-v{display:block}}';
 
 /**
  * Reporte "Recorrido" de un elemento (openspec add-lifecycle-timeline, decisión 11; tareas 6.1 y 6.2): diagrama de su
@@ -105,7 +102,6 @@ export function LifecycleReport({
           {t('incomplete')}
         </p>
       ) : null}
-      <style>{RESPONSIVE_CSS}</style>
       <figure style={{ margin: '0 0 1rem', overflowX: 'auto' }} data-testid="lifecycle-figure">
         {(['horizontal', 'vertical'] as const).map((orientation) => (
           <LifecycleDiagram

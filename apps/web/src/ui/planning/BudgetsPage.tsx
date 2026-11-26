@@ -6,7 +6,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { AuditHistory } from '../AuditHistory';
 import { scaleFor } from '../common/money';
 import { todayIn } from '../common/dates';
-import { cardStyle, ConfirmPanel, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
+import { cardStyle, ConfirmDialog, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import {
@@ -21,6 +21,7 @@ import {
   type LineFormErrors,
   type LineFormValues,
 } from './budget-logic';
+import type { BudgetLineRisk, BudgetRisk } from '../budget-risk/types';
 import { BudgetLineForm, natureOf, type TargetOptions } from './BudgetLineForm';
 import { loadCatalog, type Catalog } from './catalog';
 import { BudgetLinesTable, LineMissingNotice, targetName, type TargetNames } from './BudgetLinesTable';
@@ -93,6 +94,7 @@ function Budgets({
 }) {
   const f = useFormat('Budgets', ctx);
   const pf = useFormat('Planning', ctx);
+  const rf = useFormat('BudgetRisk', ctx);
   const today = todayIn(ctx.timeZone);
   const [periods, setPeriods] = useState<readonly FinancialPeriod[] | undefined>();
   const [selected, setSelected] = useState<string | undefined>();
@@ -106,6 +108,7 @@ function Budgets({
   const [errors, setErrors] = useState<LineFormErrors>({});
   const [removing, setRemoving] = useState<BudgetLine | undefined>();
   const [omitted, setOmitted] = useState<readonly OmittedLine[]>([]);
+  const [risk, setRisk] = useState<ReadonlyMap<string, BudgetLineRisk> | undefined>();
 
   useEffect(() => {
     loadPeriods(ctx)
@@ -145,6 +148,27 @@ function Budgets({
       });
   }, [ctx, periodId]);
   useEffect(loadBudget, [loadBudget]);
+
+  // Riesgo de exceder cada línea (add-budget-overrun-risk): solo del periodo en curso y como lectura aparte, que se
+  // superpone al plan sin cambiar ninguna de sus cifras. Si falla o no aplica, el plan se muestra igual, sin la columna.
+  const isCurrent = period !== undefined && period.periodStart <= today && today <= period.periodEnd;
+  const hasPlan = budget !== null && budget !== undefined;
+  useEffect(() => {
+    setRisk(undefined);
+    if (!periodId || !isCurrent || !hasPlan) return;
+    let cancelled = false;
+    ctx.api
+      .get<BudgetRisk>(`${ctx.base}/periods/${periodId}/budget-risk`)
+      .then((r) => {
+        if (cancelled || r.data?.status !== 'AVAILABLE') return;
+        setRisk(new Map(r.data.lines.map((l) => [l.budgetLineId, l])));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // El riesgo se recalcula al cambiar de periodo o al recargarse el plan (`budget` cambia de referencia).
+  }, [ctx, periodId, isCurrent, hasPlan, budget]);
 
   const scale = scaleFor(budget?.currency ?? ctx.ws.baseCurrency, ctx.scales);
   const closed = budget?.periodStatus === 'CLOSED' || period?.status === 'CLOSED';
@@ -320,6 +344,8 @@ function Budgets({
             <PlanView
               ctx={ctx}
               f={f}
+              risk={risk}
+              riskFormat={rf}
               budget={budget}
               names={names}
               options={options}
@@ -384,6 +410,8 @@ function PlanView({
   omitted,
   onChanged,
   highlightedId,
+  risk,
+  riskFormat,
 }: {
   ctx: WorkspaceContext;
   f: FormatContext;
@@ -408,6 +436,8 @@ function PlanView({
   omitted: readonly OmittedLine[];
   onChanged: () => void;
   highlightedId: string | undefined;
+  risk: ReadonlyMap<string, BudgetLineRisk> | undefined;
+  riskFormat: FormatContext;
 }) {
   return (
     <>
@@ -440,7 +470,7 @@ function PlanView({
       >
         <h2 id="budget-lines-title">{f.t('lines.title')}</h2>
         {removing ? (
-          <ConfirmPanel
+          <ConfirmDialog
             title={f.t('lines.confirmRemoveTitle', { name: nameOfRemoving })}
             description={f.t('lines.confirmRemoveBody')}
             confirmLabel={f.t('lines.remove')}
@@ -461,6 +491,8 @@ function PlanView({
           busyId={busy ? '*' : undefined}
           onEdit={onEdit}
           onRemove={onAskRemove}
+          risk={risk}
+          riskFormat={riskFormat}
         />
         {canWrite && !panel ? (
           <div style={rowStyle}>

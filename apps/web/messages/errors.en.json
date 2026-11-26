@@ -140,6 +140,7 @@
   "CREDIT_CARD_ACCOUNT_IN_USE": "That account already belongs to another card. Choose another account or archive the previous card.",
   "CARD_PAYMENT_PLAN_CONFLICT": "An active recurring payment to this card already exists. End it under Recurring payments and enable the payment plan again.",
   "INSTALLMENT_PLAN_INVALID": "That purchase cannot be paid in installments: it must be a posted expense of a card account with no other installment plan.",
+  "CARD_CHARGE_INVALID": "The charge could not be registered: enter at least one component greater than zero, a date that is neither in the future nor before the account opening, an account of the active card, or a posted card expense whose components add up to its amount.",
   "EARMARK_EXCEEDS_BALANCE": "The reservation exceeds the available balance of the account (balance minus what other goals already reserve).",
   "GOAL_CLOSED": "The goal is closed or cancelled and admits no new movements.",
   "GOAL_ACCOUNT_NOT_ELIGIBLE": "That account cannot be linked to a goal: it must be an active asset account (not a liability) of your workspace.",

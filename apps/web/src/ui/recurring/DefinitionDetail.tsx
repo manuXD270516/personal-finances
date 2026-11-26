@@ -8,6 +8,7 @@ import { Tabs } from '../common/Tabs';
 import { todayIn } from '../common/dates';
 import {
   cellStyle,
+  ConfirmDialog,
   ConfirmPanel,
   Field,
   formStyle,
@@ -437,7 +438,7 @@ function EndPanel({
 }) {
   const [endDate, setEndDate] = useState('');
   return (
-    <ConfirmPanel
+    <ConfirmDialog
       testId="end-panel"
       title={f.t('detail.endTitle', { name })}
       description={f.t('detail.endDescription')}
@@ -460,7 +461,7 @@ function EndPanel({
           />
         )}
       </Field>
-    </ConfirmPanel>
+    </ConfirmDialog>
   );
 }
 

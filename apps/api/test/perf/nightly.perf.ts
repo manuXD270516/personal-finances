@@ -31,7 +31,7 @@ import {
   writeReport,
   type BenchResult,
 } from './perf-report.js';
-import { perfOutDir, readEntries, recordSuiteLoad } from './background-load.js';
+import { anomalyLabelsPath, perfOutDir, readEntries, recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
 
 /**
@@ -235,6 +235,8 @@ beforeAll(async () => {
     {
       scale: SCALE,
       concurrency: 4,
+      // Etiquetas de anomalías fuera de la base (docs/29 §2.3): las usa `anomalies.perf.ts` (add-spending-anomaly-detection, D483).
+      labelsOut: anomalyLabelsPath(),
       ...(MONTHS !== undefined ? { months: MONTHS } : {}),
       ...(SATELLITES !== undefined ? { satellites: SATELLITES } : {}),
     },

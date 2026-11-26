@@ -1,5 +1,7 @@
 import { dec, DomainError, MoneyDecimal } from '@pf/shared-kernel';
 import { CASH_FLOW_SHORTFALL_RISK_MESSAGE_KEY } from './cash-flow-notifications.js';
+import { SPENDING_ANOMALY_MESSAGE_KEY } from './spending-anomaly-notifications.js';
+import { BUDGET_OVERRUN_RISK_MESSAGE_KEY } from './budget-risk-notifications.js';
 import { HOME_DIGEST_MESSAGE_KEY } from './home-digest.js';
 import {
   FX_RATE_ANOMALY_GROUP_MESSAGE_KEY,
@@ -147,6 +149,8 @@ type MessageKind =
   | 'fx_rate_anomaly_retained'
   | 'fx_rate_anomaly_group'
   | 'cash_flow_shortfall_risk'
+  | 'spending_anomaly'
+  | 'budget_overrun_risk'
   | 'home_digest';
 
 const moneyText = (value: { amount: string; currency: string }, locale: NotificationLocale): string =>
@@ -196,6 +200,8 @@ function kindOf(messageKey: string): MessageKind {
   if (messageKey === FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY) return 'fx_rate_anomaly_retained';
   if (messageKey === FX_RATE_ANOMALY_GROUP_MESSAGE_KEY) return 'fx_rate_anomaly_group';
   if (messageKey === CASH_FLOW_SHORTFALL_RISK_MESSAGE_KEY) return 'cash_flow_shortfall_risk';
+  if (messageKey === SPENDING_ANOMALY_MESSAGE_KEY) return 'spending_anomaly';
+  if (messageKey === BUDGET_OVERRUN_RISK_MESSAGE_KEY) return 'budget_overrun_risk';
   if (messageKey === HOME_DIGEST_MESSAGE_KEY) return 'home_digest';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
 }
@@ -429,6 +435,33 @@ function valuesOf(
       threshold: moneyText(money(params, 'threshold'), locale),
     };
   }
+  if (kind === 'spending_anomaly') {
+    const top = recordOf(params, 'top');
+    return {
+      count: String(params['count'] ?? ''),
+      // Fecha de la pasada y del gasto: no son montos ni nombres (el email `basic` las muestra).
+      date: formatDate(str(params, 'passDate'), locale),
+      transactionDate: formatDate(str(top, 'transactionDate'), locale),
+      amount: moneyText(money(top, 'reportingAmount'), locale),
+      reason: listOf(
+        strings(top, 'reasons').map((kind) => message(locale, `inapp.spending_anomaly.reason.${kind}`)),
+        locale,
+      ),
+    };
+  }
+  if (kind === 'budget_overrun_risk') {
+    const estimated = params['estimatedDate'];
+    return {
+      target: str(params, 'targetName'),
+      period: str(params, 'periodLabel'),
+      projected: formatDecimal(money(params, 'projected').amount, locale),
+      reference: formatDecimal(money(params, 'reference').amount, locale),
+      currency: money(params, 'reference').currency,
+      // Fecha estimada del exceso (no es un monto ni un nombre: el email `basic` la muestra).
+      date: typeof estimated === 'string' ? formatDate(estimated, locale) : '',
+      basis: message(locale, `inapp.budget_overrun_risk.basis.${str(params, 'basis')}`),
+    };
+  }
   if (kind === 'home_digest') return { date: formatDate(str(params, 'generatedOn'), locale) };
   return {
     period: str(params, 'periodLabel'),
@@ -449,8 +482,10 @@ function recordOf(params: NotificationParams, key: string): NotificationParams {
  * cantidad `pendingCount` del aviso; vacío para el resto.
  */
 function pluralSuffix(kind: MessageKind, params: NotificationParams, locale: NotificationLocale): string {
-  if (kind !== 'fx_rate_anomaly_group') return '';
-  const count = params['pendingCount'];
+  // Riesgo de presupuesto: sin días por delante no hay fecha estimada y se usa la plantilla `_nodate`.
+  if (kind === 'budget_overrun_risk') return typeof params['estimatedDate'] === 'string' ? '' : '_nodate';
+  if (kind !== 'fx_rate_anomaly_group' && kind !== 'spending_anomaly') return '';
+  const count = params[kind === 'spending_anomaly' ? 'count' : 'pendingCount'];
   const category = new Intl.PluralRules(FORMAT_LOCALE[locale]).select(typeof count === 'number' ? count : 0);
   return category === 'one' ? '_one' : '_other';
 }
@@ -532,8 +567,8 @@ export function renderEmail(input: EmailRenderInput): RenderedEmail {
       ? 'detailed_variable'
       : variant === 'detailed' && kind === 'fx_rate_feed_stale' && values['lastRate'] === ''
         ? 'detailed_never'
-        : variant === 'detailed'
-          ? `detailed${pluralSuffix(kind, input.params, locale)}`
+        : variant === 'detailed' || kind === 'spending_anomaly' || kind === 'budget_overrun_risk'
+          ? `${variant}${pluralSuffix(kind, input.params, locale)}`
           : variant;
   const line = fill(message(locale, `email.${kind}.${variantKey}`), values);
   const cta = message(locale, 'email.cta');

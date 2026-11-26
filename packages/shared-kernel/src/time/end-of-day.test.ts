@@ -37,4 +37,12 @@ describe('endOfDayInstant (shared-kernel)', () => {
       expect((err as DomainError).code).toBe('INVALID_TIMEZONE');
     }
   });
+
+  it('el formateador por zona se reutiliza sin cambiar el resultado y una zona inválida sigue fallando cada vez', () => {
+    for (let i = 0; i < 3; i += 1) {
+      expect(iso('2026-03-08', 'America/New_York')).toBe('2026-03-09T03:59:59.999Z');
+      expect(iso('2026-11-12', 'America/La_Paz')).toBe('2026-11-13T03:59:59.999Z');
+      expect(() => endOfDayInstant('2026-11-12', 'Marte/Olimpo')).toThrow(/INVALID_TIMEZONE|time zone/);
+    }
+  });
 });

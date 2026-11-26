@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { ConfirmPanel, cardStyle, errorStyle, mutedStyle, rowStyle } from '../common/ui';
+import { ConfirmDialog, cardStyle, errorStyle, mutedStyle, rowStyle } from '../common/ui';
 import { problemOf, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { BFF_API, useOptionalSession } from '../session-context';
 import {
@@ -282,7 +282,7 @@ function Attachments({
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
 
       {removing ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={t('removeTitle')}
           description={t('removeBody', { name: removing.name })}
           confirmLabel={t('remove')}

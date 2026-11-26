@@ -1,6 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { api, bob, go, newFinanceUser, todayLaPaz } from '../src/finance.js';
+import { withForecastDiagnostics } from '../src/forecast-diagnostics.js';
 import { prepareForecastHistory } from '../src/forecast-history.js';
 import { serviceHealth, setMlService } from '../src/stack.js';
 
@@ -22,17 +23,19 @@ test.describe('Con el servicio de pronósticos caído el núcleo responde y la v
     browser,
   }) => {
     test.setTimeout(1_500_000);
-    const { page, W } = await newFinanceUser(browser, 'fc-degradation');
+    const { page, W, workspaceId } = await newFinanceUser(browser, 'fc-degradation');
     const { account, category } = await prepareForecastHistory(page, W);
 
     // 1. Con el servicio arriba: una corrida real publica el pronóstico vigente.
     await api(page, 'POST', `${W}/forecasts`);
-    await expect
-      .poll(async () => (await api(page, 'GET', `${W}/forecasts/latest?horizon=3`))['status'], {
-        timeout: 600_000,
-        intervals: [5_000],
-      })
-      .toBe('AVAILABLE');
+    await withForecastDiagnostics(workspaceId, () =>
+      expect
+        .poll(async () => (await api(page, 'GET', `${W}/forecasts/latest?horizon=3`))['status'], {
+          timeout: 600_000,
+          intervals: [5_000],
+        })
+        .toBe('AVAILABLE'),
+    );
     const before = await api(page, 'GET', `${W}/forecasts/latest?horizon=3`);
     expect(before['stale']).toBe(false);
     const generatedAt = String(before['generatedAt']);

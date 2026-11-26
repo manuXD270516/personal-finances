@@ -45,6 +45,7 @@ import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg
 import { PgAccountMovementsQuery, systemCategoryCodesFrom } from '../infrastructure/pg-account-movements.js';
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
 import { GoalTransferAdapter } from '../application/goal-transfer.port.js';
+import { CardChargeTransactionsAdapter } from '../application/card-charge-transactions.port.js';
 import { LoanTransactionsAdapter } from '../application/loan-transactions.port.js';
 import { RecordImportedConversions } from '../application/record-imported-conversions.js';
 import {
@@ -57,15 +58,18 @@ import {
   PgTransactionStatusQuery,
 } from '../infrastructure/pg-imported.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
+import { PgExpenseLines } from '../infrastructure/pg-expense-lines.js';
 import { PgClassificationCoverage, PgClassificationSubjects } from '../infrastructure/pg-rule-queries.js';
 import { LOAN_TRANSACTIONS_PORT, type TransactionExistenceQuery } from '../contracts/index.js';
 import type {
   AccountMovementsQuery,
   ClassificationCoverageQuery,
   ClassificationSubjectsQuery,
+  ExpenseLineQuery,
   CounterpartyCategoryUsageQuery,
   RuleClassificationCommand,
   GoalTransferPort,
+  CardChargeTransactionsPort,
   LoanTransactionsPort,
   DuplicateCandidatesQuery,
   ImportedConversionsCommand,
@@ -139,6 +143,8 @@ export interface TransactionsRuntime {
   readonly recurring: RecurringTransactionPort;
   /** Escritura para DEBT (add-loans): desembolso y pago de préstamo administrados, en la UoW del llamador. */
   readonly loans: LoanTransactionsPort;
+  /** Escritura para DEBT (add-card-interest-ledger-portions): cargos de tarjeta, en la UoW del llamador. */
+  readonly cardCharges: CardChargeTransactionsPort;
   /** Escritura para GOALS (add-savings-goals): transferencia de un aporte o retiro con origen `GOAL`, en la UoW del llamador. */
   readonly goals: GoalTransferPort;
   /** Lectura de una transacción para vincularla a una ocurrencia (add-recurrence-engine). */
@@ -161,6 +167,8 @@ export interface TransactionsRuntime {
   readonly ruleClassification: RuleClassificationCommand;
   /** Cobertura de clasificación por reglas y estadísticas por regla (add-rule-engine, D334). */
   readonly classificationCoverage: ClassificationCoverageQuery;
+  /** Líneas de gasto para la detección de gastos atípicos de FORECAST (add-spending-anomaly-detection). */
+  readonly expenseLines: ExpenseLineQuery;
 }
 
 /**
@@ -229,6 +237,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     closing: new PgTransactionsClosingQuery(deps.uow, deps.currencies, deps.categories),
     recurring: new RecurringTransactionAdapter(service),
     loans: new LoanTransactionsAdapter(service),
+    cardCharges: new CardChargeTransactionsAdapter(service),
     goals: new GoalTransferAdapter(service),
     links: new PgTransactionLinkQuery(deps.uow, deps.currencies),
     pending: new PgPendingFlowQuery(deps.uow, deps.currencies),
@@ -249,6 +258,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     classificationSubjects: new PgClassificationSubjects(),
     ruleClassification: bulkEdit,
     classificationCoverage: new PgClassificationCoverage(),
+    expenseLines: new PgExpenseLines(deps.uow, deps.currencies),
   };
 }
 

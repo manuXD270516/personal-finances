@@ -3,7 +3,7 @@ import { formatInstant } from '../dashboard/format';
 import type { FormatContext, ResolvedRate } from '../dashboard/types';
 import { formatDecimal } from '../AuditHistory';
 import { businessDate, NetWorthChart, NetWorthTable, shortPeriod } from './NetWorthEvolutionChart';
-import { NETWORTH_CSS } from './styles';
+import './networth.css';
 import type { NetWorthHistory, NetWorthPoint } from './types';
 
 /** Periodos de la tarjeta compacta del Home (docs/33 D104) y de la vista completa. */
@@ -111,7 +111,6 @@ export function NetWorthEvolutionView({
       aria-labelledby={`${prefix}-heading`}
       className={variant === 'compact' ? 'pf-home-card' : 'pf-home-group'}
     >
-      <style>{NETWORTH_CSS}</style>
       <div className="pf-home-group-head">
         <Heading id={`${prefix}-heading`}>{f.t('title')}</Heading>
         <p className="pf-home-muted" style={{ margin: 0 }}>

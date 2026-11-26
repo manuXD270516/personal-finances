@@ -421,6 +421,7 @@ export async function runStatementPipeline(
         decidedScore: null,
         warnings: [],
         kind: null,
+        suggestedCategory: null,
       };
     }
     const fp = fingerprints.get(p.staged.id) as { fingerprint: string; occurrenceIndex: number };
@@ -460,6 +461,8 @@ export async function runStatementPipeline(
       decidedScore: prior === null && result.preselected ? result.decidedScore : null,
       warnings,
       kind: p.normalized.direction === 'IN' ? 'INCOME' : 'EXPENSE',
+      // Un movimiento ya importado (duplicado exacto) no se crea: no hay nada que clasificar.
+      suggestedCategory: result.classification === 'DUPLICATE_EXACT' ? null : (proposed?.suggestion ?? null),
     };
   });
 

@@ -5,7 +5,7 @@ import type { Money, Transaction } from '../common/types';
 import {
   badgeStyle,
   cardStyle,
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   formStyle,
   inputStyle,
@@ -203,7 +203,7 @@ export function AdjustmentPanel({
   const [reason, setReason] = useState('');
   const direction = adjustmentDirection(difference);
   return (
-    <ConfirmPanel
+    <ConfirmDialog
       testId="adjustment-panel"
       title={f.t('adjustment.title')}
       description={
@@ -231,7 +231,7 @@ export function AdjustmentPanel({
           />
         )}
       </Field>
-    </ConfirmPanel>
+    </ConfirmDialog>
   );
 }
 

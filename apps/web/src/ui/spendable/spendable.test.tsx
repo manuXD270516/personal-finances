@@ -27,7 +27,7 @@ const ctxOf = (locale: string): FormatContext => {
 const ctx = ctxOf('es');
 const bob = (amount: string) => ({ amount, currency: 'BOB' });
 const usd = (amount: string) => ({ amount, currency: 'USD' });
-const text = (html: string) => html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, '');
+const text = (html: string) => html.replace(/<[^>]+>/g, '');
 const GENERATED = '2026-10-20T14:00:00Z';
 
 const card = (spendable: SpendableSummary | null, over: { noData?: boolean; generatedAt?: string } = {}) =>

@@ -3,13 +3,17 @@ import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { ResolvedOccurrencesQuery, UpcomingPaymentsQuery } from '@pf/commitments/contracts';
 import type { LoanScheduleQuery } from '@pf/debt/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
+import { ANOMALY_METRICS } from '@pf/forecasting/contracts';
 import {
   MlForecastingServiceClient,
+  type AnomalyRuntimeOptions,
   type ForecastingRuntimeOptions,
 } from '@pf/forecasting/interface/forecasting.module';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import { otelCounters, otelHistograms } from '@pf/platform/otel';
-import type { NominalFlowQuery } from '@pf/transactions/contracts';
+import { dec } from '@pf/shared-kernel';
+import type { NotificationIntakePort } from '@pf/notifications/contracts';
+import type { ExpenseLineQuery, NominalFlowQuery } from '@pf/transactions/contracts';
 import type { ApiConfig, WorkerConfig } from '@pf/platform/config';
 
 /** Variables `FORECASTING_*` que lee la composición (API y worker; las del worker son opcionales en la API). */
@@ -17,6 +21,7 @@ export type ForecastingConfig = Partial<
   Pick<
     ApiConfig,
     | 'FORECASTING_ENABLED'
+    | 'FORECASTING_ANOMALIES_ENABLED'
     | 'FORECASTING_STALE_DAYS'
     | 'FORECASTING_COHERENCE_GAP_RATIO'
     | 'REPORTING_RATE_VALIDITY_WINDOW'
@@ -33,6 +38,11 @@ export type ForecastingConfig = Partial<
       | 'FORECASTING_HISTORY_MAX_PERIODS'
       | 'FORECASTING_MIN_PERIODS_MODEL'
       | 'FORECASTING_MIN_PERIODS_SIMPLE'
+      | 'FORECASTING_ANOMALY_LOOKBACK_DAYS'
+      | 'FORECASTING_ANOMALY_ROBUST_Z'
+      | 'FORECASTING_ANOMALY_MIN_RATIO'
+      | 'FORECASTING_ANOMALY_MIN_SAMPLE'
+      | 'FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE'
     >
   >;
 
@@ -232,5 +242,121 @@ export function forecastingKnownPorts(input: {
       installments: (workspaceId, from, to) =>
         input.loans.listUpcomingInstallments({ workspaceId, from, to }),
     },
+  };
+}
+
+type ExpenseLine = Awaited<ReturnType<AnomalyRuntimeOptions['expenses']['listExpenseLines']>>[number];
+
+/** Transacciones por página al recorrer las líneas de gasto (la historia anual del Large Seed son ~20 000 porciones). */
+const EXPENSE_LINES_PAGE = 2000;
+
+/**
+ * Adaptadores de la detección de gastos atípicos (add-spending-anomaly-detection) sobre los contratos públicos de
+ * TRANSACTIONS (`ExpenseLineQuery`), COMMITMENTS (ocurrencias resueltas) y, solo en el worker, NOTIFICATIONS
+ * (`NotificationIntakePort`, dentro de la misma unidad de trabajo). Lecturas en serie: nunca en paralelo sobre el mismo cliente.
+ */
+export function forecastingAnomalyPorts(input: {
+  readonly expenseLines: ExpenseLineQuery;
+  readonly resolved: Pick<ResolvedOccurrencesQuery, 'listResolved'>;
+  readonly config: ForecastingConfig;
+  readonly rateValidityWindowDays: number;
+  /** Solo el worker avisa; la API nunca ejecuta la detección. */
+  readonly intake?: Pick<NotificationIntakePort, 'notify'>;
+}): AnomalyRuntimeOptions {
+  const { config, intake } = input;
+  return {
+    expenses: {
+      async listExpenseLines(workspaceId, from, to) {
+        const out: ExpenseLine[] = [];
+        let after: string | undefined;
+        for (;;) {
+          const page = await input.expenseLines.listExpenseLines({
+            workspaceId,
+            from,
+            to,
+            limit: EXPENSE_LINES_PAGE,
+            ...(after ? { after } : {}),
+          });
+          for (const l of page.items) {
+            // Administrados por otro módulo (préstamos, cargos de tarjeta de D465, metas): no se evalúan.
+            if (l.managedBy !== null || l.debtRole !== null) continue;
+            out.push({
+              transactionId: l.transactionId,
+              version: l.version,
+              date: l.date,
+              counterpartyId: l.counterpartyId,
+              categoryId: l.categoryId,
+              splitIndex: l.splitIndex,
+              amount: l.amount,
+            });
+          }
+          if (!page.next) break;
+          after = page.next;
+        }
+        return out;
+      },
+    },
+    resolved: {
+      // Pagos vinculados a una ocurrencia de un compromiso (cambios de precio de suscripciones: otro módulo, D475).
+      async transactionIds(workspaceId, from, to) {
+        const rows = await input.resolved.listResolved({ workspaceId, from, to, direction: 'OUTFLOW' });
+        return new Set(rows.map((r) => r.transactionId));
+      },
+    },
+    transactions: {
+      statesOf: (workspaceId, transactionIds) =>
+        input.expenseLines.transactionStates({ workspaceId, transactionIds }),
+    },
+    ...(intake
+      ? {
+          notifier: {
+            notify: async (f) => {
+              await intake.notify({
+                workspaceId: f.workspaceId,
+                type: 'SPENDING_ANOMALY',
+                factKey: `spending-anomalies:${f.passDate}`,
+                sourceEventId: f.passId,
+                occurredAt: f.occurredAt,
+                payload: {
+                  workspaceId: f.workspaceId,
+                  passDate: f.passDate,
+                  count: f.count,
+                  top: f.top,
+                  timeZone: f.timeZone,
+                },
+              });
+            },
+          },
+        }
+      : {}),
+    settings: {
+      enabled: config.FORECASTING_ANOMALIES_ENABLED ?? true,
+      lookbackDays: config.FORECASTING_ANOMALY_LOOKBACK_DAYS ?? 7,
+      thresholds: {
+        robustZ: dec(String(config.FORECASTING_ANOMALY_ROBUST_Z ?? 3.5)),
+        minRatio: dec(String(config.FORECASTING_ANOMALY_MIN_RATIO ?? 3)),
+        minSample: config.FORECASTING_ANOMALY_MIN_SAMPLE ?? 8,
+        newCounterpartyPercentile: config.FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE ?? 95,
+      },
+      rateValidityWindowDays: input.rateValidityWindowDays,
+    },
+    metrics: forecastingAnomalyMetrics(),
+  };
+}
+
+/** Métricas `forecast_anomaly_*` (docs/18): sin montos ni identificadores de transacciones en las etiquetas. */
+export function forecastingAnomalyMetrics(): NonNullable<AnomalyRuntimeOptions['metrics']> {
+  const counters = otelCounters('@pf/forecasting');
+  const histograms = otelHistograms('@pf/forecasting');
+  return {
+    evaluated: (count) => {
+      if (count > 0) counters.increment(ANOMALY_METRICS.evaluated, {}, count);
+    },
+    notRated: (count) => {
+      if (count > 0) counters.increment(ANOMALY_METRICS.notRated, {}, count);
+    },
+    flagged: (reason, count) => counters.increment(ANOMALY_METRICS.flagged, { reason }, count),
+    decided: (decision) => counters.increment(ANOMALY_METRICS.decided, { decision }),
+    passDuration: (seconds) => histograms.record(ANOMALY_METRICS.passDuration, seconds, {}),
   };
 }

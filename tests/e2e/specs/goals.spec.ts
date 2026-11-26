@@ -129,7 +129,7 @@ test.describe('Metas de ahorro (goals/savings-goals)', () => {
     await expect(warning).toContainText('-400,00 BOB');
     await expect(warning).toContainText('Ahorro BOB');
     await page.getByLabel('Motivo').fill('Aporte equivocado');
-    await page.getByTestId('confirm-panel').getByRole('button', { name: 'Sí, anular' }).click();
+    await page.getByTestId('transaction-confirm').getByRole('button', { name: 'Sí, anular' }).click();
     await expect(page.getByTestId('transaction-detail')).toHaveAttribute('data-status', 'VOIDED');
 
     // La meta reacciona (consumidor del worker) y muestra el faltante de 400,00 BOB en "Ahorro BOB".

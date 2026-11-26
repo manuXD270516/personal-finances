@@ -62,6 +62,18 @@
       datasourceTemplate: 'docker',
       versioningTemplate: 'docker',
     },
+    {
+      // deploy/host/*.sh: constantes `readonly X_IMAGE=imagen:tag@sha256:…` (rclone del respaldo, aws-cli del bootstrap).
+      // Siempre digest de índice multi-arch (amd64 y arm64; N1-C12b).
+      customType: 'regex',
+      description: 'Imágenes de terceros fijadas por tag y digest en los scripts del host',
+      managerFilePatterns: ['/^deploy/host/[^/]+\\.sh$/'],
+      matchStrings: [
+        'readonly [A-Z_]+_IMAGE=(?<depName>[a-z0-9][a-z0-9._/-]*):(?<currentValue>[A-Za-z0-9][A-Za-z0-9._-]*)@(?<currentDigest>sha256:[a-f0-9]{64})',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'docker',
+    },
   ],
 
   // Orden: la última regla que coincide gana.

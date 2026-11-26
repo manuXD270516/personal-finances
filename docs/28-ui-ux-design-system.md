@@ -1,8 +1,8 @@
 # 28 — UI/UX & Design System
 
-> **Estado:** Propuesto · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) (§1, §4, §5 ADR-0019, §8, §12), [01-functional-requirements.md](01-functional-requirements.md), [13-import-architecture.md](13-import-architecture.md), [14-reporting.md](14-reporting.md), [15-ml-architecture.md](15-ml-architecture.md), [27-ai-assistant-roadmap.md](27-ai-assistant-roadmap.md), ADR-0019 (Frontend: Next.js + BFF)
+> **Estado:** As-built (actualizado el 2026-11-25, change `refine-web-accessibility-foundations`; D505, D506, D508) · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) (§1, §4, §5 ADR-0019, §8, §12), [01-functional-requirements.md](01-functional-requirements.md), [13-import-architecture.md](13-import-architecture.md), [14-reporting.md](14-reporting.md), [15-ml-architecture.md](15-ml-architecture.md), [27-ai-assistant-roadmap.md](27-ai-assistant-roadmap.md), ADR-0019 (Frontend: Next.js + BFF)
 >
-> **Stack UI:** Next.js (App Router) + TypeScript + Tailwind + shadcn/ui + TanStack Query + ECharts. Idioma: **español** primero (`es-BO`); i18n preparado para inglés (`en`) y portugués (`pt-BR`). NFR: `NFR-USAB-*`.
+> **Stack UI (as-built, D506):** Next.js (App Router) + TypeScript + **CSS propio** (hoja `apps/web/app/globals.css` con tokens `--pf-*` y estilos base en `:where()`; sin Tailwind ni shadcn/ui) + **gráficos SVG propios** (sin ECharts) + fuentes del sistema (D505). Los nombres de componentes y tokens de este documento son semánticos: donde dice Tailwind, shadcn/ui o ECharts se lee «CSS propio con tokens» y «SVG propio». Idioma: **español** primero (`es-BO`); i18n preparado para inglés (`en`) y portugués (`pt-BR`). NFR: `NFR-USAB-*`.
 
 ---
 
@@ -139,15 +139,22 @@ Mobile: una columna en orden Q2 → Q1 → Q4 → Q3 → Q5 → Q9 → Q6 → Q7
 ```mermaid
 flowchart LR
     A[＋] --> B[Monto · teclado numérico<br/>con coma decimal] --> C[Categoría<br/>sugeridas por uso/hora/lugar] --> D[Cuenta<br/>default: última usada] --> E{Guardar}
-    E --> F[Toast: Gasto registrado · Deshacer 10 s]
+    E --> F[Aviso persistente: Gasto registrado · Deshacer · Ver]
     B -.opcional.-> G[Descripción, fecha, tags, adjuntar foto, split]
 ```
 
 - Tipo por defecto: **Gasto**; segmented control `Gasto | Ingreso | Transferencia | Conversión`.
 - Monto primero, con moneda de la cuenta seleccionada visible al lado (`Bs`), cambiable.
 - Fecha por defecto: hoy (TZ workspace); chips "Ayer", "Elegir".
-- **Deshacer** = `void` (reversa) si ya se posteó — explicado como "Deshacer" en UI; tras 10 s, se anula desde el detalle.
+- **Deshacer** = `void` (reversa) si ya se posteó — explicado como "Deshacer" en UI. El aviso con «Deshacer» es **persistente** hasta cerrarlo o salir de la página (D508; sin el límite de 10 s original); después se anula desde el detalle.
 - Idempotency-Key generado por el cliente al abrir el formulario (doble tap no duplica).
+- **As-built (`add-quick-capture`, 2026-11-25):**
+  - **Monto primero.** En el alta, el orden del DOM es monto → tipo → categoría → cuenta → fecha → resto (sin CSS `order`) y el monto toma el foco al abrir `/transacciones/nueva` (`inputmode="decimal"`, `enterkeyhint="next"`). La edición conserva su orden y no mueve el foco.
+  - **Registrar y seguir (D502).** «Registrar» deja el formulario en la misma URL, con tipo, cuenta, fecha y estado conservados, el resto vacío, una `Idempotency-Key` nueva y el foco en el monto. «Registrar e ir al detalle» conserva la navegación anterior (`?aviso=registrada`).
+  - **Aviso persistente (D508).** Cada registro publica «Gasto de Bs 45,00 registrado» con «Deshacer» y «Ver» en la región de avisos (abajo, `role="region"` «Avisos»). «Deshacer» anula con el `void` existente (reversa, auditoría y evento) sin límite de tiempo; el aviso pasa a «Registro anulado». No se guarda entre documentos: una recarga empieza sin avisos. Hasta 3 avisos visibles; entra el cuarto y sale el más antiguo.
+  - **Cuenta recordada (D510).** La última cuenta usada va en `localStorage` del dispositivo (`pfos:last-account:v1:<usuario>:<workspace>`, solo el id), sin `PATCH /me`. Orden: `?cuenta=` → recordada si sigue activa → vacío.
+  - **Acceso «＋ Registrar»** en la barra superior para quien puede editar, oculto en el alta; a 360 px solo se ve el «＋» (nombre accesible «Registrar», objetivo de 44 px).
+  - **Región de avisos.** Anuncio una sola vez con `document.ariaNotify` (con «Acciones disponibles» si hay acciones) y respaldo `role="status"`; mostrar un aviso no mueve el foco; cerrar mueve el foco al aviso vecino o a donde estaba.
 - Offline (futuro): cola local con estado "pendiente de sincronizar".
 
 ### 4.2 Transferencia
@@ -246,7 +253,7 @@ Pasos: 1 Archivo → 2 Mapeo de columnas (solo si no hay perfil; vista previa de
 
 ## 5. Design tokens
 
-Definidos como CSS variables (Tailwind theme + shadcn/ui), con valores light/dark. Los nombres son **semánticos**; los valores concretos se ajustan en implementación verificando contraste.
+Definidos como CSS variables propias `--pf-*` en `app/globals.css` (D506), con valores light (el tema oscuro es del lote L3). Los nombres son **semánticos**; los valores concretos se ajustan en implementación verificando contraste.
 
 ### 5.1 Color base
 
@@ -278,7 +285,7 @@ Reglas: el rojo se reserva para **problemas** (excedido, faltante, error), no pa
 
 ### 5.3 Tipografía
 
-- Familia: **Inter** (UI) con `font-feature-settings: "tnum" 1, "cv11"`; alternativa del sistema. Monoespaciada opcional para IDs: JetBrains Mono.
+- Familia: **fuentes del sistema** (`system-ui`, `Segoe UI`, `Roboto`…; D505): no se autohospeda Inter ni se cargan fuentes de terceros. Monoespaciada para IDs: `ui-monospace`/`Consolas`.
 - **Montos siempre con numerales tabulares** (`tabular-nums`) y alineados a la derecha en tablas; código de moneda/símbolo alineado consistentemente.
 - Escala (rem): `xs 0.75 · sm 0.875 · base 1 · lg 1.125 · xl 1.25 · 2xl 1.5 · 3xl 1.875 · display 2.25` (KPI principal). Line-height 1.5 texto, 1.2 KPIs.
 - Pesos: 400 texto, 500 labels, 600 KPIs/títulos. Mínimo 16 px en inputs móviles (evita zoom iOS).
@@ -291,9 +298,9 @@ Reglas: el rojo se reserva para **problemas** (excedido, faltante, error), no pa
 - Densidad: `comfortable` (default) y `compact` (tablas de transacciones en desktop) como preferencia.
 - Targets táctiles ≥ 44×44 px (supera el mínimo 24×24 de WCAG 2.2 2.5.8).
 
-## 6. Componentes clave (shadcn/ui + propios)
+## 6. Componentes clave (propios, sin shadcn/ui)
 
-`MoneyText` (formatea Money; props: `value`, `currency`, `display: symbol|code`, `signMode`, `kind` → aplica token semántico + icono + aria-label), `MoneyInput` (acepta coma decimal y pegado con formatos locales; produce string decimal; nunca `number`), `CurrencyBadge`, `AccountPicker`, `CategoryPicker` (con búsqueda, recientes, colores/iconos de categoría), `TransactionRow`, `StatusBadge`, `KpiCard`, `BudgetBar`, `ChartCard` (ECharts + tabla alternativa), `EmptyState`, `ConfirmDialog` (acciones irreversibles muestran resumen), `ProblemAlert` (mapea RFC 9457 → texto).
+`MoneyText` (formatea Money; props: `value`, `currency`, `display: symbol|code`, `signMode`, `kind` → aplica token semántico + icono + aria-label), `MoneyInput` (acepta coma decimal y pegado con formatos locales; produce string decimal; nunca `number`), `CurrencyBadge`, `AccountPicker`, `CategoryPicker` (con búsqueda, recientes, colores/iconos de categoría), `TransactionRow`, `StatusBadge`, `KpiCard`, `BudgetBar`, `ChartCard` (SVG propio + tabla alternativa), `EmptyState`, `ConfirmDialog` y `ConfirmPanel` (patrón de confirmación en dos niveles, ver §6.2), `ProblemAlert` (mapea RFC 9457 → texto), `ProblemAlert` (mapea RFC 9457 → texto).
 
 ### 6.1 Patrón "Recorrido" (reporte de máquina de estados, docs/31 D37)
 
@@ -301,7 +308,15 @@ Pestaña **Recorrido** en el detalle de transacción y de cuenta (`add-lifecycle
 
 Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrece para **categorías y contrapartes** (acción "Recorrido" en el árbol de categorías y en la lista de contrapartes, panel o diálogo accesible, layout fijo de dos estados `Activa` ⇄ `Archivada`) y toda vista del recorrido suma las acciones **"Exportar CSV"** y **"Exportar PDF"** (botones secundarios junto al título; descarga directa, sin modal). Desde `add-loans` el patrón también cubre el **préstamo** (pestaña Recorrido del detalle, máquina `LOAN_LIFECYCLE`; los pagos y sus anulaciones son anotaciones).
 
-## 7. Convenciones de gráficos (ECharts)
+### 6.2 Confirmaciones y errores de formulario (change `refine-web-accessibility-foundations`)
+
+- **Confirmación en dos niveles.** Las acciones **irreversibles o con efecto contable** (anular, revertir un import, reabrir un periodo, eliminar, archivar, descartar, revocar, cancelar o terminar un plan, una meta, una suscripción o una recurrencia) se confirman en `ConfirmDialog`: un `<dialog>` nativo abierto con `showModal()` y `role="alertdialog"`; el navegador aporta la inertización del resto de la página, la contención del foco, Escape y la devolución del foco al disparador. Las acciones **reversibles o con formulario propio** (pausar o reanudar, aprobar, omitir, editar o vincular una ocurrencia, solicitar un export, cargar los datos de demostración) usan `ConfirmPanel`, en línea. En ambos, el foco inicial va a «Cancelar» (la acción segura), que precede a la confirmación en el orden de tabulación, y al cancelar el foco vuelve al control que abrió la confirmación.
+- **Foco al error.** Tras un envío rechazado por la validación, el foco va al primer campo inválido en el orden del DOM (que es el orden visual: no se reordena con CSS) o, en los formularios largos (alta y edición de préstamo, alta y edición de tarjeta, mapeo de columnas del import), al **resumen de errores** (`ErrorSummary`: conteo con plural ICU y un enlace por campo). El error del campo se enlaza con `aria-describedby` y `aria-invalid`; no es región viva.
+- **Validación al salir del campo** solo para los montos de gasto, transferencia y conversión: el error aparece al salir de un campo modificado y desaparece en cuanto el valor es válido; un obligatorio vacío sin tocar no muestra error hasta el envío.
+- **Movimiento reducido.** Sin anulación global: cada animación o transición se declara junto a su regla, dentro de `@media (prefers-reduced-motion: no-preference)`. Un test estático de las hojas de estilo lo vigila.
+- **Colores forzados y pestañas.** El ítem actual de la navegación lleva un borde con `currentColor`; las pestañas van en una sola fila con desplazamiento horizontal y el seleccionado se marca con un borde, sin cambiar el ancho.
+
+## 7. Convenciones de gráficos (SVG propio)
 
 | Convención | Regla |
 |---|---|
@@ -311,10 +326,10 @@ Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrec
 | Ingreso vs gasto | Ingreso `--fin-income`, gasto un neutro/azul oscuro (no rojo); savings como línea. |
 | Proyecciones | Línea punteada + banda sombreada (intervalo); leyenda "Rango probable 80 %". |
 | Ejes | Formato abreviado es-BO (`Bs 12,5 mil`) en ejes; valor exacto en tooltip. Eje Y comienza en 0 para barras. |
-| Interacción | Tooltip con valor exacto, moneda y % del total; clic = drill-down; teclado: foco por serie con `aria` (ECharts `aria.enabled` + `decal` patrones). |
+| Interacción | Tooltip con valor exacto, moneda y % del total; clic = drill-down; teclado: foco por serie con `aria` y patrones (`decal`) en el SVG propio. |
 | Accesibilidad | Cada gráfico tiene **tabla de datos alternativa** ("Ver como tabla") y resumen textual (`aria-describedby`). Patrones (`decal`) activables para no depender del color. |
 | Donut/pie | Solo ≤ 6 segmentos; resto agrupado "Otros". Preferir barras ordenadas. |
-| Tema | Temas ECharts `pfos-light` y `pfos-dark` generados desde los tokens. |
+| Tema | Colores de los gráficos tomados de los tokens `--pf-*` (tema claro hoy; el oscuro llega con L3). |
 
 ## 8. Formato de moneda, números y fechas
 
@@ -390,7 +405,7 @@ Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrec
 
 ## 11. Responsive / mobile-first
 
-- Breakpoints Tailwind: `sm 640 · md 768 · lg 1024 · xl 1280`. Diseño base para 360–414 px.
+- Breakpoints de la hoja propia: `640 · 768 · 1024` px. Diseño base para 360–414 px.
 - Mobile prioriza: quick add, saldo disponible, próximos pagos, lista de transacciones con swipe (categorizar / anular con confirmación).
 - Tablas → listas de tarjetas en móvil; reportes muestran KPI + gráfico simplificado + "ver tabla".
 - Quick add como **sheet** inferior con teclado numérico (`inputmode="decimal"`), monto autoenfocado.
@@ -435,7 +450,7 @@ Skeletons para cargas < 1 s; nunca spinner de pantalla completa en el dashboard.
 3. ¿Gasto en neutro (propuesto) o en rojo como en muchas apps? (Propuesta: rojo solo para problemas.)
 4. ¿Precisión de display de USDT en listas: 2 decimales (propuesto) o 6?
 5. ¿PWA instalable en Phase 2 y offline quick-add más adelante?
-6. ¿Fuente Inter autohospedada (privacidad, sin Google Fonts en runtime)? Propuesta: sí, vía `next/font` local.
+6. ~~¿Fuente Inter autohospedada?~~ **Cerrada (D505, 2026-11-25):** se usan las fuentes del sistema; no se autohospeda Inter.
 7. ¿En qué fase se completan las traducciones `en`/`pt-BR`? (La arquitectura las soporta desde Phase 1.)
 
 ## Adjuntos y página de documentos (add-document-attachments)

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Category } from '../common/types';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { HOME_CSS } from '../dashboard/styles';
+import '../dashboard/home.css';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { BUDGETS_PATH, SPENDABLE_SETTINGS_PATH, UPCOMING_PATH } from './logic';
 import type { Spendable } from './types';
@@ -47,7 +47,6 @@ function SpendableDetail({ ctx }: { ctx: WorkspaceContext }) {
 
   return (
     <div className="pf-home" data-testid="spendable-page">
-      <style>{HOME_CSS}</style>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {!spendable && !problem ? (
         <p aria-busy="true" role="status">

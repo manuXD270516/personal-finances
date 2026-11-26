@@ -16,11 +16,13 @@ import type {
 } from '@pf/ledger/contracts';
 import { pgExistingIds, runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
+import type { CounterMetrics } from '@pf/platform/otel';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
 import type {
   AccountMovementsQuery,
+  CardChargeTransactionsPort,
   LoanTransactionsPort,
   NominalFlowQuery,
   PendingFlowQuery,
@@ -28,6 +30,7 @@ import type {
 } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { CardActivityService } from '../application/card-activity.handler.js';
+import { CardChargesService } from '../application/card-charges.service.js';
 import { CardDailyService } from '../application/card-daily.runner.js';
 import type { CardBalancePort, CardDeps, CardSettings } from '../application/card-ports.js';
 import { CardsQueries } from '../application/cards.queries.js';
@@ -60,6 +63,7 @@ import {
   type LoanExistenceQuery,
 } from '../contracts/index.js';
 import {
+  PgCardChargeRepository,
   PgCardRepository,
   PgInstallmentPlanRepository,
   PgReminderRepository,
@@ -77,7 +81,13 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-debt.js';
 import { DEBT_SUMMARY_QUERIES, DebtSummaryController } from './debt-summary-http.js';
-import { CARDS_QUERIES, CARDS_SERVICE, CreditCardsController, INSTALLMENTS_SERVICE } from './cards-http.js';
+import {
+  CARD_CHARGES_SERVICE,
+  CARDS_QUERIES,
+  CARDS_SERVICE,
+  CreditCardsController,
+  INSTALLMENTS_SERVICE,
+} from './cards-http.js';
 import {
   AMORTIZATION_QUERIES,
   AMORTIZATION_SERVICE,
@@ -222,6 +232,8 @@ export interface CardsRuntimeOptions {
   /** Saldos presentados a varias fechas (INV-022). */
   readonly balanceHistory: AccountBalanceHistoryQuery;
   readonly movements: AccountMovementsQuery;
+  /** Escritura de los cargos de tarjeta en TRANSACTIONS (add-card-interest-ledger-portions). */
+  readonly cardCharges: CardChargeTransactionsPort;
   /** Asientos de apertura por cuenta y rango (LEDGER). */
   readonly openingEntries: LedgerOpeningEntriesQuery;
   readonly pending: PendingFlowQuery;
@@ -232,6 +244,8 @@ export interface CardsRuntimeOptions {
   /** Ventana de vigencia de las tasas de valoración (`REPORTING_RATE_VALIDITY_WINDOW`). */
   readonly rateValidityWindowDays: number;
   readonly settings?: Partial<CardSettings>;
+  /** Contadores OTel (`debt_card_cycle_mismatch_total`); sin ellos no se registran métricas. */
+  readonly counters?: CounterMetrics;
 }
 
 export const DEFAULT_CARD_SETTINGS: Omit<CardSettings, 'rateValidityWindowDays'> = {
@@ -243,6 +257,8 @@ export interface CardsRuntime {
   readonly cards: CardsService;
   readonly queries: CardsQueries;
   readonly installments: InstallmentsService;
+  /** Registrar, adoptar y anular los intereses y cargos de una tarjeta (add-card-interest-ledger-portions). */
+  readonly charges: CardChargesService;
   readonly activity: CardActivityService;
   readonly daily: CardDailyService;
 }
@@ -293,6 +309,8 @@ export function createCardsRuntime(options: CardsRuntimeOptions): CardsRuntime {
     plans: new PgInstallmentPlanRepository(),
     utilization: new PgUtilizationRepository(),
     reminders: new PgReminderRepository(),
+    charges: new PgCardChargeRepository(),
+    chargeTransactions: options.cardCharges,
     accounts,
     balances,
     movements: options.movements,
@@ -310,6 +328,7 @@ export function createCardsRuntime(options: CardsRuntimeOptions): CardsRuntime {
     outbox: options.outbox,
     ids: uuidV7Ids,
     clock: options.clock,
+    ...(options.counters ? { metrics: options.counters } : {}),
     settings: {
       ...DEFAULT_CARD_SETTINGS,
       rateValidityWindowDays: options.rateValidityWindowDays,
@@ -320,6 +339,7 @@ export function createCardsRuntime(options: CardsRuntimeOptions): CardsRuntime {
     cards: new CardsService(deps),
     queries: new CardsQueries(deps),
     installments: new InstallmentsService(deps),
+    charges: new CardChargesService(deps),
     activity: new CardActivityService(deps),
     daily: new CardDailyService(deps),
   };
@@ -484,6 +504,7 @@ export class DebtModule {
         { provide: CARDS_SERVICE, useValue: options.cards.cards },
         { provide: CARDS_QUERIES, useValue: options.cards.queries },
         { provide: INSTALLMENTS_SERVICE, useValue: options.cards.installments },
+        { provide: CARD_CHARGES_SERVICE, useValue: options.cards.charges },
         { provide: DEBT_SUMMARY_QUERIES, useValue: options.summary },
       ],
     };

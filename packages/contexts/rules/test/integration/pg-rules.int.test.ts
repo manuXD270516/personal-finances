@@ -203,6 +203,7 @@ describe('rules.rule', () => {
       `SELECT schema_name, table_name FROM platform.workspace_scoped_table WHERE schema_name = 'rules' ORDER BY table_name`,
     );
     expect(rows.map((r) => `${r.schema_name}.${r.table_name}`)).toEqual([
+      'rules.category_suggestion_outcome',
       'rules.rule',
       'rules.rule_suggestion_decision',
       'rules.rule_version',

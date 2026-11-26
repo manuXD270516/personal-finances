@@ -309,3 +309,11 @@ Todo change declara su impacto en tests (ver [16-testing-strategy.md §11](./16-
 | Rendimiento del calendario de 90 días con la banda | TC-REPORTING-PREDICTED-011 | performance (nightly) |
 
 - Tests: `variable-liquid-outflow.test.ts`, `liquid-forecast.test.ts` y `pg-forecasting.int.test.ts` (FORECAST), `predicted-spending-band.test.ts` (con PBT) y `predicted-cash-flow.queries.test.ts` (REPORTING), `cash-flow.test.tsx`, `forecast-home.test.tsx` y `DashboardView.test.tsx` (web), `forecasting.api.test.ts` (API), `cash-flow-calendar.perf.ts` (nightly) y `predicted-cash-flow-band.spec.ts` (E2E, perfil `ml`). La variante E2E con la función deshabilitada de TC-REPORTING-PREDICTED-006 se cubre por API: el stack de E2E trae el pronóstico siempre habilitado.
+
+## Nota as-built: `add-spending-anomaly-detection` (Phase 9, 2026-11-25)
+
+- Matriz: `TC-FORECAST-ANOMALY-001..026` y `TC-NOTIFICATIONS-ANOMALY-001..005`. Dominio (`robust-stats`, `spending-anomaly-detector`, `expense-history-index`, con PBT y timeout explícito) y aplicación (`spending-anomalies.test.ts`, `backtest-spending-anomalies.test.ts`) en `@pf/forecasting`; aviso y textos es/en/pt en `@pf/notifications` (con el valor por omisión por tipo); vista y marca en `apps/web` (`spending-anomalies.test.tsx`); API contra PostgreSQL real (`spending-anomalies.api.test.ts`), arranque del worker (`event-throughput.int.test.ts`, TC-013) y E2E (`spending-anomalies.spec.ts`). `TC-FORECAST-ANOMALY-025` y `-026` corren además en el nightly (`anomalies.perf.ts`).
+
+## Nota as-built: `add-budget-overrun-risk` (Phase 9, 2026-11-26)
+
+- Matriz: `TC-REPORTING-INSIGHT-001..019` y `TC-NOTIFICATIONS-BUDGETRISK-001..005`. Dominio (`budget-overrun-projector.test.ts`, con PBT y timeout explícito) y aplicación (`budget-risk.queries.test.ts`, `report-summary.budget-risk.test.ts`) en `@pf/reporting`; aviso, preferencias y textos es/en/pt en `@pf/notifications` (`budget-risk-notifications.test.ts`); paso de avisos en el job (`reporting-jobs.test.ts`); UI en `apps/web` (`budget-risk.test.tsx`); API contra PostgreSQL real y el worker (`budget-risk.int.test.ts`), arranque del worker con la plantilla del host (`event-throughput.int.test.ts`, TC-015) y E2E (`budget-overrun-risk.spec.ts`). `TC-REPORTING-INSIGHT-017` corre además en el nightly (`budget-risk.perf.ts`).

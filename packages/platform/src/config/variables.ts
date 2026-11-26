@@ -502,6 +502,12 @@ export const VARIABLES = {
     description: 'Duración máxima de la sesión desde el login, haya o no actividad (`12h`…).',
     default: '12h',
   }),
+  WEB_CSP_REPORT_ONLY: variable(bool, {
+    group: 'BFF (finance-web)',
+    description:
+      'Interruptor de emergencia de la CSP de la web (D458): `true` emite `Content-Security-Policy-Report-Only` (la misma política, sin bloquear) en lugar de `Content-Security-Policy`. Se usa si una pantalla se rompe en producción: se cambia en `/etc/pfos/pfos.env` y se redespliega el mismo SHA.',
+    default: 'false',
+  }),
   RATE_LIMIT_STORE: variable(z.enum(['memory', 'valkey']), {
     group: 'Convenciones de API',
     description:
@@ -795,6 +801,20 @@ export const VARIABLES = {
     },
   ),
 
+  // ── REPORTING: riesgo de exceder un presupuesto (openspec add-budget-overrun-risk, design.md decisiones 2 y 7; D478) ──
+  REPORTING_BUDGET_RISK_ENABLED: variable(bool, {
+    group: 'Reporting',
+    description:
+      'Habilita el riesgo de exceder un presupuesto (API y worker): la consulta `getBudgetRisk`, el bloque del Home y el paso de avisos dentro de `reporting.cash-flow-watch`, sin consumidores ni conexiones nuevas. Deshabilitado, la consulta responde `DISABLED` y el paso no corre. El aviso por notificación está apagado por omisión para cada usuario.',
+    default: 'true',
+  }),
+  REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS: variable(positiveInt, {
+    group: 'Reporting',
+    description:
+      'Días transcurridos del periodo (con hoy) desde los cuales el riesgo de una línea se proyecta por el ritmo del periodo cuando no hay pronóstico; antes, el riesgo no está disponible (`TOO_EARLY`), salvo que el gastado más los pagos conocidos ya superen la referencia.',
+    default: '7',
+  }),
+
   // ── Planning: periodos financieros (openspec add-financial-periods, design.md decisiones 5 y 6; docs/33 D63) ──
   PLANNING_PERIOD_LOOKAHEAD: variable(
     positiveInt.refine((n) => n <= 24, 'entre 1 y 24 periodos'),
@@ -1004,6 +1024,43 @@ export const VARIABLES = {
     description:
       'Fracción del gasto total esperado de un periodo a partir de la cual la vista de pronósticos informa la diferencia entre la suma de las categorías y el total (cada serie se pronostica por separado, sin reconciliación). `0.05` = 5 %.',
     default: '0.05',
+  }),
+  // ── FORECAST: gastos atípicos (openspec add-spending-anomaly-detection; D473, D474; mediana y MAD en TypeScript) ──
+  FORECASTING_ANOMALIES_ENABLED: variable(bool, {
+    group: 'Forecasting',
+    description:
+      'Habilita la detección de gastos atípicos (API y worker). Corre dentro del trabajo diario `forecasting.schedule` aunque `FORECASTING_ENABLED` sea `false` (no usa el servicio `finance-ml`) y no suma consumidores ni conexiones. Deshabilitada, la API conserva la lista ya detectada e informa `featureStatus: DISABLED`. El aviso por notificación está apagado por omisión para cada usuario.',
+    default: 'true',
+  }),
+  FORECASTING_ANOMALY_LOOKBACK_DAYS: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Días hacia atrás (desde hoy, en la zona del workspace) de los gastos que la pasada diaria evalúa si su versión vigente no se evaluó todavía.',
+    default: '7',
+  }),
+  FORECASTING_ANOMALY_ROBUST_Z: variable(z.coerce.number().gt(0), {
+    group: 'Forecasting',
+    description:
+      'Puntaje robusto mínimo (0.6745 × (monto − mediana) / MAD) para marcar un gasto atípico por categoría o contraparte; se exige además `FORECASTING_ANOMALY_MIN_RATIO`. Con MAD igual a cero alcanza la razón.',
+    default: '3.5',
+  }),
+  FORECASTING_ANOMALY_MIN_RATIO: variable(z.coerce.number().gt(0), {
+    group: 'Forecasting',
+    description:
+      'Veces la mediana que debe alcanzar el monto de un gasto para marcarse como atípico por categoría o contraparte.',
+    default: '3.0',
+  }),
+  FORECASTING_ANOMALY_MIN_SAMPLE: variable(positiveInt, {
+    group: 'Forecasting',
+    description:
+      'Gastos de historia (365 días anteriores) mínimos por categoría, por contraparte y en el workspace (percentil de contraparte nueva) para evaluar un gasto.',
+    default: '8',
+  }),
+  FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE: variable(z.coerce.number().gt(0).lte(100), {
+    group: 'Forecasting',
+    description:
+      'Percentil (por rango más cercano) de los gastos del workspace de los 365 días anteriores desde el cual un gasto con una contraparte sin gastos previos se marca como atípico.',
+    default: '95',
   }),
   COMMITMENTS_SCHEDULER_CRON: variable(
     z
@@ -1302,6 +1359,58 @@ export const VARIABLES = {
       default: '50',
     },
   ),
+  // ── add-category-suggestions (classification/auto-classification, D476 y D477) ──
+  RULES_CATEGORY_SUGGEST_ENABLED: variable(bool, {
+    group: 'Rules',
+    description:
+      'Habilita las sugerencias de categoría por historial en la instalación (API y worker). Deshabilitado, la consulta responde `DISABLED` y la vista previa del import no muestra sugerencias; es el rollback del change.',
+    default: 'true',
+  }),
+  RULES_CATEGORY_SUGGEST_WINDOW_DAYS: variable(
+    positiveInt.refine((n) => n <= 366, 'hasta 366 días'),
+    {
+      group: 'Rules',
+      description:
+        'Ventana en días de la evidencia de las sugerencias de categoría (365): se cuentan las clasificaciones que fijó el usuario en los últimos N días.',
+      default: '365',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_MAX_EVIDENCE: variable(
+    positiveInt.refine((n) => n <= 5000, 'hasta 5000 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Máximo de transacciones de evidencia que lee el sugeridor de categorías (5000, las más recientes de la ventana); si hay más se cuenta en la métrica `rules_category_suggestion_evidence_truncated_total`.',
+      default: '5000',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_MIN_SUPPORT: variable(
+    positiveInt.refine((n) => n <= 1000, 'hasta 1000 transacciones'),
+    {
+      group: 'Rules',
+      description:
+        'Apoyo mínimo de una sugerencia de categoría (2): transacciones del patrón (contraparte o clave de descripción) y del mismo tipo. Una sugerencia se confirma una por una, por eso es menor que el de las sugerencias de reglas.',
+      default: '2',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE: variable(
+    z.string().regex(/^(0.[0-9]{1,4}|1(.0{1,4})?)$/u, 'decimal entre 0 y 1 con hasta 4 decimales'),
+    {
+      group: 'Rules',
+      description:
+        'Confianza mínima de una sugerencia de categoría (0.7000, D477): transacciones del patrón en la categoría ganadora ÷ total del patrón y del mismo tipo, con 4 decimales HALF_EVEN.',
+      default: '0.7000',
+    },
+  ),
+  RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS: variable(
+    positiveInt.refine((n) => n <= 3600, 'hasta 3600 segundos'),
+    {
+      group: 'Rules',
+      description:
+        'Vigencia en segundos de la caché en proceso del índice de evidencia por workspace de la consulta del alta manual (300, tope de 200 workspaces). Una aceptación no la invalida: la sugerencia siguiente puede tardar hasta este tiempo en reflejarla.',
+      default: '300',
+    },
+  ),
   IMPORT_PERSIST_BATCH_SIZE: variable(
     positiveInt.refine((n) => n <= 1000, 'hasta 1000 filas por lote'),
     {
@@ -1499,7 +1608,7 @@ export const VARIABLES = {
   OBJECT_STORAGE_PUBLIC_ENDPOINT: variable(httpUrl, {
     group: 'Documentos adjuntos',
     description:
-      'Endpoint S3 PÚBLICO con el que se firman las URL de subida (el host forma parte de la firma y debe ser alcanzable por el navegador). Sin valor: el mismo `OBJECT_STORAGE_ENDPOINT`. En producción es el hostname `PF_DOMAIN_FILES` de Caddy, limitado a `PUT` firmados sobre el bucket de cuarentena.',
+      'Endpoint S3 PÚBLICO con el que se firman las URL de subida (el host forma parte de la firma y debe ser alcanzable por el navegador). Sin valor: el mismo `OBJECT_STORAGE_ENDPOINT`. En producción es el hostname `PF_DOMAIN_FILES` de Caddy, limitado a `PUT` firmados sobre el bucket de cuarentena. En finance-web, su origen (esquema, host y puerto) va en `connect-src` de la CSP y es obligatoria con `PFOS_ENV=staging|production`.',
     optional: true,
     // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'http://127.0.0.1:29000',
@@ -1749,7 +1858,10 @@ export const APP_VARIABLES = {
     'FORECASTING_ENABLED',
     'FORECASTING_STALE_DAYS',
     'FORECASTING_COHERENCE_GAP_RATIO',
+    'FORECASTING_ANOMALIES_ENABLED',
     'REPORTING_RATE_VALIDITY_WINDOW',
+    'REPORTING_BUDGET_RISK_ENABLED',
+    'REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS',
     'PLANNING_PERIOD_LOOKAHEAD',
     'PLANNING_HISTORY_DEFAULT_PERIODS',
     'PLANNING_HISTORY_MAX_PERIODS',
@@ -1795,6 +1907,13 @@ export const APP_VARIABLES = {
     'RULES_SUGGEST_HIGH_MIN_SUPPORT',
     'RULES_SUGGEST_MAX_EVIDENCE',
     'RULES_SUGGEST_MAX_RESULTS',
+    // add-category-suggestions: la API resuelve la consulta del alta manual.
+    'RULES_CATEGORY_SUGGEST_ENABLED',
+    'RULES_CATEGORY_SUGGEST_WINDOW_DAYS',
+    'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE',
+    'RULES_CATEGORY_SUGGEST_MIN_SUPPORT',
+    'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE',
+    'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS',
     // add-workspace-export: la API solicita, descarga (descifra en streaming) e importa.
     ...EXPORT_PORTABILITY,
     'REAUTH_MAX_AGE',
@@ -1839,6 +1958,12 @@ export const APP_VARIABLES = {
     'FORECASTING_HISTORY_MAX_PERIODS',
     'FORECASTING_MIN_PERIODS_MODEL',
     'FORECASTING_MIN_PERIODS_SIMPLE',
+    'FORECASTING_ANOMALIES_ENABLED',
+    'FORECASTING_ANOMALY_LOOKBACK_DAYS',
+    'FORECASTING_ANOMALY_ROBUST_Z',
+    'FORECASTING_ANOMALY_MIN_RATIO',
+    'FORECASTING_ANOMALY_MIN_SAMPLE',
+    'FORECASTING_ANOMALY_NEW_COUNTERPARTY_PERCENTILE',
     'GOALS_DAILY_CRON',
     // add-basic-csv-import: jobs diarios de expiración y purga del staging.
     'IMPORT_STAGING_RETENTION',
@@ -1850,6 +1975,13 @@ export const APP_VARIABLES = {
     'IMPORT_PROCESSING_TIMEOUT',
     'IMPORT_DUPLICATE_HIGH_SCORE',
     'IMPORT_DUPLICATE_LOW_SCORE',
+    // add-category-suggestions: la etapa de clasificación del import (consumidor `imports.persist`) calcula las sugerencias.
+    'RULES_CATEGORY_SUGGEST_ENABLED',
+    'RULES_CATEGORY_SUGGEST_WINDOW_DAYS',
+    'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE',
+    'RULES_CATEGORY_SUGGEST_MIN_SUPPORT',
+    'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE',
+    'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS',
     // add-banking-providers: solo el worker tiene las claves privadas y habla con los proveedores.
     'CONNECTION_CREDENTIALS_PUBLIC_KEYS',
     'CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE',
@@ -1869,6 +2001,9 @@ export const APP_VARIABLES = {
     // add-cash-flow-forecast: job que detecta el riesgo de déficit de cada workspace.
     'REPORTING_CASH_FLOW_WATCH_CRON',
     'REPORTING_SHORTFALL_ALERT_HORIZON_DAYS',
+    // add-budget-overrun-risk: el paso de avisos corre en el worker dentro de `reporting.cash-flow-watch`.
+    'REPORTING_BUDGET_RISK_ENABLED',
+    'REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).
     'EMAIL_DRIVER',
     'SMTP_HOST',
@@ -1912,6 +2047,8 @@ export const APP_VARIABLES = {
   web: [
     ...GENERAL,
     'WEB_PUBLIC_URL',
+    'WEB_CSP_REPORT_ONLY',
+    'OBJECT_STORAGE_PUBLIC_ENDPOINT',
     'FINANCE_API_URL',
     'OIDC_ISSUER_URL',
     'OIDC_DISCOVERY_URL',

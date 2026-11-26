@@ -239,7 +239,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | accounts | `accounts/account-management`, `accounts/institutions` |
 | ledger | `ledger/journal-posting`, `ledger/balances` |
 | transactions | `transactions/transaction-recording`, `transactions/transfers`, `transactions/conversions`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection`, `transactions/bulk-edit` |
-| classification | `classification/categories`, `classification/tags`, `classification/custom-fields`, `classification/counterparties` |
+| classification | `classification/categories`, `classification/tags`, `classification/custom-fields`, `classification/counterparties`, `classification/auto-classification` (Phase 9, change 73, D476; la implementa `@pf/rules`) |
 | planning | `planning/financial-periods`, `planning/budgets`, `planning/budget-templates`, `planning/month-closing` |
 | commitments | `commitments/recurrence-engine`, `commitments/subscriptions` |
 | goals | `goals/savings-goals` |
@@ -248,12 +248,12 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | documents | `documents/attachments` |
 | imports | `imports/import-pipeline` (activa desde Phase 3 con el subconjunto CSV de `add-basic-csv-import`; pipeline completo en Phase 6), `imports/banking-providers` |
 | rules | `rules/rule-engine` |
-| reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` (versión simple en Phase 3: `add-upcoming-payments`; calendario completo en Phase 7) |
-| forecast | `forecast/expense-forecasting` |
+| reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` (versión simple en Phase 3: `add-upcoming-payments`; calendario completo en Phase 7), `reporting/predictive-insights` (Phase 9, change 74, D478) |
+| forecast | `forecast/expense-forecasting`, `forecast/anomaly-detection` (Phase 9, change 72, D473) |
 | notify | `notifications/alerts` |
 | audit | `audit/audit-trail`, `audit/lifecycle-timeline` |
 | assistant | `assistant/read-only-assistant` |
-| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery` |
+| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery`, `platform/web-interface` (patrones transversales de la UI web: accesibilidad de formularios, diálogos, avisos, movimiento y cobertura de navegadores; change `refine-web-accessibility-foundations`, [docs/79](79-ui-ux-modern-web-decisions.md)) |
 | security | `security/access-control`, `security/file-upload-security` |
 | quality | `quality/test-traceability` |
 

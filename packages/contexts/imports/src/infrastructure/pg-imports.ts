@@ -5,6 +5,7 @@ import { sql } from 'kysely';
 import type { Pool } from 'pg';
 import type {
   BulkEditSet,
+  CategorySuggestionEntry,
   CurrencyCatalogPort,
   IdGenerator,
   ImportJobFilter,
@@ -359,6 +360,8 @@ interface StagedDbRow {
   warnings: RowIssue[] | null;
   account_id: string | null;
   external: ExternalRowData | null;
+  suggested_category: CategorySuggestionEntry | null;
+  suggestion_accepted: boolean;
 }
 
 const STAGED_COLUMNS = sql`
@@ -369,7 +372,8 @@ const STAGED_COLUMNS = sql`
   s.running_balance::text AS running_balance, s.reference, s.counterparty_text, s.kind, s.proposal, s.edits,
   s.candidates, s.occurrence_candidates, s.occurrence_link, s.duplicate_of_row, s.decided_by,
   to_char(s.decided_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS decided_at,
-  s.decided_score::text AS decided_score, s.warnings, s.account_id, s.external`;
+  s.decided_score::text AS decided_score, s.warnings, s.account_id, s.external,
+  s.suggested_category, s.suggestion_accepted`;
 
 const toStaged = (r: StagedDbRow): StagedRow => ({
   id: r.id,
@@ -408,6 +412,8 @@ const toStaged = (r: StagedDbRow): StagedRow => ({
   warnings: r.warnings ?? [],
   accountId: r.account_id,
   external: r.external,
+  suggestedCategory: r.suggested_category,
+  suggestionAccepted: r.suggestion_accepted,
 });
 
 /** Categoría efectiva de la fila: la editada (aunque sea vacía) o, si no, la de la propuesta. */
@@ -421,6 +427,11 @@ function filterConditions(filter: PreviewFilter) {
   if (filter.decision) conds.push(sql`s.decision = ${filter.decision}`);
   if (filter.needsCategory === true) conds.push(sql`${EFFECTIVE_CATEGORY} IS NULL`);
   if (filter.needsCategory === false) conds.push(sql`${EFFECTIVE_CATEGORY} IS NOT NULL`);
+  if (filter.hasSuggestion === true) {
+    conds.push(
+      sql`s.suggested_category IS NOT NULL AND NOT (COALESCE(s.edits, '{}'::jsonb) ? 'categoryId') AND s.proposal->'category'->>'value' IS NULL`,
+    );
+  }
   if (filter.ruleId) {
     conds.push(
       sql`s.proposal IS NOT NULL AND jsonb_path_exists(s.proposal, '$.** ? (@.ruleId == $r)', jsonb_build_object('r', ${filter.ruleId}::text))`,
@@ -779,6 +790,8 @@ export class PgStagingRepository implements StagingRepository {
           proposal = NULLIF(v->'proposal', 'null'::jsonb), candidates = v->'candidates',
           occurrence_candidates = v->'occurrenceCandidates', duplicate_of_row = (v->>'duplicateOfRow')::int,
           decided_score = (v->>'decidedScore')::numeric, warnings = v->'warnings', kind = v->>'kind',
+          suggested_category = CASE WHEN s.suggestion_accepted THEN s.suggested_category
+                                    ELSE NULLIF(v->'suggestedCategory', 'null'::jsonb) END,
           decided_by = NULL, decided_at = NULL, occurrence_link = NULL,
           transaction_id = NULL, batch_no = NULL, batch_error = NULL
           FROM jsonb_array_elements(${json(part)}::jsonb) v
@@ -795,6 +808,7 @@ export class PgStagingRepository implements StagingRepository {
           issues = '[]'::jsonb, matched_transaction_id = NULL, proposal = NULL, candidates = NULL,
           occurrence_candidates = NULL, occurrence_link = NULL, duplicate_of_row = NULL, decided_score = NULL,
           decided_by = NULL, decided_at = NULL, warnings = NULL, kind = NULL,
+          suggested_category = NULL, suggestion_accepted = false,
           transaction_id = NULL, batch_no = NULL, batch_error = NULL
          WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.id = ANY(${part}::uuid[])`.execute(
         db(),
@@ -809,17 +823,93 @@ export class PgStagingRepository implements StagingRepository {
       readonly id: string;
       readonly proposal: ClassificationProposal | null;
       readonly warnings: readonly RowIssue[];
+      readonly suggestedCategory?: CategorySuggestionEntry | null;
     }[],
   ): Promise<void> {
     for (const part of chunks(items)) {
+      // La sugerencia de una fila cuya sugerencia ya se aceptó se conserva: la tasa de aceptación la necesita.
       await sql`
         UPDATE imports.staged_transaction s SET
-          proposal = NULLIF(v->'proposal', 'null'::jsonb), warnings = v->'warnings'
+          proposal = NULLIF(v->'proposal', 'null'::jsonb), warnings = v->'warnings',
+          suggested_category = CASE WHEN s.suggestion_accepted THEN s.suggested_category
+                                    ELSE NULLIF(v->'suggestedCategory', 'null'::jsonb) END
           FROM jsonb_array_elements(${json(part)}::jsonb) v
          WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.id = (v->>'id')::uuid`.execute(
         db(),
       );
     }
+  }
+
+  async suggestionCandidates(
+    workspaceId: string,
+    jobId: string,
+    filter: {
+      readonly levels: readonly ('HIGH' | 'MEDIUM')[];
+      readonly rowIds?: readonly string[] | undefined;
+    },
+  ): Promise<readonly { readonly rowId: string; readonly categoryId: string }[]> {
+    const rowFilter =
+      filter.rowIds === undefined ? sql`TRUE` : sql`s.id = ANY(${[...filter.rowIds]}::uuid[])`;
+    const { rows } = await sql<{ id: string; category_id: string }>`
+      SELECT s.id, s.suggested_category->>'categoryId' AS category_id
+        FROM imports.staged_transaction s
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId}
+         AND s.classification IN ('NEW', 'DUPLICATE_PROBABLE')
+         AND s.suggested_category IS NOT NULL
+         AND s.suggested_category->>'level' = ANY(${[...filter.levels]}::text[])
+         AND NOT (COALESCE(s.edits, '{}'::jsonb) ? 'categoryId')
+         AND COALESCE(s.edits->>'kind', s.kind, 'EXPENSE') IN ('EXPENSE', 'INCOME')
+         AND s.proposal->'category'->>'value' IS NULL
+         AND ${rowFilter}
+       ORDER BY s.row_number`.execute(db());
+    return rows.map((r) => ({ rowId: r.id, categoryId: r.category_id }));
+  }
+
+  async acceptSuggestions(workspaceId: string, jobId: string, rowIds: readonly string[]): Promise<number> {
+    let updated = 0;
+    for (const part of chunks(rowIds)) {
+      const result = await sql`
+        UPDATE imports.staged_transaction s SET
+          edits = COALESCE(s.edits, '{}'::jsonb)
+                  || jsonb_build_object('categoryId', s.suggested_category->>'categoryId'),
+          suggestion_accepted = true
+         WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.id = ANY(${part}::uuid[])
+           AND s.suggested_category IS NOT NULL
+           AND NOT (COALESCE(s.edits, '{}'::jsonb) ? 'categoryId')`.execute(db());
+      updated += Number(result.numAffectedRows ?? 0);
+    }
+    return updated;
+  }
+
+  async markSuggestionAccepted(workspaceId: string, jobId: string, rowId: string): Promise<void> {
+    await sql`
+      UPDATE imports.staged_transaction SET suggestion_accepted = true
+       WHERE workspace_id = ${workspaceId} AND import_job_id = ${jobId} AND id = ${rowId}`.execute(db());
+  }
+
+  async suggestionOutcomes(workspaceId: string, jobId: string) {
+    const { rows } = await sql<{
+      id: string;
+      level: 'HIGH' | 'MEDIUM';
+      suggested: string;
+      effective: string | null;
+      accepted: boolean;
+    }>`
+      SELECT s.id, s.suggested_category->>'level' AS level, s.suggested_category->>'categoryId' AS suggested,
+             ${EFFECTIVE_CATEGORY} AS effective, s.suggestion_accepted AS accepted
+        FROM imports.staged_transaction s
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId}
+         AND s.classification IN ('NEW', 'DUPLICATE_PROBABLE') AND s.decision = 'CREATE'
+         AND s.suggested_category IS NOT NULL
+         AND COALESCE(s.edits->>'kind', s.kind, 'EXPENSE') IN ('EXPENSE', 'INCOME')
+       ORDER BY s.row_number`.execute(db());
+    return rows.map((r) => ({
+      rowId: r.id,
+      level: r.level,
+      suggestedCategoryId: r.suggested,
+      effectiveCategoryId: r.effective,
+      accepted: r.accepted,
+    }));
   }
 
   async applyEdit(
