@@ -48,7 +48,7 @@ async function recordInUi(
   }
   if (input.category)
     await form.getByLabel('Categoría de la parte 1').selectOption({ label: input.category });
-  await form.getByRole('button', { name: 'Registrar', exact: true }).click();
+  await form.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
   await expect(page.getByTestId('transaction-detail')).toBeVisible();
   return txIdOf(page);
 }
@@ -76,7 +76,7 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     await form.getByRole('button', { name: 'Repartir en partes iguales' }).click();
     await expect(form.getByLabel('Monto de la parte 1 (BOB)')).toHaveValue('75.00');
     await expect(form.getByTestId('split-remaining')).toHaveText('Restante por asignar: 0 (cuadra).');
-    await form.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await form.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByText('Movimiento registrado.')).toBeVisible();
     const spent = txIdOf(page);
     await expect(page.getByTestId('tx-split-amount')).toHaveText(['75,00 BOB', '75,00 BOB']);
@@ -242,7 +242,7 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     await expect(refund.locator(`option[value="${farmacia}"]`)).toBeAttached();
     await refund.getByLabel('Gasto que se reembolsa').selectOption(farmacia);
     await refund.getByLabel('Categoría de la parte 1').selectOption({ label: health!.name });
-    await refund.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await refund.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByTestId('tx-amount')).toContainText('+50,00 BOB');
 
     // Ajuste con motivo (sin splits).
@@ -253,7 +253,7 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     await adj.getByRole('button', { name: 'Registrar', exact: true }).click();
     await expect(adj.getByText('El ajuste necesita un motivo.')).toBeVisible();
     await adj.getByLabel('Motivo del ajuste').fill('Diferencia de arqueo');
-    await adj.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await adj.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByTestId('transaction-detail')).toHaveAttribute('data-kind', 'ADJUSTMENT');
 
     // Filtro por medio de pago QR: solo la compra y el cobro.
@@ -285,7 +285,7 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     await expect(dup.getByLabel('Monto (BOB)')).toHaveValue('20.00');
     await expect(dup.getByTestId('duplicate-warning')).toBeVisible();
     await dup.getByLabel('Estado').selectOption('PENDING');
-    await dup.getByRole('button', { name: 'Registrar', exact: true }).click();
+    await dup.getByRole('button', { name: 'Registrar e ir al detalle', exact: true }).click();
     await expect(page.getByTestId('duplicate-notice')).toBeVisible();
     await expect(page.getByTestId('tx-status').first()).toHaveText('Pendiente');
     await page.getByRole('button', { name: 'Contabilizar' }).click();

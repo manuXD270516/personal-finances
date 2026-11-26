@@ -139,7 +139,7 @@ Mobile: una columna en orden Q2 → Q1 → Q4 → Q3 → Q5 → Q9 → Q6 → Q7
 ```mermaid
 flowchart LR
     A[＋] --> B[Monto · teclado numérico<br/>con coma decimal] --> C[Categoría<br/>sugeridas por uso/hora/lugar] --> D[Cuenta<br/>default: última usada] --> E{Guardar}
-    E --> F[Toast: Gasto registrado · Deshacer 10 s]
+    E --> F[Aviso persistente: Gasto registrado · Deshacer · Ver]
     B -.opcional.-> G[Descripción, fecha, tags, adjuntar foto, split]
 ```
 
@@ -148,6 +148,13 @@ flowchart LR
 - Fecha por defecto: hoy (TZ workspace); chips "Ayer", "Elegir".
 - **Deshacer** = `void` (reversa) si ya se posteó — explicado como "Deshacer" en UI. El aviso con «Deshacer» es **persistente** hasta cerrarlo o salir de la página (D508; sin el límite de 10 s original); después se anula desde el detalle.
 - Idempotency-Key generado por el cliente al abrir el formulario (doble tap no duplica).
+- **As-built (`add-quick-capture`, 2026-11-25):**
+  - **Monto primero.** En el alta, el orden del DOM es monto → tipo → categoría → cuenta → fecha → resto (sin CSS `order`) y el monto toma el foco al abrir `/transacciones/nueva` (`inputmode="decimal"`, `enterkeyhint="next"`). La edición conserva su orden y no mueve el foco.
+  - **Registrar y seguir (D502).** «Registrar» deja el formulario en la misma URL, con tipo, cuenta, fecha y estado conservados, el resto vacío, una `Idempotency-Key` nueva y el foco en el monto. «Registrar e ir al detalle» conserva la navegación anterior (`?aviso=registrada`).
+  - **Aviso persistente (D508).** Cada registro publica «Gasto de Bs 45,00 registrado» con «Deshacer» y «Ver» en la región de avisos (abajo, `role="region"` «Avisos»). «Deshacer» anula con el `void` existente (reversa, auditoría y evento) sin límite de tiempo; el aviso pasa a «Registro anulado». No se guarda entre documentos: una recarga empieza sin avisos. Hasta 3 avisos visibles; entra el cuarto y sale el más antiguo.
+  - **Cuenta recordada (D510).** La última cuenta usada va en `localStorage` del dispositivo (`pfos:last-account:v1:<usuario>:<workspace>`, solo el id), sin `PATCH /me`. Orden: `?cuenta=` → recordada si sigue activa → vacío.
+  - **Acceso «＋ Registrar»** en la barra superior para quien puede editar, oculto en el alta; a 360 px solo se ve el «＋» (nombre accesible «Registrar», objetivo de 44 px).
+  - **Región de avisos.** Anuncio una sola vez con `document.ariaNotify` (con «Acciones disponibles» si hay acciones) y respaldo `role="status"`; mostrar un aviso no mueve el foco; cerrar mueve el foco al aviso vecino o a donde estaba.
 - Offline (futuro): cola local con estado "pendiente de sincronizar".
 
 ### 4.2 Transferencia

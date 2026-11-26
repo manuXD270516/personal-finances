@@ -118,7 +118,7 @@ En «GF Pruebas», sobre «Banco Prueba BOB». Usá **Transacciones** → «Nuev
 | ID | Pasos | Esperado | Bloq. | Respaldo |
 |---|---|---|---|---|
 | GF-TX-01 | Gasto de 150,00 «Compra mixta» con dos partes: 100 y 40 | «Restante por asignar: 10,00 BOB» y no deja registrar | Sí | TC-TRANSACTIONS-SPLIT-001 |
-| GF-TX-02 | En el mismo formulario, «Repartir en partes iguales» → «Registrar» | Partes 75,00 y 75,00, «Restante por asignar: 0 (cuadra).», «Movimiento registrado.» | Sí | TC-TRANSACTIONS-SPLIT-001 |
+| GF-TX-02 | En el mismo formulario, «Repartir en partes iguales» → «Registrar e ir al detalle» | Partes 75,00 y 75,00, «Restante por asignar: 0 (cuadra).», «Movimiento registrado.» | Sí | TC-TRANSACTIONS-SPLIT-001 |
 | GF-TX-03 | Abrir la transacción → «Editar» → monto 120,00 → repartir → «Guardar cambios» | «Cambios guardados: reversa y nuevo asiento (revisión 2).», partes 60,00 y 60,00 | Sí | TC-TRANSACTIONS-EDIT-001 |
 | GF-TX-04 | «Marcar como confirmada»; abrir «Historial de cambios» y «Recorrido» | «Transacción confirmada.»; el recorrido muestra «— → Contabilizada», la revisión 1 → 2 y «Contabilizada → Confirmada» | Sí | TC-TRANSACTIONS-CLEARED-002, TC-AUDIT-LIFECYCLE-013 |
 | GF-TX-05 | Gasto de 30,00 «Taxi» → «Anular» sin motivo, después con «Duplicado del banco» | «Sí, anular» queda deshabilitado sin motivo; luego «Transacción anulada.» y estado «Anulada» | Sí | TC-TRANSACTIONS-EDIT-001 |
@@ -128,6 +128,9 @@ En «GF Pruebas», sobre «Banco Prueba BOB». Usá **Transacciones** → «Nuev
 | GF-TX-09 | Gasto de 45,905 BOB | Rechaza: BOB admite hasta 2 decimales | Sí | TC-TRANSACTIONS-AMOUNT-001 |
 | GF-TX-10 | Seleccionar 3 gastos → «Recategorizar» → categoría Hogar → «Ver vista previa» → «Aplicar a 3 transacciones» | «3 transacciones actualizadas. Operación {id}.»; el saldo no cambia; el enlace lleva a la auditoría de la operación | No | TC-TRANSACTIONS-BULK-001, TC-AUDIT-GLOBAL-007 |
 | GF-TX-11 | Con el segundo usuario agregado como Lector (si invitás miembros), abrir una transacción | Ve el historial sin «Editar» ni «Anular» | No | TC-TRANSACTIONS-HISTORY-002 |
+| GF-TX-12 | En el teléfono (o a 360 px), abrir `＋ Registrar`; escribir 45,00 con el teclado numérico, elegir categoría y «Registrar»; repetir con 30,00 | El monto tiene el foco al abrir; tras cada registro sigue en el alta con el monto vacío, la cuenta y la fecha conservadas y un aviso «Gasto de Bs 45,00 registrado» con «Deshacer» y «Ver»; saldo 9.880 − 45 − 30 = **9.805,00 BOB** | Sí | TC-TRANSACTIONS-QUICK-003 |
+| GF-TX-13 | En el aviso del último gasto, «Deshacer» | El aviso pasa a «Registro anulado»; el gasto queda «Anulada» y el saldo vuelve a **9.835,00 BOB** | Sí | TC-TRANSACTIONS-QUICK-006 |
+| GF-TX-14 | Con NVDA (escritorio) o TalkBack (teléfono), registrar un gasto desde el alta | El lector anuncia una sola vez «Gasto de … registrado. Acciones disponibles» sin sacar el foco del monto; «Avisos» se alcanza como región y «Cerrar» lo descarta (docs/28 §10) | No | TC-PLATFORM-WEBUI-022 |
 
 ## 4. Transferencias y conversión con FX
 
