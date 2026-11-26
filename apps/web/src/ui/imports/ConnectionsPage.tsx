@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cardStyle,
   formStyle,
@@ -435,7 +435,7 @@ function Connections({ ctx }: { ctx: WorkspaceContext }) {
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
 
       {revoking ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="connection-revoke-confirm"
           title={f.t('revokeTitle', { name: revoking.name })}
           description={f.t('revokeBody')}

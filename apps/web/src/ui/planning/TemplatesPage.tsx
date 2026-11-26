@@ -8,7 +8,7 @@ import {
   badgeStyle,
   cardStyle,
   cellStyle,
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   formStyle,
   inputStyle,
@@ -519,7 +519,7 @@ function Templates({ ctx }: { ctx: WorkspaceContext }) {
               ) : null}
 
               {archiving ? (
-                <ConfirmPanel
+                <ConfirmDialog
                   title={f.t('archive.title', { name: detail.name })}
                   description={f.t('archive.body')}
                   confirmLabel={f.t('actions.archive')}

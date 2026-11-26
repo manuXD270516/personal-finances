@@ -7,7 +7,7 @@ import { AuditHistory } from '../AuditHistory';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
 import { todayIn } from '../common/dates';
 import type { Account, Institution } from '../common/types';
-import { ConfirmPanel, Field, inputStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
+import { ConfirmDialog, Field, inputStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
 import { Tabs } from '../common/Tabs';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
@@ -256,7 +256,8 @@ function AccountDetail({
                   </div>
                 ) : null}
                 {pending ? (
-                  <ConfirmPanel
+                  <ConfirmDialog
+                    testId="account-confirm"
                     title={t(`confirm.${pending}.title`, { name: account.name })}
                     description={t(`confirm.${pending}.description`)}
                     confirmLabel={t(`confirm.${pending}.confirm`)}
@@ -293,7 +294,7 @@ function AccountDetail({
                         </Field>
                       </div>
                     ) : null}
-                  </ConfirmPanel>
+                  </ConfirmDialog>
                 ) : null}
                 {editing ? (
                   <AccountForm

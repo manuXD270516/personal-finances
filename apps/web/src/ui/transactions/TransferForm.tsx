@@ -5,6 +5,7 @@ import { uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { formatMoney, isNegative } from '../dashboard/format';
 import { todayIn } from '../common/dates';
+import { nextFieldError, useDirtyFields, withFieldError } from '../common/forms';
 import { parseAmount, scaleFor } from '../common/money';
 import { PAYMENT_METHODS, type PaymentMethod, type Transaction } from '../common/types';
 import { Field, formStyle, inputStyle, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
@@ -82,6 +83,20 @@ function TransferForm({
   const mismatch = Boolean(from && to && from.currency !== to.currency);
   const currency = from?.currency ?? ctx.ws.baseCurrency;
   const money = { locale, currency, scale: scaleFor(currency, ctx.scales) };
+  // Validación del monto al salir del campo (decisión 4 del change): el error aparece al salir de un campo modificado y se limpia al corregir.
+  const { isDirty, markDirty } = useDirtyFields();
+  const validateAmountField = (event: 'blur' | 'input', raw: string) =>
+    setErrors((prev) => {
+      const parsed = parseAmount(raw, money);
+      const computed = parsed.ok
+        ? undefined
+        : t(`errors.amount.${parsed.error}`, { scale: money.scale, currency });
+      return withFieldError(
+        prev,
+        'amount',
+        nextFieldError(event, { dirty: isDirty('amount'), current: prev['amount'], computed }),
+      );
+    });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -225,7 +240,12 @@ function TransferForm({
                 autoComplete="off"
                 style={inputStyle}
                 value={s.amount}
-                onChange={(e) => set({ amount: e.target.value })}
+                onChange={(e) => {
+                  markDirty('amount');
+                  set({ amount: e.target.value });
+                  validateAmountField('input', e.target.value);
+                }}
+                onBlur={() => validateAmountField('blur', s.amount)}
               />
             )}
           </Field>

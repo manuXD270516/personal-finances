@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { isImeEnter } from '../common/forms';
 import { scaleFor } from '../common/money';
 import type { Page, Transaction } from '../common/types';
 import { ConfirmPanel, Field, inputStyle, mutedStyle, rowStyle } from '../common/ui';
@@ -402,6 +403,8 @@ function LinkPanel({ ctx, f, occurrence, onDone, onCancel }: PanelProps) {
               onKeyDown={(ev) => {
                 if (ev.key === 'Enter') {
                   ev.preventDefault();
+                  // Enter que confirma una composición (método de entrada o tecla muerta) no busca (decisión 11 del change).
+                  if (isImeEnter(ev)) return;
                   setQuery(text);
                 }
               }}

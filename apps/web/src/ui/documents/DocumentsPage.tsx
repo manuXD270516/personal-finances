@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cellStyle,
   inputStyle,
@@ -301,7 +301,7 @@ function Documents({ ctx }: { ctx: WorkspaceContext }) {
       ) : null}
 
       {action?.kind === 'delete' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={t('page.deleteTitle')}
           description={t('page.deleteBody', { name: action.doc.originalName })}
           confirmLabel={t('page.delete')}

@@ -119,7 +119,7 @@ Propuesta y viabilidad en [docs/78](78-propuesta-mejora-ui-ux-modern-web.md); de
 
 | # | Change | Estado |
 |---|---|---|
-| 77 | `refine-web-accessibility-foundations` (L1) | **Redactado** (2026-11-25). `platform/web-interface` (nueva, 10 ADDED); TC-PLATFORM-WEBUI-001..020 en `draft`. El grupo 6 (WebKit en E2E) depende del spike de la cookie `Secure` sobre `http` de loopback (D509). |
+| 77 | `refine-web-accessibility-foundations` (L1) | **Implementado** (2026-11-25; se archiva cuando el owner conteste [docs/80](80-webkit-e2e-questions.md)). `ConfirmDialog` sobre `<dialog>`, foco al error y resumen de errores, validación de montos al salir del campo, movimiento reducido por componente, colores forzados, pestañas en una fila y Enter con composición; docs/28 al as-built. TC-PLATFORM-WEBUI-001..018 `automated`. **Espera al owner (D509):** el spike de WebKit falló (la cookie `Secure` no viaja sobre `http://localhost` en WebKit; no se tocó la cookie ni el esquema), así que las tareas 6.1 a 6.3 y TC-PLATFORM-WEBUI-019 y -020 siguen abiertos; opciones y recomendación en docs/80. |
 | 78 | `add-quick-capture` (L2) | **Redactado** (2026-11-25). `transactions/transaction-recording` (5 ADDED) y `platform/web-interface` (1 ADDED); TC-TRANSACTIONS-QUICK-001..015 y TC-PLATFORM-WEBUI-021..024 en `draft`. Depende de 77 por `useFocusFirstError` y se archiva después. |
 | 79–84 | `add-dark-theme`, `refine-mobile-navigation`, `refine-data-tables`, `add-pwa-install`, `refine-perceived-performance`, `adopt-client-navigation` | Sin redactar; se redactan cuando toque implementarlos (docs/03 §7). |
 

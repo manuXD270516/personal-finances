@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { routing } from '../../i18n/routing';
 import { ProblemMessage } from '../errors/ProblemMessage';
+import { useFocusFirstErrorOnSubmit } from './common/forms';
 import { WorkspaceSelector } from './identity/IdentityViews';
 import { switchLocalePath, type UiLocale } from './identity/logic';
 import { localized, useSession } from './session-context';
@@ -30,6 +31,9 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const [switching, setSwitching] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const navId = useId();
+
+  // Tras un envío rechazado por la validación, el foco va al resumen o al primer campo inválido (decisión 2 del change).
+  useFocusFirstErrorOnSubmit();
 
   // En móvil, el panel de navegación se cierra al cambiar de ruta.
   useEffect(() => setNavOpen(false), [pathname]);

@@ -8,7 +8,7 @@ import type { AuditLogEntry, ConversionDetail, ConversionRevision, Page, Transac
 import {
   cardStyle,
   cellStyle,
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   inputStyle,
   mutedStyle,
@@ -564,7 +564,8 @@ function Detail({
                   </div>
                 ) : null}
                 {pending ? (
-                  <ConfirmPanel
+                  <ConfirmDialog
+                    testId="transaction-confirm"
                     title={t(`detail.confirm.${pending}.title`)}
                     description={t(`detail.confirm.${pending}.description`)}
                     confirmLabel={t(`detail.confirm.${pending}.confirm`)}
@@ -612,7 +613,7 @@ function Detail({
                         )}
                       </Field>
                     ) : null}
-                  </ConfirmPanel>
+                  </ConfirmDialog>
                 ) : null}
                 {editing && catalogs.loaded ? (
                   <TransactionForm

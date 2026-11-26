@@ -140,7 +140,8 @@ test.describe('Importar CSV (imports/import-pipeline)', () => {
     // Resumen previo a la aprobación: sin categoría y con el saldo actual → resultante.
     await approve.click();
     const confirm = page.getByTestId('import-approve-confirm');
-    await expect(confirm).toBeFocused();
+    // El diálogo modal deja el foco en la acción segura («Cancelar», la primera).
+    await expect(confirm.getByRole('button').first()).toBeFocused();
     await expect(confirm).toContainText('Se crearán 3 transacciones.');
     await expect(confirm).toContainText('Salidas: 36,00 BOB. Entradas: 8.000,00 BOB.');
     await expect(confirm).toContainText('Saldo actual 3.754,70 BOB, saldo resultante 11.718,70 BOB.');

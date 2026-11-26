@@ -186,6 +186,9 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
     await expect(page.getByTestId('adjustment-panel')).toBeVisible();
     const recAdjustment = await seriousViolations(page);
     if (recAdjustment.length > 0) found['Reconciliar: diálogo de ajuste'] = recAdjustment;
+    // El ajuste es un diálogo modal: la página queda inerte hasta cerrarlo (Escape lo cancela).
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('adjustment-panel')).toHaveCount(0);
     await page.getByRole('tab', { name: 'Recorrido' }).click();
     await expect(page.locator('[data-testid="lifecycle-diagram"]:visible')).toHaveCount(1);
     const recLifecycle = await seriousViolations(page);

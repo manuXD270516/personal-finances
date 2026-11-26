@@ -7,7 +7,7 @@ import { problemMessage } from '../../errors/error-messages';
 import { RowSuggestion } from '../category-suggestions/RowSuggestion';
 import { acceptSuggestionsPath, type SuggestionKind } from '../category-suggestions/logic';
 import { useCatalogs } from '../transactions/catalogs';
-import { ConfirmPanel, mutedStyle } from '../common/ui';
+import { ConfirmDialog, mutedStyle } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import {
@@ -519,7 +519,7 @@ export function ReviewStep({
       ) : null}
 
       {confirming && summary && ctx.canEdit ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="import-approve-confirm"
           title={f.t('approve.title')}
           description={f.t('approve.description')}
@@ -530,7 +530,7 @@ export function ReviewStep({
           onCancel={() => setConfirming(false)}
         >
           <ApproveSummary summary={summary} f={f} transactionsHref={transactionsHref} />
-        </ConfirmPanel>
+        </ConfirmDialog>
       ) : (
         <ApproveBar
           f={f}

@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { cardStyle, ConfirmPanel, mutedStyle, warningStyle } from '../common/ui';
+import { cardStyle, ConfirmDialog, ConfirmPanel, mutedStyle, warningStyle } from '../common/ui';
 import { BFF_API, localized, useSession } from '../session-context';
 import {
   POLL_MS,
@@ -250,7 +250,7 @@ export function ExportPanel() {
         </ul>
       ) : null}
       {typeof confirm === 'object' && confirm ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="export-discard-confirm"
           title={t('export.discardTitle')}
           description={t('export.discardBody')}
