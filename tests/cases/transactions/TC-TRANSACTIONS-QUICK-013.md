@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/quick-capture.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["quick-capture","audit"]

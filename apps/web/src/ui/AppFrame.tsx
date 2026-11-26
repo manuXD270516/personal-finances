@@ -6,12 +6,21 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { routing } from '../../i18n/routing';
 import { ProblemMessage } from '../errors/ProblemMessage';
 import { useFocusFirstErrorOnSubmit } from './common/forms';
+import { NoticeRegion, NoticesProvider } from './common/notices';
 import { WorkspaceSelector } from './identity/IdentityViews';
 import { switchLocalePath, type UiLocale } from './identity/logic';
 import { localized, useSession } from './session-context';
 import { NotificationBell } from './notifications/NotificationBell';
 import { RecurringNavCount } from './recurring/RecurringNavCount';
-import { activeNav, initialOf, isNotificationsRoute, NAV_ITEMS, type NavKey } from './shell/nav';
+import {
+  activeNav,
+  initialOf,
+  isNotificationsRoute,
+  NAV_ITEMS,
+  NEW_TRANSACTION_PATH,
+  showQuickAdd,
+  type NavKey,
+} from './shell/nav';
 
 /** Nombre de cada idioma de la UI en el catálogo `Locales`. */
 const LOCALE_NAME: Record<UiLocale, 'es-BO' | 'en-US' | 'pt-BR'> = { es: 'es-BO', en: 'en-US', pt: 'pt-BR' };
@@ -39,7 +48,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
   useEffect(() => setNavOpen(false), [pathname]);
 
   const frame = (body: ReactNode, bar?: ReactNode, nav?: ReactNode) => (
-    <>
+    <NoticesProvider>
       <a className="pf-skip" href="#contenido">
         {t('skipToContent')}
       </a>
@@ -75,8 +84,10 @@ export function AppFrame({ children }: { children: ReactNode }) {
         <main id="contenido" tabIndex={-1} className="pf-main">
           <div className="pf-main-inner">{body}</div>
         </main>
+        {/* Región de avisos persistente: montada también mientras carga (change add-quick-capture). */}
+        <NoticeRegion />
       </div>
-    </>
+    </NoticesProvider>
   );
 
   if (state.status === 'loading') return frame(<p data-testid="loading">{t('loading')}</p>);
@@ -118,6 +129,13 @@ export function AppFrame({ children }: { children: ReactNode }) {
           }}
         />
       </div>
+      {showQuickAdd(pathname, active?.role) ? (
+        // Acceso directo al alta (add-quick-capture): solo quien puede editar y no dentro del alta.
+        <a className="pf-quick-add" href={localized(locale, NEW_TRANSACTION_PATH)}>
+          <span aria-hidden="true">＋</span>
+          <span className="pf-quick-add-label">{t('quickAdd')}</span>
+        </a>
+      ) : null}
       <NotificationBell
         href={localized(locale, '/notificaciones')}
         current={isNotificationsRoute(pathname)}
