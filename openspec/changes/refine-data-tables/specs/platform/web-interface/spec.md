@@ -137,3 +137,12 @@ Trace: NFR-PERF-004 · Priority: Should
 #### Scenario: Sin contención en filas de tabla
 - **CUANDO** se revisan las hojas de estilo y los componentes de la interfaz
 - **ENTONCES** ninguna regla difiere el dibujo de una fila o de un grupo de filas de tabla
+
+### Requirement: Detalle de un préstamo sin desbordamiento horizontal
+A 360 px de ancho, el detalle de un préstamo, incluida su sección «Detalle» con los saldos y los totales pagados, NO DEBE (MUST NOT) producir desplazamiento horizontal de la página: los montos y sus rótulos DEBEN (MUST) acomodarse al ancho disponible sin recortarse y sin dejar de leerse completos.
+Trace: NFR-USAB-006, NFR-USAB-107 · Priority: Should
+
+#### Scenario: Saldos de un préstamo a 360 px
+- **CUANDO** a 360 px el OWNER abre el detalle de un préstamo de 12000.00 BOB con una diferencia no registrada de 150.00 BOB
+- **ENTONCES** la página no se desplaza a lo ancho
+- **Y** el principal pendiente, el saldo de la cuenta, la diferencia y los totales pagados se leen completos
