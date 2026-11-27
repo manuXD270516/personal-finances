@@ -67,5 +67,6 @@ describe('atributo title en elementos del DOM', () => {
       domTitleAttributes(file, readFileSync(file, 'utf8')).filter((u) => !u.marked),
     );
     expect(offenders.map((u) => `${relative(ROOT, u.file)}:${u.line}`)).toEqual([]);
-  });
+    // Recorre y analiza todos los TSX de la UI: en CI (más lento) pasa de los 5 s por omisión.
+  }, 60_000);
 });
