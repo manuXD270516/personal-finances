@@ -16,11 +16,14 @@ export function AdvancedFilters({
   value,
   rules,
   onChange,
+  suggestionLabel,
 }: {
   f: FormatContext;
   value: ReviewFilter;
   rules: readonly { readonly ruleId: string; readonly version: number | null }[];
   onChange: (patch: Partial<ReviewFilter>) => void;
+  /** Texto del filtro «con sugerencia» (add-category-suggestions); sin él no se ofrece. */
+  suggestionLabel?: string | undefined;
 }) {
   return (
     <div style={rowStyle} data-testid="import-advanced-filters">
@@ -32,6 +35,16 @@ export function AdvancedFilters({
       >
         {f.t('filters.needsCategory')}
       </button>
+      {suggestionLabel ? (
+        <button
+          type="button"
+          aria-pressed={value.hasSuggestion === true}
+          data-testid="import-filter-HAS_SUGGESTION"
+          onClick={() => onChange({ hasSuggestion: value.hasSuggestion !== true })}
+        >
+          {suggestionLabel}
+        </button>
+      ) : null}
       <Field label={f.t('filters.confidence')}>
         {(p) => (
           <select
@@ -222,6 +235,7 @@ export function BulkTools({
   onBulkCategory,
   onReevaluate,
   onConfirmMatches,
+  suggestions,
 }: {
   f: FormatContext;
   categories: readonly Category[];
@@ -236,6 +250,11 @@ export function BulkTools({
   onBulkCategory: (categoryId: string) => void;
   onReevaluate: () => void;
   onConfirmMatches: () => void;
+  /** Aceptación en lote de las sugerencias de categoría por nivel (add-category-suggestions, D476). */
+  suggestions?: {
+    readonly f: FormatContext;
+    readonly onAccept: (minLevel: 'HIGH' | 'MEDIUM') => void;
+  };
 }) {
   const [categoryId, setCategoryId] = useState('');
   const groupsOptions = [
@@ -303,6 +322,29 @@ export function BulkTools({
         </button>
       </div>
       <p style={{ ...mutedStyle, margin: 0 }}>{f.t('bulk.reevaluateHint')}</p>
+      {suggestions ? (
+        <div style={{ display: 'grid', gap: 'var(--pf-space-1)' }} data-testid="import-accept-suggestions">
+          <div style={rowStyle}>
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="accept-suggestions-high"
+              onClick={() => suggestions.onAccept('HIGH')}
+            >
+              {suggestions.f.t('import.acceptHigh')}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="accept-suggestions-medium"
+              onClick={() => suggestions.onAccept('MEDIUM')}
+            >
+              {suggestions.f.t('import.acceptMedium')}
+            </button>
+          </div>
+          <p style={{ ...mutedStyle, margin: 0 }}>{suggestions.f.t('import.hint')}</p>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -35,6 +35,8 @@ let goalId: string;
 let cardId: string;
 let cardPurchaseId: string;
 let cardAccountIds: string[];
+let charged: { status: number; body: Json };
+let toVoid: { status: number; body: Json };
 
 const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -232,6 +234,31 @@ beforeAll(async () => {
     installmentCount: 3,
   });
   expect(installments.status, JSON.stringify(installments.body)).toBe(201);
+  // Dos cargos de la tarjeta (openspec add-card-interest-ledger-portions): uno vigente de 4.80 y uno anulado de 2.00; el
+  // cargo, su transacción (con `debt_role`) y la tarjeta que la administra viajan y se remapean juntos.
+  charged = await api.post(m.owner, `/credit-cards/${cardId}/charges`, {
+    accountId: visaBob,
+    businessDate: today,
+    interest: '4.00',
+    insurance: '0.80',
+  });
+  expect(charged.status, JSON.stringify(charged.body)).toBe(201);
+  toVoid = await api.post(m.owner, `/credit-cards/${cardId}/charges`, {
+    accountId: visaBob,
+    businessDate: today,
+    interest: '2.00',
+  });
+  expect(toVoid.status, JSON.stringify(toVoid.body)).toBe(201);
+  const voidedCharge = await h.call(
+    'POST',
+    `${api.base}/credit-cards/${cardId}/charges/${String(toVoid.body['id'])}/void`,
+    {
+      token: m.owner.token,
+      body: { reason: 'monto equivocado' },
+      headers: { 'idempotency-key': randomUUID(), 'if-match': `"${String(toVoid.body['version'])}"` },
+    },
+  );
+  expect(voidedCharge.status, JSON.stringify(voidedCharge.body)).toBe(200);
   // Una meta con una reserva y un aporte real (openspec add-savings-goals): movimientos, cuentas vinculadas y plan viajan
   // en el export y se remapean al importar.
   const savings = await api.post(m.owner, '/accounts', {
@@ -753,9 +780,11 @@ describe('Tarjetas en el round-trip', () => {
         'json/card-installment-plans.jsonl',
         'json/card-installments.jsonl',
         'json/card-utilization-states.jsonl',
+        'json/card-charges.jsonl',
       ]),
     );
     expect(lines(reader.read('json/credit-card-accounts.jsonl'))).toHaveLength(2);
+    expect(lines(reader.read('json/card-charges.jsonl'))).toHaveLength(2);
     expect(lines(reader.read('json/card-installments.jsonl'))).toHaveLength(3);
     const done = await importAndWait(h, m.owner, zip);
     expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
@@ -780,7 +809,7 @@ describe('Tarjetas en el round-trip', () => {
       }[];
     };
     expect(detail.accounts.map((a) => [a.currency, a.balance])).toEqual([
-      ['BOB', money('1400.00')],
+      ['BOB', money('1404.80')],
       ['USD', money('100.00', 'USD')],
     ]);
     // Las cuentas de la tarjeta importada son las del workspace nuevo, no las del origen.
@@ -825,6 +854,36 @@ describe('Tarjetas en el round-trip', () => {
     );
     expect(purchase.status, JSON.stringify(purchase.body)).toBe(200);
     expect(purchase.body['description']).toBe('Laptop (export)');
+    // [TC-DEBT-CARD-056] Los dos cargos (vigente y anulado) vuelven con sus componentes, su estado y su transacción.
+    const charges = await h.call(
+      'GET',
+      `/api/v1/workspaces/${created}/credit-cards/${imported!.id}/charges?limit=50`,
+      { token: m.owner.token },
+    );
+    expect(charges.status, JSON.stringify(charges.body)).toBe(200);
+    const items = charges.body['items'] as {
+      status: string;
+      total: Json;
+      origin: string;
+      voidReason: string | null;
+      transactionId: string;
+      accountId: string;
+    }[];
+    expect(items.map((c) => [c.status, c.total, c.origin]).sort()).toEqual([
+      ['ACTIVE', money('4.80'), 'RECORDED'],
+      ['VOIDED', money('2.00'), 'RECORDED'],
+    ]);
+    expect(items.find((c) => c.status === 'VOIDED')!.voidReason).toBe('monto equivocado');
+    for (const c of items) {
+      expect(importedIds.has(c.accountId)).toBe(true);
+      expect([charged.body['transactionId'], toVoid.body['transactionId']]).not.toContain(c.transactionId);
+      const tx = await h.call('GET', `/api/v1/workspaces/${created}/transactions/${c.transactionId}`, {
+        token: m.owner.token,
+      });
+      expect(tx.status, JSON.stringify(tx.body)).toBe(200);
+      // La marca de cargo y la tarjeta que lo administra se remapean: es la tarjeta importada, no la de origen.
+      expect(tx.body).toMatchObject({ debtRole: 'CARD_CHARGE', debtCardId: imported!.id });
+    }
     // El `scope_key` de los umbrales (texto con el id de la cuenta de tarjeta) se remapea con el mismo mapa.
     const scopes = await asAdmin(h, async (c) => {
       const keys = await c.query<{ scope_key: string }>(

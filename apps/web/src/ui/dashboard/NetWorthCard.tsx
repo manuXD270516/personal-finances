@@ -1,6 +1,7 @@
 import { formatMoney } from './format';
 import { statusOf } from './QuestionWidgets';
 import type { FormatContext, ReportSummary } from './types';
+import { TableRegion } from '../common/ui';
 
 const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' } as const;
 const cell = {
@@ -44,50 +45,54 @@ export function NetWorthCard({ summary, ctx }: { summary: ReportSummary; ctx: Fo
             </div>
           ) : null}
           {nw.byCurrency.length > 0 ? (
-            <table data-testid="net-worth-by-currency" style={tableStyle}>
-              <caption style={{ textAlign: 'left' }}>{t('netWorth.byCurrency')}</caption>
-              <thead>
-                <tr>
-                  <th scope="col" style={{ textAlign: 'left' }}>
-                    {t('netWorth.currency')}
-                  </th>
-                  <th scope="col" style={cell}>
-                    {t('netWorth.net')}
-                  </th>
-                  <th scope="col" style={cell}>
-                    {t('netWorth.converted', { currency: summary.consolidated.currency })}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {nw.byCurrency.map((c) => (
-                  <tr key={c.currency} data-currency={c.currency}>
-                    <th scope="row" style={{ textAlign: 'left' }}>
-                      {c.currency}
+            <TableRegion label={t('netWorth.byCurrency')}>
+              <table data-testid="net-worth-by-currency" style={tableStyle}>
+                <caption style={{ textAlign: 'left' }}>{t('netWorth.byCurrency')}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ textAlign: 'left' }}>
+                      {t('netWorth.currency')}
                     </th>
-                    <td style={cell}>{formatMoney(c.net, locale)}</td>
-                    <td style={cell}>
-                      {c.converted ? formatMoney(c.converted, locale) : t('netWorth.noRate')}
-                    </td>
+                    <th scope="col" style={cell}>
+                      {t('netWorth.net')}
+                    </th>
+                    <th scope="col" style={cell}>
+                      {t('netWorth.converted', { currency: summary.consolidated.currency })}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {nw.byCurrency.map((c) => (
+                    <tr key={c.currency} data-currency={c.currency}>
+                      <th scope="row" style={{ textAlign: 'left' }}>
+                        {c.currency}
+                      </th>
+                      <td style={cell}>{formatMoney(c.net, locale)}</td>
+                      <td style={cell}>
+                        {c.converted ? formatMoney(c.converted, locale) : t('netWorth.noRate')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableRegion>
           ) : null}
           {nw.byAccountType.length > 0 ? (
-            <table data-testid="net-worth-by-type" style={tableStyle}>
-              <caption style={{ textAlign: 'left' }}>{t('netWorth.byAccountType')}</caption>
-              <tbody>
-                {nw.byAccountType.map((a) => (
-                  <tr key={a.type} data-account-type={a.type}>
-                    <th scope="row" style={{ textAlign: 'left' }}>
-                      {t(`accountTypes.${a.type}`)}
-                    </th>
-                    <td style={cell}>{formatMoney(a.amount, locale)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <TableRegion label={t('netWorth.byAccountType')}>
+              <table data-testid="net-worth-by-type" style={tableStyle}>
+                <caption style={{ textAlign: 'left' }}>{t('netWorth.byAccountType')}</caption>
+                <tbody>
+                  {nw.byAccountType.map((a) => (
+                    <tr key={a.type} data-account-type={a.type}>
+                      <th scope="row" style={{ textAlign: 'left' }}>
+                        {t(`accountTypes.${a.type}`)}
+                      </th>
+                      <td style={cell}>{formatMoney(a.amount, locale)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableRegion>
           ) : null}
         </>
       )}

@@ -1,3 +1,4 @@
+import { InfoTip } from '../common/InfoTip';
 import { cardStyle, Field, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
 import { formatLocalDate } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
@@ -155,13 +156,14 @@ export function CatalogView(p: CatalogViewProps) {
                   </span>
                 ) : null}
                 {!e.adoptable ? (
-                  <span
-                    style={wrapBadgeStyle}
-                    data-testid="catalog-not-adoptable"
-                    title={f.t('catalog.notAdoptableHint')}
-                  >
-                    {f.t('catalog.notAdoptable')}
-                  </span>
+                  <>
+                    <span style={wrapBadgeStyle} data-testid="catalog-not-adoptable">
+                      {f.t('catalog.notAdoptable')}
+                    </span>
+                    <InfoTip label={f.t('infoTip', { subject: f.t('catalog.notAdoptable') })}>
+                      {f.t('catalog.notAdoptableHint')}
+                    </InfoTip>
+                  </>
                 ) : null}
                 {e.verification === 'PENDING' ? (
                   <span style={wrapBadgeStyle} data-testid="catalog-pending-verification">

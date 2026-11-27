@@ -157,6 +157,7 @@ describe('vistas de los reportes ampliados (TC-REPORTING-REPORTS-054)', () => {
             { type: 'CONVERSION', amount: amount('2.00') },
             { type: 'TRANSFER', amount: amount('5.00') },
             { type: 'LOAN', amount: amount('400.00') },
+            { type: 'CARD', amount: amount('0.00') },
             { type: 'FEE_CATEGORY', amount: amount('15.00') },
           ],
           total: amount('422.00'),
@@ -168,7 +169,7 @@ describe('vistas de los reportes ampliados (TC-REPORTING-REPORTS-054)', () => {
     expect(text).toContain('Comisión de conversión');
     expect(text).toContain('422,00 BOB');
     expect(text).toContain('Últimos 12 periodos completos: 422,00 BOB');
-    expect(text).toContain('intereses de tarjeta');
+    expect(text).toContain('Intereses y cargos de tarjetas');
   });
 
   it('[TC-REPORTING-REPORTS-054] metas: acumulado mensual, esperado y estado en texto, con enlace a los movimientos', () => {
@@ -220,6 +221,8 @@ describe('vistas de los reportes ampliados (TC-REPORTING-REPORTS-054)', () => {
               principalPaid: bob('1110.00'),
               interestPaid: bob('310.00'),
               chargesPaid: bob('0.00'),
+              interestCharged: null,
+              chargesCharged: null,
             },
           ],
         },
@@ -235,6 +238,8 @@ describe('vistas de los reportes ampliados (TC-REPORTING-REPORTS-054)', () => {
               principalPaid: null,
               interestPaid: null,
               chargesPaid: null,
+              interestCharged: bob('4.00'),
+              chargesCharged: bob('0.80'),
             },
           ],
         },
@@ -245,13 +250,18 @@ describe('vistas de los reportes ampliados (TC-REPORTING-REPORTS-054)', () => {
           outstanding: amount('18290.00'),
           principalPaid: amount('1110.00'),
           interestPaid: amount('310.00'),
+          interestCharged: amount('4.00'),
         },
       ],
     };
     const text = textOf(renderToStaticMarkup(<DebtsView f={f} data={data} onDrill={noop} />));
     expect(text).toContain('17.790,00 BOB');
     expect(text).toContain('310,00 BOB');
-    expect(text).toContain('Las tarjetas muestran solo el saldo pendiente');
+    // [TC-REPORTING-REPORTS-060] lo cargado por la tarjeta se muestra por mes y en el consolidado.
+    expect(text).toContain('Interés cargado');
+    expect(text).toContain('4,00 BOB');
+    expect(text).toContain('0,80 BOB');
+    expect(text).toContain('Las tarjetas muestran el saldo pendiente');
     expect(text).toContain('Consolidado en BOB');
   });
 

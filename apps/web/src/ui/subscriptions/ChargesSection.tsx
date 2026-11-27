@@ -13,7 +13,7 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -138,7 +138,7 @@ export function ChargesTable({
       </p>
     );
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={f.t('charges.caption')}>
       <table style={tableStyle} data-testid="charges-table">
         <caption className="pf-sr-only">{f.t('charges.caption')}</caption>
         <thead>
@@ -203,7 +203,7 @@ export function ChargesTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

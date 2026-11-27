@@ -5,6 +5,7 @@ import { dec } from '@pf/shared-kernel';
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import golden from '../../src/demo/dataset/golden-summary.json' with { type: 'json' };
+import { buildGoals } from '../../src/demo/dataset/plan-modules/goals.js';
 import { structuralOf, summarizeModules } from '../../src/demo/dataset/module-summary.js';
 import { connect } from '../support/db.js';
 import { rowsByTable, unbalancedEntries } from '../support/demo-db.js';
@@ -18,6 +19,10 @@ import { httpReports, sqlLedger } from '../support/reports-reconciliation.js';
 const deps = inject('deps');
 const FIXED = '2026-09-30';
 const SECOND = '2026-10-05';
+/** Ancla de borde: A − 20 cae en 31-oct y el desembolso del crédito educativo se recortaba a 28-feb (TC-IDENTITY-DEMO-025). */
+const EDGE = '2026-11-20';
+/** Ancla con el día del plan de metas en 31 (A − 25 = 31-oct): los aportes de diciembre caen el 31 (TC-IDENTITY-DEMO-026). */
+const GOAL_EDGE = '2026-11-25';
 /** Catálogo de referencia FICTICIO del repositorio, para probar que la demo no adopta entradas del catálogo. */
 const CATALOG_DIR = fileURLToPath(new URL('../../reference/institutions/demo', import.meta.url));
 
@@ -136,7 +141,9 @@ describe('dataset Demo v2: carga y determinismo', () => {
   it('el canal email de todos los tipos queda apagado y el in-app activo para el usuario de la demo', async () => {
     const prefs = await read(() => q.r.notifications.preferences.get(ws, userId));
     expect(prefs.types.length).toBeGreaterThan(0);
-    expect(prefs.types.every((t) => t.email === false && t.inApp === true)).toBe(true);
+    // Los avisos de gastos atípicos (D474) y de riesgo de presupuesto (D478) están apagados por omisión también en la app.
+    const off = ['SPENDING_ANOMALY', 'BUDGET_OVERRUN_RISK'];
+    expect(prefs.types.every((t) => t.email === false && t.inApp === !off.includes(t.type))).toBe(true);
   });
 });
 
@@ -548,6 +555,42 @@ describe('otra fecha ancla e independencia del catálogo (TC-IDENTITY-DEMO-020)'
     } finally {
       await q2.close();
     }
+  }, 600_000);
+});
+
+describe('ancla de borde de fin de mes (TC-IDENTITY-DEMO-025)', () => {
+  it('[TC-IDENTITY-DEMO-025] con la ancla 2026-11-20 la carga termina READY y la cuota 8 del crédito educativo vence el 2026-10-28', async () => {
+    const edge = await world.load({ anchor: EDGE });
+    expect(edge.outcome, edge.failure ?? '').toBe('READY');
+    const other = edge.job.demoWorkspaceId;
+    const q3 = demoQueryRuntimes({ databaseUrl: deps.databaseUrl, today: EDGE });
+    try {
+      const inEdge = <T>(fn: () => Promise<T>) => q3.inWs(edge.user.id, other, fn);
+      await world.waitPublished(other);
+      const loansList = await inEdge(() => q3.r.debt.queries.list(other, {}));
+      const educativo = loansList.find((l) => l.name === 'Crédito educativo')!;
+      const rows = (await inEdge(() => q3.r.debt.queries.installments(other, educativo.id))).installments;
+      expect(rows[7]).toMatchObject({ n: 8, dueDate: '2026-10-28', status: 'PAID' });
+      expect(rows[8]).toMatchObject({ n: 9, dueDate: '2026-11-28' });
+      expect(rows.filter((r) => r.status === 'PAID')).toHaveLength(8);
+      const consumo = await inEdge(() =>
+        q3.r.debt.queries.get(other, loansList.find((l) => l.name === 'Préstamo de consumo')!.id),
+      );
+      expect(consumo.overdueInstallments.length).toBeGreaterThanOrEqual(1);
+      expect(await unbalancedEntries(migrator, other)).toEqual([]);
+    } finally {
+      await q3.close();
+    }
+  }, 600_000);
+});
+
+describe('ancla con día de plan de metas 31 (TC-IDENTITY-DEMO-026)', () => {
+  it('[TC-IDENTITY-DEMO-026] con la ancla 2026-11-25 la carga termina READY y los aportes del Fondo de emergencia son los de la regla de la meta', async () => {
+    const edge = await world.load({ anchor: GOAL_EDGE });
+    expect(edge.outcome, edge.failure ?? '').toBe('READY');
+    const dates = buildGoals(GOAL_EDGE).emergencyContributions;
+    expect(dates).toContain('2025-12-31');
+    expect(dates).not.toContain('2025-12-30');
   }, 600_000);
 });
 

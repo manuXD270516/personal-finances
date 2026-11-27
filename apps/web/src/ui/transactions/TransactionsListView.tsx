@@ -1,10 +1,13 @@
 import { formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
+import { InfoTip } from '../common/InfoTip';
 import type { Transaction } from '../common/types';
 import { badgeStyle, mutedStyle } from '../common/ui';
 import { displayValue, valuesOf, type CustomFieldDefinition } from '../custom-fields/logic';
 import { isWithoutStatement } from '../reconciliation/logic';
+import { CardChargeBadge } from '../debt/cards/CardChargeTransaction';
 import { NeedsReviewBadge } from '../rules/TransactionRules';
+import { AnomalyBadge, type AnomalyMarks } from '../spending-anomalies/AnomalyMarks';
 import { amountFor } from './logic';
 import type { NameResolver } from './TransactionTimeline';
 
@@ -42,23 +45,28 @@ export function StatusBadge({ status, f }: { status: string; f: FormatContext })
 
 /**
  * Marca de seguimiento derivada (docs/33 D111): "conciliada sin extracto — pendiente de revisión". El texto lleva
- * la señal (el color solo la refuerza); `title` explica por qué aparece.
+ * la señal (el color solo la refuerza); el botón de información (`InfoTip`) explica por qué aparece.
  */
 export function WithoutStatementBadge({ tx, f }: { tx: Transaction; f: FormatContext }) {
   if (!isWithoutStatement(tx)) return null;
+  const label = f.t('flags.RECONCILED_WITHOUT_STATEMENT.label');
   return (
-    <span
-      data-testid="tx-without-statement"
-      title={f.t('flags.RECONCILED_WITHOUT_STATEMENT.hint')}
-      style={{
-        ...badgeStyle,
-        borderColor: 'var(--pf-warning-border)',
-        background: 'var(--pf-warning-bg)',
-        color: 'var(--pf-warning-fg)',
-      }}
-    >
-      {f.t('flags.RECONCILED_WITHOUT_STATEMENT.label')}
-    </span>
+    <>
+      <span
+        data-testid="tx-without-statement"
+        style={{
+          ...badgeStyle,
+          borderColor: 'var(--pf-warning-border)',
+          background: 'var(--pf-warning-bg)',
+          color: 'var(--pf-warning-fg)',
+        }}
+      >
+        {label}
+      </span>
+      <InfoTip label={f.t('infoTip', { subject: label })}>
+        {f.t('flags.RECONCILED_WITHOUT_STATEMENT.hint')}
+      </InfoTip>
+    </>
   );
 }
 
@@ -85,6 +93,7 @@ export function TransactionsListView({
   onToggle,
   selectable,
   customFields,
+  anomalies,
 }: {
   transactions: readonly Transaction[];
   names: NameResolver;
@@ -96,6 +105,8 @@ export function TransactionsListView({
   selectable: boolean;
   /** Definiciones (activas y archivadas) para mostrar los custom fields de los splits; `cf` es del namespace `CustomFields`. */
   customFields?: { readonly definitions: readonly CustomFieldDefinition[]; readonly cf: FormatContext };
+  /** Marcas de gasto atípico abiertas por transacción (add-spending-anomaly-detection); `f` es del namespace `SpendingAnomalies`. */
+  anomalies?: { readonly marks: AnomalyMarks; readonly f: FormatContext };
 }) {
   const { t, locale } = f;
   if (transactions.length === 0) return <p data-testid="transactions-empty">{t('list.empty')}</p>;
@@ -124,7 +135,7 @@ export function TransactionsListView({
               gap: '0.25rem 0.75rem',
               alignItems: 'baseline',
               padding: '0.5rem 0',
-              borderBottom: '1px solid #eaeef2',
+              borderBottom: '1px solid var(--pf-border)',
               opacity: tx.status === 'VOIDED' ? 0.7 : 1,
             }}
           >
@@ -153,6 +164,10 @@ export function TransactionsListView({
             <StatusBadge status={tx.status} f={f} />
             <WithoutStatementBadge tx={tx} f={f} />
             {tx.needsReview ? <NeedsReviewBadge f={f} /> : null}
+            {anomalies?.marks.get(tx.id) ? (
+              <AnomalyBadge anomaly={anomalies.marks.get(tx.id)!} f={anomalies.f} names={names} href={href} />
+            ) : null}
+            {tx.debtRole === 'CARD_CHARGE' ? <CardChargeBadge label={f.t('list.cardCharge')} /> : null}
             <span style={{ ...mutedStyle, flexBasis: '100%' }}>
               {t(`kinds.${tx.kind}`)}
               {tx.source !== 'MANUAL' && f.has(`sources.${tx.source}`) ? (

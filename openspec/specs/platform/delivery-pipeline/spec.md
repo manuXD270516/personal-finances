@@ -235,3 +235,177 @@ Trace: NFR-PERF-007, NFR-PERF-008 · Priority: Must
 - **CUANDO** con la configuración del código un consumidor tarda 130 segundos en drenar y con la del host todos drenan en 40 segundos
 - **ENTONCES** la fila del código se publica como informativa excedida, con el consumidor y su tiempo
 - **Y** el veredicto del job no cambia por esa fila
+
+### Requirement: Actualización de dependencias agrupada y semanal
+El repositorio DEBE (MUST) tener un servicio de actualización de dependencias que proponga por pull request contra la rama principal las versiones nuevas de las dependencias del workspace (manifiestos, catálogo de versiones y versión del gestor de paquetes), de la versión de Node, de las acciones de CI fijadas por SHA de commit y de las imágenes fijadas por digest. Las propuestas DEBEN (MUST) agruparse por ecosistema y abrirse solo dentro de una ventana semanal fija; las acciones DEBEN (MUST) seguir referenciadas por SHA de commit completo con el tag como comentario, y las imágenes por tag y digest. Cada pull request de actualización DEBE (MUST) pasar los mismos checks requeridos que cualquier otra, y el servicio NO DEBE (MUST NOT) modificar la protección de la rama principal ni la lista de checks requeridos.
+Trace: NFR-MAINT-012, NFR-SEC-013 · Priority: Should
+
+#### Scenario: Parches y versiones menores de la semana en un solo grupo
+- **CUANDO** durante la semana se publican un parche y una versión menor de dos dependencias de desarrollo del workspace y ambas superan la antigüedad mínima
+- **ENTONCES** dentro de la ventana semanal se abre una sola pull request del grupo de dependencias del workspace que actualiza los manifiestos y el lockfile
+- **Y** fuera de la ventana semanal no se abre ninguna pull request por esas versiones
+
+#### Scenario: Acción de CI fijada por SHA
+- **CUANDO** se publica una versión menor de una acción de CI que los workflows usan fijada por SHA
+- **ENTONCES** la pull request reemplaza el SHA por el SHA completo del commit de la versión nueva y actualiza el comentario con su tag
+- **Y** todos los workflows que usan esa acción se actualizan en la misma pull request
+
+#### Scenario: Imagen fijada por digest en varios archivos
+- **CUANDO** se publica un parche de la imagen de PostgreSQL que usan el compose y los tests con contenedores
+- **ENTONCES** una sola pull request actualiza el tag y el digest en todos los archivos que la referencian
+
+#### Scenario: La configuración no toca la protección de la rama
+- **CUANDO** el servicio de actualización está activo
+- **ENTONCES** la protección de la rama principal sigue exigiendo los mismos checks requeridos, con rama al día y sin excepción para administradores
+- **Y** el servicio no tiene una regla que agregue, quite o salte checks requeridos
+
+### Requirement: Sin fusión automática de versiones mayores ni con checks en rojo
+Una pull request de actualización a una versión mayor NO DEBE (MUST NOT) fusionarse automáticamente: DEBE (MUST) abrirse separada de los grupos semanales y quedar abierta hasta que el owner la revise. Ninguna pull request de actualización DEBE (MUST) fusionarse con un check requerido en rojo o pendiente. Si se permite la fusión automática para alguna clase de actualización, DEBE (MUST) delegarse en la fusión automática de la plataforma, que espera los checks requeridos de la rama principal, y NO DEBE (MUST NOT) saltar la protección de la rama.
+Trace: NFR-SEC-013, NFR-MAINT-012 · Priority: Must
+
+#### Scenario: Versión mayor en su propia pull request
+- **CUANDO** se publica una versión mayor del compilador de TypeScript que el workspace fija en su catálogo
+- **ENTONCES** se abre una pull request propia para esa versión mayor, fuera del grupo semanal
+- **Y** la pull request no tiene la fusión automática activada aunque todos sus checks pasen
+
+#### Scenario: Actualización con un check requerido en rojo
+- **CUANDO** una pull request de actualización de una versión menor tiene en rojo el check de tests de integración
+- **ENTONCES** la pull request no se fusiona
+- **Y** queda abierta hasta que se corrija en su rama o se cierre
+
+#### Scenario: Fusión automática permitida espera todos los checks
+- **CUANDO** una pull request de una clase de actualización con fusión automática permitida tiene un check requerido todavía pendiente
+- **ENTONCES** la pull request no se fusiona hasta que todos los checks requeridos estén en verde con la rama al día
+
+### Requirement: Antigüedad mínima y lockfile verificable
+El servicio de actualización NO DEBE (MUST NOT) proponer una versión publicada hace menos de la antigüedad mínima configurada, por defecto 3 días, y esa antigüedad NO DEBE (MUST NOT) ser menor que la que exige el gestor de paquetes al instalar. Cada pull request de actualización DEBE (MUST) incluir el lockfile regenerado de forma que la instalación con lockfile congelado y el escaneo de dependencias del gate pasen sin excepciones nuevas. El servicio NO DEBE (MUST NOT) agregar paquetes a la lista de dependencias con scripts de instalación permitidos, ni a las excepciones de antigüedad mínima, ni a las excepciones de vulnerabilidades.
+Trace: NFR-SEC-013 · Priority: Must
+
+#### Scenario: Versión publicada hace un día
+- **CUANDO** una dependencia del workspace publicó una versión nueva hace 1 día
+- **ENTONCES** el servicio no la propone en la ventana semanal de ese día
+- **Y** la propone en la primera ventana semanal en la que la versión tiene al menos 3 días
+
+#### Scenario: Dependencia nueva con scripts de instalación
+- **CUANDO** una versión nueva de una dependencia trae una dependencia transitiva con un script de instalación que no está en la lista permitida
+- **ENTONCES** la pull request no agrega ese paquete a la lista permitida
+- **Y** si la instalación con lockfile congelado falla, la pull request queda en rojo para revisión manual
+
+#### Scenario: Vulnerabilidad crítica introducida por la actualización
+- **CUANDO** la versión propuesta tiene una vulnerabilidad crítica con corrección disponible
+- **ENTONCES** el check de escaneo de dependencias falla y la pull request no se fusiona
+- **Y** el servicio no crea una excepción en el archivo de excepciones de vulnerabilidades
+
+### Requirement: Nightly de rendimiento con el Large Seed
+Un pipeline programado una vez al día, que NO DEBE (MUST NOT) ser un check requerido de la rama principal, DEBE (MUST) cargar el Large Seed a escala completa a través de los casos de uso, medir el p95 del listado paginado de transacciones, de la búsqueda de texto en transacciones, de los comandos de escritura, del dashboard, del saldo as-of y de los reportes agregados, y fallar cuando algún p95 supere su umbral de los requisitos no funcionales. DEBE (MUST) publicar en cada corrida un reporte con el valor medido y el umbral de cada benchmark como artefacto, y un fallo del nightly NO DEBE (MUST NOT) bloquear las pull requests. Cuando el job de rendimiento falla, el pipeline DEBE (MUST) abrir un issue de aviso con un título fijo y el resumen de la corrida, o comentar el issue abierto con ese título si ya existe, sin abrir duplicados; el permiso de escritura de issues que esto requiere DEBE (MUST) declararse en ese job y NO DEBE (MUST NOT) concederse a nivel de todo el pipeline.
+Trace: NFR-PERF-001, NFR-PERF-002, NFR-PERF-003, NFR-PERF-004, NFR-PERF-005, NFR-PERF-006 · Priority: Should
+
+#### Scenario: Búsqueda de texto con el Large Seed
+- **CUANDO** el nightly busca un texto frecuente de las compras de supermercado ("super", la descripción normalizada que genera el Large Seed) en el workspace principal del Large Seed con al menos 50 000 transacciones, con 50 resultados por página
+- **ENTONCES** el reporte incluye el p95 de la búsqueda frente al umbral de 400 ms
+- **Y** el nightly falla si el p95 supera 400 ms
+
+#### Scenario: Un p95 supera su umbral
+- **CUANDO** el p95 del listado paginado de transacciones es 310 ms y su umbral local es 300 ms
+- **ENTONCES** el nightly falla indicando el benchmark y el valor medido
+- **Y** el reporte se publica como artefacto aunque la corrida falle
+
+#### Scenario: Nightly en rojo no bloquea pull requests
+- **CUANDO** la última corrida del nightly falló
+- **ENTONCES** una pull request con todos los checks requeridos en verde puede fusionarse
+
+#### Scenario: Fallo del nightly de rendimiento abre o comenta un aviso
+- **CUANDO** el job de rendimiento del nightly falla porque el p95 de la búsqueda de texto es 450 ms frente a su umbral de 400 ms y no hay un issue abierto titulado "nightly perf: umbral superado"
+- **ENTONCES** se abre un issue con ese título que incluye el enlace a la corrida y el resumen del reporte con el benchmark y el valor medido
+- **Y** si en la corrida siguiente vuelve a fallar con ese issue abierto, se agrega un comentario al mismo issue y no se abre otro
+- **Y** el permiso de escritura de issues está declarado en el job de rendimiento y no a nivel de todo el pipeline, y los demás jobs que no avisan por issue no lo tienen
+
+### Requirement: El benchmark del import publica el desglose de la persistencia
+El benchmark nocturno del import de 5 000 filas DEBE (MUST) publicar, para cada configuración, la persistencia descompuesta en: la espera desde la aprobación hasta que empieza la persistencia, la duración de cada lote con la de cada uno de sus pasos (lectura de las filas preparadas, transacciones, asientos y movimientos, vínculos, auditoría, recorrido, eventos, progreso de la importación y confirmación), el cierre de la importación y la diferencia hasta que la prueba observa el estado final. La suma de esas partes DEBE (MUST) coincidir con la persistencia medida con una tolerancia de ±5 %. Durante la persistencia el benchmark DEBE (MUST) muestrear y publicar las esperas de la base por tipo, el mantenimiento concurrente de la base (limpieza automática de tablas y puntos de control), los trabajos que el relay encoló para los consumidores y la carga del host. Un lote que tarde más del triple de la mediana de los lotes DEBE (MUST) marcarse como atípico. El desglose NO DEBE (MUST NOT) cambiar el umbral ni el veredicto de la fila, que siguen decidiéndose con la persistencia total.
+Trace: NFR-PERF-007 · Priority: Must
+
+#### Scenario: Desglose de una persistencia de 19 949 ms
+- **CUANDO** la fila con la configuración del host mide una persistencia de 19 949 ms para 5 000 filas en 25 lotes de 200
+- **ENTONCES** el reporte publica la espera inicial, los 25 lotes con su duración y la de cada paso, el cierre y la observación final
+- **Y** la suma de las partes queda entre 18 952 ms y 20 946 ms
+- **Y** el veredicto de la fila lo decide la persistencia total de 19 949 ms frente a 20 000 ms
+
+#### Scenario: Lote atípico con sus esperas
+- **CUANDO** la mediana de los 25 lotes es 610 ms y el lote 17 tarda 2 400 ms
+- **ENTONCES** el reporte marca el lote 17 como atípico por superar 1 830 ms
+- **Y** publica para ese lote la duración de cada paso y las esperas de la base muestreadas mientras corría
+
+#### Scenario: Mantenimiento de la base durante la persistencia
+- **CUANDO** durante la persistencia corren una limpieza automática de la tabla de trabajos de la cola y un punto de control
+- **ENTONCES** el reporte publica ambos con su inicio y su duración dentro de la ventana de la persistencia
+- **Y** la medición se publica como válida
+
+### Requirement: Huella del runner publicada en el reporte de rendimiento
+El job de rendimiento DEBERÍA (SHOULD) publicar, al empezar y antes del benchmark del import, la huella del runner: modelo y cantidad de CPU, memoria total, una calibración de CPU de carga fija y una calibración de confirmaciones de la base, cada calibración con su factor relativo frente a la referencia registrada en la documentación del pipeline. La huella DEBE (MUST) ser informativa: NO DEBE (MUST NOT) cambiar ningún umbral ni el veredicto de ninguna fila, ni repetir o invalidar una medición.
+Trace: NFR-PERF-007, NFR-MAINT-005 · Priority: Should
+
+#### Scenario: Runner más lento que la referencia
+- **CUANDO** la calibración de CPU tarda 123 ms frente a una referencia de 54 ms y la fila del host mide una persistencia de 32 723 ms
+- **ENTONCES** el reporte publica la huella con el factor de CPU 2,28 junto a la fila del import
+- **Y** la fila del host se publica como fallida frente a 20 000 ms, sin repetirse ni invalidarse
+
+#### Scenario: Runner de referencia
+- **CUANDO** la calibración de CPU tarda 54 ms frente a una referencia de 54 ms
+- **ENTONCES** el reporte publica el factor de CPU 1,00
+- **Y** ninguna fila cambia su veredicto por la huella
+
+### Requirement: Una suite informativa no decide el veredicto aunque su preparación no termine
+Una suite informativa del pipeline programado (la ráfaga del import y el costo por consumidor) que no completa su preparación dentro de su tope DEBE (MUST) publicarse como informativa «sin completar», con el paso que no terminó y un diagnóstico del outbox: eventos pendientes por tipo, intentos de publicación, último error, antigüedad del pendiente más viejo y la transacción abierta más larga de la base. Esa suite NO DEBE (MUST NOT) cambiar el veredicto del job. Las filas bloqueantes NO DEBEN (MUST NOT) cambiar por esta regla.
+Trace: NFR-PERF-008 · Priority: Must
+
+#### Scenario: Outbox que no llega a 0 en la preparación
+- **CUANDO** en la preparación de la ráfaga el outbox conserva 37 eventos pendientes al vencer el tope de 600 s
+- **ENTONCES** la suite se publica «sin completar» con el paso de publicación del outbox, los 37 eventos por tipo, sus intentos y su último error
+- **Y** el veredicto del job no cambia por esa suite
+
+#### Scenario: Fila bloqueante intacta
+- **CUANDO** la suite de la ráfaga queda «sin completar» y la fila del host del import mide una persistencia de 21 300 ms
+- **ENTONCES** el job falla por la fila del host frente a 20 000 ms
+- **Y** el reporte publica ambas filas por separado
+
+### Requirement: El benchmark del import mide sin trabajos programados ajenos
+El worker del benchmark del import DEBERÍA (SHOULD) arrancar sin las pasadas de arranque de los trabajos programados ajenos a la importación y a la entrega de eventos (entre ellos la vigilancia del flujo de caja y el digest del Home), igual que ya arranca sin las del mantenimiento del ledger o el relleno de tasas. El reporte DEBE (MUST) publicar los trabajos programados que corrieron dentro de la ventana de la persistencia y del drenado, con su inicio y su duración; si uno corrió, la medición DEBE (MUST) publicarse como válida, sin repetirse.
+Trace: NFR-PERF-007 · Priority: Should
+
+#### Scenario: Arranque sin pasadas ajenas
+- **CUANDO** el benchmark arranca el worker con la configuración del host
+- **ENTONCES** no se encola ninguna pasada de arranque de la vigilancia del flujo de caja ni del digest del Home
+- **Y** el reporte publica 0 trabajos programados dentro de la ventana medida
+
+#### Scenario: Trabajo horario dentro de la ventana
+- **CUANDO** la vigilancia horaria del flujo de caja corre durante la persistencia y tarda 4 200 ms
+- **ENTONCES** el reporte publica ese trabajo con su inicio y su duración junto a la fila del import
+- **Y** la fila decide su veredicto con la persistencia medida, sin repetirse
+
+### Requirement: Cada configuración del benchmark del import parte de una base en reposo
+El benchmark del import DEBE (MUST), antes de medir cada configuración (la del código y la de la plantilla del host) y con el worker anterior detenido: purgar el backlog que dejó la configuración anterior (eventos pendientes del outbox y trabajos abiertos de las colas `events.*`), vaciar y analizar las tablas que esa purga ensucia, esperar la quietud del host y verificar que la base está en reposo (0 eventos pendientes, 0 trabajos `events.*` abiertos y ninguna consulta ajena activa). Si la configuración bloqueante no queda en reposo dentro del tope, DEBE (MUST) fallar con el motivo en lugar de medir sobre un backlog ajeno. El reporte DEBE (MUST) publicar esa preparación y el seguimiento del outbox durante la persistencia y el drenado; si el drenado no termina dentro de su tope, DEBE (MUST) publicar un diagnóstico del outbox en lugar de lanzar un error. Un drenado que no termina en la fila informativa NO DEBE (MUST NOT) cambiar el veredicto del job ni contaminar la medición de la fila bloqueante.
+Trace: NFR-PERF-007, NFR-PERF-008 · Priority: Must
+
+#### Scenario: Backlog de la configuración anterior
+- **CUANDO** la configuración del código termina con 12 201 eventos pendientes en el outbox y se prepara la configuración del host
+- **ENTONCES** el benchmark purga ese backlog con el worker detenido, vacía y analiza las tablas afectadas y no empieza a medir hasta que el outbox y las colas de eventos están en 0
+- **Y** la persistencia del host no incluye la espera por el drenado de la configuración anterior
+
+#### Scenario: Drenado que no termina en la fila informativa
+- **CUANDO** el drenado de la configuración del código no llega a 0 en 180 s con 12 201 eventos pendientes
+- **ENTONCES** el reporte publica la fila con el seguimiento del outbox y el diagnóstico (pendientes por tipo, intentos, antigüedad, transacción abierta más larga y plan de la consulta del relay) en lugar de lanzar un error
+- **Y** el veredicto del job lo deciden solo las filas bloqueantes
+
+### Requirement: WebKit dentro del job de E2E sin un check obligatorio nuevo
+El subconjunto de specs en WebKit DEBE (MUST) correr dentro del mismo job de E2E del pull request que la suite en Chromium, de modo que un fallo en WebKit haga fallar ese job. El change NO DEBE (MUST NOT) agregar un check obligatorio nuevo ni cambiar la protección de la rama principal sin una decisión del owner. El job DEBE (MUST) terminar dentro de su límite de tiempo y DEBE (MUST) publicar la duración de cada navegador en su resumen.
+Trace: NFR-USAB-005, NFR-MAINT-007 · Priority: Should
+
+#### Scenario: Un fallo en WebKit hace fallar el job existente
+- **CUANDO** un spec del subconjunto falla solo en WebKit en un pull request
+- **ENTONCES** falla el job de E2E existente
+- **Y** la lista de checks obligatorios de la rama principal es la misma que antes del change
+
+#### Scenario: Duración publicada y dentro del límite
+- **CUANDO** termina el job de E2E de un pull request
+- **ENTONCES** su resumen muestra la duración de la suite en Chromium y la del subconjunto en WebKit
+- **Y** el job termina dentro de su límite de 40 minutos

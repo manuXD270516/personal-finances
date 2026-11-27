@@ -6,16 +6,32 @@ import type { PortabilitySection } from '@pf/shared-kernel';
  * nombre de las categorías de sistema por idioma (`classification.category_name_i18n`) es catálogo global, no del workspace.
  */
 export const CLASSIFICATION_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
-  { name: 'category-groups', context: 'classification', table: 'classification.category_group', order: 300, orderBy: ['id'] },
+  {
+    name: 'category-groups',
+    context: 'classification',
+    table: 'classification.category_group',
+    order: 300,
+    orderBy: ['id'],
+  },
   {
     name: 'categories',
     context: 'classification',
     table: 'classification.category',
     order: 310,
     orderBy: ['id'],
-    selfRefs: ['parent_id'],
+    selfRefs: ['parent_id', 'merged_into_id'],
+    // add-category-and-counterparty-merge: los exports anteriores no traen la fusión (propiedades opcionales).
+    legacyDefaults: { merged_into_id: null, merged_at: null },
   },
-  { name: 'counterparties', context: 'classification', table: 'classification.counterparty', order: 320, orderBy: ['id'] },
+  {
+    name: 'counterparties',
+    context: 'classification',
+    table: 'classification.counterparty',
+    order: 320,
+    orderBy: ['id'],
+    selfRefs: ['merged_into_id'],
+    legacyDefaults: { merged_into_id: null, merged_at: null },
+  },
   {
     name: 'counterparty-aliases',
     context: 'classification',

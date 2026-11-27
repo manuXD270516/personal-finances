@@ -1,6 +1,5 @@
-import type { CSSProperties } from 'react';
 import { formatDecimal } from '../../AuditHistory';
-import { badgeStyle, mutedStyle } from '../../common/ui';
+import { badgeStyle, Meter, mutedStyle } from '../../common/ui';
 import type { FormatContext } from '../../dashboard/types';
 import { Badge } from '../../recurring/Badges';
 import {
@@ -20,15 +19,6 @@ const LEVEL_COLOR: Record<UtilizationView['level'], string> = {
   unknown: 'var(--pf-border-strong)',
 };
 
-const trackStyle: CSSProperties = {
-  height: '0.625rem',
-  borderRadius: 'var(--pf-radius-full)',
-  background: 'var(--pf-surface-sunken)',
-  border: '1px solid var(--pf-border-strong)',
-  overflow: 'hidden',
-  minWidth: '6rem',
-};
-
 /** Estado de un estado de cuenta con TEXTO + icono (NFR-USAB-104): Abierto, Emitido, Pagado, Pago parcial, Vencido. */
 export function StatementStatusBadge({ status, f }: { status: CardStatementStatus; f: FormatContext }) {
   return (
@@ -43,7 +33,7 @@ export function StatementStatusBadge({ status, f }: { status: CardStatementStatu
 
 /**
  * Utilización del crédito: porcentaje en TEXTO con su nivel (Normal / Atención / Crítica) y una barra con
- * `role="progressbar"`. El color solo refuerza: el texto y el icono dicen lo mismo. Sin tasa para valorar un límite
+ * `<meter>`. El color solo refuerza: el texto y el icono dicen lo mismo. Sin tasa para valorar un límite
  * compartido no se inventa un porcentaje: se dice qué falta.
  */
 export function UtilizationMeter({
@@ -84,21 +74,16 @@ export function UtilizationMeter({
           <span aria-hidden="true">{icon}</span> {levelText}
         </span>
       </p>
-      <div
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={view.width}
-        aria-valuetext={`${text} · ${levelText}`}
-        style={trackStyle}
-        data-testid="utilization-bar"
-      >
-        <div
-          aria-hidden="true"
-          style={{ width: `${view.width}%`, height: '100%', background: LEVEL_COLOR[view.level] }}
-        />
-      </div>
+      <Meter
+        value={view.width}
+        label={label}
+        valueText={`${text} · ${levelText}`}
+        color={LEVEL_COLOR[view.level]}
+        low={30}
+        high={80}
+        optimum={0}
+        testId="utilization-bar"
+      />
     </div>
   );
 }

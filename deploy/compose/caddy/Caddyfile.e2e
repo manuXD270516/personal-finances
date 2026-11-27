@@ -1,0 +1,31 @@
+# Caddy del stack de E2E (perfil `tls`, change add-e2e-https, D516). NO es el borde de producción (`Caddyfile`: ACME,
+# hostnames públicos, HSTS y reglas de método de la subida): aquí solo se pone HTTPS delante de la web, Keycloak y la
+# subida directa para que los navegadores (WebKit incluido) acepten la cookie `__Host-` con `Secure`.
+{
+	# Autoridad interna de Caddy, sin ACME y sin cuenta. Vive en `/data` (tmpfs): muere con el contenedor.
+	local_certs
+	# No toca ningún almacén de confianza (los clientes usan ignoreHTTPSErrors o NODE_EXTRA_CA_CERTS).
+	skip_install_trust
+	admin off
+	# Puertos de E2E distintos de 80/443: sin redirección http (no se publica el 80 y cap_drop ALL no lo permitiría).
+	auto_https disable_redirects
+}
+
+# `reverse_proxy` conserva el `Host` original (necesario para la firma SigV4 de las URL presignadas) y agrega
+# `X-Forwarded-Proto: https`. Sin HSTS a propósito: un `Strict-Transport-Security` para `localhost` se quedaría en el
+# navegador del desarrollador y rompería su stack por http.
+
+# finance-web (Next.js BFF)
+https://localhost:{$PF_WEB_TLS_PORT} {
+	reverse_proxy finance-web:3000
+}
+
+# Keycloak (issuer OIDC = https://localhost:<puerto TLS>/realms/pfos)
+https://localhost:{$PF_KEYCLOAK_TLS_PORT} {
+	reverse_proxy keycloak:8080
+}
+
+# Subida directa de documentos (URL presignada) al almacenamiento de objetos
+https://localhost:{$PF_OBJECT_STORAGE_TLS_PORT} {
+	reverse_proxy object-storage:8333
+}

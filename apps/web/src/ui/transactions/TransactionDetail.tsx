@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
@@ -8,7 +8,7 @@ import type { AuditLogEntry, ConversionDetail, ConversionRevision, Page, Transac
 import {
   cardStyle,
   cellStyle,
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   inputStyle,
   mutedStyle,
@@ -16,21 +16,25 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { Tabs } from '../common/Tabs';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
 import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { ConversionDetailView } from '../fx/ConversionDetailView';
+import { CardChargeAdoption, CardChargeInfo } from '../debt/cards/CardChargeTransaction';
+import { AnomalyDetail } from '../spending-anomalies/AnomalyMarks';
 import { LoanTransactionInfo } from '../debt/LoanTransactionInfo';
 import { TransactionGoalInfo } from '../goals/TransactionGoalInfo';
 import { VoidImpactNotice } from '../goals/VoidImpact';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { MatchSuggestionsNotice } from '../recurring/MatchSuggestionsPanel';
 import { useCatalogs } from './catalogs';
-import { availableActions } from './logic';
+import { availableActions, isManagedTransaction as isManaged } from './logic';
+import { initialAccount, readLastAccount } from './last-account';
+import { ManagedEditForm } from './ManagedEditForm';
 import { TransactionForm, type RecordKind } from './TransactionForm';
 import { isWithoutStatement } from '../reconciliation/logic';
 import type { TransactionLifecycle } from '../lifecycle/types';
@@ -93,6 +97,18 @@ function NewTransaction({
       .then((r) => setSource(r.data ?? null))
       .catch(() => setSource(null));
   }, [ctx.api, ctx.base, duplicateOf]);
+  // Cuenta inicial (add-quick-capture, D510): `?cuenta=`, luego la última usada en este dispositivo si sigue activa.
+  const startAccount = useMemo(
+    () =>
+      catalogs.loaded
+        ? initialAccount({
+            linkAccountId: accountId,
+            remembered: readLastAccount(ctx.me.id, ctx.ws.id),
+            activeAccounts: catalogs.activeAccounts,
+          })
+        : '',
+    [catalogs.loaded, catalogs.activeAccounts, accountId, ctx.me.id, ctx.ws.id],
+  );
   if (!catalogs.loaded || source === undefined) return <p aria-busy="true">{t('list.loading')}</p>;
   return (
     <section style={pageStyle}>
@@ -104,7 +120,9 @@ function NewTransaction({
         ctx={ctx}
         catalogs={catalogs}
         {...(source ? { duplicateOf: source } : {})}
-        {...(accountId ? { presetAccountId: accountId } : {})}
+        {...(startAccount ? { presetAccountId: startAccount } : {})}
+        afterSave="stay"
+        autoFocusAmount
         {...(kind && RECORD.includes(kind) ? { presetKind: kind as RecordKind } : {})}
         onSaved={(tx) => {
           const warn = tx.warnings?.some((w) => w.code === 'POSSIBLE_DUPLICATE');
@@ -384,6 +402,16 @@ function Detail({
                   }
                 />
                 {tx.loanId ? <LoanTransactionInfo ctx={ctx} tx={tx} /> : null}
+                {tx.debtRole === 'CARD_CHARGE' ? <CardChargeInfo ctx={ctx} tx={tx} /> : null}
+                <AnomalyDetail ctx={ctx} transactionId={tx.id} names={catalogs.names} />
+                <CardChargeAdoption
+                  ctx={ctx}
+                  tx={tx}
+                  onAdopted={(message) => {
+                    setStatus(message);
+                    load();
+                  }}
+                />
                 <TransactionGoalInfo ctx={ctx} tx={tx} />
                 <section aria-labelledby="tx-legs-title" style={cardStyle}>
                   <h2 id="tx-legs-title" style={{ fontSize: '1rem', marginTop: 0 }}>
@@ -403,7 +431,7 @@ function Detail({
                     <h2 id="tx-splits-title" style={{ fontSize: '1rem', marginTop: 0 }}>
                       {t('splits.title')}
                     </h2>
-                    <div style={tableWrapStyle}>
+                    <TableRegion labelledBy="tx-splits-title">
                       <table style={tableStyle}>
                         <thead>
                           <tr>
@@ -454,7 +482,7 @@ function Detail({
                           ))}
                         </tbody>
                       </table>
-                    </div>
+                    </TableRegion>
                   </section>
                 ) : null}
                 {tx.conversion ? (
@@ -470,9 +498,9 @@ function Detail({
                 {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
                 {ctx.canEdit ? (
                   <div style={rowStyle} role="group" aria-label={t('detail.actions')}>
-                    {actions.edit && RECORD.includes(tx.kind) ? (
+                    {actions.edit && (RECORD.includes(tx.kind) || isManaged(tx)) ? (
                       <button type="button" onClick={() => setEditing(true)} disabled={editing || busy}>
-                        {t('detail.edit')}
+                        {isManaged(tx) ? t('detail.editDescriptive') : t('detail.edit')}
                       </button>
                     ) : null}
                     {RECORD.includes(tx.kind) && tx.kind !== 'ADJUSTMENT' ? (
@@ -552,7 +580,8 @@ function Detail({
                   </div>
                 ) : null}
                 {pending ? (
-                  <ConfirmPanel
+                  <ConfirmDialog
+                    testId="transaction-confirm"
                     title={t(`detail.confirm.${pending}.title`)}
                     description={t(`detail.confirm.${pending}.description`)}
                     confirmLabel={t(`detail.confirm.${pending}.confirm`)}
@@ -588,10 +617,11 @@ function Detail({
                     {pending !== 'reconcile' ? (
                       <Field label={t('detail.confirm.reason')}>
                         {(p) => (
-                          <input
+                          <textarea
                             {...p}
                             name="reason"
                             required
+                            rows={3}
                             maxLength={500}
                             style={inputStyle}
                             value={reason}
@@ -600,9 +630,23 @@ function Detail({
                         )}
                       </Field>
                     ) : null}
-                  </ConfirmPanel>
+                  </ConfirmDialog>
                 ) : null}
-                {editing && catalogs.loaded ? (
+                {editing && catalogs.loaded && isManaged(tx) ? (
+                  <ManagedEditForm
+                    ctx={ctx}
+                    tx={tx}
+                    catalogs={catalogs}
+                    onCancel={() => setEditing(false)}
+                    onSaved={(next) => {
+                      setTx(next);
+                      setEditing(false);
+                      setStatus(t('detail.done.edited'));
+                      load();
+                    }}
+                  />
+                ) : null}
+                {editing && catalogs.loaded && !isManaged(tx) ? (
                   <TransactionForm
                     ctx={ctx}
                     catalogs={catalogs}

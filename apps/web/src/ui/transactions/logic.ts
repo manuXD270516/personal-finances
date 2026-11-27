@@ -115,17 +115,26 @@ export function availableActions(tx: Transaction) {
   return {
     edit: s !== 'VOIDED',
     // Las transacciones de préstamo las administra el préstamo (TRANSACTION_MANAGED_EXTERNALLY): sin montos ni anulación.
-    financialEdit: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind),
+    // Las transacciones de préstamo y los cargos de tarjeta los administra su contexto (TRANSACTION_MANAGED_EXTERNALLY).
+    financialEdit: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind) && !tx.debtRole,
     post: s === 'PENDING',
     clear: s === 'POSTED',
     unclear: s === 'CLEARED',
     // Marcado directo como conciliada SIN extracto (docs/33 D74); la conciliación contra extracto es la sesión.
     reconcile: s === 'CLEARED',
     unreconcile: s === 'RECONCILED',
-    void: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind),
+    void: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind) && !tx.debtRole,
     duplicate: tx.kind === 'INCOME' || tx.kind === 'EXPENSE' || tx.kind === 'REFUND',
   };
 }
+
+/** La transacción la administra otro contexto (préstamo o tarjeta): solo admite la edición descriptiva. */
+export const isManagedTransaction = (tx: Pick<Transaction, 'kind' | 'debtRole'>): boolean =>
+  isLoanManagedKind(tx.kind) || tx.debtRole === 'CARD_CHARGE';
+
+/** «Editar descripción y notas» (fix-phase-4-debt-followups): roles con edición y transacción no anulada. */
+export const managedEditOffered = (tx: Transaction, canEdit: boolean): boolean =>
+  canEdit && isManagedTransaction(tx) && tx.status !== 'VOIDED';
 
 /** Un evento del ciclo de vida de la transacción presentado como transición de estado. */
 export interface TimelineItem {

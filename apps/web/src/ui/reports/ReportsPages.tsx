@@ -4,11 +4,13 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { useSwapTransition } from '../common/motion';
 import { mutedStyle, pageStyle } from '../common/ui';
 import { problemOf, listAll, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { todayIn } from '../common/dates';
 import { BFF_API } from '../session-context';
-import { REPORT_CHART_CSS } from './ReportChart';
+import './report-chart.css';
+import './reports.css';
 import {
   AccountsView,
   ConversionsView,
@@ -20,7 +22,7 @@ import {
   TagsView,
   TrendsView,
 } from './ExtendedViews';
-import { ConversionBlock, DrillDownPanel, FiltersBar, REPORTS_CSS } from './ReportParts';
+import { ConversionBlock, DrillDownPanel, FiltersBar } from './ReportParts';
 import { SavedViewsPanel } from './SavedViewsPanel';
 import {
   AccountHistoryView,
@@ -72,7 +74,6 @@ function Catalog({ ctx }: { ctx: WorkspaceContext }) {
   }, [ctx.api, ctx.base]);
   return (
     <section style={pageStyle} aria-labelledby="reports-title" data-testid="reports-catalog">
-      <style>{REPORTS_CSS}</style>
       <header>
         <h1 id="reports-title">{f.t('title')}</h1>
         <p style={mutedStyle}>{f.t('subtitle')}</p>
@@ -118,6 +119,7 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
   );
   const [draft, setDraft] = useState<ReportFilters>(applied);
   const [data, setData] = useState<unknown>();
+  const swap = useSwapTransition('reports-filter');
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [accounts, setAccounts] = useState<readonly { id: string; name: string }[]>([]);
   const [cell, setCell] = useState<DrillCell | undefined>();
@@ -146,12 +148,12 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
     setProblem(undefined);
     ctx.api
       .get<unknown>(reportApiPath(ctx.base, slug, applied, defaults))
-      .then((r) => !cancelled && setData(r.data))
+      .then((r) => !cancelled && swap(() => setData(r.data)))
       .catch((err: unknown) => !cancelled && setProblem(problemOf(err)));
     return () => {
       cancelled = true;
     };
-  }, [ctx.api, ctx.base, slug, applied, defaults, ready]);
+  }, [ctx.api, ctx.base, slug, applied, defaults, ready, swap]);
 
   const apply = useCallback(() => {
     setApplied(draft);
@@ -268,7 +270,6 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
   const id = REPORT_SLUGS[slug].id;
   return (
     <section style={pageStyle} aria-labelledby="report-title" data-testid={`report-${slug}`}>
-      <style>{REPORTS_CSS + REPORT_CHART_CSS}</style>
       <header>
         <h1 id="report-title">{f.t(`names.${id}`)}</h1>
         <p style={mutedStyle}>{f.t(`purposes.${id}`)}</p>

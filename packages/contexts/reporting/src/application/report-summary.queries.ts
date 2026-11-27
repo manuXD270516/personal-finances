@@ -42,6 +42,7 @@ import {
 import { CashFlowCalculation, homeBlock } from './cash-flow-calendar.queries.js';
 import { PredictedCashFlow, expectedSpendingOf } from './predicted-cash-flow.js';
 import type { GoalHomeSummaryRow, ReportingDeps } from './ports/index.js';
+import { BudgetRiskCalculation } from './budget-risk.queries.js';
 import { isLiquidAccount, SpendableCalculation } from './spendable.queries.js';
 import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS, rateKey, toExact } from './valuation-support.js';
 
@@ -340,6 +341,11 @@ export class ReportSummaryQueries {
             { horizonDays: 30, withPlan: false, withSuggestions: false },
           )
         : null;
+    // ---- líneas del plan en riesgo de excederse (Q5, add-budget-overrun-risk): solo lectura, no toca el disponible
+    const budgetRiskEval =
+      deps.budgetRisk && query.asOf === undefined
+        ? await deps.budgetRisk.evaluateCurrent({ workspaceId: ws, timeZone, scaleOf })
+        : null;
     for (const r of cashFlowCalc?.ratesUsed ?? []) {
       const key = rateKey(r);
       if (!used.has(key)) used.set(key, r);
@@ -565,6 +571,9 @@ export class ReportSummaryQueries {
       goalContributions,
       spendable: spendableCalc?.summary ?? null,
       cashFlow: cashFlowCalc ? homeBlock(cashFlowCalc, predictedBands?.byCurrency) : null,
+      budgetRisk: budgetRiskEval
+        ? BudgetRiskCalculation.homeBlock(budgetRiskEval.dto, budgetRiskEval.periodLabel)
+        : null,
       forecast: expectedSpendingOf(forecastRead, periodText),
       meta: {
         generatedAt: nowText,

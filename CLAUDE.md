@@ -13,7 +13,7 @@ Estas reglas aplican a cualquier sesión, local o en la nube. Complementan los a
 ## Pull requests
 
 - Una rama por change. Commits y PR en español; los commits terminan con `Co-Authored-By` del modelo que los escribió.
-- Abre el PR y activa enseguida `gh pr merge --auto --squash --delete-branch`. `main` está protegida: los 17 checks son obligatorios, `strict` (la rama debe estar al día) y `enforce_admins`.
+- Abre el PR y activa enseguida `gh pr merge --auto --squash --delete-branch`. `main` está protegida: los 19 checks son obligatorios, `strict` (la rama debe estar al día) y `enforce_admins`.
 - Vigila el PR hasta que se fusione. Si queda atrás de `main`, `gh pr update-branch`. Si un check falla, lee el log del job (`gh api repos/<repo>/actions/jobs/<id>/logs`), corrige en la misma rama y vuelve a vigilar. Un fallo de un test ajeno al cambio se diagnostica antes de relanzar; no se relanza a ciegas más de una vez. Runners cancelados sin ejecutar: relanza (`gh run rerun --failed`).
 - Nunca abras un PR roto a propósito ni fusiones con checks en rojo o pendientes.
 - Tras la fusión de una feature, un PR aparte `chore(openspec): archivar <change>`.
@@ -41,6 +41,7 @@ Estas reglas aplican a cualquier sesión, local o en la nube. Complementan los a
 - Migraciones solo expand, con timestamp posterior a la última de `main`; nunca edites una fusionada.
 - Contratos aditivos: oasdiff limpio (`pnpm contract:breaking`), Spectral y Redocly sin errores. En el YAML, las descripciones con comas dentro de un flow mapping van entre comillas.
 - Presupuesto de conexiones: la plantilla del host suma API 22 + worker 34 = 56 sobre `max_connections=70` de Postgres (`deploy/compose/compose.prod.yaml`; con las dos colas pg-boss, 64 de 67 útiles). No agregues consumidores sin justificarlo y validar el test de arranque del worker.
+- **Soporte de navegadores:** Baseline Widely available como piso. Una función Newly available se usa si su ausencia no impide completar la tarea (mejora progresiva) o con un respaldo propio de ≤ 20 líneas sin dependencias. Sin polyfills. Limited availability solo como mejora opcional que no cambia la tarea (D500, [docs/79](docs/79-ui-ux-modern-web-decisions.md)).
 - Tests: TC-id en el nombre (`it('[TC-…] …')`). Los PBT y los de muchos datos llevan timeout explícito (CI es más lento). No busques números sueltos con `toContain` (aparecen dentro de ids y marcas de tiempo): usa regex con límites. Los consumidores asíncronos (Planning provisiona periodos tras cada asiento) generan filas en segundo plano; las comparaciones de estado deben tenerlo en cuenta.
 
 ## Gates antes de entregar

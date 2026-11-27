@@ -311,7 +311,8 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `imports.ImportRevertRequested.v1` (**schema publicado**, add-import-pipeline) | IMPORTS | IMPORTS (worker, `imports.persist`) | `RevertImport` (misma transacción que `REVERTING` y la auditoría) | `importJobId, accountId, allowPartial, toVoid, blocked` | inbox + estado del job y de cada transacción (las ya anuladas se saltan) | N |
 | `imports.ImportReverted.v1` (**schema publicado**, add-import-pipeline) | IMPORTS | ninguno obligatorio | Fin del deshacer (`ROLLED_BACK` o `PARTIALLY_ROLLED_BACK`) | `importJobId, accountId, voided, alreadyVoided, blocked, status` | `(importJobId, status, aggregateVersion)` | N |
 | `forecast.ForecastGenerated.v1` | FORECAST | NOTIFY, REPORTING | Corrida exitosa | `forecastRunId, scope, horizonMonths, modelName, modelVersion, summary` | `forecastRunId` | N |
-| `classification.CategoriesMerged.v1` | CLASSIFICATION | TRANSACTIONS, PLANNING, RULES, REPORTING | `MergeCategories` | `sourceCategoryIds[], targetCategoryId` | `(targetCategoryId, aggregateVersion)` | N |
+| `classification.CategoriesMerged.v1` | CLASSIFICATION | Ninguno (la fusión es síncrona por puerto, D249) | `MergeCategories` | `sourceCategoryId, targetCategoryId, movedSubcategoryIds[], counts[], operationId, mergedAt` (una origen por operación) | `(sourceCategoryId, aggregateVersion)` | N |
+| `classification.CounterpartiesMerged.v1` | CLASSIFICATION | Ninguno (D249) | `MergeCounterparties` | `sourceCounterpartyId, targetCounterpartyId, movedAliases[], counts[], operationId, mergedAt` | `(sourceCounterpartyId, aggregateVersion)` | N |
 
 ## 4. Versionado y evolución
 
@@ -362,4 +363,5 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 ## Nota as-built: `add-ml-forecasting-service` (Phase 8, 2026-11-12)
 
+- Gastos atípicos (`add-spending-anomaly-detection`, Phase 9): **sin eventos nuevos**. La detección no publica `forecasting.AnomalyDetected.v1` (docs/15 §12): sin consumidores sería solo outbox (D249); el aviso va por el puerto en proceso `NotificationIntakePort`, en la misma unidad de trabajo que inserta los gastos atípicos.
 - `forecast.ForecastGenerated.v1` (productor FORECAST, agregado `ForecastRun`, sin montos, sin consumidores en Phase 8; actor `SYSTEM`). `planning.MonthClosed` no tiene consumidor FORECAST. Presupuesto del worker intacto: 28 consumidores + 4 reservadas = 32 de 34 (`TC-FORECAST-SERVICE-010`).

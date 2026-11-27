@@ -56,6 +56,7 @@ describe('renovate.json5: ventana semanal, grupos y fijado (TC-PLATFORM-PIPELINE
       'docker/api.Dockerfile',
       'docker/web.Dockerfile',
       'docker/postgres.Dockerfile',
+      'docker/keycloak.Dockerfile',
       'apps/api/test/support/images.ts',
     ];
     const withoutDigest: string[] = [];
@@ -88,6 +89,28 @@ describe('renovate.json5: ventana semanal, grupos y fijado (TC-PLATFORM-PIPELINE
     );
     expect(found.map((f) => f.depName)).toEqual(['postgres', 'chrislusf/seaweedfs', 'axllent/mailpit']);
     for (const f of found) expect(f.currentDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-005] el gestor regex de los scripts del host cubre rclone y aws-cli (tag + digest de índice)', () => {
+    const manager = config.customManagers.find((m) =>
+      m.managerFilePatterns.some((p) => toRegExp(p).test('deploy/host/pfos-backup.sh')),
+    );
+    expect(manager?.customType).toBe('regex');
+    expect(manager?.datasourceTemplate).toBe('docker');
+    const found: string[] = [];
+    for (const file of ['deploy/host/pfos-backup.sh', 'deploy/host/pfos-bootstrap-storage.sh']) {
+      expect(
+        manager!.managerFilePatterns.some((p) => toRegExp(p).test(file)),
+        file,
+      ).toBe(true);
+      for (const s of manager!.matchStrings) {
+        for (const m of readText(file).matchAll(new RegExp(s, 'g'))) {
+          expect(m.groups!['currentDigest']).toMatch(/^sha256:[a-f0-9]{64}$/);
+          found.push(m.groups!['depName']!);
+        }
+      }
+    }
+    expect(found).toEqual(['rclone/rclone', 'amazon/aws-cli']);
   });
 
   it('[TC-PLATFORM-PIPELINE-005] cubre los gestores acordados y deja fuera spikes, fixtures y los binarios con SHA-256', () => {

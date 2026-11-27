@@ -1,6 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { api, bob, go, newFinanceUser, openAccount, todayLaPaz } from '../src/finance.js';
+import { withForecastDiagnostics } from '../src/forecast-diagnostics.js';
 
 /**
  * Banda del gasto variable predicho en el calendario de flujo de caja y en el Home (openspec
@@ -89,19 +90,22 @@ test.describe('Banda del gasto variable predicho con el servicio finance-ml (rep
 
     // Solicita la corrida; la procesa el worker (cada minuto) con el servicio real.
     await api(page, 'POST', `${W}/forecasts`);
-    await expect
-      .poll(
-        async () => {
-          const latest = await api(
-            page,
-            'GET',
-            `/workspaces/${workspaceId}/forecasts/latest?scope=LIQUID_VARIABLE_OUTFLOW`,
-          );
-          return `${latest['status']}:${(latest['series'] as unknown[]).length}`;
-        },
-        { timeout: 600_000, intervals: [5_000] },
-      )
-      .toBe('AVAILABLE:1');
+    // Si agota el tiempo, el error trae el estado de las corridas y de la cola del runner (docs/38 §4).
+    await withForecastDiagnostics(workspaceId, () =>
+      expect
+        .poll(
+          async () => {
+            const latest = await api(
+              page,
+              'GET',
+              `/workspaces/${workspaceId}/forecasts/latest?scope=LIQUID_VARIABLE_OUTFLOW`,
+            );
+            return `${latest['status']}:${(latest['series'] as unknown[]).length}`;
+          },
+          { timeout: 600_000, intervals: [5_000] },
+        )
+        .toBe('AVAILABLE:1'),
+    );
 
     // ── Calendario de 30 días: la banda (área y línea del esperado), la probabilidad y la explicación del 80 %.
     await go(page, '/flujo-de-caja');

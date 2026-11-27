@@ -22,7 +22,7 @@ tags: ["ci", "dependencies", "renovate"]
 error_code: null
 preconditions:
   - "Configuración del servicio de actualización versionada en la raíz del repositorio"
-  - "Protección de main con los 17 checks requeridos, strict y enforce_admins"
+  - "Protección de main con los 18 checks requeridos, strict y enforce_admins"
 input:
   - update: "parche y versión menor de dos dependencias de desarrollo del workspace, publicadas hace más de 3 días"
     expected: "una sola PR del grupo del workspace dentro de la ventana semanal, con manifiestos y lockfile"
@@ -63,3 +63,4 @@ Entonces se abre una sola PR del grupo del workspace con manifiestos y lockfile
 - Ventana y grupos según las preguntas 2 y 3 de design.md.
 
 - 2026-10-16: la parte de política está automatizada (`scripts/delivery-policy/test/renovate-policy.test.ts`, `pnpm test`). Pendiente de verificación manual (tareas 3.1–3.2, no hechas): el número de la PR de configuración (onboarding) de la app de Mend y qué se hizo con ella; la primera corrida real, el Dependency Dashboard y la protección de `main` con 17 checks, `strict` y `enforce_admins`.
+- 2026-11-20 (verificación con `gh`, solo lectura): onboarding = PR #142 (`renovate/configure`), cerrada sola (`autoclosed`) el 2026-10-16 al encontrar `renovate.json5` en `main`; Dependency Dashboard = issue #146 «Panel de dependencias (Renovate)», abierto; primeras PR de grupo fusionadas con checks en verde y la rama al día: #200 (acciones de ci), #202, #203, #204 (imágenes) y #201 (fusionada por el bot); `main` con 18 checks requeridos, `strict` y `enforce_admins`.

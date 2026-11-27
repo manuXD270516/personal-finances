@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cardStyle,
   formStyle,
@@ -13,6 +13,7 @@ import {
   pageStyle,
   rowStyle,
 } from '../common/ui';
+import { createVisiblePoller } from '../common/polling';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import { Badge } from '../recurring/Badges';
@@ -406,8 +407,10 @@ function Connections({ ctx }: { ctx: WorkspaceContext }) {
   const verifying = items?.some((c) => isVerifying(c.status)) ?? false;
   useEffect(() => {
     if (!verifying) return;
-    const timer = setInterval(() => void load(), POLL_MS);
-    return () => clearInterval(timer);
+    // En pausa con la pestaña oculta; al volver consulta enseguida (M-31).
+    const poller = createVisiblePoller({ intervalMs: POLL_MS, run: load });
+    poller.start();
+    return () => poller.stop();
   }, [verifying, load]);
 
   async function run(action: () => Promise<unknown>) {
@@ -435,7 +438,7 @@ function Connections({ ctx }: { ctx: WorkspaceContext }) {
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
 
       {revoking ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="connection-revoke-confirm"
           title={f.t('revokeTitle', { name: revoking.name })}
           description={f.t('revokeBody')}

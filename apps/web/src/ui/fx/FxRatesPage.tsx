@@ -7,6 +7,7 @@ import { formatInstant } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { formatDecimal } from '../AuditHistory';
 import { localDateTimeIn, zonedLocalToInstant } from '../common/dates';
+import { InfoTip } from '../common/InfoTip';
 import { parseRate, trimRate } from '../common/money';
 import { FX_RATE_TYPES, type FxRate, type FxRatePreference, type FxRateType } from '../common/types';
 import {
@@ -21,7 +22,7 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { Tabs } from '../common/Tabs';
@@ -403,7 +404,7 @@ function RatePairSection({
           )}
         </Field>
       </div>
-      <div style={tableWrapStyle}>
+      <TableRegion labelledBy={id}>
         <table style={tableStyle}>
           <thead>
             <tr>
@@ -455,13 +456,12 @@ function RatePairSection({
                     <RateAttributionLink attribution={r.attribution} />
                   ) : r.source === 'USER_CONVERSION' ? (
                     <>
-                      <span
-                        style={badgeStyle}
-                        data-testid="rate-observation"
-                        title={t('rates.observationHint')}
-                      >
+                      <span style={badgeStyle} data-testid="rate-observation">
                         {t('rates.observation')}
-                      </span>{' '}
+                      </span>
+                      <InfoTip label={t('infoTip', { subject: t('rates.observation') })}>
+                        {t('rates.observationHint')}
+                      </InfoTip>{' '}
                       {r.conversionRef ? (
                         <a href={href(`/transacciones/${r.conversionRef.transactionId}`)}>
                           {t('rates.viewConversion')}
@@ -509,7 +509,7 @@ function RatePairSection({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       {correcting ? (
         <form
           style={{ ...rowStyle, marginTop: '0.5rem' }}

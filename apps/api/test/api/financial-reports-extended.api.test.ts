@@ -415,6 +415,7 @@ describe('catálogo y reportes ampliados por HTTP (reporting/financial-reports)'
       ['CONVERSION', '0.00'],
       ['TRANSFER', '0.00'],
       ['LOAN', '479.17'],
+      ['CARD', '0.00'],
       ['FEE_CATEGORY', '15.00'],
     ]);
     expect(month.total.consolidated.amount).toBe('494.17');

@@ -5,6 +5,7 @@
  */
 import type { ResolvedRateDto, RateAttributionDto } from '@pf/fx/contracts';
 import type { CashFlowHomeBlockDto, CategoryVariationDto } from './cash-flow.js';
+import type { BudgetRiskHomeDto } from './budget-risk.js';
 
 export const REPORTING_CONTEXT = 'reporting' as const;
 
@@ -214,7 +215,11 @@ export interface SpendableSummaryDto {
     readonly mode: 'FINANCIAL_PERIOD' | 'NEXT_INCOME';
     readonly from: string;
     readonly to: string;
-    readonly nextIncome: { readonly occurrenceId: string; readonly name: string; readonly date: string } | null;
+    readonly nextIncome: {
+      readonly occurrenceId: string;
+      readonly name: string;
+      readonly date: string;
+    } | null;
     readonly fallback: boolean;
   };
   readonly reportingCurrency: string;
@@ -325,6 +330,8 @@ export interface ReportSummaryDto {
   readonly spendable: SpendableSummaryDto | null;
   /** Saldo más bajo esperado y riesgo de 30 días (Q8, add-cash-flow-forecast); `null` sin cuentas líquidas. */
   readonly cashFlow: CashFlowHomeBlockDto | null;
+  /** Líneas del plan en riesgo de excederse (Q5, add-budget-overrun-risk); `null` sin plan o sin líneas en riesgo. */
+  readonly budgetRisk: BudgetRiskHomeDto | null;
   /** Gasto esperado del periodo (Q3, add-predicted-cash-flow-band); `null` sin pronóstico vigente del periodo. */
   readonly forecast: {
     readonly expectedSpending: {
@@ -470,6 +477,11 @@ export interface UpcomingPaymentItemDto {
   readonly status: UpcomingItemStatusDto;
   readonly daysOverdue?: number;
   readonly amountType: UpcomingAmountTypeDto;
+  /**
+   * Origen del monto esperado de un pago de tarjeta (estado de cuenta emitido, ciclo abierto o cuotas programadas de
+   * un ciclo posterior); ausente en los demás pagos (openspec fix-phase-4-debt-followups).
+   */
+  readonly expectedBasis?: 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS';
   /** `null` en `VARIABLE` y en `MIN_MAX` (ver `range`). */
   readonly amount: MoneyDto | null;
   readonly range?: { readonly min: MoneyDto; readonly max: MoneyDto };
@@ -613,4 +625,5 @@ export interface ConversionCostAnalysisDto {
 export * from './financial-reports.js';
 
 export * from './cash-flow.js';
+export * from './budget-risk.js';
 export * from './portability.js';

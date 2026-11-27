@@ -3,8 +3,9 @@ import type { CategoryCatalogQuery, CounterpartyCatalogQuery } from '@pf/classif
 import type { LatestForecastQuery, LiquidVariableSpendQuery } from '@pf/forecasting/contracts';
 import type { FxQuoteSideRatesPort, FxValuationPort, ResolvedRateDto } from '@pf/fx/contracts';
 import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
-import type { Clock } from '@pf/shared-kernel';
+import type { Clock, Currency } from '@pf/shared-kernel';
 import type { ConversionDetailQuery, NominalFlowQuery } from '@pf/transactions/contracts';
+import type { BudgetRiskDto } from '../../contracts/budget-risk.js';
 
 /**
  * Unidad de trabajo de LECTURA: una transacción PG con `SET LOCAL app.workspace_id` (RLS, INV-025) en la que corren
@@ -95,6 +96,11 @@ export interface ReportingDeps {
    * trae el bloque `spendable` (cifras de cierre y pruebas que no lo necesitan).
    */
   readonly spendable?: SpendableDeps;
+  /**
+   * Líneas del plan en riesgo de excederse (Q5, add-budget-overrun-risk): el riesgo del periodo en curso. Opcional: sin él
+   * el resumen trae `budgetRisk: null`.
+   */
+  readonly budgetRisk?: BudgetRiskSource;
 }
 
 // ───────────────────────────────────────────── reporting/dashboard: metas (add-savings-goals)
@@ -248,6 +254,8 @@ export interface UpcomingOccurrenceRow {
     readonly max: string | null;
     readonly currency: string;
   };
+  /** Origen del esperado de un pago administrado (cuotas de tarjeta, etc.); `null` si no lo informa. */
+  readonly expectedBasis?: 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS' | null;
   /** Monto proyectado (máximo en `MIN_MAX`); `null` si es `VARIABLE`. */
   readonly projected: MoneyRow | null;
   readonly accountId: string;
@@ -500,3 +508,12 @@ export interface SpendableDeps {
 }
 
 export * from './shortfall.js';
+
+/** Lo que el Home y el paso de avisos necesitan del cálculo: el riesgo del periodo en curso, en la unidad de trabajo ya abierta. */
+export interface BudgetRiskSource {
+  evaluateCurrent(input: {
+    readonly workspaceId: string;
+    readonly timeZone: string;
+    readonly scaleOf?: (code: string, amount?: string) => Currency;
+  }): Promise<{ readonly dto: BudgetRiskDto; readonly periodLabel: string } | null>;
+}

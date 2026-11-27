@@ -79,7 +79,7 @@ export class PgClassificationSubjects implements ClassificationSubjectsQuery {
         FROM txn.transaction t
         JOIN fx.currency c ON c.code = t.currency
        WHERE t.workspace_id = ${input.workspaceId}
-         AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED'
+         AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED' AND t.debt_role IS NULL
          AND t.transaction_date BETWEEN ${input.from}::date AND ${input.to}::date
          ${accountFilter} ${cursor}
        ORDER BY t.transaction_date, t.id
@@ -102,7 +102,7 @@ export class PgClassificationSubjects implements ClassificationSubjectsQuery {
         FROM txn.transaction t
         JOIN fx.currency c ON c.code = t.currency
        WHERE t.workspace_id = ${input.workspaceId} AND t.id = ANY (${[...input.transactionIds]}::uuid[])
-         AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED'
+         AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED' AND t.debt_role IS NULL
        ORDER BY t.transaction_date, t.id`.execute(db());
     return this.hydrate(input.workspaceId, rows);
   }
@@ -124,7 +124,7 @@ export class PgClassificationSubjects implements ClassificationSubjectsQuery {
           ON s.workspace_id = t.workspace_id AND s.transaction_id = t.id AND s.superseded_in_revision IS NULL
         JOIN classification.category cat ON cat.id = s.category_id AND cat.workspace_id = s.workspace_id
        WHERE t.workspace_id = ${input.workspaceId}
-         AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED'
+         AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED' AND t.debt_role IS NULL
          AND t.transaction_date BETWEEN ${input.from}::date AND ${input.to}::date
          AND t.source IN ('MANUAL', 'IMPORT', 'RECURRING', 'SYSTEM')
          AND cat.system_code IS DISTINCT FROM 'UNCATEGORIZED'
@@ -245,7 +245,7 @@ export class PgClassificationCoverage implements ClassificationCoverageQuery {
       WITH universe AS (
         SELECT t.id FROM txn.transaction t
          WHERE t.workspace_id = ${input.workspaceId} AND t.source = 'IMPORT'
-           AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED' ${scope}
+           AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED' AND t.debt_role IS NULL ${scope}
       ), per AS (
         SELECT u.id,
                bool_and(COALESCE(s.category_origin = 'RULE', false)) AS all_rule,
@@ -263,7 +263,7 @@ export class PgClassificationCoverage implements ClassificationCoverageQuery {
       WITH universe AS (
         SELECT t.id, t.updated_at FROM txn.transaction t
          WHERE t.workspace_id = ${input.workspaceId} AND t.source = 'IMPORT'
-           AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED' ${scope}
+           AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND') AND t.status <> 'VOIDED' AND t.debt_role IS NULL ${scope}
       )
       SELECT s.category_rule_id AS rule_id, max(s.category_rule_version) AS version, count(DISTINCT u.id)::text AS n,
              to_char(max(u.updated_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS last

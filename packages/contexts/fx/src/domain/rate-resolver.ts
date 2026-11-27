@@ -99,6 +99,39 @@ interface Pick extends ValuationChoice {
   readonly inverse: boolean;
 }
 
+/** Candidata usable con su instante interpretado una vez y su posición en la lista original. */
+interface IndexedState {
+  readonly state: ExchangeRateState;
+  readonly t: number;
+  readonly order: number;
+}
+
+const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+/** Primera posición con `t >= value` (los elementos están ordenados por `t`). */
+function lowerBound(items: readonly IndexedState[], value: number): number {
+  let lo = 0;
+  let hi = items.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((items[mid] as IndexedState).t < value) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** Primera posición con `t > value`. */
+function upperBound(items: readonly IndexedState[], value: number): number {
+  let lo = 0;
+  let hi = items.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((items[mid] as IndexedState).t <= value) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 /**
  * DS `RateResolver` (FR-FX-004/005/006; design.md decisión 4), puro: la tasa vigente de un par a un instante es la
  * tasa NO reemplazada más reciente con `asOf ≤ instante` y dentro de la ventana (7 días por defecto), del tipo pedido
@@ -107,6 +140,11 @@ interface Pick extends ValuationChoice {
  */
 export class RateResolver {
   private readonly selector: ValuationRateSelector;
+  /**
+   * Índice de las candidatas usables por par no ordenado, ordenadas por instante (fix-trends-report-perf): cada `asOf`
+   * se interpreta UNA vez y cada `pick` examina solo las del par y la ventana. Se construye en la primera consulta.
+   */
+  private byPair: ReadonlyMap<string, readonly IndexedState[]> | null = null;
 
   /**
    * `policy`: roles de providers y obsolescencia (fx/market-rate-providers). Dentro de cada orientación la tasa se
@@ -221,13 +259,7 @@ export class RateResolver {
   ): Pick | null {
     const to = at.epochMillis;
     const from = to - windowDays * DAY_MS;
-    const usable = this.candidates
-      .filter(isUsableCandidate)
-      .map((c) => c.state)
-      .filter((s) => {
-        const t = Date.parse(s.asOf);
-        return t <= to && t >= from;
-      });
+    const usable = this.usableInWindow(a, b, from, to);
     // Compra/venta solo si se piden explícitamente (sin tipo nunca entran; design.md decisión 29).
     const ofType = (s: ExchangeRateState) =>
       type === null ? !isOneSidedRateType(s.rateType) : s.rateType === type;
@@ -255,6 +287,35 @@ export class RateResolver {
     if (direct) return { ...direct, inverse: false };
     const inverse = choose(b, a);
     return inverse ? { ...inverse, inverse: true } : null;
+  }
+
+  /**
+   * Candidatas usables del par `{a, b}` (cualquier orientación) con `from ≤ asOf ≤ to`, en el orden original de la lista
+   * de candidatas (de él dependen los empates de vigencia en el selector).
+   */
+  private usableInWindow(a: string, b: string, from: number, to: number): ExchangeRateState[] {
+    const group = this.index().get(pairKey(a, b));
+    if (!group) return [];
+    const slice = group.slice(lowerBound(group, from), upperBound(group, to));
+    return slice.sort((x, y) => x.order - y.order).map((x) => x.state);
+  }
+
+  private index(): ReadonlyMap<string, readonly IndexedState[]> {
+    if (this.byPair) return this.byPair;
+    const groups = new Map<string, IndexedState[]>();
+    this.candidates.forEach((c, order) => {
+      if (!isUsableCandidate(c)) return;
+      const t = Date.parse(c.state.asOf);
+      if (Number.isNaN(t)) return; // un instante ilegible nunca cae dentro de una ventana
+      const key = pairKey(c.state.rate.base.code, c.state.rate.quote.code);
+      const group = groups.get(key);
+      const entry = { state: c.state, t, order };
+      if (group) group.push(entry);
+      else groups.set(key, [entry]);
+    });
+    for (const group of groups.values()) group.sort((x, y) => x.t - y.t || x.order - y.order);
+    this.byPair = groups;
+    return groups;
   }
 }
 

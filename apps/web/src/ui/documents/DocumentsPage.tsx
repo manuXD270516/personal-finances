@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cellStyle,
   inputStyle,
@@ -13,8 +13,8 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { BFF_API } from '../session-context';
@@ -220,7 +220,7 @@ function Documents({ ctx }: { ctx: WorkspaceContext }) {
         </p>
       ) : null}
       {items && items.length > 0 ? (
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={t('page.region')}>
+        <TableRegion label={t('page.region')}>
           <table style={tableStyle} data-testid="documents-table">
             <caption className="pf-sr-only">{t('page.caption')}</caption>
             <thead>
@@ -297,11 +297,11 @@ function Documents({ ctx }: { ctx: WorkspaceContext }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       ) : null}
 
       {action?.kind === 'delete' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           title={t('page.deleteTitle')}
           description={t('page.deleteBody', { name: action.doc.originalName })}
           confirmLabel={t('page.delete')}

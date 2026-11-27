@@ -17,8 +17,9 @@ import {
   seriesRows,
   type CashFlowSelection,
 } from './logic';
-import { CASH_FLOW_CSS } from './styles';
+import './cash-flow.css';
 import type { CashFlowCalendar, CashFlowCurrency, CashFlowEvent, CashFlowRisk } from './types';
+import { TableRegion } from '../common/ui';
 
 export interface CashFlowViewProps {
   readonly calendar: CashFlowCalendar;
@@ -120,7 +121,7 @@ function CurrencySummary({
 }) {
   return (
     <div className="pf-cf-card" data-testid="cash-flow-currencies">
-      <div className="pf-cf-table-wrap">
+      <TableRegion label={f.t('summary.caption')}>
         <table className="pf-cf-table">
           <caption>{f.t('summary.caption')}</caption>
           <thead>
@@ -152,7 +153,7 @@ function CurrencySummary({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </div>
   );
 }
@@ -279,7 +280,7 @@ function SeriesTable({
   return (
     <details data-testid="cash-flow-table-details">
       <summary>{f.t('table.show')}</summary>
-      <div className="pf-cf-table-wrap">
+      <TableRegion label={caption}>
         <table className="pf-cf-table" data-testid="cash-flow-table">
           <caption>{caption}</caption>
           <thead>
@@ -344,7 +345,7 @@ function SeriesTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </details>
   );
 }
@@ -490,7 +491,7 @@ function AccountsSection({
       data-testid="cash-flow-accounts"
     >
       <h2 id="cash-flow-accounts-title">{f.t('accounts.title')}</h2>
-      <div className="pf-cf-table-wrap">
+      <TableRegion label={f.t('accounts.caption', { currency: current.currency })}>
         <table className="pf-cf-table">
           <caption>{f.t('accounts.caption', { currency: current.currency })}</caption>
           <thead>
@@ -532,7 +533,7 @@ function AccountsSection({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </section>
   );
 }
@@ -728,7 +729,6 @@ export function CashFlowView(props: CashFlowViewProps & { createAccountHref?: st
   const current = pickCurrency(calendar.currencies, selection.currency);
   return (
     <div className="pf-cf" data-testid="cash-flow-page" data-horizon={calendar.horizonDays}>
-      <style>{CASH_FLOW_CSS}</style>
       <header style={{ display: 'grid', gap: 'var(--pf-space-1)' }}>
         <h1>{f.t('title')}</h1>
         <p className="pf-cf-muted">

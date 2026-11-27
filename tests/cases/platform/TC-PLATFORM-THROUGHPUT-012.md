@@ -54,3 +54,5 @@ Entonces el resumen publica, para cada uno de los consumidores que reciben esos 
 ## Notas
 
 - Change: `optimize-consumer-throughput` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).
+
+- **Evidencia (2026-11-24, change 63):** Nightlies programados 44760461447 (20-11), 44913986214 (21-11), 45032465801 (22-11), 45231166087 (23-11, cuenta por D449) y 45446974855 (24-11), todos con la migración de ADR-0034 (#246). La fase B de `throughput.perf.ts` (ritmo aislado de cada consumidor con handler real) completó en los cinco: `processed` igual a `pending` en los seis consumidores (p. ej. `reporting.data-version` 15 002 de 15 002 en 5,5 a 9,4 s) y las filas NFR-PERF-008 se publican como informativas sin decidir el veredicto (D300).

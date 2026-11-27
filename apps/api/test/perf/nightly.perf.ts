@@ -31,7 +31,7 @@ import {
   writeReport,
   type BenchResult,
 } from './perf-report.js';
-import { perfOutDir, readEntries, recordSuiteLoad } from './background-load.js';
+import { anomalyLabelsPath, perfOutDir, readEntries, recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
 
 /**
@@ -69,11 +69,25 @@ let token = '';
 let ownerId = '';
 let app: Pool;
 let worker: Pool;
+/** Último día cargado del dataset: el `as-of` de los snapshots que reconstruye el job diario (NFR-PERF-005 y gate RLS). */
+let snapshotAsOf = '';
 let superuser: Client;
 let appClient: Client;
 const ids = { accounts: new Map<string, string>(), categories: new Map<string, string>() };
 
 const ms = (started: number) => Math.round(performance.now() - started);
+
+/**
+ * `RebuildBalanceSnapshots` como el job diario del worker: reemplaza los snapshots del workspace por los de
+ * `snapshotAsOf` (el último día cargado del dataset) y deja `last_sequence` en el último asiento registrado.
+ */
+const rebuildSnapshotsLikeDailyJob = () =>
+  createLedgerMaintenance({
+    pool: worker,
+    clock: systemClock,
+    logger: capturingLogger('finance-api', 'worker', 'warn').logger,
+    metrics: { increment: () => undefined },
+  }).rebuildBalanceSnapshots({ asOfDate: snapshotAsOf, workspaceId: WS });
 
 async function timed(n: number, fn: (i: number) => Promise<void>): Promise<number[]> {
   for (let i = 0; i < Math.min(WARMUP, n); i += 1) await fn(i);
@@ -221,6 +235,8 @@ beforeAll(async () => {
     {
       scale: SCALE,
       concurrency: 4,
+      // Etiquetas de anomalías fuera de la base (docs/29 §2.3): las usa `anomalies.perf.ts` (add-spending-anomaly-detection, D483).
+      labelsOut: anomalyLabelsPath(),
       ...(MONTHS !== undefined ? { months: MONTHS } : {}),
       ...(SATELLITES !== undefined ? { satellites: SATELLITES } : {}),
     },
@@ -394,17 +410,9 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
     // `RebuildBalanceSnapshots` como el job diario del worker: reemplaza los snapshots del workspace por los del día
     // anterior a hoy (aquí, el último día cargado del dataset).
-    const maintenance = createLedgerMaintenance({
-      pool: worker,
-      clock: systemClock,
-      logger: capturingLogger('finance-api', 'worker', 'warn').logger,
-      metrics: { increment: () => undefined },
-    });
+    snapshotAsOf = monthEnds.at(-1)!;
     const t = performance.now();
-    const { snapshots, asOfDate } = await maintenance.rebuildBalanceSnapshots({
-      asOfDate: monthEnds.at(-1)!,
-      workspaceId: WS,
-    });
+    const { snapshots, asOfDate } = await rebuildSnapshotsLikeDailyJob();
     timings['snapshots_rebuild_ms'] = ms(t);
     dataset['snapshots de saldo'] = `${snapshots} (as-of ${asOfDate})`;
     await superuser.query('VACUUM (ANALYZE) ledger.balance_snapshot');
@@ -984,6 +992,13 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     };
 
     // 1) Gate (D43): las sentencias que emite la aplicación (`PgBalanceQuery`, con snapshots del job diario).
+    // Los tests anteriores registran asientos retroactivos en este workspace (metas y préstamos del benchmark de
+    // reportes, desde #214): invalidan el snapshot de su cuenta (`sequence > last_sequence` con `entry_date ≤
+    // as_of_date`) y la consulta cae a la Σ completa, un caso que en producción el job diario corrige esa misma noche.
+    // Se reconstruyen como lo haría el job, para medir el overhead de RLS sobre la consulta que de verdad corre.
+    expect(snapshotAsOf, 'NFR-PERF-005 fija el as-of de los snapshots').not.toBe('');
+    await rebuildSnapshotsLikeDailyJob();
+    await superuser.query('VACUUM (ANALYZE) ledger.balance_snapshot');
     const capturePool = new Pool({ connectionString: deps.databaseUrl, max: 1 });
     try {
       const ledger = createLedgerRuntime({

@@ -122,7 +122,8 @@ test.describe('Pagos recurrentes', () => {
       .getByRole('button', { name: /^Aprobar Internet/ })
       .click();
     const panel = page.getByTestId('approve-panel');
-    await expect(panel).toBeFocused();
+    // El foco inicial va a la acción segura («Cancelar», la primera).
+    await expect(panel.getByRole('button').first()).toBeFocused();
     await panel.getByLabel('Monto real (BOB)').fill('205,50');
     await panel.getByRole('button', { name: 'Aprobar', exact: true }).click();
     await expect(page.getByTestId('recurring-status')).toContainText('Aprobaste Internet');

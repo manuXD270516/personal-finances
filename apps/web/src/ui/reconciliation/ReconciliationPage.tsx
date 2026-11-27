@@ -7,7 +7,7 @@ import { todayIn } from '../common/dates';
 import { scaleFor } from '../common/money';
 import { Tabs } from '../common/Tabs';
 import type { Account, Transaction } from '../common/types';
-import { ConfirmPanel, mutedStyle, pageStyle, rowStyle } from '../common/ui';
+import { ConfirmDialog, mutedStyle, pageStyle, rowStyle } from '../common/ui';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
@@ -263,7 +263,8 @@ function Reconcile({
             />
           ) : null}
           {pending === 'cancel' ? (
-            <ConfirmPanel
+            <ConfirmDialog
+              testId="reconciliation-cancel-confirm"
               title={t('cancel.title')}
               description={t('cancel.description')}
               confirmLabel={t('cancel.confirm')}

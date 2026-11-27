@@ -44,7 +44,11 @@ import {
 } from '@pf/notifications/contracts';
 import { PLANNING_CLOSE_SNAPSHOT_HASH_HOOK, PLANNING_PORTABILITY_SECTIONS } from '@pf/planning/contracts';
 import { REPORTING_PORTABILITY_EXCLUSIONS, REPORTING_PORTABILITY_SECTIONS } from '@pf/reporting/contracts';
-import { RULES_PORTABILITY_SECTIONS, RULES_SUGGESTION_FINGERPRINT_HOOK } from '@pf/rules/contracts';
+import {
+  RULES_PORTABILITY_EXCLUSIONS,
+  RULES_PORTABILITY_SECTIONS,
+  RULES_SUGGESTION_FINGERPRINT_HOOK,
+} from '@pf/rules/contracts';
 import { ruleSuggestionFingerprintHook } from '@pf/rules/interface/rules.module';
 import { closeSnapshotRestoreHook } from '@pf/planning/interface/planning.module';
 import { requireSqlExecutor } from '@pf/platform/api';
@@ -91,6 +95,8 @@ export const PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
   ...IMPORTS_PORTABILITY_EXCLUSIONS,
   ...NOTIFICATIONS_PORTABILITY_EXCLUSIONS,
   ...REPORTING_PORTABILITY_EXCLUSIONS,
+  // add-category-suggestions: los resultados de las sugerencias de categoría son telemetría de producto.
+  ...RULES_PORTABILITY_EXCLUSIONS,
   // add-ml-forecasting-service: los pronósticos se recalculan, no viajan (FR-IDENTITY-010).
   ...FORECASTING_PORTABILITY_EXCLUSIONS,
 ];

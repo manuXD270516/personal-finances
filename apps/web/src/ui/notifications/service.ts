@@ -21,8 +21,10 @@ export async function fetchUnreadCount(
   base: string,
   etag?: string,
 ): Promise<{ unread: number | undefined; etag: string | undefined }> {
+  // Contador de fondo: prioridad baja para no demorar las consultas que el usuario espera (M-31).
   const r = await api.get<{ unread: number }>(`${base}/notifications/unread-count`, {
     ...(etag ? { etag } : {}),
+    background: true,
   });
   return { unread: r.data?.unread, etag: r.etag };
 }

@@ -11,6 +11,7 @@ import {
   type ImportCreated,
   type ImportDateFormat,
   type ImportJob,
+  type ImportJobDetail,
   type ImportJobStatus,
   type ImportMapping,
   type ImportPreviewCandidate,
@@ -296,6 +297,15 @@ export function columnNames(
   return header.map((name) => (hasHeader && skip === 0 && name.trim() !== '' ? name : undefined));
 }
 
+/**
+ * Al retomar una importación en `AWAITING_MAPPING`: la respuesta de `getImport` trae la muestra y el mapeo sugerido y se
+ * trata como la de la creación; sin muestra (otro estado o una API anterior) se conserva el aviso `mapping-no-sample`.
+ */
+export function resumedCreated(detail: ImportJobDetail): ImportCreated | undefined {
+  if (detail.status !== 'AWAITING_MAPPING' || detail.sampleRows === undefined) return undefined;
+  return { ...detail, sampleRows: detail.sampleRows, suggestedMapping: detail.suggestedMapping ?? null };
+}
+
 /** Registros que se muestran en la muestra: el primero del archivo y hasta 20 más (`sampleRows`). */
 export function sampleRecords(
   header: readonly string[],
@@ -482,6 +492,7 @@ export function previewPath(
     needsCategory?: boolean;
     ruleId?: string;
     candidateConfidence?: 'HIGH' | 'MEDIUM' | 'LOW';
+    hasSuggestion?: boolean;
     cursor?: string | null;
     limit?: number;
   } = {},
@@ -489,6 +500,7 @@ export function previewPath(
   const q = new URLSearchParams();
   if (opts.classification) q.set('classification', opts.classification);
   if (opts.needsCategory) q.set('needsCategory', 'true');
+  if (opts.hasSuggestion) q.set('hasSuggestion', 'true');
   if (opts.ruleId) q.set('ruleId', opts.ruleId);
   if (opts.candidateConfidence) q.set('candidateConfidence', opts.candidateConfidence);
   if (opts.cursor) q.set('cursor', opts.cursor);

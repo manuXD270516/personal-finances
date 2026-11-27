@@ -147,13 +147,16 @@ export function LoanBalances({ loan, f }: { loan: LoanDetail; f: FormatContext }
   const diff = loan.unreconciledDifference;
   const different = diff !== null && !/^[-+]?0*(\.0*)?$/.test(diff.amount);
   return (
-    <section aria-labelledby="loan-balances-title" style={cardStyle} data-testid="loan-balances">
+    <section
+      aria-labelledby="loan-balances-title"
+      style={cardStyle}
+      className="pf-loan-balances"
+      data-testid="loan-balances"
+    >
       <h2 id="loan-balances-title" style={{ fontSize: '1rem', marginTop: 0 }}>
         {f.t('balances.title')}
       </h2>
-      <dl
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--pf-space-2) var(--pf-space-6)', margin: 0 }}
-      >
+      <dl className="pf-loan-figures">
         <div>
           <dt style={mutedStyle}>{f.t('balances.outstanding')}</dt>
           <dd style={{ margin: 0, fontSize: '1.25rem' }} data-testid="loan-outstanding-principal">
@@ -190,10 +193,7 @@ export function LoanBalances({ loan, f }: { loan: LoanDetail; f: FormatContext }
       <h3 style={{ fontSize: '0.9375rem', marginBottom: 'var(--pf-space-1)' }}>
         {f.t('balances.paidTotals')}
       </h3>
-      <dl
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--pf-space-1) var(--pf-space-4)', margin: 0 }}
-        data-testid="loan-paid-totals"
-      >
+      <dl className="pf-loan-figures pf-loan-figures--tight" data-testid="loan-paid-totals">
         {(['principal', 'interest', 'fees', 'insurance', 'taxes'] as const).map((k) => (
           <div key={k}>
             <dt style={mutedStyle}>{f.t(`components.${k}`)}</dt>
@@ -511,7 +511,9 @@ function Detail({
             id: 'detail',
             label: lf.t('tabs.detail'),
             content: (
-              <div style={{ display: 'grid', gap: 'var(--pf-space-4)' }}>
+              // Una sola columna `minmax(0, 1fr)`: con la columna `auto` el ancho del cronograma (tabla ancha) ensanchaba
+              // todas las tarjetas, «Detalle» incluida, ~250 px más que el teléfono (refine-data-tables, 5.8).
+              <div className="pf-loan-detail">
                 {loan.status === 'ACTIVE' || loan.status === 'PAID_OFF' ? (
                   <LoanBalances loan={loan} f={f} />
                 ) : null}

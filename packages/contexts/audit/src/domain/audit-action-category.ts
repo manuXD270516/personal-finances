@@ -56,6 +56,8 @@ export const DATA_ACTION_ENTITIES = [
   'classification.category',
   'classification.category_group',
   'classification.counterparty',
+  // add-category-and-counterparty-merge (Phase 9): un registro por contexto participante de la fusión.
+  'classification.merge',
   'classification.custom_field',
   'classification.tag',
   // add-loans (Phase 4): préstamos, tablas del banco y comparaciones; y las transacciones administradas del préstamo.
@@ -67,6 +69,7 @@ export const DATA_ACTION_ENTITIES = [
   'debt.credit_card',
   'debt.card_statement',
   'debt.card_installment_plan',
+  'debt.card_charge',
   'fx.exchange_rate',
   // add-savings-goals (Phase 4): metas, movimientos, reservas por cuenta y sugerencias.
   'goals.goal',

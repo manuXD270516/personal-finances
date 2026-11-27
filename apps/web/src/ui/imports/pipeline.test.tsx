@@ -170,6 +170,28 @@ describe('procesamiento por etapas', () => {
     expect(textOf(html)).toContain('Etapa «Normalización»: 1000 de 3000 filas.');
   });
 
+  it('[TC-PLATFORM-TABLES-016] el avance del procesamiento es un progress con nombre que dice qué se procesa', () => {
+    const html = renderToStaticMarkup(
+      <ProcessingPanel
+        f={f}
+        job={job({
+          status: 'PROCESSING',
+          stage: 'NORMALIZE',
+          progress: {
+            attempt: 0,
+            batchCount: 0,
+            batchesDone: 0,
+            stage: 'NORMALIZE',
+            processedRows: 1000,
+            totalRows: 3000,
+          },
+        })}
+      />,
+    );
+    expect(html).toMatch(/<progress[^>]*aria-label="Progreso del procesamiento"/);
+    expect(html).not.toContain('<meter');
+  });
+
   it('una importación subida muestra que está en cola, sin lista de etapas', () => {
     const html = renderToStaticMarkup(<ProcessingPanel f={f} job={job({ status: 'UPLOADED' })} />);
     expect(textOf(html)).toContain('Subida, en cola');

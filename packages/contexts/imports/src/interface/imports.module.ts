@@ -1,3 +1,4 @@
+import type { ClassificationMergeParticipant } from '@pf/classification/contracts';
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountsQueryPort } from '@pf/accounts/contracts';
 import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
@@ -50,6 +51,8 @@ import type {
   OutboxPort,
   ReferenceCatalogPort,
   RulesEvaluationPort,
+  CategorySuggestionFeedbackPort,
+  CategorySuggestionsPort,
   SystemCategoriesPort,
 } from '../application/ports/index.js';
 import {
@@ -158,6 +161,10 @@ export interface ImportsRuntimeOptions {
   readonly documents: DocumentSourcePort;
   /** Evaluación de reglas (add-rule-engine); sin el motor aplicado, un adaptador que falla deja `IMPORT_RULES_UNAVAILABLE`. */
   readonly rules: RulesEvaluationPort;
+  /** Sugerencias de categoría por historial (add-category-suggestions); sin él, la vista previa no las muestra. */
+  readonly suggestions?: CategorySuggestionsPort;
+  /** Tasa de aceptación de las sugerencias: se registra al aprobar, en la misma unidad de trabajo. */
+  readonly suggestionFeedback?: CategorySuggestionFeedbackPort;
   /** Contraparte por alias y categoría por defecto (CLASSIFICATION). */
   readonly counterparties: CounterpartyResolverPort;
   /** Coincidencias con compromisos y vínculo con la ocurrencia confirmada (COMMITMENTS). */
@@ -301,6 +308,8 @@ export function createImportsRuntime(options: ImportsRuntimeOptions): ImportsRun
     profiles: new PgMappingProfileRepository(),
     documents: options.documents,
     rules: options.rules,
+    ...(options.suggestions ? { suggestions: options.suggestions } : {}),
+    ...(options.suggestionFeedback ? { suggestionFeedback: options.suggestionFeedback } : {}),
     counterparties: options.counterparties,
     matching: options.matching,
     occurrenceLinks: options.occurrenceLinks,
@@ -568,9 +577,15 @@ export const importJobExistenceQuery: ImportJobExistenceQuery = {
 
 import { IMPORT_JOB_LIFECYCLE } from '../domain/import-job.js';
 import { CONNECTION_LIFECYCLE } from '../domain/banking/connection.js';
+import { PgImportsMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 
 /** Máquina `ImportJob` declarada (dato puro) para el recorrido (add-lifecycle-timeline, add-import-pipeline). */
 export const IMPORT_JOB_LIFECYCLE_MACHINE = IMPORT_JOB_LIFECYCLE.definition;
 
 /** Máquina `ImportConnection` declarada (dato puro) para el recorrido (add-banking-providers, D52). */
 export const IMPORT_CONNECTION_LIFECYCLE_MACHINE = CONNECTION_LIFECYCLE.definition;
+
+/** Participante de IMPORTS en la fusión de categorías y contrapartes (add-category-and-counterparty-merge): filas aún no persistidas. */
+export function createClassificationMergeParticipant(): ClassificationMergeParticipant {
+  return new PgImportsMergeParticipant();
+}

@@ -58,7 +58,7 @@ Fusiones respecto a la lista original (justificadas en `docs/05-bounded-contexts
    - Cada `Account` del usuario (Accounts context) ↔ exactamente un `LedgerAccount` ASSET o LIABILITY. `Account` lleva atributo `liquidity` (`LIQUID | SEMI_LIQUID | ILLIQUID`) usado por *safe to spend* y cash-flow calendar.
    - Cuentas de sistema por workspace y moneda, creadas bajo demanda: `INCOME:<CCY>`, `EXPENSE:<CCY>`, `EQUITY:OPENING_BALANCE:<CCY>`, `EQUITY:FX_TRADING:<CCY>`, `EQUITY:ADJUSTMENTS:<CCY>`.
    - `JournalEntry` con `Posting[]`. Convención de signo: **débito positivo, crédito negativo**.
-   - **Invariante:** para cada `JournalEntry` y **para cada moneda**, `Σ posting.amount = 0`. Validado en dominio y reforzado en BD (constraint trigger diferido).
+   - **Invariante:** para cada `JournalEntry` y **para cada moneda**, `Σ posting.amount = 0`. Validado en dominio y reforzado en BD al confirmar la transacción: recolectores por sentencia encolan los asientos tocados y un constraint trigger diferido por transacción los valida por conjunto ([ADR-0034](adr/0034-validacion-por-sentencia-de-los-invariantes-del-ledger.md), migración `20261120100000_ledger_statement_validation.sql`).
    - Inmutabilidad: nunca se hace UPDATE/DELETE de postings. Correcciones = **entry de reversa + entry nueva**, enlazadas (`reverses_entry_id`). `void` = reversa.
    - **Clasificación fuera del ledger:** categorías, tags y custom fields viven en `TransactionSplit` (Transactions/Classification). Cada posting nominal referencia `split_id`. Recategorizar **no** toca el ledger.
    - Solo transacciones en estado `posted | cleared | reconciled` tienen JournalEntry. `pending` no impacta el ledger (sí las proyecciones de "saldo disponible/proyectado").
@@ -239,7 +239,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | accounts | `accounts/account-management`, `accounts/institutions` |
 | ledger | `ledger/journal-posting`, `ledger/balances` |
 | transactions | `transactions/transaction-recording`, `transactions/transfers`, `transactions/conversions`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection`, `transactions/bulk-edit` |
-| classification | `classification/categories`, `classification/tags`, `classification/custom-fields`, `classification/counterparties` |
+| classification | `classification/categories`, `classification/tags`, `classification/custom-fields`, `classification/counterparties`, `classification/auto-classification` (Phase 9, change 73, D476; la implementa `@pf/rules`) |
 | planning | `planning/financial-periods`, `planning/budgets`, `planning/budget-templates`, `planning/month-closing` |
 | commitments | `commitments/recurrence-engine`, `commitments/subscriptions` |
 | goals | `goals/savings-goals` |
@@ -248,12 +248,12 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | documents | `documents/attachments` |
 | imports | `imports/import-pipeline` (activa desde Phase 3 con el subconjunto CSV de `add-basic-csv-import`; pipeline completo en Phase 6), `imports/banking-providers` |
 | rules | `rules/rule-engine` |
-| reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` (versión simple en Phase 3: `add-upcoming-payments`; calendario completo en Phase 7) |
-| forecast | `forecast/expense-forecasting` |
+| reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` (versión simple en Phase 3: `add-upcoming-payments`; calendario completo en Phase 7), `reporting/predictive-insights` (Phase 9, change 74, D478) |
+| forecast | `forecast/expense-forecasting`, `forecast/anomaly-detection` (Phase 9, change 72, D473) |
 | notify | `notifications/alerts` |
 | audit | `audit/audit-trail`, `audit/lifecycle-timeline` |
 | assistant | `assistant/read-only-assistant` |
-| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery` |
+| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery`, `platform/web-interface` (patrones transversales de la UI web: accesibilidad de formularios, diálogos, avisos, movimiento y cobertura de navegadores; change `refine-web-accessibility-foundations`, [docs/79](79-ui-ux-modern-web-decisions.md)) |
 | security | `security/access-control`, `security/file-upload-security` |
 | quality | `quality/test-traceability` |
 

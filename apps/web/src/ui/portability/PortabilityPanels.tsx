@@ -4,7 +4,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { cardStyle, ConfirmPanel, mutedStyle, warningStyle } from '../common/ui';
+import { createVisiblePoller } from '../common/polling';
+import { cardStyle, ConfirmDialog, ConfirmPanel, mutedStyle, warningStyle } from '../common/ui';
 import { BFF_API, localized, useSession } from '../session-context';
 import {
   POLL_MS,
@@ -79,8 +80,10 @@ export function ExportPanel() {
   const running = items?.some(exportInProgress) ?? false;
   useEffect(() => {
     if (!running) return;
-    const timer = setTimeout(() => void refresh(), POLL_MS);
-    return () => clearTimeout(timer);
+    // En pausa con la pestaña oculta; al volver consulta enseguida (M-31).
+    const poller = createVisiblePoller({ intervalMs: POLL_MS, run: refresh });
+    poller.start();
+    return () => poller.stop();
   }, [running, items, refresh]);
 
   if (!ready || !active || active.role !== 'OWNER') return null;
@@ -250,7 +253,7 @@ export function ExportPanel() {
         </ul>
       ) : null}
       {typeof confirm === 'object' && confirm ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="export-discard-confirm"
           title={t('export.discardTitle')}
           description={t('export.discardBody')}
@@ -287,15 +290,20 @@ export function ImportPanel() {
   const running = importInProgress(job);
   useEffect(() => {
     if (!running || !api || !job) return;
-    const timer = setTimeout(async () => {
-      try {
-        const r = await api.get<WorkspaceImportView>(`/workspace-imports/${job.id}`);
-        if (r.data) setJob(r.data);
-      } catch (err) {
-        setProblem(problemOf(err));
-      }
-    }, POLL_MS);
-    return () => clearTimeout(timer);
+    // En pausa con la pestaña oculta; al volver consulta enseguida (M-31).
+    const poller = createVisiblePoller({
+      intervalMs: POLL_MS,
+      run: async () => {
+        try {
+          const r = await api.get<WorkspaceImportView>(`/workspace-imports/${job.id}`);
+          if (r.data) setJob(r.data);
+        } catch (err) {
+          setProblem(problemOf(err));
+        }
+      },
+    });
+    poller.start();
+    return () => poller.stop();
   }, [running, job, api]);
 
   useEffect(() => {

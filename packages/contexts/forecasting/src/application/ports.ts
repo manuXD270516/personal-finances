@@ -1,3 +1,4 @@
+import type { CategoryMergeQuery } from '@pf/classification/contracts';
 import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { Clock, FlowRateResolverInput, FlowResolvedRate } from '@pf/shared-kernel';
 import type {
@@ -321,6 +322,8 @@ export interface ForecastingDeps {
   readonly flows: FlowsPort;
   readonly known: KnownSourcesPort;
   readonly categories: CategoriesPort;
+  /** D496: la historia de una categoría fusionada cuenta como la de su destino (add-category-and-counterparty-merge). */
+  readonly categoryMerge?: CategoryMergeQuery;
   /** Cuentas líquidas por moneda (add-predicted-cash-flow-band); sin él la corrida no pronostica el gasto líquido. */
   readonly liquidAccounts?: LiquidAccountsPort;
   readonly rates: RatesPort;

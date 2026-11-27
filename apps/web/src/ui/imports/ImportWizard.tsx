@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemMessage } from '../../errors/error-messages';
-import { ConfirmPanel, mutedStyle, pageStyle } from '../common/ui';
+import { createVisiblePoller } from '../common/polling';
+import { ConfirmDialog, mutedStyle, pageStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { BFF_API, useSession } from '../session-context';
 import {
@@ -19,6 +20,7 @@ import {
   isCancellable,
   isPolling,
   mappingFormOf,
+  resumedCreated,
   stepOf,
   type MappingErrors,
   type MappingForm,
@@ -31,7 +33,7 @@ import { AlreadyImportedWarning, ResultStep } from './ResultPanels';
 import { StepIndicator } from './StepIndicator';
 import { UploadStep } from './UploadStep';
 import { useAccounts } from './useAccounts';
-import type { ImportCreated, ImportJob, ImportMapped, ImportPreviewSummary } from './types';
+import type { ImportCreated, ImportJob, ImportJobDetail, ImportMapped, ImportPreviewSummary } from './types';
 import { AttachmentsSection } from '../documents/AttachmentsSection';
 import { reasonKey } from '../documents/logic';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
@@ -114,12 +116,18 @@ export function ImportWizard({
     if (!importId) return;
     let cancelled = false;
     ctx.api
-      .get<ImportJob>(importPath(ctx.base, importId))
+      .get<ImportJobDetail>(importPath(ctx.base, importId))
       .then((r) => {
         if (cancelled || !r.data) return;
         etag.current = r.etag;
         setJob(r.data);
-        setForm(mappingFormOf(r.data.mapping));
+        const resumed = resumedCreated(r.data);
+        if (resumed) {
+          setCreated(resumed);
+          setForm(initialMappingOf(resumed));
+        } else {
+          setForm(mappingFormOf(r.data.mapping));
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) setProblem(problemOf(err));
@@ -158,30 +166,37 @@ export function ImportWizard({
     headingRef.current?.focus();
   }, [viewStep]);
 
-  // Persistencia en segundo plano: consulta cada POLL_MS con If-None-Match (304 = sin cambios).
+  // Persistencia en segundo plano: consulta cada POLL_MS con If-None-Match (304 = sin cambios), en pausa con la pestaña
+  // oculta y con una consulta inmediata al volver (M-31, `createVisiblePoller`).
   useEffect(() => {
     if (!job || !isPolling(job.status)) return;
     let cancelled = false;
-    const timer = setTimeout(() => {
-      ctx.api
-        .get<ImportJob>(importPath(ctx.base, job.id), etag.current ? { etag: etag.current } : {})
-        .then((r) => {
+    const poller = createVisiblePoller({
+      intervalMs: POLL_MS,
+      run: async () => {
+        try {
+          const r = await ctx.api.get<ImportJob>(
+            importPath(ctx.base, job.id),
+            etag.current ? { etag: etag.current } : {},
+          );
           if (cancelled) return;
           if (r.etag) etag.current = r.etag;
           if (r.data) setJob(r.data);
           else setTick((n) => n + 1);
-        })
-        .catch((err: unknown) => {
+        } catch (err: unknown) {
           if (cancelled) return;
           setProblem(problemOf(err));
           // Un fallo transitorio no corta el seguimiento; uno definitivo (no existe, sin permiso) sí.
           if (!(err instanceof FinanceApiError) || err.status >= 500 || err.status === 429)
             setTick((n) => n + 1);
-        });
-    }, POLL_MS);
+          return false;
+        }
+      },
+    });
+    poller.start();
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      poller.stop();
     };
   }, [ctx.api, ctx.base, job, tick]);
 
@@ -431,7 +446,7 @@ export function ImportWizard({
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
 
       {confirmCancel ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="import-cancel-confirm"
           title={f.t('cancel.title')}
           description={f.t('cancel.description')}

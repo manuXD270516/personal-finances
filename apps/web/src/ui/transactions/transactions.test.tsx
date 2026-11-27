@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { NextIntlClientProvider } from 'next-intl';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { AuditLogEntry, Transaction } from '../common/types';
@@ -7,9 +9,12 @@ import {
   availableActions,
   buildTimeline,
   EMPTY_TRANSACTION_FILTERS,
+  managedEditOffered,
   transactionsQuery,
 } from './logic';
 import { newSplitRow, splitByPercent, splitEqually, summarizeSplits } from './splits';
+import type { WorkspaceContext } from '../common/workspace';
+import { ManagedEditForm } from './ManagedEditForm';
 import { TransactionsListView } from './TransactionsListView';
 import { TransactionTimeline, type NameResolver } from './TransactionTimeline';
 
@@ -350,5 +355,73 @@ describe('splits del formulario (6.1)', () => {
     expect(
       splitByPercent([newSplitRow({ percent: '60' }), newSplitRow({ percent: '30' })], '10.00', m),
     ).toBeNull();
+  });
+});
+
+describe('edición descriptiva de transacciones administradas (fix-phase-4-debt-followups)', () => {
+  const messages = JSON.parse(
+    readFileSync(new URL('../../../messages/es.json', import.meta.url), 'utf8'),
+  ) as Record<string, unknown>;
+  const ctx = {
+    base: '/workspaces/w1',
+    canEdit: true,
+    formatLocale: 'es-BO',
+    timeZone: 'America/La_Paz',
+    uiLocale: 'es',
+    href: (p: string) => `/es${p}`,
+    api: {},
+  } as unknown as WorkspaceContext;
+  const catalogs = {
+    loaded: true,
+    counterparties: [],
+    names: { account: () => 'Banco BOB', category: () => 'Intereses pagados' },
+    addCounterparty: () => undefined,
+  } as never;
+  const form = (t: Transaction) =>
+    renderToStaticMarkup(
+      <NextIntlClientProvider locale="es" messages={messages} timeZone="America/La_Paz">
+        <ManagedEditForm
+          ctx={ctx}
+          tx={t}
+          catalogs={catalogs}
+          onCancel={() => undefined}
+          onSaved={() => undefined}
+        />
+      </NextIntlClientProvider>,
+    );
+  const loan = tx({ kind: 'LOAN_PAYMENT', loanId: 'l1', amount: bob('2342.02'), notes: null });
+  const charge = tx({ debtRole: 'CARD_CHARGE', debtCardId: 'card-1', amount: bob('4.80') });
+
+  it('[TC-TRANSACTIONS-MANAGEDEDIT-001] el pago de un préstamo ofrece solo descripción y notas, sin campos financieros', () => {
+    expect(managedEditOffered(loan, true)).toBe(true);
+    const html = form(loan);
+    expect(html).toContain('name="description"');
+    expect(html).toContain('name="notes"');
+    for (const name of ['amount', 'accountId', 'transactionDate', 'currency'])
+      expect(html).not.toContain(`name="${name}"`);
+    expect(html).not.toContain('managed-edit-readonly');
+  });
+
+  it('[TC-TRANSACTIONS-MANAGEDEDIT-002] el cargo de una tarjeta muestra lo financiero de solo lectura con el aviso y el enlace', () => {
+    expect(managedEditOffered(charge, true)).toBe(true);
+    const html = form(charge);
+    expect(html).toContain('data-testid="managed-edit-readonly"');
+    expect(textOf(html)).toMatch(/4[.,]80/);
+    expect(textOf(html)).toContain('Lo administra la tarjeta');
+    expect(html).toContain('href="/es/debts/tarjetas/card-1"');
+    expect(html).toContain('name="description"');
+    expect(html).toContain('name="notes"');
+    for (const name of ['amount', 'accountId', 'transactionDate'])
+      expect(html).not.toContain(`name="${name}"`);
+  });
+
+  it('[TC-TRANSACTIONS-MANAGEDEDIT-003] el VIEWER no ve la edición descriptiva', () => {
+    expect(managedEditOffered(loan, false)).toBe(false);
+    expect(managedEditOffered(charge, false)).toBe(false);
+  });
+
+  it('[TC-TRANSACTIONS-MANAGEDEDIT-004] un pago anulado no ofrece la edición descriptiva; un gasto común tampoco', () => {
+    expect(managedEditOffered({ ...loan, status: 'VOIDED' }, true)).toBe(false);
+    expect(managedEditOffered(tx({}), true)).toBe(false);
   });
 });

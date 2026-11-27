@@ -6,6 +6,7 @@ import {
   present,
   sumByCurrency,
   type Currency,
+  type DatedAmount,
   type Decimal,
 } from '@pf/shared-kernel';
 import { ReportConversionPolicy, type ReportAmount } from './report-conversion.js';
@@ -170,6 +171,13 @@ export interface TrendSeries {
   readonly total: ReportAmount;
 }
 
+/** Suma `amount` al acumulado de su (día, moneda) en `rows` (exacto: `Money.add` no redondea). */
+function accumulate(rows: Map<string, DatedAmount>, date: string, amount: Money): void {
+  const key = `${date}|${amount.currency.code}`;
+  const prev = rows.get(key);
+  rows.set(key, prev ? { date, amount: prev.amount.add(amount) } : { date, amount });
+}
+
 /**
  * `TrendMatrix` (reporte 6): matriz categoría × periodo. Las 7 categorías de primer nivel con mayor gasto consolidado
  * del rango (empate por nombre) son series y el resto se agrupa en "Otras categorías"; con `perDays` cada celda se divide
@@ -187,42 +195,85 @@ export const TrendMatrix = {
     const top = new Map(input.categories.map((c) => [c.categoryId, c.topId]));
     const names = new Map(input.categories.map((c) => [c.categoryId, c.name]));
     const topOf = (id: string) => top.get(id) ?? id;
-    const topIds = [...new Set(input.facts.map((f) => topOf(f.categoryId)))];
+
+    // Una sola pasada (fix-trends-report-perf): cada hecho se acumula UNA vez por (categoría de primer nivel, día,
+    // moneda). `ReportConversionPolicy.value` consolida por (día, moneda) antes de convertir, así que valorar sobre
+    // estos acumulados da exactamente las mismas cifras que valorar los hechos. `Map` conserva el orden de primera
+    // aparición de las categorías de primer nivel, del que depende el orden de las tasas usadas (ver abajo).
+    const byTop = new Map<string, Map<string, DatedAmount>>();
+    for (const fact of input.facts) {
+      const id = topOf(fact.categoryId);
+      let rows = byTop.get(id);
+      if (!rows) byTop.set(id, (rows = new Map()));
+      accumulate(rows, fact.date, fact.amount);
+    }
+
+    // Ranking de TODAS las categorías de primer nivel, en orden de primera aparición: es la primera valoración de
+    // cada (moneda, día), de modo que `meta.conversion.ratesUsed` conserva el mismo orden que con la definición
+    // funcional (las celdas y los totales solo consultan tasas ya consultadas).
     const ranked = byAmountThenName(
-      topIds.map((categoryId) => ({
+      [...byTop].map(([categoryId, rows]) => ({
         categoryId,
         name: names.get(categoryId) ?? categoryId,
-        amount: input.policy.value(
-          input.facts
-            .filter((f) => topOf(f.categoryId) === categoryId)
-            .map((f) => ({ date: f.date, amount: f.amount })),
-        ),
+        amount: input.policy.value([...rows.values()]),
       })),
     );
     const kept = ranked.slice(0, TREND_TOP_SERIES);
-    const restIds = new Set(ranked.slice(TREND_TOP_SERIES).map((r) => r.categoryId));
-    const cellsOf = (pick: (f: TrendFact) => boolean) =>
-      input.periods.map((period) => ({
-        period,
-        amount: input.policy.value(
-          input.facts
-            .filter((f) => pick(f) && f.date >= period.from && f.date <= period.to)
-            .map((f) => ({ date: f.date, amount: f.amount })),
-          input.perDay ? period.days : undefined,
-        ),
-      }));
-    const totalOf = (pick: (f: TrendFact) => boolean) =>
-      input.policy.value(
-        input.facts.filter(pick).map((f) => ({ date: f.date, amount: f.amount })),
-        input.perDay ? input.periods.reduce((n, p) => n + p.days, 0) : undefined,
-      );
-    const series: TrendSeries[] = kept.map((k) => {
-      const pick = (f: TrendFact) => topOf(f.categoryId) === k.categoryId;
-      return { categoryId: k.categoryId, name: k.name, cells: cellsOf(pick), total: totalOf(pick) };
-    });
-    if (restIds.size > 0) {
-      const pick = (f: TrendFact) => restIds.has(topOf(f.categoryId));
-      series.push({ categoryId: null, name: input.othersName, cells: cellsOf(pick), total: totalOf(pick) });
+
+    // Periodo(s) de cada día distinto, por contención de fechas (los periodos de un reporte no se solapan, pero la
+    // definición funcional filtra por contención: se conserva sin suponerlo).
+    const periodsOfDay = new Map<string, number[]>();
+    const periodIndexes = (date: string): readonly number[] => {
+      let found = periodsOfDay.get(date);
+      if (!found) {
+        found = [];
+        input.periods.forEach((p, i) => {
+          if (date >= p.from && date <= p.to) (found as number[]).push(i);
+        });
+        periodsOfDay.set(date, found);
+      }
+      return found;
+    };
+    const totalDays = input.perDay ? input.periods.reduce((n, p) => n + p.days, 0) : undefined;
+    const seriesOf = (
+      categoryId: string | null,
+      name: string,
+      rows: ReadonlyMap<string, DatedAmount>,
+      /** Total ya valorado (el del ranking), reutilizable solo sin normalizar por día: es la misma valoración. */
+      known?: ReportAmount,
+    ): TrendSeries => {
+      const buckets: DatedAmount[][] = input.periods.map(() => []);
+      for (const row of rows.values()) {
+        for (const i of periodIndexes(row.date)) (buckets[i] as DatedAmount[]).push(row);
+      }
+      return {
+        categoryId,
+        name,
+        cells: input.periods.map((period, i) => ({
+          period,
+          amount: input.policy.value(buckets[i] as DatedAmount[], input.perDay ? period.days : undefined),
+        })),
+        total: known ?? input.policy.value([...rows.values()], totalDays),
+      };
+    };
+    const series: TrendSeries[] = kept.map((k) =>
+      seriesOf(
+        k.categoryId,
+        k.name,
+        byTop.get(k.categoryId) as Map<string, DatedAmount>,
+        input.perDay ? undefined : k.amount,
+      ),
+    );
+    const rest = ranked.slice(TREND_TOP_SERIES);
+    if (rest.length > 0) {
+      // «Otras categorías»: los acumulados de las restantes, sumados por (día, moneda).
+      const others = new Map<string, DatedAmount>();
+      for (const r of rest) {
+        for (const row of (byTop.get(r.categoryId) as Map<string, DatedAmount>).values()) {
+          accumulate(others, row.date, row.amount);
+        }
+      }
+      series.push(seriesOf(null, input.othersName, others));
     }
     return series;
   },
@@ -230,8 +281,8 @@ export const TrendMatrix = {
 
 // ───────────────────────────────────────────── reporte 14: comisiones
 
-export type FeeType = 'CONVERSION' | 'TRANSFER' | 'LOAN' | 'FEE_CATEGORY';
-export const FEE_TYPES: readonly FeeType[] = ['CONVERSION', 'TRANSFER', 'LOAN', 'FEE_CATEGORY'];
+export type FeeType = 'CONVERSION' | 'TRANSFER' | 'LOAN' | 'CARD' | 'FEE_CATEGORY';
+export const FEE_TYPES: readonly FeeType[] = ['CONVERSION', 'TRANSFER', 'LOAN', 'CARD', 'FEE_CATEGORY'];
 
 export interface FeeFact {
   readonly date: string;
@@ -240,17 +291,21 @@ export interface FeeFact {
   /** Tipo de la transacción de la porción y su rol (`FEE` para las comisiones de transferencias y conversiones). */
   readonly transactionKind: string;
   readonly portionRole: 'NOMINAL' | 'FEE';
+  /** Rol de DEBT de la transacción (`CARD_CHARGE`: interés y cargos de una tarjeta, add-card-interest-ledger-portions). */
+  readonly debtRole?: 'CARD_CHARGE' | null;
 }
 
 /**
  * Clasificación EXCLUSIVA de una porción de gasto en un tipo de comisión (decisión 4): comisión de una conversión, de
- * una transferencia, porciones de un pago de préstamo (interés, cargos, seguro, impuestos) o gasto en las categorías de
- * comisiones del sistema. `null` si no es una comisión.
+ * una transferencia, porciones de un pago de préstamo (interés, cargos, seguro, impuestos), porciones de un cargo de
+ * tarjeta registrado o adoptado (`debtRole = CARD_CHARGE`, antes que las categorías: nunca inferido por categoría, D372) o
+ * gasto en las categorías de comisiones del sistema. `null` si no es una comisión.
  */
 export function classifyFee(f: FeeFact, feeCategoryIds: ReadonlySet<string>): FeeType | null {
   if (f.portionRole === 'FEE' && f.transactionKind === 'CONVERSION') return 'CONVERSION';
   if (f.portionRole === 'FEE' && f.transactionKind === 'TRANSFER') return 'TRANSFER';
   if (f.transactionKind === 'LOAN_PAYMENT') return 'LOAN';
+  if (f.debtRole === 'CARD_CHARGE') return 'CARD';
   if (f.portionRole === 'NOMINAL' && feeCategoryIds.has(f.categoryId)) return 'FEE_CATEGORY';
   return null;
 }
@@ -376,6 +431,12 @@ export interface DebtMonthInput {
         readonly charges: Money;
       }[]
     | null;
+  /**
+   * Cargado en el mes por las porciones de los cargos vigentes de una tarjeta (interés y demás cargos) con la fecha de
+   * cada cargo; `null` en préstamos (add-card-interest-ledger-portions).
+   */
+  readonly charged?:
+    readonly { readonly date: string; readonly interest: Money; readonly other: Money }[] | null;
 }
 
 export interface DebtSeries extends DebtInfo {
@@ -385,6 +446,9 @@ export interface DebtSeries extends DebtInfo {
     readonly principalPaid: Money | null;
     readonly interestPaid: Money | null;
     readonly chargesPaid: Money | null;
+    /** Interés y demás cargos (comisiones, seguro, impuestos) cargados por la tarjeta; `null` en préstamos. */
+    readonly interestCharged: Money | null;
+    readonly chargesCharged: Money | null;
   }[];
 }
 
@@ -410,12 +474,20 @@ export const DebtEvolutionSeries = {
             const code = m.outstanding.currency;
             return m.payments.reduce((acc, p) => acc.add(pick(p)), Money.zero(code));
           };
+          const charged = (
+            pick: (p: NonNullable<DebtMonthInput['charged']>[number]) => Money,
+          ): Money | null => {
+            if (m.charged === undefined || m.charged === null) return null;
+            return m.charged.reduce((acc, p) => acc.add(pick(p)), Money.zero(m.outstanding.currency));
+          };
           return {
             period: m.period,
             outstanding: m.outstanding,
             principalPaid: sum((p) => p.principal),
             interestPaid: sum((p) => p.interest),
             chargesPaid: sum((p) => p.charges),
+            interestCharged: charged((p) => p.interest),
+            chargesCharged: charged((p) => p.other),
           };
         }),
       }));
@@ -432,15 +504,19 @@ export const DebtEvolutionSeries = {
     readonly outstanding: ReportAmount;
     readonly principalPaid: ReportAmount;
     readonly interestPaid: ReportAmount;
+    readonly interestCharged: ReportAmount;
   }[] {
     return periods.map((period) => {
       const months = debts.flatMap((d) => d.months.filter((m) => m.period.to === period.to));
       const payments = months.flatMap((m) => m.payments ?? []);
+      const charges = months.flatMap((m) => m.charged ?? []);
       return {
         period,
         outstanding: balances.value(months.map((m) => ({ date: period.to, amount: m.outstanding }))),
         principalPaid: flows.value(payments.map((p) => ({ date: p.date, amount: p.principal }))),
         interestPaid: flows.value(payments.map((p) => ({ date: p.date, amount: p.interest }))),
+        // Solo el interés cargado de las tarjetas, a la tasa de la fecha de cada cargo.
+        interestCharged: flows.value(charges.map((p) => ({ date: p.date, amount: p.interest }))),
       };
     });
   },

@@ -26,6 +26,9 @@ import type {
 import type { PdfStatementReader } from '../pdf/pdf-statement-reader.js';
 import type {
   BulkEditSet,
+  CategorySuggestionEntry,
+  CategorySuggestionFeedbackPort,
+  CategorySuggestionsPort,
   CounterpartyResolverPort,
   DocumentSourcePort,
   InstitutionOfAccountPort,
@@ -187,6 +190,11 @@ export interface StagedRow {
   readonly accountId: string | null;
   /** Referencia externa, señal y conversión propuesta de un registro del proveedor. */
   readonly external: ExternalRowData | null;
+  // ── add-category-suggestions
+  /** Sugerencia de categoría por historial (propuesta; nunca se aplica sin una acción del usuario). */
+  readonly suggestedCategory: CategorySuggestionEntry | null;
+  /** El usuario aceptó la sugerencia (la categoría quedó editada con origen manual). */
+  readonly suggestionAccepted: boolean;
 }
 
 /** Resultado de normalizar y clasificar una fila de datos (se escribe en el staging al aplicar el mapeo). */
@@ -240,6 +248,8 @@ export interface StagingRepository {
       readonly decision: Decision | null;
     }[]
   >;
+  /** Hasta `limit` registros posteriores al encabezado (el primero por línea), en orden de línea: la muestra al retomar. */
+  sampleRaw(workspaceId: string, jobId: string, limit: number): Promise<readonly (readonly string[])[]>;
   /** Escribe la normalización de las filas de datos y deja sin clasificar (NULL) las de `resetIds`. */
   applyNormalization(
     workspaceId: string,
@@ -270,7 +280,10 @@ export interface StagingRepository {
     items: readonly PipelineRowResult[],
     resetIds: readonly string[],
   ): Promise<void>;
-  /** Reescribe solo la propuesta de clasificación (y sus advertencias) de las filas dadas; no toca las ediciones. */
+  /**
+   * Reescribe solo la propuesta de clasificación (y sus advertencias y la sugerencia) de las filas dadas; no toca las
+   * ediciones. La sugerencia de una fila cuya sugerencia ya se aceptó se conserva (la tasa de aceptación la necesita).
+   */
   applyProposals(
     workspaceId: string,
     jobId: string,
@@ -278,8 +291,38 @@ export interface StagingRepository {
       readonly id: string;
       readonly proposal: ClassificationProposal | null;
       readonly warnings: readonly RowIssue[];
+      readonly suggestedCategory?: CategorySuggestionEntry | null;
     }[],
   ): Promise<void>;
+  /**
+   * Filas con sugerencia vigente que el usuario aún no editó (`categoryId` ausente de las ediciones), de los niveles
+   * dados y, si se indican, solo las `rowIds`. Orden por línea.
+   */
+  suggestionCandidates(
+    workspaceId: string,
+    jobId: string,
+    filter: {
+      readonly levels: readonly ('HIGH' | 'MEDIUM')[];
+      readonly rowIds?: readonly string[] | undefined;
+    },
+  ): Promise<readonly { readonly rowId: string; readonly categoryId: string }[]>;
+  /** Fija la categoría sugerida como edición manual de cada fila y marca la sugerencia como aceptada. */
+  acceptSuggestions(workspaceId: string, jobId: string, rowIds: readonly string[]): Promise<number>;
+  /** Marca (o no) la sugerencia de la fila como aceptada al decidir una sola fila. */
+  markSuggestionAccepted(workspaceId: string, jobId: string, rowId: string): Promise<void>;
+  /** Filas a crear que mostraron una sugerencia: su nivel, la categoría sugerida, la efectiva y si se aceptó. */
+  suggestionOutcomes(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<
+    readonly {
+      readonly rowId: string;
+      readonly level: 'HIGH' | 'MEDIUM';
+      readonly suggestedCategoryId: string;
+      readonly effectiveCategoryId: string | null;
+      readonly accepted: boolean;
+    }[]
+  >;
   /** Edición de una fila: ediciones, tipo, decisión (con autor y momento) y vínculo con la ocurrencia. */
   applyEdit(
     workspaceId: string,
@@ -499,6 +542,10 @@ export interface ImportsDeps {
   readonly profiles: MappingProfileRepository;
   readonly documents: DocumentSourcePort;
   readonly rules: RulesEvaluationPort;
+  /** Sugerencias de categoría por historial (add-category-suggestions); ausente ⇒ la vista previa no las muestra. */
+  readonly suggestions?: CategorySuggestionsPort;
+  /** Registro de la tasa de aceptación al aprobar (misma unidad de trabajo); ausente ⇒ no se registra. */
+  readonly suggestionFeedback?: CategorySuggestionFeedbackPort;
   readonly counterparties: CounterpartyResolverPort;
   readonly matching: OccurrenceMatchingPort;
   readonly occurrenceLinks: OccurrenceLinkingPort;

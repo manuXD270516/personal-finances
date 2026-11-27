@@ -5,3 +5,7 @@ export * from './request-forecast-run.js';
 export * from './schedule-forecast-runs.js';
 export * from './support.js';
 export * from './snapshot.js';
+export * from './anomaly-ports.js';
+export * from './detect-spending-anomalies.js';
+export * from './spending-anomaly-queries.js';
+export * from './backtest-spending-anomalies.js';

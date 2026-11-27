@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeNav, initialOf, stripLocale } from './nav';
+import { activeNav, initialOf, showQuickAdd, stripLocale } from './nav';
 
 describe('navegación principal del marco', () => {
   it('quita el prefijo de locale y la barra final', () => {
@@ -40,6 +40,9 @@ describe('navegación principal del marco', () => {
     // Phase 8 (add-expense-forecasts): pronósticos.
     expect(activeNav('/pronosticos')).toBe('forecasts');
     expect(activeNav('/en/pronosticos')).toBe('forecasts');
+    // Phase 9 (add-spending-anomaly-detection): gastos atípicos.
+    expect(activeNav('/gastos-atipicos')).toBe('spendingAnomalies');
+    expect(activeNav('/pt/gastos-atipicos')).toBe('spendingAnomalies');
     // Phase 7 (add-cash-flow-forecast): calendario de flujo de caja.
     expect(activeNav('/flujo-de-caja')).toBe('cashFlow');
     expect(activeNav('/en/flujo-de-caja')).toBe('cashFlow');
@@ -74,5 +77,20 @@ describe('navegación principal del marco', () => {
     expect(initialOf('owner demo')).toBe('O');
     expect(initialOf('  Ñandú')).toBe('Ñ');
     expect(initialOf('')).toBe('?');
+  });
+});
+
+describe('acceso «＋ Registrar» de la barra superior (add-quick-capture)', () => {
+  it('[TC-TRANSACTIONS-QUICK-014] se muestra a quien puede editar, salvo en el alta', () => {
+    expect(showQuickAdd('/presupuestos', 'EDITOR')).toBe(true);
+    expect(showQuickAdd('/en/presupuestos', 'OWNER')).toBe(true);
+    expect(showQuickAdd('/transacciones', 'EDITOR')).toBe(true);
+    expect(showQuickAdd('/transacciones/nueva', 'EDITOR')).toBe(false);
+    expect(showQuickAdd('/pt/transacciones/nueva', 'EDITOR')).toBe(false);
+  });
+
+  it('[TC-TRANSACTIONS-QUICK-015] no se muestra al VIEWER ni sin rol', () => {
+    expect(showQuickAdd('/presupuestos', 'VIEWER')).toBe(false);
+    expect(showQuickAdd('/presupuestos', undefined)).toBe(false);
   });
 });

@@ -3,20 +3,25 @@
 # Lo ejecuta como root /usr/local/sbin/pfos-deploy (comando forzado SSH instalado por cloud-init), que ya validó los
 # argumentos y dejó /opt/pfos/repo en el commit de main que se despliega. Nunca recibe secretos: solo digests.
 #
-#   pfos-deploy.sh deploy <sha> <finance-api@sha256> <finance-web@sha256> <pfos-postgres@sha256> [<finance-ml@sha256>]
-#     (finance-ml es OPCIONAL: servicio de pronósticos del perfil `ml`; sin él el despliegue y el producto funcionan igual)
+#   pfos-deploy.sh deploy <sha> <finance-api@sha256> <finance-web@sha256> <pfos-postgres@sha256> [<extra>...]
+#     Extras OPCIONALES, identificados por el nombre de la imagen (en cualquier orden, sin repetir):
+#       <finance-ml@sha256>      servicio de pronósticos del perfil `ml`; sin él el producto funciona igual
+#       <pfos-keycloak@sha256>   Keycloak con build optimizado (docker/keycloak.Dockerfile); sin él se usa la imagen oficial
 #   pfos-deploy.sh rollback      # vuelve al release exitoso anterior (mismos digests de entonces)
 #   pfos-deploy.sh status
 set -euo pipefail
 umask 077
 
-readonly REPO=/opt/pfos/repo
+# Rutas: las variables PFOS_* existen solo para probar el script sin un host (scripts/host-ops); sudo y el comando forzado no
+# las definen, así que en producción valen los valores por omisión.
+readonly ETC_DIR="${PFOS_ETC_DIR:-/etc/pfos}"
+readonly REPO="${PFOS_REPO_DIR:-/opt/pfos/repo}"
 readonly COMPOSE_DIR="${REPO}/deploy/compose"
-readonly ENV_FILE=/etc/pfos/pfos.env
-readonly PGBR_ENV_FILE=/etc/pfos/pgbackrest.env
-readonly STATE_DIR=/var/lib/pfos
+readonly ENV_FILE="${ETC_DIR}/pfos.env"
+readonly PGBR_ENV_FILE="${ETC_DIR}/pgbackrest.env"
+readonly STATE_DIR="${PFOS_STATE_DIR:-/var/lib/pfos}"
 readonly RELEASE_ENV="${STATE_DIR}/release.env"
-# Una línea por release exitoso: <utc> <sha> <api-ref> <web-ref> <pg-ref> [<ml-ref>]
+# Una línea por release exitoso: <utc> <sha> <api-ref> <web-ref> <pg-ref> [<extra-ref>...] (los extras se reconocen por nombre)
 readonly RELEASES_LOG="${STATE_DIR}/releases.log"
 
 log() { printf '%s pfos-deploy: %s\n' "$(date -u +%FT%TZ)" "$*"; }
@@ -35,18 +40,54 @@ compose() {
     --env-file "${ENV_FILE}" --env-file "${release_env}" --profile core "$@"
 }
 
+# Reparte los extras opcionales por NOMBRE de imagen (no por posición): deja ML y KC en las variables del llamador.
+# Una referencia desconocida o repetida aborta, aunque el comando forzado del host ya filtra la lista cerrada.
+classify_extras() {
+  ML="" KC=""
+  local ref
+  for ref in "$@"; do
+    case "${ref}" in
+      ghcr.io/manuxd270516/finance-ml@sha256:*)
+        [ -z "${ML}" ] || die "finance-ml repetida"
+        ML="${ref}"
+        ;;
+      ghcr.io/manuxd270516/pfos-keycloak@sha256:*)
+        [ -z "${KC}" ] || die "pfos-keycloak repetida"
+        KC="${ref}"
+        ;;
+      *) die "imagen extra no reconocida: ${ref}" ;;
+    esac
+  done
+}
+
 write_release_env() {
-  local file="$1" sha="$2" api="$3" web="$4" pg="$5" ml="${6:-}"
+  local file="$1" sha="$2" api="$3" web="$4" pg="$5" ml="${6:-}" kc="${7:-}"
   printf 'PFOS_RELEASE_SHA=%s\nFINANCE_API_IMAGE=%s\nFINANCE_WEB_IMAGE=%s\nPFOS_POSTGRES_IMAGE=%s\n' \
     "${sha}" "${api}" "${web}" "${pg}" >"${file}"
   # Servicio de pronósticos (opcional, perfil `ml`): solo si el despliegue trae su digest.
   [ -z "${ml}" ] || printf 'FINANCE_ML_IMAGE=%s\n' "${ml}" >>"${file}"
+  # Keycloak con build optimizado (opcional): sin él compose.prod.yaml usa la imagen oficial fijada por digest.
+  [ -z "${kc}" ] || printf 'PFOS_KEYCLOAK_IMAGE=%s\n' "${kc}" >>"${file}"
 }
 
 # La credencial de servicio del servicio de pronósticos es un secreto de archivo montado en el worker y en `ml-forecasting`
 # (0444 dentro de /etc/pfos, que es 0700 de root). Sin el servicio habilitado el archivo queda vacío y no se usa.
 ensure_ml_token_file() {
-  [ -e /etc/pfos/ml-service-token ] || install -m 0444 /dev/null /etc/pfos/ml-service-token
+  [ -e "${ETC_DIR}/ml-service-token" ] || install -m 0444 /dev/null "${ETC_DIR}/ml-service-token"
+}
+
+# Clave PRIVADA de las conexiones (D342): archivo 0400 del uid del worker (node, 1000) que solo `finance-worker` monta (compose.prod.yaml).
+# Si faltara, Docker crearía un DIRECTORIO como origen del montaje; vacío equivale a no tener claves. Si existe, solo se
+# normalizan dueño y permisos: el contenido nunca se toca (lo carga el owner, runbook de conexiones).
+ensure_connection_keys_file() {
+  local file="${ETC_DIR}/connection-credentials.keys"
+  [ ! -d "${file}" ] || die "${file} es un directorio: borrarlo y desplegar de nuevo"
+  if [ -e "${file}" ]; then
+    chown 1000:1000 "${file}"
+    chmod 0400 "${file}"
+  else
+    install -o 1000 -g 1000 -m 0400 /dev/null "${file}"
+  fi
 }
 
 pull_and_verify() {
@@ -66,7 +107,8 @@ install_host_units() {
   install -m 0644 "${REPO}"/deploy/host/systemd/*.service "${REPO}"/deploy/host/systemd/*.timer /etc/systemd/system/
   systemctl daemon-reload
   systemctl enable --now pfos-backup-full.timer pfos-backup-diff.timer pfos-backup-monthly.timer \
-    pfos-backup-check.timer pfos-docs-replica.timer >/dev/null
+    pfos-backup-check.timer pfos-docs-replica.timer pfos-restore-drill.timer pfos-backup-verify.timer \
+    pfos-image-prune.timer >/dev/null
 }
 
 stack_running() { [ -n "$(docker ps -q --filter label=com.docker.compose.project=pfos --filter label=com.docker.compose.service=postgres)" ]; }
@@ -108,27 +150,27 @@ up_release() {
 previous_release() { tail -n 2 "${RELEASES_LOG}" 2>/dev/null | head -n 1; }
 
 cmd_deploy() {
-  local sha="$1" api="$2" web="$3" pg="$4" ml="${5:-}" candidate
+  local sha="$1" api="$2" web="$3" pg="$4" candidate ML KC
+  shift 4
+  classify_extras "$@"
   [ -r "${ENV_FILE}" ] && [ -r "${PGBR_ENV_FILE}" ] || die "faltan ${ENV_FILE} o ${PGBR_ENV_FILE} (runbook §2.3)"
   grep -q '__generate__\|__set__' "${ENV_FILE}" "${PGBR_ENV_FILE}" && die "quedan placeholders sin completar en /etc/pfos"
 
   log "release ${sha}: pull por digest"
-  if [ -n "${ml}" ]; then
-    pull_and_verify "${sha}" "${api}" "${web}" "${pg}" "${ml}"
-  else
-    pull_and_verify "${sha}" "${api}" "${web}" "${pg}"
-  fi
+  pull_and_verify "${sha}" "${api}" "${web}" "${pg}" ${ML:+"${ML}"} ${KC:+"${KC}"}
   ensure_ml_token_file
+  ensure_connection_keys_file
   install_host_units
 
   candidate="$(mktemp "${STATE_DIR}/release.env.XXXXXX")"
-  write_release_env "${candidate}" "${sha}" "${api}" "${web}" "${pg}" "${ml}"
+  write_release_env "${candidate}" "${sha}" "${api}" "${web}" "${pg}" "${ML}" "${KC}"
   pre_migrate_backup "${sha}"
 
   log "compose up (migrate → api/worker → web → caddy)"
   if up_release "${candidate}" && mv -f "${candidate}" "${RELEASE_ENV}" && smoke; then
     ensure_stanza
-    printf '%s %s %s %s %s %s\n' "$(date -u +%FT%TZ)" "${sha}" "${api}" "${web}" "${pg}" "${ml}" >>"${RELEASES_LOG}"
+    printf '%s %s %s %s %s%s%s\n' "$(date -u +%FT%TZ)" "${sha}" "${api}" "${web}" "${pg}" \
+      "${ML:+ ${ML}}" "${KC:+ ${KC}}" >>"${RELEASES_LOG}"
     log "OK release ${sha}"
     return 0
   fi
@@ -145,11 +187,15 @@ cmd_deploy() {
 }
 
 redeploy_line() {
-  local _ts sha api web pg ml
-  read -r _ts sha api web pg ml <<<"$1"
+  local _ts sha api web pg rest ML KC
+  local -a extras=()
+  read -r _ts sha api web pg rest <<<"$1"
+  read -ra extras <<<"${rest}"
+  classify_extras "${extras[@]}"
   git -C "${REPO}" -c advice.detachedHead=false checkout --quiet --detach "${sha}"
-  write_release_env "${RELEASE_ENV}" "${sha}" "${api}" "${web}" "${pg}" "${ml:-}"
+  write_release_env "${RELEASE_ENV}" "${sha}" "${api}" "${web}" "${pg}" "${ML}" "${KC}"
   ensure_ml_token_file
+  ensure_connection_keys_file
   up_release "${RELEASE_ENV}"
   smoke
 }
@@ -174,11 +220,22 @@ cmd_status() {
 }
 
 mkdir -p "${STATE_DIR}"
-exec 9>"${STATE_DIR}/deploy.lock"
-flock -n 9 || die "hay otro deploy en curso"
+# Lock compartido con las operaciones del host (drill, verify, image-prune de pfos-backup.sh): quien lo tiene escribe su
+# nombre en el archivo, y un deploy que lo encuentra tomado falla sin tocar nada e informa cuál es.
+exec 9<>"${STATE_DIR}/deploy.lock"
+if ! flock -n 9; then
+  holder="$(head -n 1 "${STATE_DIR}/deploy.lock" 2>/dev/null || true)"
+  die "operación del host en curso: ${holder:-desconocida}"
+fi
+: >"${STATE_DIR}/deploy.lock"
+printf '%s\n' "${1:-}${2:+ $2}" >&9
 
 case "${1:-}" in
-  deploy) cmd_deploy "$2" "$3" "$4" "$5" "${6:-}" ;;
+  deploy)
+    [ "$#" -ge 5 ] || die "uso: pfos-deploy.sh deploy <sha> <api> <web> <pg> [<extra>...]"
+    shift
+    cmd_deploy "$@"
+    ;;
   rollback) cmd_rollback ;;
   status) cmd_status ;;
   *) die "uso: pfos-deploy.sh deploy|rollback|status" ;;

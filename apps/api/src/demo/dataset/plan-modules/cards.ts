@@ -278,7 +278,8 @@ export function kantutaFigures(anchor: string): KantutaFigures {
     bob.push({ date: pay.date, execDate: pay.date, delta: -pay.amount.minor, kind: 'payment' });
   }
   const installment = 80_000n;
-  const k0 = addMonthsClamped(plan.k1, -1);
+  // Cierre anterior a K1: desde K2 (cuyo día es el día de cierre) y no encadenando recortes desde K1.
+  const k0 = addMonthsClamped(plan.k2, -2);
   const floor = (cur: 'bob' | 'usd'): MinimumRule => ({
     percent: '5.00',
     floor: cur === 'bob' ? 5_000n : 1_000n,

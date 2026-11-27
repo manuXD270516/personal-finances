@@ -101,6 +101,6 @@ Informe completo y evidencia: [spikes/SPIKE-06-auth-bff/README.md](../../spikes/
   - Se recomienda el *synchronizer token* derivado frente al double-submit cookie.
 - **Latencia del doble salto**: en este host Windows no se distingue del suelo de ~15 ms de loopback (p50 BFF 15.3 ms vs directa 15.2 ms). Hay que volver a medir en Linux/CI.
 - **Pendiente para Phase 1**:
-  - CSP con nonce generado en `proxy.ts` y HSTS (requiere HTTPS local).
+  - CSP con nonce generado en `proxy.ts` y HSTS (requiere HTTPS local). **Resuelto el 2026-11-24** (`add-web-content-security-policy`, D457/D458): `proxy.ts` emite la CSP con nonce por petición y todas las páginas se renderizan por petición; el HSTS lo agrega Caddy (ADR-0027).
   - Lock distribuido de refresh si hay más de una réplica.
   - Verificar Secure cookies en WebKit sobre http://localhost (no probado).

@@ -140,7 +140,8 @@ test.describe('Importar CSV (imports/import-pipeline)', () => {
     // Resumen previo a la aprobación: sin categoría y con el saldo actual → resultante.
     await approve.click();
     const confirm = page.getByTestId('import-approve-confirm');
-    await expect(confirm).toBeFocused();
+    // El diálogo modal deja el foco en la acción segura («Cancelar», la primera).
+    await expect(confirm.getByRole('button').first()).toBeFocused();
     await expect(confirm).toContainText('Se crearán 3 transacciones.');
     await expect(confirm).toContainText('Salidas: 36,00 BOB. Entradas: 8.000,00 BOB.');
     await expect(confirm).toContainText('Saldo actual 3.754,70 BOB, saldo resultante 11.718,70 BOB.');
@@ -214,6 +215,29 @@ test.describe('Importar CSV (imports/import-pipeline)', () => {
     await expect(page.getByTestId('import-item')).toHaveCount(2);
     await expect(page.locator('[data-testid="import-item"][data-status="COMPLETED"]')).toHaveCount(1);
     await expect(page.locator('[data-testid="import-item"][data-status="CANCELLED"]')).toHaveCount(1);
+    expect(await seriousViolations(page)).toEqual([]);
+    await context.close();
+  });
+
+  test('[TC-IMPORTS-CSV-031] retomar una importación esperando mapeo muestra las filas del archivo sin el aviso de muestra', async ({
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    const { context, page, W } = await newFinanceUser(browser, 'csvresume');
+    const bank = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '4000.00');
+    await go(page, `/imports/nueva?cuenta=${bank}`);
+    await page.getByTestId('import-legacy-toggle').click();
+    await page.getByTestId('import-legacy-file').setInputFiles(CSV);
+    await page.getByTestId('import-legacy-upload-submit').click();
+    await expect(page.getByTestId('import-wizard')).toHaveAttribute('data-step', '2');
+
+    // Se retoma desde la lista: la respuesta de getImport trae la muestra.
+    const listed = (await api(page, 'GET', `${W}/imports?accountId=${bank}`))['data'] as { id: string }[];
+    expect(listed).toHaveLength(1);
+    await go(page, `/imports/${listed[0]!.id}`);
+    await expect(page.getByTestId('import-wizard')).toHaveAttribute('data-step', '2');
+    await expect(page.getByTestId('mapping-sample')).toContainText('PAGO QR CAFÉ');
+    await expect(page.getByTestId('mapping-no-sample')).toHaveCount(0);
     expect(await seriousViolations(page)).toEqual([]);
     await context.close();
   });

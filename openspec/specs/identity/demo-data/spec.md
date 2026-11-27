@@ -67,6 +67,17 @@ Trace: FR-IDENTITY-014, FR-LEDGER-001 · Priority: Must
 - **Y** el "Préstamo de consumo" tiene al menos una cuota en mora, el "Préstamo familiar" está saldado, "Viaje" está atrasada respecto del plan y "Laptop" está alcanzada
 - **Y** ningún movimiento de la demo tiene fecha posterior a la ancla, salvo las ocurrencias, cuotas y cargos futuros que generan los propios cronogramas
 
+#### Scenario: Ancla de fin de mes con la cuota en día 29 a 31
+- **CUANDO** se cargan los datos de demostración con la fecha ancla 2026-11-20, de modo que `A − 20` cae el 2026-10-31
+- **ENTONCES** la carga termina `READY` sin `DEMO_GOLDEN_MISMATCH`
+- **Y** la cuota 8 del "Crédito educativo" vence el 2026-10-28 (día 28, no el 31) y está pagada, y la cuota 9 vence el 2026-11-28
+- **Y** el primer periodo de cada préstamo mide 30 días 30/360 desde su desembolso, con cualquier ancla
+
+#### Scenario: Ancla con el día del plan de metas en 29 a 31
+- **CUANDO** se cargan los datos de demostración con la fecha ancla 2026-11-25, de modo que `A − 25` cae el 2026-10-31 y el plan del "Fondo de emergencia" corre el día 31
+- **ENTONCES** la carga termina `READY` sin `DEMO_LOAD_FAILED`
+- **Y** los aportes del "Fondo de emergencia" caen en el último día de cada mes corto (2025-11-30, 2025-12-31, 2026-01-31, 2026-02-28), igual que las ocurrencias que genera la regla de la meta, con cualquier ancla
+
 ### Requirement: Estado de la carga observable y sin resultados parciales
 La carga DEBE (MUST) ejecutarse de forma asíncrona y exponer su estado (`LOADING`, `READY`, `FAILED`); si la carga falla, el workspace de demostración DEBE (MUST) quedar en `FAILED`, NO DEBE (MUST NOT) presentarse como `READY` con datos parciales y DEBE (MUST) poder limpiarse.
 Trace: FR-IDENTITY-013 · Priority: Must

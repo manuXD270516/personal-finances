@@ -4,16 +4,18 @@
  * (Inter queda como pregunta abierta de docs/28; si se adopta, se autohospeda vía `next/font/local`). Es un recurso
  * estático de la propia app (`style-src 'self'`), compatible con la CSP de docs/12 §6.
  *
- * Tema: solo light por ahora. Los valores viven en `:root` y los componentes consumen únicamente los nombres
- * semánticos; el tema dark (docs/28 §9) se añadirá redefiniendo estos tokens bajo `[data-theme='dark']` /
- * `prefers-color-scheme`, sin tocar los selectores de componentes.
+ * Tema (add-dark-theme, D501): claro y oscuro. Los valores claros viven en `:root`; los oscuros se redefinen en dos
+ * bloques idénticos (`@media (prefers-color-scheme: dark)` y `:root[data-theme='dark']`), no con `light-dark()`
+ * (Newly, D500). `data-theme` lo pone el servidor desde la cookie espejo `pfos_theme`; sin él, manda el sistema.
+ * Los componentes consumen solo nombres semánticos y no declaran colores literales (lo garantiza `colors.test.ts`);
+ * los pares de contraste de ambos esquemas los mide `contrast.test.ts`.
  *
  * Especificidad: los estilos base van envueltos en `:where()` (especificidad 0) para que los estilos por página
  * (objetos `style` y clases como `.pf-home`) siempre ganen.
  */
 
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
 
   /* Color base (docs/28 §5.1). */
   --pf-bg: #ffffff;
@@ -45,6 +47,17 @@
   --pf-warning-bg: #fff8c5;
   --pf-warning-border: #9a6700;
   --pf-warning-fg: #3b2300;
+  --pf-warning-accent: #bf8700;
+
+  /* Tokens añadidos por add-dark-theme: pistas, bordes de tarjeta, diagrama de recorrido y el gasto atenuado del Home. */
+  --pf-track: #e2e8f0;
+  --pf-card-border: #d0d7de;
+  --pf-fin-expense-soft: #334155;
+  --pf-chart-on: #0969da;
+  --pf-chart-on-strong: #0a3069;
+  --pf-chart-on-fg: #ffffff;
+  --pf-chart-off: #8c959f;
+  --pf-chart-visited: #ddf4ff;
 
   /* Tipografía (docs/28 §5.3). */
   --pf-font-sans:
@@ -83,6 +96,190 @@
   --pf-sidebar-w: 15rem;
   --pf-content-max: 72rem;
   --pf-duration: 150ms;
+}
+
+/* ---------- Tema oscuro (D501) ---------- */
+/* Los dos bloques llevan los mismos valores; `contrast.test.ts` exige que coincidan. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --pf-bg: #0b0f14;
+    --pf-surface: #121821;
+    --pf-surface-raised: #1a2230;
+    --pf-surface-sunken: #202a3a;
+    --pf-fg: #e2e8f0;
+    --pf-fg-muted: #94a3b8;
+    --pf-border: #273244;
+    --pf-border-strong: #475569;
+    --pf-control-border: #7c8aa0;
+    --pf-primary: #60a5fa;
+    --pf-primary-hover: #93c5fd;
+    --pf-primary-fg: #0b0f14;
+    --pf-primary-soft: #172a4d;
+    --pf-focus: #93c5fd;
+    --pf-destructive: #f87171;
+    --pf-error: #f87171;
+    --pf-fin-income: #34d399;
+    --pf-fin-expense: #e2e8f0;
+    --pf-fin-transfer: #94a3b8;
+    --pf-fin-conversion: #a78bfa;
+    --pf-fin-neutral: #94a3b8;
+    --pf-fin-warning: #fbbf24;
+    --pf-fin-over-budget: #f87171;
+    --pf-fin-ok: #4ade80;
+    --pf-warning-bg: #2b2208;
+    --pf-warning-border: #fbbf24;
+    --pf-warning-fg: #fde68a;
+    --pf-warning-accent: #d4a017;
+    --pf-track: #273244;
+    --pf-card-border: #334155;
+    --pf-fin-expense-soft: #cbd5e1;
+    --pf-chart-on: #58a6ff;
+    --pf-chart-on-strong: #bfdbfe;
+    --pf-chart-on-fg: #0b0f14;
+    --pf-chart-off: #8b949e;
+    --pf-chart-visited: #10294a;
+    --pf-shadow-raised: none;
+    --pf-shadow-overlay: 0 2px 8px rgb(0 0 0 / 0.4);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --pf-bg: #0b0f14;
+  --pf-surface: #121821;
+  --pf-surface-raised: #1a2230;
+  --pf-surface-sunken: #202a3a;
+  --pf-fg: #e2e8f0;
+  --pf-fg-muted: #94a3b8;
+  --pf-border: #273244;
+  --pf-border-strong: #475569;
+  --pf-control-border: #7c8aa0;
+  --pf-primary: #60a5fa;
+  --pf-primary-hover: #93c5fd;
+  --pf-primary-fg: #0b0f14;
+  --pf-primary-soft: #172a4d;
+  --pf-focus: #93c5fd;
+  --pf-destructive: #f87171;
+  --pf-error: #f87171;
+  --pf-fin-income: #34d399;
+  --pf-fin-expense: #e2e8f0;
+  --pf-fin-transfer: #94a3b8;
+  --pf-fin-conversion: #a78bfa;
+  --pf-fin-neutral: #94a3b8;
+  --pf-fin-warning: #fbbf24;
+  --pf-fin-over-budget: #f87171;
+  --pf-fin-ok: #4ade80;
+  --pf-warning-bg: #2b2208;
+  --pf-warning-border: #fbbf24;
+  --pf-warning-fg: #fde68a;
+  --pf-warning-accent: #d4a017;
+  --pf-track: #273244;
+  --pf-card-border: #334155;
+  --pf-fin-expense-soft: #cbd5e1;
+  --pf-chart-on: #58a6ff;
+  --pf-chart-on-strong: #bfdbfe;
+  --pf-chart-on-fg: #0b0f14;
+  --pf-chart-off: #8b949e;
+  --pf-chart-visited: #10294a;
+  --pf-shadow-raised: none;
+  --pf-shadow-overlay: 0 2px 8px rgb(0 0 0 / 0.4);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* La impresión sale siempre en claro, aunque el tema sea oscuro (decisión 10). */
+/* Transiciones en el mismo documento (change refine-perceived-performance, M-28; NFR-USAB-107): fundido de 200 ms por
+   defecto, sin `view-transition-name` por elemento y solo cuando el usuario no pidió movimiento reducido. Sin soporte de
+   View Transitions (Newly 2025-10-14) estas reglas no se usan: `withViewTransition` actualiza el DOM sin animación. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-group(*) {
+    animation-duration: 200ms;
+  }
+}
+
+/* Explicación accesible (`InfoTip`, M-09; popover nativo, Newly 2025-01-27). NADA aquí oculta el contenido fuera de
+   `:popover-open`: la hoja del navegador ya lo oculta cuando entiende `popover`; sin soporte el texto queda visible junto
+   al botón (D500). Objetivo táctil de al menos 24 x 24 px (NFR-USAB-106). */
+.pf-infotip {
+  display: inline;
+}
+.pf-infotip-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.5rem;
+  min-block-size: 1.5rem;
+  padding: 0;
+  margin-inline: var(--pf-space-1);
+  border-radius: var(--pf-radius-full);
+  font-size: var(--pf-text-xs);
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+.pf-infotip-body:popover-open {
+  max-inline-size: min(24rem, calc(100vw - 2rem));
+  padding: var(--pf-space-3) var(--pf-space-4);
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-raised);
+  color: var(--pf-fg);
+  box-shadow: var(--pf-shadow-overlay);
+  font-size: var(--pf-text-sm);
+  font-weight: 400;
+  text-align: start;
+}
+
+@media print {
+  :root,
+  :root:not([data-theme='light']),
+  :root[data-theme='dark'] {
+    color-scheme: light;
+
+    --pf-bg: #ffffff;
+    --pf-surface: #f8fafc;
+    --pf-surface-raised: #ffffff;
+    --pf-surface-sunken: #f1f5f9;
+    --pf-fg: #0f172a;
+    --pf-fg-muted: #475569;
+    --pf-border: #e2e8f0;
+    --pf-border-strong: #94a3b8;
+    --pf-control-border: #64748b;
+    --pf-primary: #1d4ed8;
+    --pf-primary-hover: #1e40af;
+    --pf-primary-fg: #ffffff;
+    --pf-primary-soft: #eff6ff;
+    --pf-focus: #2563eb;
+    --pf-destructive: #b91c1c;
+    --pf-error: #b91c1c;
+    --pf-fin-income: #047857;
+    --pf-fin-expense: #0f172a;
+    --pf-fin-transfer: #475569;
+    --pf-fin-conversion: #6d28d9;
+    --pf-fin-neutral: #64748b;
+    --pf-fin-warning: #b45309;
+    --pf-fin-over-budget: #b91c1c;
+    --pf-fin-ok: #15803d;
+    --pf-warning-bg: #fff8c5;
+    --pf-warning-border: #9a6700;
+    --pf-warning-fg: #3b2300;
+    --pf-warning-accent: #bf8700;
+    --pf-track: #e2e8f0;
+    --pf-card-border: #d0d7de;
+    --pf-fin-expense-soft: #334155;
+    --pf-chart-on: #0969da;
+    --pf-chart-on-strong: #0a3069;
+    --pf-chart-on-fg: #ffffff;
+    --pf-chart-off: #8c959f;
+    --pf-chart-visited: #ddf4ff;
+    --pf-shadow-raised: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
+    --pf-shadow-overlay: 0 4px 12px rgb(15 23 42 / 0.12), 0 2px 4px rgb(15 23 42 / 0.08);
+  }
 }
 
 /* ---------- Base ---------- */
@@ -129,6 +326,23 @@ body {
 :where(p) {
   margin: 0;
 }
+
+/* Legibilidad (change refine-perceived-performance, M-23): títulos con líneas equilibradas (Newly 2024-05-13) y párrafos sin
+   palabra huérfana en la última línea (`pretty`, Limited: sin soporte no cambia nada). Mejora progresiva (D500), sin polyfill. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p,
+li {
+  text-wrap: pretty;
+}
+/* Textos de ayuda de los campos: no pasan de unos 70 caracteres por línea. `small` es en línea, por eso `display: block`. */
+.pf-help {
+  display: block;
+  max-inline-size: 70ch;
+}
 :where(small) {
   font-size: var(--pf-text-sm);
 }
@@ -173,6 +387,16 @@ body {
 :where(textarea) {
   min-height: 5rem;
 }
+/* Campos que crecen con su contenido (change refine-perceived-performance, M-05; `field-sizing` es Newly 2026-06-16). Solo
+   con soporte: sin él, la regla de arriba (alto mínimo de 5rem y desplazamiento) no cambia. El ancho no se toca (evita saltos
+   horizontales); a partir de 12 líneas el campo se desplaza por dentro. */
+@supports (field-sizing: content) {
+  textarea {
+    field-sizing: content;
+    min-block-size: 3lh;
+    max-block-size: 12lh;
+  }
+}
 :where(input, select, textarea):disabled {
   background: var(--pf-surface-sunken);
   color: var(--pf-fg-muted);
@@ -214,9 +438,14 @@ body {
   padding: var(--pf-space-2) var(--pf-space-4);
   min-height: var(--pf-control-h);
   cursor: pointer;
-  transition:
-    background-color var(--pf-duration) ease,
-    border-color var(--pf-duration) ease;
+}
+/* Transición de color de los botones: solo sin preferencia de movimiento reducido (decisión 8 del change, NFR-USAB-107). */
+@media (prefers-reduced-motion: no-preference) {
+  :where(button) {
+    transition:
+      background-color var(--pf-duration) ease,
+      border-color var(--pf-duration) ease;
+  }
 }
 :where(button:hover:not(:disabled)) {
   background: var(--pf-surface-sunken);
@@ -237,7 +466,9 @@ body {
 
 /* Tablas: cabecera sutil, filas separadas, montos tabulares (docs/28 §5.3). */
 :where(table) {
-  border-collapse: collapse;
+  /* `separate`: con `collapse` el borde de una celda fija se pierde al desplazar (refine-data-tables, decisión 3). */
+  border-collapse: separate;
+  border-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 :where(th) {
@@ -253,6 +484,178 @@ body {
   text-align: left;
   font-weight: 600;
   padding-bottom: var(--pf-space-2);
+}
+
+/* ---------- Regiones de tabla (refine-data-tables, M-16/M-17) ---------- */
+
+/* Región con nombre y foco (`TableRegion`): desplaza a lo ancho dentro de sí misma, nunca la página. */
+.pf-table-wrap {
+  /* Contenedor de posicionamiento: el `<caption>` accesible (`pf-sr-only`, absoluto) no debe ensanchar la página. */
+  position: relative;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  background: var(--pf-surface-raised);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-md);
+}
+/* Tablas de mucho volumen: alto máximo propio; solo así `position: sticky` fija la cabecera. */
+.pf-table-wrap--tall {
+  max-block-size: min(32rem, 70dvh);
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+}
+.pf-table-wrap--tall > table > thead > tr > th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  /* Opaco: las filas no se ven a través de la cabecera. */
+  background: var(--pf-surface);
+}
+/* Columna de identificación fija (fecha o número de cuota): la primera celda de cada fila es `th scope="row"`. */
+.pf-table--idcol > tbody > tr > th[scope='row'] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--pf-surface-raised);
+  color: var(--pf-fg);
+  font-weight: 500;
+  font-size: inherit;
+  white-space: nowrap;
+}
+.pf-table--idcol > thead > tr > th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  /* Por encima de la columna fija y de la cabecera fija. */
+  z-index: 2;
+}
+
+/* Pista de que hay más columnas a la derecha (mejora progresiva): un degradado en el borde final que se retira al
+   llegar al último. La máscara solo cambia la opacidad, no mueve nada: vale también con movimiento reducido. Sin
+   soporte de `animation-timeline` no hay pista y queda la barra de desplazamiento, que no se oculta. */
+@property --pf-fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+/* La animación está ligada al desplazamiento del usuario y solo cambia la opacidad de la máscara: no mueve nada, así
+   que corre con cualquier preferencia de movimiento (la consulta cubre ambas y la declara ante styles.test.ts). */
+@media (prefers-reduced-motion: no-preference), (prefers-reduced-motion: reduce) {
+  @supports (animation-timeline: scroll()) {
+    .pf-table-wrap {
+      --pf-fade-size: 2.5rem;
+      --pf-fade-dir: right;
+      --pf-fade-end-pos: 100%;
+      mask:
+        linear-gradient(black, black) no-clip subtract,
+        linear-gradient(to var(--pf-fade-dir), transparent, black) var(--pf-fade-end-pos) 0 /
+          var(--pf-fade-end) 100% no-repeat no-clip;
+      animation: pf-hide-fade-end linear both;
+      animation-timeline: scroll(self inline);
+      animation-range: calc(100% - var(--pf-fade-size)) 100%;
+    }
+    .pf-table-wrap:dir(rtl) {
+      --pf-fade-dir: left;
+      --pf-fade-end-pos: 0;
+    }
+    @keyframes pf-hide-fade-end {
+      from {
+        --pf-fade-end: var(--pf-fade-size);
+      }
+    }
+  }
+}
+
+/* Detalle de un préstamo (refine-data-tables, 5.8): una columna que puede encogerse (`minmax(0, 1fr)`) y tarjetas con
+   `min-inline-size: 0`; con la columna `auto` el cronograma ancho ensanchaba todas las tarjetas y la página. */
+.pf-loan-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--pf-space-4);
+}
+.pf-loan-detail > * {
+  min-inline-size: 0;
+}
+.pf-loan-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-2) var(--pf-space-6);
+  margin: 0;
+}
+.pf-loan-figures--tight {
+  gap: var(--pf-space-1) var(--pf-space-4);
+}
+.pf-loan-figures > div {
+  min-inline-size: 0;
+}
+.pf-loan-figures dd {
+  overflow-wrap: anywhere;
+}
+
+/* Medidas (`Meter`): utilización de una tarjeta y avance de una meta. El relleno toma `--pf-meter-fill`. */
+.pf-meter {
+  appearance: none;
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 6rem;
+  block-size: 0.625rem;
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius-full);
+  background: var(--pf-surface-sunken);
+  overflow: hidden;
+}
+.pf-meter::-webkit-meter-bar {
+  block-size: 100%;
+  border: 0;
+  background: var(--pf-surface-sunken);
+}
+.pf-meter::-webkit-meter-optimum-value {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+.pf-meter::-webkit-meter-suboptimum-value {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+.pf-meter::-webkit-meter-even-less-good-value {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+.pf-meter::-moz-meter-bar {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+
+/* Cabecera clicable de las tablas con orden por columna (`SortableHeader`). */
+.pf-table th:has(> .pf-sort-btn) {
+  padding: 0;
+}
+.pf-sort-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-space-1);
+  inline-size: 100%;
+  min-block-size: 2.75rem;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  justify-content: inherit;
+  cursor: pointer;
+}
+:where(.pf-sort-btn:hover:not(:disabled)) {
+  background: var(--pf-surface-sunken);
+}
+.pf-sort-icon {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  flex: none;
+  opacity: 0.35;
+}
+th[aria-sort] .pf-sort-icon {
+  opacity: 1;
+}
+th[aria-sort='descending'] .pf-sort-icon {
+  transform: rotate(180deg);
 }
 
 :where(hr) {
@@ -408,7 +811,6 @@ body {
 .pf-ws-role {
   font-size: var(--pf-text-xs);
   color: var(--pf-fg-muted);
-  white-space: nowrap;
 }
 
 /* Menú de usuario (disclosure). */
@@ -563,7 +965,10 @@ body {
   background: var(--pf-primary-soft);
   color: var(--pf-primary);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--pf-primary);
+  /* Borde con `currentColor`: sobrevive a los colores forzados, donde el fondo y las sombras desaparecen (decisión 9 del change). El
+     relleno se compensa para que el texto no salte respecto de los demás ítems. */
+  border-inline-start: 0.25rem solid currentColor;
+  padding-inline-start: calc(var(--pf-space-3) - 0.25rem);
 }
 
 .pf-main {
@@ -634,14 +1039,14 @@ html {
   display: none;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 40em) {
   .pf-hide-sm {
     display: inline;
   }
 }
 
 /* Bajo `lg 1024` el rótulo del selector de workspace queda solo para lectores de pantalla (el `<label>` se conserva). */
-@media (max-width: 1023.98px) {
+@media (width < 64em) {
   .pf-ws-label {
     position: absolute;
     width: 1px;
@@ -655,9 +1060,11 @@ html {
   }
 }
 
-@media (max-width: 639.98px) {
+@media (width < 40em) {
   .pf-topbar {
     flex-wrap: wrap;
+    /* Con el acceso «＋ Registrar» la fila de 360 px queda justa: menos separación horizontal para que el menú de usuario no baje. */
+    column-gap: var(--pf-space-1);
   }
   .pf-ws {
     order: 10;
@@ -672,7 +1079,7 @@ html {
   }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48em) {
   .pf-shell {
     grid-template-columns: var(--pf-sidebar-w) minmax(0, 1fr);
     grid-template-rows: auto 1fr;
@@ -698,14 +1105,322 @@ html {
   }
 }
 
-/* Movimiento reducido (docs/28 §10): sin transiciones ni animaciones. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+/* ---------- Confirmación modal (ConfirmDialog, <dialog> + showModal) ---------- */
+
+.pf-confirm-dialog {
+  width: min(32rem, calc(100vw - 2 * var(--pf-space-4)));
+  max-height: calc(100dvh - 2 * var(--pf-space-4));
+  padding: var(--pf-space-4);
+  border: 1px solid var(--pf-warning-border);
+  border-left-width: 4px;
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-warning-bg);
+  color: var(--pf-warning-fg);
+  box-shadow: var(--pf-shadow-overlay);
+  overflow-wrap: anywhere;
+  /* Mejora progresiva: sin efecto donde el diálogo no desborda (D500). */
+  overscroll-behavior: contain;
+}
+.pf-confirm-dialog[open] {
+  display: grid;
+  gap: var(--pf-space-2);
+}
+.pf-confirm-dialog::backdrop {
+  background: rgb(15 23 42 / 0.5);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* ---------- Resumen de errores de un formulario ---------- */
+
+.pf-error-summary {
+  border: 1px solid var(--pf-error);
+  border-left-width: 4px;
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-raised);
+  padding: var(--pf-space-3) var(--pf-space-4);
+  display: grid;
+  gap: var(--pf-space-2);
+}
+.pf-error-summary-title {
+  font-size: var(--pf-text-base);
+  color: var(--pf-error);
+}
+.pf-error-summary ul {
+  margin: 0;
+  padding-inline-start: var(--pf-space-4);
+}
+
+/* ---------- Pestañas (common/Tabs) ---------- */
+
+.pf-tabs-root {
+  /* Como ítem de una rejilla, sin esto la fila de pestañas ensancharía la página en vez de desplazarse. */
+  min-width: 0;
+}
+.pf-tabs {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  gap: var(--pf-space-1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 1px solid var(--pf-border);
+}
+.pf-tab {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  min-height: 2.75rem;
+  border: 0;
+  border-block-end: 0.1875rem solid transparent;
+  border-radius: var(--pf-radius-sm) var(--pf-radius-sm) 0 0;
+  background: none;
+  color: var(--pf-fg-muted);
+  cursor: pointer;
+}
+/* Mismo peso en todas las pestañas: seleccionar una no cambia el ancho de ninguna. El indicador es un borde. */
+.pf-tab[aria-selected='true'] {
+  color: var(--pf-primary);
+  border-block-end-color: var(--pf-primary);
+}
+
+/* ---------- Región de avisos (add-quick-capture; guía persistent-toast-notifications) ---------- */
+
+/* La región (`role="region"`) no ocupa lugar: solo contiene el respaldo `role="status"` y el grupo de avisos. */
+.pf-notices {
+  margin: 0;
+}
+/* Grupo de avisos: `popover="manual"` los pasa a la capa superior; sin soporte se ven igual, fijos abajo. */
+.pf-notices-list {
+  position: fixed;
+  inset: auto var(--pf-space-4) var(--pf-space-4) var(--pf-space-4);
+  z-index: 40;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+  width: auto;
+  max-height: none;
+  display: grid;
+  gap: var(--pf-space-2);
+}
+@media (min-width: 40rem) {
+  .pf-notices-list {
+    inset: auto var(--pf-space-4) var(--pf-space-4) auto;
+    width: min(26rem, calc(100vw - 2 * var(--pf-space-4)));
+  }
+}
+.pf-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pf-space-1) var(--pf-space-3);
+  padding: var(--pf-space-2) var(--pf-space-3);
+  background: var(--pf-surface-raised);
+  color: var(--pf-fg);
+  border: 1px solid var(--pf-border-strong);
+  border-inline-start: 0.25rem solid var(--pf-fin-ok);
+  border-radius: var(--pf-radius-md);
+  box-shadow: var(--pf-shadow-overlay);
+}
+.pf-notice[data-tone='info'] {
+  border-inline-start-color: var(--pf-primary);
+}
+.pf-notice[data-tone='warning'] {
+  border-inline-start-color: var(--pf-fin-warning);
+}
+.pf-notice[data-tone='error'] {
+  border-inline-start-color: var(--pf-error);
+}
+.pf-notice-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.pf-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-2);
+}
+/* Botones y enlaces de los avisos con la misma forma y un objetivo táctil de al menos 44 px. */
+.pf-notice-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: var(--pf-space-1) var(--pf-space-3);
+  font: inherit;
+  font-weight: 500;
+  color: var(--pf-primary);
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-control-border);
+  border-radius: var(--pf-radius-md);
+  text-decoration: none;
+  cursor: pointer;
+}
+.pf-notice-action:hover:not([aria-disabled='true']) {
+  background: var(--pf-primary-soft);
+  color: var(--pf-primary-hover);
+}
+.pf-notice-action[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Con avisos visibles, el contenido deja espacio abajo para que no tapen el formulario ni el botón de enviar. */
+.pf-shell:has(.pf-notice) .pf-main {
+  padding-bottom: 15rem;
+  scroll-padding-bottom: 15rem;
+}
+
+/* Acceso «＋ Registrar» de la barra superior (add-quick-capture, decisión 5): enlace con forma de botón principal. */
+.pf-quick-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pf-space-1);
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  font-weight: 600;
+  color: var(--pf-primary-fg);
+  background: var(--pf-primary);
+  border: 1px solid var(--pf-primary);
+  border-radius: var(--pf-radius-md);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pf-quick-add:hover {
+  background: var(--pf-primary-hover);
+  border-color: var(--pf-primary-hover);
+  color: var(--pf-primary-fg);
+}
+/* En pantallas angostas solo se ve el «＋»; el nombre accesible «Registrar» queda para lectores de pantalla. */
+.pf-quick-add-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (min-width: 40em) {
+  .pf-quick-add-label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+  }
+}
+
+/* Envío secundario (p. ej. «Registrar e ir al detalle»): mismo tamaño que el principal, sin relleno. */
+.pf-button-secondary {
+  background: var(--pf-bg);
+  border-color: var(--pf-control-border);
+  color: var(--pf-fg);
+}
+.pf-button-secondary:hover:not(:disabled) {
+  background: var(--pf-surface-sunken);
+  border-color: var(--pf-control-border);
+}
+
+/* ---------- Diagrama de recorrido (LifecycleDiagram): colores por tokens --pf-chart-* ---------- */
+.pf-lc-arrow--on {
+  fill: var(--pf-chart-on);
+}
+.pf-lc-arrow--off {
+  fill: var(--pf-chart-off);
+}
+.pf-lc-start {
+  fill: var(--pf-fg);
+}
+.pf-lc-edge--on {
+  stroke: var(--pf-chart-on);
+}
+.pf-lc-edge--off {
+  stroke: var(--pf-chart-off);
+}
+.pf-lc-edge-label--on {
+  fill: var(--pf-chart-on-strong);
+}
+.pf-lc-edge-label--off {
+  fill: var(--pf-fg-muted);
+}
+.pf-lc-pill {
+  fill: var(--pf-chart-on);
+  stroke: var(--pf-bg);
+}
+.pf-lc-pill-text,
+.pf-lc-node-text--current {
+  fill: var(--pf-chart-on-fg);
+}
+.pf-lc-node--current {
+  fill: var(--pf-chart-on);
+  stroke: var(--pf-chart-on-strong);
+}
+.pf-lc-node--visited {
+  fill: var(--pf-chart-visited);
+  stroke: var(--pf-chart-on);
+}
+.pf-lc-node--off {
+  fill: var(--pf-surface);
+  stroke: var(--pf-chart-off);
+}
+.pf-lc-node-inner--current {
+  stroke: var(--pf-chart-on-fg);
+}
+.pf-lc-node-inner--visited {
+  stroke: var(--pf-chart-on);
+}
+.pf-lc-node-inner--off {
+  stroke: var(--pf-chart-off);
+}
+.pf-lc-node-text--visited {
+  fill: var(--pf-chart-on-strong);
+}
+.pf-lc-node-text--off {
+  fill: var(--pf-fg-muted);
+}
+
+/* Impresión de tablas (refine-data-tables): completas, sin alto máximo ni desplazamiento propio, con la cabecera
+   repetida en cada página. La barra inferior y la lateral no se imprimen. */
+@media print {
+  .pf-table-wrap,
+  .pf-table-wrap--tall {
+    max-block-size: none;
+    overflow: visible;
+    mask: none;
+    animation: none;
+  }
+  .pf-table-wrap--tall > table > thead > tr > th,
+  .pf-table--idcol > tbody > tr > th[scope='row'],
+  .pf-table--idcol > thead > tr > th:first-child {
+    position: static;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  .pf-sort-icon {
+    display: none;
+  }
+  /* Navegación del marco: no se imprime (sin la barra inferior, que llega con el change 80). */
+  .pf-topbar,
+  .pf-sidenav,
+  .pf-skip {
+    display: none;
   }
 }

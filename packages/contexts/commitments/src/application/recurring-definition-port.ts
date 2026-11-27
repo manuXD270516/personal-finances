@@ -593,7 +593,7 @@ export class EngineRecurringDefinitionPort implements RecurringDefinitionPort {
           );
         }
         if (!occ.unresolved) return;
-        occ.edit({ expected: spec }, { byManager: true });
+        occ.edit({ expected: spec }, { byManager: true, basis: input.expectation.basis ?? null });
       } else {
         spec = buildAmountSpec({ type: 'FIXED', amount: input.amount }, currency, '/amount');
         occ.edit({ expected: spec });
@@ -669,6 +669,7 @@ export class EngineRecurringDefinitionPort implements RecurringDefinitionPort {
             expected: { ...expectedOf(o), currency: s.currency },
             transactionId: s.transactionId,
             editedByUser: s.amountOverridden,
+            expectedBasis: s.expectedBasis,
             skipReason: s.skipReason,
           };
         });

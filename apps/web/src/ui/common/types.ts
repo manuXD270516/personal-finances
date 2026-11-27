@@ -295,6 +295,10 @@ export interface Transaction {
   readonly conversion?: ConversionDetail | null;
   /** Préstamo que administra la transacción (`LOAN_DISBURSEMENT` / `LOAN_PAYMENT`, add-loans). */
   readonly loanId?: string | null;
+  /** Rol de DEBT sobre un gasto (`CARD_CHARGE`: interés y cargos de una tarjeta, administrado por la tarjeta). */
+  readonly debtRole?: 'CARD_CHARGE' | null;
+  /** Tarjeta que administra el gasto cuando hay `debtRole`. */
+  readonly debtCardId?: string | null;
   /** Desglose de un `LOAN_PAYMENT`: el principal reduce la deuda; el resto es gasto. */
   readonly loanPaymentBreakdown?: {
     readonly principal: Money;
@@ -324,6 +328,8 @@ export interface Category {
   readonly icon?: string | null;
   readonly sortOrder: number;
   readonly archivedAt?: string | null;
+  /** Destino de la fusión: una fusionada queda archivada para siempre (no se desarchiva). */
+  readonly mergedInto?: { readonly id: string; readonly name: string } | null;
   readonly version: number;
 }
 
@@ -351,6 +357,7 @@ export interface Counterparty {
   readonly defaultCategoryId?: string | null;
   readonly aliases?: readonly string[];
   readonly archivedAt?: string | null;
+  readonly mergedInto?: { readonly id: string; readonly name: string } | null;
   readonly version: number;
 }
 

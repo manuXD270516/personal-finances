@@ -278,6 +278,9 @@ export interface DebtsReport {
       readonly principalPaid: Money | null;
       readonly interestPaid: Money | null;
       readonly chargesPaid: Money | null;
+      /** Interés y demás cargos registrados en la tarjeta en el mes; `null` en préstamos. */
+      readonly interestCharged: Money | null;
+      readonly chargesCharged: Money | null;
     }[];
   }[];
   readonly consolidated: readonly {
@@ -285,6 +288,7 @@ export interface DebtsReport {
     readonly outstanding: ReportAmount;
     readonly principalPaid: ReportAmount;
     readonly interestPaid: ReportAmount;
+    readonly interestCharged: ReportAmount;
   }[];
 }
 export interface RecurringCostsReport {

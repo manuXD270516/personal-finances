@@ -124,6 +124,8 @@ export interface NominalFlowRowDto {
     readonly transactionKind: string;
     readonly portionRole: 'NOMINAL' | 'FEE';
     readonly loanComponent?: 'INTEREST' | 'CHARGES' | 'INSURANCE' | 'TAXES' | null;
+    /** Rol de DEBT de la transacción (`CARD_CHARGE`: interés y cargos de una tarjeta); `null` si no lo tiene. */
+    readonly debtRole?: 'CARD_CHARGE' | null;
   };
 }
 
@@ -797,6 +799,71 @@ export interface LoanTransactionsPort {
 
 export const LOAN_TRANSACTIONS_PORT = Symbol.for('pf.transactions.LoanTransactionsPort');
 
+// ───────────────────────────────────────────── add-card-interest-ledger-portions (DEBT → TRANSACTIONS)
+
+/** `externalRef` de un cargo registrado: el id del cargo (`debt.card_charge`). */
+export const CARD_CHARGE_NAMESPACE = 'debt.card-charge' as const;
+
+/** Componentes de un cargo de tarjeta: decimales a la escala de la moneda de la cuenta; al menos uno positivo. */
+export interface CardChargeAmountsDto {
+  readonly interest: string;
+  readonly fees: string;
+  readonly insurance: string;
+  readonly taxes: string;
+}
+
+/**
+ * Puerto de escritura de DEBT sobre TRANSACTIONS para los cargos de tarjeta (openspec
+ * add-card-interest-ledger-portions, decisiones 4 y 5). Corre en la unidad de trabajo del llamador (transacción,
+ * asiento, auditoría y outbox de TRANSACTIONS se confirman junto con el cargo de DEBT). Los errores de dominio
+ * (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`, `CURRENCY_MISMATCH`, `CARD_CHARGE_INVALID`…) se propagan sin traducir.
+ */
+export interface CardChargeTransactionsPort {
+  /**
+   * Gasto `EXPENSE` POSTED `source = DEBT` en `accountId` por la suma de los componentes, con una porción por cada
+   * componente positivo en su categoría de sistema (`INTEREST`, `FEES`, `INSURANCE`, `TAXES`) y `debtRole = CARD_CHARGE`.
+   * `externalRef = {debt.card-charge, chargeId}`; idempotente por esa referencia.
+   */
+  recordCharge(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly chargeId: string;
+    readonly cardId: string;
+    readonly accountId: string;
+    readonly businessDate: string;
+    readonly currency: string;
+    readonly amounts: CardChargeAmountsDto;
+    readonly description: string;
+  }): Promise<{ readonly transactionId: string; readonly businessDate: string }>;
+  /**
+   * Adopta un gasto posteado de una de `cardAccountIds` como cargo: una revisión que reemplaza sus porciones por una
+   * por componente y fija `debtRole`. Sin transacción nueva ni cambio de saldo. Rechaza con `CARD_CHARGE_INVALID`
+   * lo que no es un gasto posteado de esas cuentas, ya es un cargo, lo administra otro contexto o no suma.
+   */
+  adoptCharge(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly cardId: string;
+    readonly cardAccountIds: readonly string[];
+    readonly transactionId: string;
+    readonly amounts: CardChargeAmountsDto;
+  }): Promise<{
+    readonly transactionId: string;
+    readonly accountId: string;
+    readonly businessDate: string;
+    readonly currency: string;
+  }>;
+  /** Anula la transacción del cargo (reversa del asiento); idempotente si ya está anulada. */
+  voidCharge(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly transactionId: string;
+    readonly reason: string;
+  }): Promise<void>;
+}
+
+export const CARD_CHARGE_TRANSACTIONS_PORT = Symbol.for('pf.transactions.CardChargeTransactionsPort');
+
 // ───────────────────────────────────────────── add-savings-goals (GOALS)
 
 /** `externalRef` de las transferencias creadas por una meta: el id del movimiento de la meta (`goals.goal_movement`). */
@@ -1066,6 +1133,9 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     revision: 'plain',
     journalEntryId: 'plain',
     bulkOperationId: 'plain',
+    // Fusión de categorías y contrapartes (add-category-and-counterparty-merge): dato que cambió y operación.
+    categoryId: 'plain',
+    mergeOperationId: 'plain',
     // Conciliación (add-reconciliation, docs/33 D74): modo (`STATEMENT` | `WITHOUT_STATEMENT`) y sesión del ajuste.
     reconciliationMode: 'plain',
     reconciliationId: 'plain',
@@ -1085,6 +1155,9 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     // Préstamos (add-loans): préstamo que administra la transacción y principal del pago.
     loanId: 'plain',
     principal: 'money',
+    // Cargos de tarjeta (add-card-interest-ledger-portions): rol de DEBT y tarjeta que administra la transacción.
+    debtRole: 'plain',
+    debtCardId: 'plain',
     // Custom fields de los splits (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
     'customFields.*': 'plain',
     // Origen de la clasificación y marca de revisión (add-rule-engine): `ruleRefs` viaja como texto JSON.
@@ -1133,3 +1206,53 @@ export interface TransactionExistenceQuery {
   existingTransactions(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
   existingConversions(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
 }
+
+// ───────────────────────────────────────────── add-spending-anomaly-detection (FORECAST)
+
+/**
+ * Porción de gasto con lo que la detección de gastos atípicos necesita (add-spending-anomaly-detection, decisión 2):
+ * el gasto (`EXPENSE`, nunca un reembolso ni una comisión), su versión, su contraparte y su categoría. Una transacción
+ * con varias porciones devuelve una línea por porción, todas con el mismo `transactionId` y `version`.
+ */
+export interface ExpenseLineDto {
+  readonly transactionId: string;
+  /** Versión de la transacción (control optimista de la aplicación). */
+  readonly version: number;
+  /** Fecha de negocio `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly status: 'POSTED' | 'CLEARED' | 'RECONCILED';
+  readonly accountId: string;
+  /** Contraparte de la transacción, o `null`. */
+  readonly counterpartyId: string | null;
+  readonly categoryId: string;
+  /** Posición de la porción dentro de la transacción (desde 0). */
+  readonly splitIndex: number;
+  /** Monto de la porción en su moneda, a la escala canónica. */
+  readonly amount: FlowMoneyDto;
+  /** Contexto que administra la transacción (`DEBT`, `GOAL`), o `null`. */
+  readonly managedBy: 'DEBT' | 'GOAL' | null;
+  /** Rol de DEBT de la transacción (`CARD_CHARGE`: interés y cargos de una tarjeta), o `null`. */
+  readonly debtRole: 'CARD_CHARGE' | null;
+}
+
+/**
+ * Líneas de gasto para FORECAST. Sin efectos; en la unidad de trabajo del llamador si existe. `listExpenseLines` recorre
+ * por keyset `(fecha, id)` de la transacción (`limit` transacciones por página, hasta 5 000) solo los `EXPENSE` no anulados
+ * en estado `POSTED`, `CLEARED` o `RECONCILED`; `after` es el cursor opaco de la página anterior. `transactionStates`
+ * devuelve el estado y la versión actuales por id (las inexistentes no figuran; una anulada figura como `VOIDED`).
+ */
+export interface ExpenseLineQuery {
+  listExpenseLines(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+    readonly limit: number;
+    readonly after?: string;
+  }): Promise<{ readonly items: readonly ExpenseLineDto[]; readonly next: string | null }>;
+  transactionStates(input: {
+    readonly workspaceId: string;
+    readonly transactionIds: readonly string[];
+  }): Promise<readonly { readonly transactionId: string; readonly version: number; readonly status: string }[]>;
+}
+
+export const EXPENSE_LINE_QUERY = Symbol.for('pf.transactions.ExpenseLineQuery');

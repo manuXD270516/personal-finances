@@ -889,7 +889,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 | FEAT-12.4 Cierre de mes | Must | planning/month-closing | **US-118** Checklist previo al cierre (pendientes, sin reconciliar, duplicados, uncategorized). **US-119** Cerrar mes generando snapshot inmutable y reporte de cierre. **US-120** Bloqueo de registros en meses cerrados (`PERIOD_CLOSED`, INV-015, TC-LEDGER-PERIOD-001). **US-121** (Should) Reporte de cierre con MoM. |
 | FEAT-12.5 Reconciliación completa | Must | transactions/reconciliation | **US-122** Sesión de reconciliación por cuenta con saldo de extracto y ajuste auditado si hay diferencia. **US-123** Des-reconciliar con motivo. |
 | FEAT-12.6 Edición masiva | Should | transactions/bulk-edit | **US-124** Cambiar categoría/tags/payee/estado de una selección con preview y audit por transacción. |
-| FEAT-12.7 Custom fields y merges | Should/Could | classification/custom-fields, classification/categories | **US-125** (Should) Definir custom fields y usarlos en transacciones. **US-126** (Could) Fusionar categorías. **US-127** (Could) Fusionar counterparties. |
+| FEAT-12.7 Custom fields y merges | Should/Could | classification/custom-fields, classification/categories | **US-125** (Should) Definir custom fields y usarlos en transacciones. **US-126** (Could) Fusionar categorías. **US-127** (Could) Fusionar counterparties. *US-126 y US-127: implementadas en Phase 9 (change 76 `add-category-and-counterparty-merge`, TC-CLASSIFICATION-MERGE-001..030).* |
 | FEAT-12.8 Export y evolución patrimonial | Must/Should | identity/workspace-membership, reporting/net-worth | **US-128** (Must) Exportar todo mi workspace en JSON/CSV. **US-129** (Should) Ver la evolución mensual de mi net worth. **US-130** (Should) Consultar el audit global con filtros. |
 
 ## EPIC-13 — Notificaciones (Phase 2, crece hasta 7)
@@ -981,9 +981,9 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 
 | Feature | Prioridad | Capability (a proponer) | Historias |
 |---------|-----------|------------|-----------|
-| FEAT-26.1 Detección de anomalías | Should | forecast/anomaly-detection | **US-246** Ver gastos atípicos por categoría/merchant con razones. **US-247** Alertar cargos duplicados o cambios de precio no anunciados. |
-| FEAT-26.2 Clasificación automática | Should | classification/auto-classification | **US-248** Recibir sugerencia de categoría con nivel de confianza, aceptarla o corregirla (las reglas explícitas tienen prioridad). |
-| FEAT-26.3 Insights predictivos | Should | reporting/predictive-insights | **US-249** Aviso temprano de riesgo de exceder un presupuesto antes de fin de mes. **US-250** Aviso de metas en riesgo y de shortfall proyectado. |
+| FEAT-26.1 Detección de anomalías | Should | forecast/anomaly-detection | **US-246** Ver gastos atípicos por categoría/merchant con razones (**implementada** por `add-spending-anomaly-detection`, change 72). **US-247** Alertar cargos duplicados o cambios de precio no anunciados (**cubierta por otras funciones, D475**: los cambios de precio de suscripciones ya se detectan en COMMITMENTS y los duplicados en la importación; no hay detector nuevo). |
+| FEAT-26.2 Clasificación automática | Should | classification/auto-classification | **US-248** Recibir sugerencia de categoría con nivel de confianza, aceptarla o corregirla (las reglas explícitas tienen prioridad). **Implementada** (2026-11-25, change 73 `add-category-suggestions`; falta el criterio de salida con los datos del owner, D477). |
+| FEAT-26.3 Insights predictivos | Should | reporting/predictive-insights | **US-249** Aviso temprano de riesgo de exceder un presupuesto antes de fin de mes. (**implementada** por `add-budget-overrun-risk`, change 74). **US-250** Aviso de metas en riesgo y de shortfall proyectado. |
 | FEAT-26.4 Automatizaciones avanzadas | Could | rules/automation-workflows | **US-251** (Could) Encadenar acciones sobre eventos (p. ej. al recibir salario proponer contribución a meta), siempre con confirmación y audit. |
 
 ## EPIC-24 — Producción y hardening (Hito H, paralelo a Phases 8–9)

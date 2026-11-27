@@ -11,7 +11,17 @@ import {
 import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
 import type { AccountsRuntime } from '@pf/accounts/interface/accounts.module';
 import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
-import { CLASSIFICATION_AUDIT_POLICY, type CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import {
+  CLASSIFICATION_AUDIT_POLICY,
+  type ClassificationMergeParticipant,
+  type CounterpartyCatalogQuery,
+} from '@pf/classification/contracts';
+import { createClassificationMergeParticipant as commitmentsMergeParticipant } from '@pf/commitments/interface/commitments.module';
+import { createClassificationMergeParticipant as debtMergeParticipant } from '@pf/debt/interface/debt.module';
+import { createClassificationMergeParticipant as importsMergeParticipant } from '@pf/imports/interface/imports.module';
+import { createClassificationMergeParticipant as planningMergeParticipant } from '@pf/planning/interface/planning.module';
+import { createClassificationMergeParticipant as reportingMergeParticipant } from '@pf/reporting/interface/reporting.module';
+import { createClassificationMergeParticipant as transactionsMergeParticipant } from '@pf/transactions/interface/transactions.module';
 import { COMMITMENTS_AUDIT_POLICY } from '@pf/commitments/contracts';
 import { importsPortsFor, type DocumentsRef } from '../imports/imports-wiring.js';
 import {
@@ -49,6 +59,7 @@ import {
   type ForecastingRuntime,
 } from '@pf/forecasting/interface/forecasting.module';
 import {
+  forecastingAnomalyPorts,
   forecastingMetrics,
   forecastingKnownPorts,
   forecastingReadPorts,
@@ -105,7 +116,7 @@ import {
   type DemoDataOptions,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
-import { NOTIFICATIONS_AUDIT_POLICY } from '@pf/notifications/contracts';
+import { NOTIFICATIONS_AUDIT_POLICY, type NotificationIntakePort } from '@pf/notifications/contracts';
 import {
   createNotificationsApiRuntime,
   NotificationsModule,
@@ -384,6 +395,8 @@ export function financeRuntimes(input: {
       Pick<
         ApiConfig,
         | 'REPORTING_RATE_VALIDITY_WINDOW'
+        | 'REPORTING_BUDGET_RISK_ENABLED'
+        | 'REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS'
         | 'PLANNING_PERIOD_LOOKAHEAD'
         | 'PLANNING_HISTORY_DEFAULT_PERIODS'
         | 'PLANNING_HISTORY_MAX_PERIODS'
@@ -410,6 +423,12 @@ export function financeRuntimes(input: {
         | 'RULES_SUGGEST_HIGH_MIN_SUPPORT'
         | 'RULES_SUGGEST_MAX_EVIDENCE'
         | 'RULES_SUGGEST_MAX_RESULTS'
+        | 'RULES_CATEGORY_SUGGEST_ENABLED'
+        | 'RULES_CATEGORY_SUGGEST_WINDOW_DAYS'
+        | 'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE'
+        | 'RULES_CATEGORY_SUGGEST_MIN_SUPPORT'
+        | 'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE'
+        | 'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS'
         | 'IMPORT_MAX_ROWS'
         | 'IMPORT_PROCESSING_TIMEOUT'
         | 'IMPORT_DUPLICATE_HIGH_SCORE'
@@ -431,6 +450,11 @@ export function financeRuntimes(input: {
   readonly documentsRef?: DocumentsRef;
   /** Conexiones con proveedores (add-banking-providers); sin ellas el módulo queda deshabilitado. */
   readonly banking?: BankingRuntimeOptions;
+  /**
+   * Aviso de gastos atípicos (add-spending-anomaly-detection): solo el worker lo cablea, con el puerto de entrega directa de
+   * NOTIFICATIONS; la API nunca ejecuta la detección.
+   */
+  readonly notificationIntake?: Pick<NotificationIntakePort, 'notify'>;
 }) {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
   // IDENTITY según el actor: la API lee el workspace con la membresía del usuario de la petición; el job y los
@@ -472,6 +496,10 @@ export function financeRuntimes(input: {
     rules?: RulesRuntime;
     forecasting?: ForecastingRuntime;
   } = {};
+  // Fusión de categorías y contrapartes (add-category-and-counterparty-merge): CLASSIFICATION define el puerto y cada
+  // contexto dueño de una referencia lo implementa. La lista se llena (en orden fijo) cuando todos están compuestos; los
+  // periodos cerrados se leen del catálogo público de PLANNING (referencia diferida, como `categoryUsage`).
+  const mergeParticipants: ClassificationMergeParticipant[] = [];
   const classification = createClassificationRuntime({
     pool: input.pool,
     clock: input.clock,
@@ -483,6 +511,13 @@ export function financeRuntimes(input: {
     lastCategoryUsed: {
       lastCategoryUsed: (query) => deferred.categoryUsage?.lastCategoryUsed(query) ?? Promise.resolve(null),
     },
+    closedPeriods: {
+      closedRanges: async (workspaceId) =>
+        (
+          await (deferred.periods?.listPeriods({ workspaceId, statuses: ['CLOSED'] }) ?? Promise.resolve([]))
+        ).map((p) => ({ from: p.periodStart, to: p.periodEnd })),
+    },
+    mergeParticipants,
   });
   // FX (add-manual-conversions): catálogo, tasas manuales y pricing de conversiones; moneda de reporte de IDENTITY.
   const fx = createFxRuntime({
@@ -560,6 +595,7 @@ export function financeRuntimes(input: {
   deferred.categoryUsage = transactions.categoryUsage;
   // RULES (add-rule-engine): reglas de clasificación. Solo contratos públicos de CLASSIFICATION y TRANSACTIONS; sin
   // consumidores de eventos ni colas nuevas (D249, presupuesto de conexiones).
+  const rulesCounters = otelCounters('@pf/rules');
   const rules = createRulesRuntime({
     pool: input.pool,
     clock: input.clock,
@@ -572,6 +608,8 @@ export function financeRuntimes(input: {
     coverage: transactions.classificationCoverage,
     calendar: workspaceCalendar(input.pool, input.clock, input.config.APP_TIMEZONE),
     settings: rulesSettingsFrom(input.config),
+    metrics: rulesCounters,
+    categoryMerge: classification.categoryMerge,
   });
   deferred.rules = rules;
   // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
@@ -692,6 +730,33 @@ export function financeRuntimes(input: {
       getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
     },
     reconciliationMarks: transactions.reconciliationMarks,
+    // add-budget-overrun-risk: riesgo de exceder cada línea del plan. PLANNING y COMMITMENTS se componen después de
+    // REPORTING (resolución tardía); el pronóstico sale de `forecast` (deshabilitado = solo el ritmo del periodo).
+    budgetRisk: {
+      enabled: input.config.REPORTING_BUDGET_RISK_ENABLED ?? true,
+      minElapsedDays: input.config.REPORTING_BUDGET_RISK_MIN_ELAPSED_DAYS ?? 7,
+      budgets: {
+        getForPeriod: async (query) => {
+          const plan = await deferred.budgetVsActual?.getForPeriod(query);
+          return plan
+            ? {
+                budgetId: plan.budgetId,
+                currency: plan.currency,
+                lines: plan.lines.map((l) => ({
+                  budgetLineId: l.budgetLineId,
+                  target: l.target,
+                  nature: l.nature,
+                  kind: l.kind,
+                  reference: l.reference,
+                  actual: l.actual,
+                  actualComplete: l.actualComplete,
+                })),
+              }
+            : null;
+        },
+      },
+      listResolved: (query) => deferred.commitments?.resolved.listResolved(query) ?? Promise.resolve([]),
+    },
     // add-cash-flow-forecast: cada cambio de los ajustes del disponible se audita con los valores anterior y nuevo.
     settingsAudit: {
       updated: async (entry) => {
@@ -858,6 +923,7 @@ export function financeRuntimes(input: {
     accountCatalog: accounts.catalog,
     balanceHistory: ledger.accountBalanceHistory,
     movements: transactions.movements,
+    cardCharges: transactions.cardCharges,
     openingEntries: ledger.openingEntries,
     pending: transactions.pending,
     links: transactions.links,
@@ -865,6 +931,7 @@ export function financeRuntimes(input: {
     recurringQuery: commitments.recurringDefinitionQuery,
     rates: fx.valuation,
     rateValidityWindowDays,
+    counters: otelCounters('@pf/debt'),
   });
   deferred.cards = cards;
   // DEBT (add-debt-summary): resumen de deudas de solo lectura sobre `LoanPortfolioQuery` y `CardPortfolioQuery` del
@@ -911,6 +978,8 @@ export function financeRuntimes(input: {
     lifecycle: input.lifecycle,
     lifecycleQuery: input.lifecycleQuery,
     outbox: classificationOutbox(writer),
+    // D496: la historia de una categoría fusionada cuenta como la de su destino en las series y los gastos atípicos.
+    categoryMerge: classification.categoryMerge,
     workspaces: identityActiveWorkspaces(input.pool),
     ...forecastingReadPorts({
       calendar: actorCalendar,
@@ -928,6 +997,14 @@ export function financeRuntimes(input: {
     service: forecastingServiceClient(input.config),
     settings: forecastingSettingsFrom(input.config, rateValidityWindowDays),
     metrics: forecastingMetrics(),
+    // Gastos atípicos (add-spending-anomaly-detection): líneas de gasto de TRANSACTIONS y ocurrencias resueltas de COMMITMENTS.
+    anomalies: forecastingAnomalyPorts({
+      expenseLines: transactions.expenseLines,
+      resolved: commitments.queries,
+      config: input.config,
+      rateValidityWindowDays,
+      ...(input.notificationIntake ? { intake: input.notificationIntake } : {}),
+    }),
   });
   deferred.forecasting = forecasting;
   // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.
@@ -953,12 +1030,26 @@ export function financeRuntimes(input: {
       commitments,
       classification: classification.validator,
       rules: rules.evaluation,
+      categorySuggestions: rules.suggestionQuery,
+      suggestionFeedback: rules.suggestionFeedback,
+      counters: rulesCounters,
       accountCatalog: accounts.catalog,
     }),
     settings: importsSettingsFrom(input.config),
     ...(input.banking ? { banking: input.banking } : {}),
     systemCategories: feesCategoryPort(classification.queries),
   });
+  // Orden fijo de la fusión: TRANSACTIONS, PLANNING, COMMITMENTS, RULES, REPORTING, DEBT e IMPORTS. Se aplican de a uno,
+  // nunca en paralelo sobre el mismo cliente; la lista cerrada la verifica un test de arquitectura.
+  mergeParticipants.push(
+    transactionsMergeParticipant(input.lifecycle),
+    planningMergeParticipant(),
+    commitmentsMergeParticipant(),
+    rules.mergeParticipant,
+    reportingMergeParticipant(),
+    debtMergeParticipant(),
+    importsMergeParticipant(),
+  );
   return {
     classification,
     fx,
@@ -1289,6 +1380,12 @@ export function rulesSettingsFrom(
       | 'RULES_SUGGEST_HIGH_MIN_SUPPORT'
       | 'RULES_SUGGEST_MAX_EVIDENCE'
       | 'RULES_SUGGEST_MAX_RESULTS'
+      | 'RULES_CATEGORY_SUGGEST_ENABLED'
+      | 'RULES_CATEGORY_SUGGEST_WINDOW_DAYS'
+      | 'RULES_CATEGORY_SUGGEST_MAX_EVIDENCE'
+      | 'RULES_CATEGORY_SUGGEST_MIN_SUPPORT'
+      | 'RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE'
+      | 'RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS'
     >
   >,
 ) {
@@ -1314,6 +1411,26 @@ export function rulesSettingsFrom(
         : {}),
       ...(config.RULES_SUGGEST_MAX_EVIDENCE ? { maxEvidence: config.RULES_SUGGEST_MAX_EVIDENCE } : {}),
       ...(config.RULES_SUGGEST_MAX_RESULTS ? { maxResults: config.RULES_SUGGEST_MAX_RESULTS } : {}),
+    },
+    categorySuggest: {
+      ...(config.RULES_CATEGORY_SUGGEST_ENABLED !== undefined
+        ? { enabled: config.RULES_CATEGORY_SUGGEST_ENABLED }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_WINDOW_DAYS
+        ? { windowDays: config.RULES_CATEGORY_SUGGEST_WINDOW_DAYS }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_MAX_EVIDENCE
+        ? { maxEvidence: config.RULES_CATEGORY_SUGGEST_MAX_EVIDENCE }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_MIN_SUPPORT
+        ? { minSupport: config.RULES_CATEGORY_SUGGEST_MIN_SUPPORT }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE
+        ? { minConfidence: config.RULES_CATEGORY_SUGGEST_MIN_CONFIDENCE }
+        : {}),
+      ...(config.RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS
+        ? { cacheTtlSeconds: config.RULES_CATEGORY_SUGGEST_CACHE_TTL_SECONDS }
+        : {}),
     },
   };
 }

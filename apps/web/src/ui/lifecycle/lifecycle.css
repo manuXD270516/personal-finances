@@ -1,0 +1,12 @@
+/* Muestra la orientación horizontal o la vertical (bajo 768 px) del diagrama; ambas son layouts fijos. */
+.pf-lifecycle-v {
+  display: none;
+}
+@media (width < 48em) {
+  .pf-lifecycle-h {
+    display: none;
+  }
+  .pf-lifecycle-v {
+    display: block;
+  }
+}

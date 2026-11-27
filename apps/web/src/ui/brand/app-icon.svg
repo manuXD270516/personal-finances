@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    PROVISIONAL: marcador neutro sin significado de marca. El diseño definitivo espera al owner (pregunta 1 de
+    docs/85; tareas 5.2 y 5.3 de add-pwa-install). Fondo a sangre (sirve para el ícono adaptable) y motivo dentro de la
+    zona segura (círculo central del 80 % del lado, radio 204,8). Blanco sobre #1d4ed8: contraste 6,7:1.
+  -->
+  <rect width="512" height="512" fill="#1d4ed8"/>
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#ffffff" stroke-width="40"/>
+  <circle cx="256" cy="256" r="52" fill="#ffffff"/>
+</svg>

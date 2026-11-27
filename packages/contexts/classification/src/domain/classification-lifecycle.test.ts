@@ -27,10 +27,10 @@ const group = () => CategoryGroup.create({ id: id(), workspaceId: WS, kind: 'EXP
 type Step = StateTransition<ClassificationStatus, ClassificationTransition>;
 
 describe('Máquinas Category y Counterparty (docs/31 D52, tarea 9.1)', () => {
-  it('[TC-AUDIT-LIFECYCLE-014] ACTIVE/ARCHIVED sin terminales; CREATE, ARCHIVE y UNARCHIVE con guarda; sin MERGE', () => {
+  it('[TC-AUDIT-LIFECYCLE-014] ACTIVE/ARCHIVED sin terminales; CREATE, ARCHIVE, UNARCHIVE y MERGE (v2) con guarda', () => {
     for (const machine of [CATEGORY_LIFECYCLE, COUNTERPARTY_LIFECYCLE]) {
       const d = machine.definition;
-      expect(d.machineVersion).toBe(1);
+      expect(d.machineVersion).toBe(2);
       expect(d.states).toEqual([
         { code: 'ACTIVE', terminal: false },
         { code: 'ARCHIVED', terminal: false },
@@ -39,9 +39,9 @@ describe('Máquinas Category y Counterparty (docs/31 D52, tarea 9.1)', () => {
         ['CREATE', [], ['ACTIVE']],
         ['ARCHIVE', ['ACTIVE'], ['ARCHIVED']],
         ['UNARCHIVE', ['ARCHIVED'], ['ACTIVE']],
+        ['MERGE', ['ACTIVE', 'ARCHIVED'], ['ARCHIVED']],
       ]);
       expect(d.transitions.every((t) => t.guard.length > 0)).toBe(true);
-      expect(d.transitions.some((t) => t.code === ('MERGE' as string))).toBe(false);
       expect(codeOf(() => machine.transition('ARCHIVE', 'ARCHIVED'))).toBe('INVALID_STATUS_TRANSITION');
       expect(codeOf(() => machine.transition('UNARCHIVE', 'ACTIVE'))).toBe('INVALID_STATUS_TRANSITION');
       expect(codeOf(() => machine.transition('CREATE', 'ACTIVE'))).toBe('INVALID_STATUS_TRANSITION');
@@ -49,7 +49,9 @@ describe('Máquinas Category y Counterparty (docs/31 D52, tarea 9.1)', () => {
     expect(CATEGORY_LIFECYCLE.definition.transitions.find((t) => t.code === 'ARCHIVE')?.events).toEqual([
       'classification.CategoryArchived.v1',
     ]);
-    expect(COUNTERPARTY_LIFECYCLE.definition.transitions.flatMap((t) => t.events)).toEqual([]);
+    expect(COUNTERPARTY_LIFECYCLE.definition.transitions.flatMap((t) => t.events)).toEqual([
+      'classification.CounterpartiesMerged.v1',
+    ]);
   });
 
   it('[TC-AUDIT-LIFECYCLE-014] los agregados marcan CREATE al crearse y rechazan archivar dos veces o desarchivar una activa', () => {
@@ -82,7 +84,7 @@ describe('Máquinas Category y Counterparty (docs/31 D52, tarea 9.1)', () => {
   });
 
   it('[TC-AUDIT-LIFECYCLE-014] PBT: toda secuencia de comandos deja un recorrido reproducible por la máquina que termina en su estado', () => {
-    const op = fc.constantFrom('archive', 'unarchive', 'rename');
+    const op = fc.constantFrom('archive', 'unarchive', 'rename', 'merge');
     fc.assert(
       fc.property(fc.array(op, { maxLength: 25 }), fc.boolean(), (ops, isCounterparty) => {
         const g = group();
@@ -100,9 +102,15 @@ describe('Máquinas Category y Counterparty (docs/31 D52, tarea 9.1)', () => {
             else if (o === 'unarchive') {
               if (agg instanceof Category) agg.unarchive(g, null);
               else agg.unarchive();
-            } else agg.update({ name: `X${i}` });
+            } else if (o === 'merge') agg.merge(id(), AT);
+            else agg.update({ name: `X${i}` });
           } catch (err) {
-            if (!isDomainError(err) || err.code !== 'INVALID_STATUS_TRANSITION') throw err;
+            if (
+              !isDomainError(err) ||
+              !['INVALID_STATUS_TRANSITION', 'CATEGORY_MERGED', 'COUNTERPARTY_MERGED'].includes(err.code)
+            ) {
+              throw err;
+            }
             rejected = true;
           }
           if (rejected) {

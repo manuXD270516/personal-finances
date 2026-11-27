@@ -15,6 +15,7 @@ import {
   type TransactionStatus,
 } from '../common/types';
 import { auditHref } from '../audit/logic';
+import { useSwapTransition } from '../common/motion';
 import { Field, inputStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
@@ -23,6 +24,7 @@ import { BULK_EDIT_MAX_ITEMS } from './bulk-edit-logic';
 import { BulkEditPanel, type BulkFocus, type BulkTarget } from './BulkEditPanel';
 import { categoryOptions, useCatalogs } from './catalogs';
 import { EMPTY_TRANSACTION_FILTERS, transactionsQuery, type TransactionFilters } from './logic';
+import { useAnomalyMarks } from '../spending-anomalies/AnomalyMarks';
 import { TransactionsListView } from './TransactionsListView';
 
 const KINDS: readonly TransactionKind[] = [
@@ -94,6 +96,10 @@ function Register({
   });
   const [draftQ, setDraftQ] = useState('');
   const [items, setItems] = useState<readonly Transaction[] | undefined>();
+  // Marca de gasto atípico de las filas visibles (add-spending-anomaly-detection, decisión 10): dato accesorio, sin bloquear la lista.
+  const anomalyFormat = useFormat('SpendingAnomalies', ctx);
+  const itemIds = useMemo(() => (items ?? []).map((i) => i.id), [items]);
+  const anomalyMarks = useAnomalyMarks(ctx, itemIds);
   const [cursor, setCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
@@ -106,6 +112,7 @@ function Register({
   const [shownQuery, setShownQuery] = useState<string | undefined>();
   // Solo la última petición escribe la lista: una respuesta tardía de filtros anteriores se descarta.
   const latest = useRef(0);
+  const swap = useSwapTransition('transactions-filter');
   const customDef = customFields.definitions.find(
     (d) => d.key === filters.customField.key && d.target === 'TRANSACTION' && !d.archivedAt,
   );
@@ -126,16 +133,21 @@ function Register({
         .then((r) => {
           if (seq !== latest.current) return;
           const data = r.data?.data ?? [];
-          setItems((prev) => (append ? [...(prev ?? []), ...data] : data));
-          setCursor(r.data?.page.hasMore ? r.data.page.nextCursor : null);
-          setShownQuery(shown);
-          setProblem(undefined);
+          const apply = () => {
+            setItems((prev) => (append ? [...(prev ?? []), ...data] : data));
+            setCursor(r.data?.page.hasMore ? r.data.page.nextCursor : null);
+            setShownQuery(shown);
+            setProblem(undefined);
+          };
+          // Un filtro nuevo cambia la lista con una transición breve (M-28); «Cargar más» y la primera carga, no.
+          if (append) apply();
+          else swap(apply);
         })
         .catch((err: unknown) => {
           if (seq === latest.current) setProblem(problemOf(err));
         });
     },
-    [ctx.api, ctx.base, ctx.formatLocale, filters, customDef],
+    [ctx.api, ctx.base, ctx.formatLocale, filters, customDef, swap],
   );
 
   useEffect(() => {
@@ -578,6 +590,7 @@ function Register({
           {...(filters.accountId ? { accountId: filters.accountId } : {})}
           selectable={ctx.canEdit}
           customFields={{ definitions: customFields.definitions, cf }}
+          anomalies={{ marks: anomalyMarks, f: anomalyFormat }}
           selected={selected}
           onToggle={(id) =>
             setSelected((prev) => {

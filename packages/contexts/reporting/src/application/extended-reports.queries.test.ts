@@ -1,6 +1,13 @@
 import { dec, DomainError, Instant } from '@pf/shared-kernel';
 import type { ConversionCostRowDto } from '@pf/transactions/contracts';
-import { beforeEach, describe, expect, it } from 'vitest';
+import * as fc from 'fast-check';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  TREND_TOP_SERIES,
+  TrendMatrix,
+  type TrendFact,
+  type TrendSeries,
+} from '../domain/extended-reports.js';
 import { FinancialReportsService } from './financial-reports.exports.js';
 import { InMemoryFinancialReports, type PortionFact } from './testing/in-memory-reports.js';
 
@@ -12,6 +19,8 @@ const CREDITO = '0190a000-0000-7000-8000-0000000000b6';
 const SUPER = '0190a000-0000-7000-8000-0000000000c1';
 const REST = '0190a000-0000-7000-8000-0000000000c3';
 const FEES = '0190a000-0000-7000-8000-0000000000c5';
+const INTERES = '0190a000-0000-7000-8000-0000000000c7';
+const SEGURO = '0190a000-0000-7000-8000-0000000000c8';
 const ALOJA = '0190a000-0000-7000-8000-0000000000c6';
 const GROUP = '0190a000-0000-7000-8000-0000000000d1';
 const VIAJE = '0190a000-0000-7000-8000-0000000000e1';
@@ -69,6 +78,8 @@ function world() {
       cat(REST, 'Restaurantes'),
       cat(ALOJA, 'Alojamiento'),
       cat(FEES, 'Comisiones bancarias', { systemCode: 'FEES' }),
+      cat(INTERES, 'Intereses pagados', { systemCode: 'INTEREST' }),
+      cat(SEGURO, 'Seguros', { systemCode: 'INSURANCE' }),
     ],
     tags: [
       { tagId: VIAJE, name: 'Viaje Cusco', archived: false },
@@ -216,6 +227,166 @@ describe('getTrends (TC-REPORTING-REPORTS-041)', () => {
   });
 });
 
+/**
+ * Oráculo de TC-REPORTING-REPORTS-055: copia LITERAL de `TrendMatrix.build` de `main` 4cdc7689 (la definición funcional
+ * anterior a `fix-trends-report-perf`), solo para este test. El mismo oráculo, con generadores de dominio, vive en
+ * `domain/trend-matrix.equivalence.test.ts`.
+ */
+function oracleTrendBuild(input: Parameters<typeof TrendMatrix.build>[0]): readonly TrendSeries[] {
+  const byAmountThenName = <T extends { amount: { exact: ReturnType<typeof dec> }; name: string }>(
+    items: T[],
+  ) => items.sort((a, b) => b.amount.exact.comparedTo(a.amount.exact) || a.name.localeCompare(b.name, 'es'));
+  const top = new Map(input.categories.map((c) => [c.categoryId, c.topId]));
+  const names = new Map(input.categories.map((c) => [c.categoryId, c.name]));
+  const topOf = (id: string) => top.get(id) ?? id;
+  const topIds = [...new Set(input.facts.map((f) => topOf(f.categoryId)))];
+  const ranked = byAmountThenName(
+    topIds.map((categoryId) => ({
+      categoryId,
+      name: names.get(categoryId) ?? categoryId,
+      amount: input.policy.value(
+        input.facts
+          .filter((f) => topOf(f.categoryId) === categoryId)
+          .map((f) => ({ date: f.date, amount: f.amount })),
+      ),
+    })),
+  );
+  const kept = ranked.slice(0, TREND_TOP_SERIES);
+  const restIds = new Set(ranked.slice(TREND_TOP_SERIES).map((r) => r.categoryId));
+  const cellsOf = (pick: (f: TrendFact) => boolean) =>
+    input.periods.map((period) => ({
+      period,
+      amount: input.policy.value(
+        input.facts
+          .filter((f) => pick(f) && f.date >= period.from && f.date <= period.to)
+          .map((f) => ({ date: f.date, amount: f.amount })),
+        input.perDay ? period.days : undefined,
+      ),
+    }));
+  const totalOf = (pick: (f: TrendFact) => boolean) =>
+    input.policy.value(
+      input.facts.filter(pick).map((f) => ({ date: f.date, amount: f.amount })),
+      input.perDay ? input.periods.reduce((n, p) => n + p.days, 0) : undefined,
+    );
+  const series: TrendSeries[] = kept.map((k) => {
+    const pick = (f: TrendFact) => topOf(f.categoryId) === k.categoryId;
+    return { categoryId: k.categoryId, name: k.name, cells: cellsOf(pick), total: totalOf(pick) };
+  });
+  if (restIds.size > 0) {
+    const pick = (f: TrendFact) => restIds.has(topOf(f.categoryId));
+    series.push({ categoryId: null, name: input.othersName, cells: cellsOf(pick), total: totalOf(pick) });
+  }
+  return series;
+}
+
+describe('getTrends: misma respuesta que la matriz anterior (TC-REPORTING-REPORTS-055)', () => {
+  const CATS = Array.from(
+    { length: 12 },
+    (_, i) => `0190a000-0000-7000-8000-00000000dd${String(i).padStart(2, '0')}`,
+  );
+  const CHILD = '0190a000-0000-7000-8000-00000000ddf1';
+  const money = (cents: number): string => {
+    const abs = Math.abs(cents);
+    return `${cents < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+  };
+
+  const scenarioArb = fc.record({
+    months: fc.constantFrom(6, 12, 24),
+    perDay: fc.boolean(),
+    portions: fc.array(
+      fc.record({
+        offsetDays: fc.integer({ min: 0, max: 24 * 31 }),
+        category: fc.integer({ min: 0, max: 12 }),
+        currency: fc.constantFrom('BOB', 'BOB', 'USD', 'USD', 'EUR'),
+        cents: fc.integer({ min: -2_000, max: 90_000 }),
+      }),
+      { minLength: 0, maxLength: 150, size: 'max' },
+    ),
+    // Tasas USD/BOB y EUR/BOB: algunas presentes (con su día) y otras ausentes.
+    rates: fc.array(
+      fc.record({
+        offsetDays: fc.integer({ min: 0, max: 24 * 31 }),
+        usd: fc.boolean(),
+        value: fc.integer({ min: 600, max: 1_300 }),
+      }),
+      { maxLength: 400, size: 'max' },
+    ),
+  });
+
+  const dayAt = (offsetDays: number): string =>
+    new Date(Date.UTC(2024, 10, 1) + offsetDays * 86_400_000).toISOString().slice(0, 10);
+
+  it('[TC-REPORTING-REPORTS-055] el DTO completo (series, celdas, totales y meta.conversion.ratesUsed en orden) es idéntico al de la matriz anterior', async () => {
+    let withOthers = 0;
+    let withRates = 0;
+    await fc.assert(
+      fc.asyncProperty(scenarioArb, async (s) => {
+        seq = 0;
+        mem = new InMemoryFinancialReports();
+        world();
+        mem.tree = {
+          ...mem.tree,
+          categories: [
+            ...CATS.map((id, i) => ({
+              categoryId: id,
+              name: `Cat ${i % 10}`,
+              kind: 'EXPENSE' as const,
+              groupId: GROUP,
+              parentId: null,
+              systemCode: null,
+              archived: false,
+            })),
+            {
+              categoryId: CHILD,
+              name: 'Hija',
+              kind: 'EXPENSE' as const,
+              groupId: GROUP,
+              parentId: CATS[3] as string,
+              systemCode: null,
+              archived: false,
+            },
+          ],
+        };
+        for (const p of s.portions) {
+          const id = p.category === 12 ? CHILD : (CATS[p.category] as string);
+          portion(dayAt(p.offsetDays), id, { amount: money(p.cents), currency: p.currency });
+        }
+        for (const r of s.rates) {
+          mem.rates.push({
+            base: r.usd ? 'USD' : 'EUR',
+            quote: 'BOB',
+            value: money(r.value),
+            asOf: `${dayAt(r.offsetDays)}T16:00:00Z`,
+          });
+        }
+        // Últimos `months` meses calendario de un horizonte de 24 que termina en 2026-10.
+        const params = {
+          ...base,
+          from: new Date(Date.UTC(2024, 10 + (24 - s.months), 1)).toISOString().slice(0, 10),
+          to: '2026-10-31',
+          grouping: 'CALENDAR_MONTH' as const,
+          ...(s.perDay ? { normalize: 'PER_DAY' as const } : {}),
+        };
+        const actual = await new FinancialReportsService(mem.financialDeps()).getTrends(params);
+        const spy = vi.spyOn(TrendMatrix, 'build').mockImplementation(oracleTrendBuild);
+        let expected;
+        try {
+          expected = await new FinancialReportsService(mem.financialDeps()).getTrends(params);
+        } finally {
+          spy.mockRestore();
+        }
+        expect(actual.report).toEqual(expected.report);
+        if (actual.report.series.some((x) => x.categoryId === null)) withOthers += 1;
+        if (actual.report.meta.conversion.ratesUsed.length > 0) withRates += 1;
+      }),
+      { numRuns: 60, seed: 20_261_125, endOnFailure: false },
+    );
+    // El generador no es vacuo: hay «Otras categorías» y tasas usadas.
+    expect(withOthers).toBeGreaterThan(5);
+    expect(withRates).toBeGreaterThan(5);
+  }, 300_000);
+});
+
 describe('getFees (TC-REPORTING-REPORTS-042)', () => {
   it('[TC-REPORTING-REPORTS-042] octubre: conversión 2.00, transferencia 5.00, préstamos 400.00 y categorías 15.00 = 422.00 BOB', async () => {
     portion('2026-10-03', FEES, bob('2.00'), {
@@ -236,9 +407,41 @@ describe('getFees (TC-REPORTING-REPORTS-042)', () => {
       ['CONVERSION', '2.00'],
       ['TRANSFER', '5.00'],
       ['LOAN', '400.00'],
+      ['CARD', '0.00'],
       ['FEE_CATEGORY', '15.00'],
     ]);
     expect(report.months[0]?.total.consolidated).toEqual(bob('422.00'));
+  });
+
+  it('[TC-REPORTING-REPORTS-058] los cargos de tarjeta de octubre suman 4.80 en tarjetas y entran al total', async () => {
+    portion('2026-10-05', SUPER, bob('320.00'), {
+      origin: { transactionKind: 'LOAN_PAYMENT', portionRole: 'NOMINAL' },
+    });
+    portion('2026-10-05', REST, bob('80.00'), {
+      origin: { transactionKind: 'LOAN_PAYMENT', portionRole: 'NOMINAL' },
+    });
+    portion('2026-10-06', FEES, bob('15.00'));
+    portion('2026-10-25', INTERES, bob('4.00'), {
+      accountId: TARJETA,
+      origin: { transactionKind: 'EXPENSE', portionRole: 'NOMINAL', debtRole: 'CARD_CHARGE' },
+    });
+    portion('2026-10-25', SEGURO, bob('0.80'), {
+      accountId: TARJETA,
+      origin: { transactionKind: 'EXPENSE', portionRole: 'NOMINAL', debtRole: 'CARD_CHARGE' },
+    });
+    const { report } = await q.getFees({ ...base, ...OCT });
+    const byType = Object.fromEntries(
+      (report.months[0]?.byType ?? []).map((b) => [b.type, b.amount.consolidated.amount]),
+    );
+    expect(byType).toMatchObject({ LOAN: '400.00', CARD: '4.80', FEE_CATEGORY: '15.00' });
+    expect(report.months[0]?.total.consolidated).toEqual(bob('419.80'));
+  });
+
+  it('[TC-REPORTING-REPORTS-061] un interés de tarjeta cargado a mano sin adoptar no cuenta como tarjetas', async () => {
+    portion('2026-10-25', INTERES, bob('4.80'), { accountId: TARJETA });
+    const { report } = await q.getFees({ ...base, ...OCT });
+    expect(report.months[0]?.byType.find((b) => b.type === 'CARD')?.amount.consolidated.amount).toBe('0.00');
+    expect(report.months[0]?.total.consolidated).toEqual(bob('0.00'));
   });
 
   it('[TC-REPORTING-REPORTS-042] el total de 12 meses cubre los 12 periodos completos anteriores al actual', async () => {
@@ -383,10 +586,78 @@ describe('getDebts (TC-REPORTING-REPORTS-044)', () => {
       outstanding: bob('500.00'),
       principalPaid: null,
       interestPaid: null,
+      interestCharged: bob('0.00'),
+      chargesCharged: bob('0.00'),
     });
     expect(
       await code(() => q.getDebts({ ...base, from: '2026-10-01', to: '2026-10-31', debtKind: 'X' as never })),
     ).toBe('VALIDATION_FAILED');
+  });
+
+  it('[TC-REPORTING-REPORTS-060] Visa Oro con un cargo de 4.00 de interés y 0.80 de seguro en octubre: lo cargado por mes', async () => {
+    mem.fakes.cards = [
+      { cardId: 'c1', cardName: 'Visa Oro', cardAccountId: 'ca1', accountId: TARJETA, currency: 'BOB' },
+    ];
+    mem.fakes.loans = [{ loanId: 'loan-auto', name: 'Crédito auto', accountId: CREDITO, currency: 'BOB' }];
+    const origin = {
+      transactionKind: 'EXPENSE',
+      portionRole: 'NOMINAL' as const,
+      debtRole: 'CARD_CHARGE' as const,
+    };
+    portion('2026-10-25', INTERES, bob('4.00'), { accountId: TARJETA, origin });
+    portion('2026-10-25', SEGURO, bob('0.80'), { accountId: TARJETA, origin });
+    // Un interés manual sin adoptar y el gasto de otra cuenta no cuentan.
+    portion('2026-10-26', INTERES, bob('9.99'), { accountId: TARJETA });
+    portion('2026-10-26', SUPER, bob('50.00'), { accountId: BANCO });
+    const { report } = await q.getDebts({ ...base, from: '2026-09-01', to: '2026-10-31' });
+    const card = report.debts.find((d) => d.kind === 'CARD')!;
+    expect(card.months.map((m) => [m.interestCharged?.amount, m.chargesCharged?.amount])).toEqual([
+      ['0.00', '0.00'],
+      ['4.00', '0.80'],
+    ]);
+    expect(card.months.map((m) => m.principalPaid)).toEqual([null, null]);
+    expect(report.consolidated.map((c) => c.interestCharged.consolidated.amount)).toEqual(['0.00', '4.00']);
+    const loan = report.debts.find((d) => d.kind === 'LOAN')!;
+    expect(loan.months.map((m) => [m.interestCharged, m.chargesCharged])).toEqual([
+      [null, null],
+      [null, null],
+    ]);
+  });
+
+  it('[TC-REPORTING-REPORTS-063] los cargos del reporte de deudas suman lo mismo que el tipo tarjetas de comisiones, por moneda', async () => {
+    mem.addAccount(
+      { accountId: 'visa-usd', name: 'Visa Oro USD', type: 'CREDIT_CARD', currency: 'USD' },
+      null,
+    );
+    mem.fakes.cards = [
+      { cardId: 'c1', cardName: 'Visa Oro', cardAccountId: 'ca1', accountId: TARJETA, currency: 'BOB' },
+      { cardId: 'c1', cardName: 'Visa Oro', cardAccountId: 'ca2', accountId: 'visa-usd', currency: 'USD' },
+    ];
+    const origin = {
+      transactionKind: 'EXPENSE',
+      portionRole: 'NOMINAL' as const,
+      debtRole: 'CARD_CHARGE' as const,
+    };
+    portion('2026-10-25', INTERES, bob('4.00'), { accountId: TARJETA, origin });
+    portion('2026-10-25', SEGURO, bob('0.80'), { accountId: TARJETA, origin });
+    portion('2026-10-25', INTERES, usd('1.25'), { accountId: 'visa-usd', origin });
+    const debts = (await q.getDebts({ ...base, ...OCT })).report;
+    const fees = (await q.getFees({ ...base, ...OCT })).report;
+    const sumOf = (currency: string) =>
+      debts.debts
+        .filter((d) => d.kind === 'CARD' && d.currency === currency)
+        .flatMap((d) => d.months)
+        .reduce(
+          (a, m) => a.plus(m.interestCharged?.amount ?? '0').plus(m.chargesCharged?.amount ?? '0'),
+          dec('0'),
+        );
+    const cardType = fees.months[0]?.byType.find((b) => b.type === 'CARD')?.amount.byCurrency ?? [];
+    expect(sumOf('BOB').toFixed(2)).toBe('4.80');
+    expect(sumOf('USD').toFixed(2)).toBe('1.25');
+    expect(cardType.map((m) => [m.currency, m.amount]).sort()).toEqual([
+      ['BOB', '4.80'],
+      ['USD', '1.25'],
+    ]);
   });
 });
 

@@ -1,17 +1,15 @@
 import type { ReactNode } from 'react';
 import { formatInstant, formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
+import { InfoTip } from '../common/InfoTip';
 import { badgeStyle, cardStyle, mutedStyle, warningStyle } from '../common/ui';
+import './lifecycle.css';
 import { LifecycleDiagram } from './LifecycleDiagram';
 import { buildDiagramModel, layoutFor, timelineRows, type ActorView, type TimelineRow } from './logic';
 import type { Lifecycle, LifecycleRevision, TransactionLifecycle } from './types';
 
 const hasRevisions = (l: Lifecycle | TransactionLifecycle): l is TransactionLifecycle =>
   Array.isArray((l as TransactionLifecycle).revisions);
-
-/** Muestra la orientación horizontal o la vertical (bajo 768 px) del diagrama; ambas son layouts fijos. */
-const RESPONSIVE_CSS =
-  '.pf-lifecycle-v{display:none}@media (max-width: 767.98px){.pf-lifecycle-h{display:none}.pf-lifecycle-v{display:block}}';
 
 /**
  * Reporte "Recorrido" de un elemento (openspec add-lifecycle-timeline, decisión 11; tareas 6.1 y 6.2): diagrama de su
@@ -105,7 +103,6 @@ export function LifecycleReport({
           {t('incomplete')}
         </p>
       ) : null}
-      <style>{RESPONSIVE_CSS}</style>
       <figure style={{ margin: '0 0 1rem', overflowX: 'auto' }} data-testid="lifecycle-figure">
         {(['horizontal', 'vertical'] as const).map((orientation) => (
           <LifecycleDiagram
@@ -144,9 +141,9 @@ export function LifecycleReport({
             data-order={row.order ?? ''}
             data-derived={String(row.derived)}
             style={{
-              borderLeft: `3px solid ${row.kind === 'TRANSITION' ? '#0969da' : '#d0d7de'}`,
+              borderLeft: `3px solid ${row.kind === 'TRANSITION' ? 'var(--pf-chart-on)' : 'var(--pf-card-border)'}`,
               paddingLeft: '0.75rem',
-              ...(row.kind === 'ANNOTATION' ? { color: '#57606a' } : {}),
+              ...(row.kind === 'ANNOTATION' ? { color: 'var(--pf-fg-muted)' } : {}),
             }}
           >
             <p style={{ margin: 0 }}>
@@ -163,9 +160,12 @@ export function LifecycleReport({
               {row.derived ? (
                 <>
                   {' '}
-                  <span style={badgeStyle} data-testid="lifecycle-derived" title={t('timeline.derivedHint')}>
+                  <span style={badgeStyle} data-testid="lifecycle-derived">
                     {t('timeline.derived')}
                   </span>
+                  <InfoTip label={t('infoTip', { subject: t('timeline.derived') })}>
+                    {t('timeline.derivedHint')}
+                  </InfoTip>
                 </>
               ) : null}
             </p>

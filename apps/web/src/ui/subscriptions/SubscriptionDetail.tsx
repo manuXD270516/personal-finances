@@ -6,7 +6,15 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { AuditHistory, formatDecimal } from '../AuditHistory';
 import { Tabs } from '../common/Tabs';
 import { todayIn } from '../common/dates';
-import { ConfirmPanel, Field, inputStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
+import {
+  ConfirmDialog,
+  ConfirmPanel,
+  Field,
+  inputStyle,
+  mutedStyle,
+  pageStyle,
+  rowStyle,
+} from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
@@ -482,7 +490,7 @@ function CancelPanel({
   const [mode, setMode] = useState<CancelMode>('NOW');
   const [reason, setReason] = useState('');
   return (
-    <ConfirmPanel
+    <ConfirmDialog
       testId="cancel-panel"
       title={f.t('detail.cancelTitle', { name: subscription.name })}
       description={f.t('detail.cancelDescription')}
@@ -539,7 +547,7 @@ function CancelPanel({
           />
         )}
       </Field>
-    </ConfirmPanel>
+    </ConfirmDialog>
   );
 }
 

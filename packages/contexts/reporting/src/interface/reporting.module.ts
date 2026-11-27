@@ -1,6 +1,10 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
-import type { CategoryCatalogQuery, CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import type {
+  CategoryCatalogQuery,
+  ClassificationMergeParticipant,
+  CounterpartyCatalogQuery,
+} from '@pf/classification/contracts';
 import type { FxQuoteSideRatesPort, FxValuationPort } from '@pf/fx/contracts';
 import type {
   AccountBalanceHistoryQuery,
@@ -16,7 +20,13 @@ import type {
   NominalPortionQuery,
 } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
+import { BudgetRiskQueries } from '../application/budget-risk.queries.js';
+import {
+  EvaluateBudgetRiskNotices,
+  type BudgetRiskWatchSummary,
+} from '../application/evaluate-budget-risk-notices.js';
 import { CashFlowCalendarQueries } from '../application/cash-flow-calendar.queries.js';
+import { DEFAULT_BUDGET_RISK_MIN_ELAPSED_DAYS } from '../domain/index.js';
 import { DataVersionProjector } from '../application/data-version-projector.js';
 import { EvaluateShortfallRisk } from '../application/evaluate-shortfall-risk.js';
 import { HomeDigestComposer } from '../application/home-digest.query.js';
@@ -59,6 +69,7 @@ import type {
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
 import { SpendableQueries } from '../application/spendable.queries.js';
+import type { BudgetRiskDeps, BudgetRiskNotifierPort } from '../application/ports/budget-risk.js';
 import type {
   ShortfallNotifierPort,
   ShortfallOutboxPort,
@@ -81,6 +92,7 @@ import {
   PgSpendableSettingsRepository,
   PgShortfallEpisodeRepository,
 } from '../infrastructure/pg-cash-flow.js';
+import { PgBudgetOverrunNoticeRepository } from '../infrastructure/pg-budget-risk.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
 import {
   FINANCIAL_REPORTS,
@@ -88,6 +100,7 @@ import {
   SAVED_REPORT_VIEWS,
 } from './financial-reports-http.js';
 import {
+  BUDGET_RISK_QUERIES,
   CASH_FLOW_QUERIES,
   CONVERSION_COST_QUERIES,
   NET_WORTH_HISTORY_QUERIES,
@@ -181,6 +194,8 @@ export interface ReportingRuntimeOptions {
   readonly reconciliationMarks: ReconciliationMarksPort;
   /** Auditoría de las exportaciones (`reporting.report.exported`); opcional en pruebas. */
   readonly reportAudit?: ReportAuditPort;
+  /** Riesgo de exceder un presupuesto (add-budget-overrun-risk); sin él, el resumen trae `budgetRisk: null` y la consulta responde `DISABLED`. */
+  readonly budgetRisk?: ReportingBudgetRiskOptions;
   /**
    * Reportes ampliados (add-financial-reports-extended): historial de metas (GOALS), pagos de préstamos y cartera de
    * deudas (DEBT), costos recurrentes y eventos de suscripciones (COMMITMENTS). Se componen después de REPORTING, así que
@@ -195,8 +210,22 @@ export interface ReportingRuntimeOptions {
   };
 }
 
+/**
+ * Riesgo de exceder un presupuesto (add-budget-overrun-risk): presupuesto vs real con las líneas completas (PLANNING),
+ * ocurrencias resueltas con categoría (COMMITMENTS) y los ajustes (`REPORTING_BUDGET_RISK_*`). Las ocurrencias pendientes
+ * salen de `commitments.listForCashFlow` y el pronóstico de `forecast`; se componen después de REPORTING (resolución tardía).
+ */
+export interface ReportingBudgetRiskOptions {
+  readonly enabled: boolean;
+  readonly minElapsedDays: number;
+  readonly budgets: BudgetRiskDeps['budgets'];
+  readonly listResolved: BudgetRiskDeps['commitments']['listResolved'];
+}
+
 export interface ReportingRuntime {
   readonly summary: ReportSummaryQueries;
+  /** Riesgo de exceder cada línea del plan (`GET /periods/{periodId}/budget-risk`, add-budget-overrun-risk). */
+  readonly budgetRisk: BudgetRiskQueries;
   /** Evolución del patrimonio por periodo financiero (`GET /reports/net-worth/history`, add-net-worth-evolution). */
   readonly history: NetWorthHistoryQueries;
   /** Análisis de costo de conversiones y su CSV (`GET /reports/conversion-costs[/export]`, add-conversion-cost-analysis). */
@@ -226,6 +255,25 @@ export interface ReportingRuntime {
 /** Composición de REPORTING (solo lectura) sobre PostgreSQL. */
 export function createReportingRuntime(options: ReportingRuntimeOptions): ReportingRuntime {
   const rateValidityWindowDays = options.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
+  const budgetRiskOptions = options.budgetRisk;
+  const budgetRisk = new BudgetRiskQueries({
+    uow: new PgReportingUnitOfWork(options.pool),
+    workspaces: options.workspaces,
+    periods: options.periods,
+    clock: options.clock,
+    rates: options.rates,
+    categories: options.categories,
+    budgets: budgetRiskOptions?.budgets ?? { getForPeriod: async () => null },
+    commitments: {
+      listForCashFlow: (query) => options.commitments.listForCashFlow(query),
+      listResolved: budgetRiskOptions?.listResolved ?? (async () => []),
+    },
+    ...(options.forecast ? { forecast: options.forecast } : {}),
+    enabled: budgetRiskOptions?.enabled ?? false,
+    minElapsedDays: budgetRiskOptions?.minElapsedDays ?? DEFAULT_BUDGET_RISK_MIN_ELAPSED_DAYS,
+    rateValidityWindowDays,
+    ...(options.metrics ? { metrics: options.metrics } : {}),
+  });
   const deps: NetWorthHistoryDeps & UpcomingPaymentsDeps = {
     uow: new PgReportingUnitOfWork(options.pool),
     workspaces: options.workspaces,
@@ -243,6 +291,7 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     commitments: options.commitments,
     pending: options.pending,
     ...(options.forecast ? { forecast: options.forecast } : {}),
+    ...(budgetRiskOptions?.enabled ? { budgetRisk } : {}),
     ...(options.goalSummary ? { goalSummary: options.goalSummary } : {}),
     ...(options.goalFlows ? { goalFlows: options.goalFlows } : {}),
     ...(options.metrics ? { metrics: options.metrics } : {}),
@@ -301,6 +350,7 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
   };
   return {
     rateValidityWindowDays,
+    budgetRisk,
     reports: new FinancialReportsService(reportDeps),
     savedViews: new SavedReportViewsService(reportDeps),
     summary: new ReportSummaryQueries(deps),
@@ -356,6 +406,7 @@ export class ReportingModule {
         { provide: UPCOMING_PAYMENTS_QUERIES, useValue: options.runtime.upcoming },
         { provide: SPENDABLE_QUERIES, useValue: options.runtime.spendable },
         { provide: CASH_FLOW_QUERIES, useValue: options.runtime.cashFlow },
+        { provide: BUDGET_RISK_QUERIES, useValue: options.runtime.budgetRisk },
         { provide: SPENDABLE_SETTINGS_SERVICE, useValue: options.runtime.spendableSettings },
         { provide: CONVERSION_COST_QUERIES, useValue: options.runtime.conversionCosts },
         { provide: FINANCIAL_REPORTS, useValue: options.runtime.reports },
@@ -402,6 +453,36 @@ export function createCashFlowWatch(options: CashFlowWatchOptions): EvaluateShor
   );
 }
 
+export interface BudgetRiskWatchOptions {
+  readonly pool: Pool;
+  readonly clock: Clock;
+  /** Riesgo de presupuesto del `ReportingRuntime` (`runtime.budgetRisk`). */
+  readonly queries: Pick<BudgetRiskQueries, 'evaluateCurrent'>;
+  readonly workspaces: ShortfallWorkspacesPort;
+  /** Entrega directa a NOTIFY (`NotificationIntakePort`, D249), en la misma unidad de trabajo del aviso. */
+  readonly notifier: BudgetRiskNotifierPort;
+  /** `REPORTING_BUDGET_RISK_ENABLED`. */
+  readonly enabled: boolean;
+}
+
+/**
+ * Paso de avisos de riesgo de presupuesto dentro de `reporting.cash-flow-watch` (openspec add-budget-overrun-risk,
+ * decisión 7): después del paso del flujo de caja y por workspace, UNO a UNO. No agrega consumidores ni conexiones: usa la
+ * `JobQueue` y el pool del worker existentes.
+ */
+export function createBudgetRiskWatch(options: BudgetRiskWatchOptions): EvaluateBudgetRiskNotices {
+  return new EvaluateBudgetRiskNotices({
+    uow: new PgReportingUnitOfWork(options.pool),
+    workspaces: options.workspaces,
+    source: options.queries,
+    notices: new PgBudgetOverrunNoticeRepository(),
+    notifier: options.notifier,
+    clock: options.clock,
+    enabled: options.enabled,
+  });
+}
+
+export { EvaluateBudgetRiskNotices, type BudgetRiskWatchSummary };
 export { EvaluateShortfallRisk, type ShortfallWatchSummary } from '../application/evaluate-shortfall-risk.js';
 export { CASH_FLOW_WATCH_JOB } from '../contracts/index.js';
 export { REPORTING_DATA_VERSION_CONSUMER } from '../contracts/index.js';
@@ -412,5 +493,11 @@ export {
   type LedgerTrialPort,
   type ReconciliationReports,
 } from '../application/reports-reconciliation.js';
+import { PgReportingMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 export { describeMismatch, type ReconciliationMismatch } from '../domain/index.js';
 export type { DrillDownParams } from '../application/financial-reports.exports.js';
+
+/** Participante de REPORTING en la fusión de categorías (add-category-and-counterparty-merge): categorías esenciales del disponible. */
+export function createClassificationMergeParticipant(): ClassificationMergeParticipant {
+  return new PgReportingMergeParticipant();
+}

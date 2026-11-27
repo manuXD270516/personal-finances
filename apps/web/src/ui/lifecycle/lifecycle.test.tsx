@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { tabTarget } from '../common/Tabs';
@@ -144,8 +145,11 @@ describe('recorrido: reporte visual y línea de tiempo (add-lifecycle-timeline 6
     expect(html).toContain(
       'aria-label="Diagrama de estados: estado actual Anulada. Camino: Pendiente → Contabilizada → Contabilizada → Anulada."',
     );
-    // Bajo 768 px se muestra la orientación vertical.
-    expect(html).toContain('@media (max-width: 767.98px)');
+    // Bajo 768 px se muestra la orientación vertical: la regla vive en una hoja estática, no en un <style> en línea (CSP).
+    expect(html).not.toContain('<style');
+    expect(readFileSync(new URL('./lifecycle.css', import.meta.url), 'utf8')).toContain(
+      '@media (width < 48em)',
+    );
   });
 
   it('[TC-AUDIT-LIFECYCLE-013] nodos y aristas con atributos de estado: visitados, actual, atenuados y numeración', () => {
@@ -374,6 +378,122 @@ describe('recorrido de categorías y contrapartes (docs/31 D52, tarea 9.6)', () 
     expect(entries[1]).toContain('Activa → Archivada');
     expect(entries[2]).toMatch(/^2\. Desarchivar/);
     expect(entries[1]).toContain('11:00');
+  });
+});
+
+describe('fusión en el recorrido de categorías y contrapartes (add-category-and-counterparty-merge 6.3)', () => {
+  const cls = esContext('Classification');
+  const clsState = (code: string) => (cls.has(`states.${code}`) ? cls.t(`states.${code}`) : code);
+  const clsField = (name: string) => (cls.has(`fields.${name}`) ? cls.t(`fields.${name}`) : name);
+  const OP = '0190a000-0000-7000-8000-0000000000f1';
+  const MACHINE_V2 = {
+    aggregateType: 'Category',
+    machineVersion: 2,
+    states: [
+      { code: 'ACTIVE', terminal: false },
+      { code: 'ARCHIVED', terminal: false },
+    ],
+    transitions: [
+      { code: 'CREATE', from: [], to: ['ACTIVE'], guard: 'g', events: [] },
+      { code: 'ARCHIVE', from: ['ACTIVE'], to: ['ARCHIVED'], guard: 'g', events: [] },
+      { code: 'UNARCHIVE', from: ['ARCHIVED'], to: ['ACTIVE'], guard: 'g', events: [] },
+      { code: 'MERGE', from: ['ACTIVE', 'ARCHIVED'], to: ['ARCHIVED'], guard: 'g', events: [] },
+    ],
+  };
+  const annotation = (
+    sequence: number,
+    changedFields: string[],
+    detailRefs: Record<string, string | number>,
+  ) => ({
+    sequence,
+    kind: 'ANNOTATION' as const,
+    occurredAt: '2026-11-20T15:00:00.000Z',
+    actor: { type: 'USER' as const, id: U_ME, displayName: null },
+    origin: 'ui',
+    changedFields,
+    detailRefs,
+    revisionFrom: null,
+    revisionTo: null,
+    aggregateVersion: sequence,
+    events: [],
+    auditLogId: null,
+    derived: false,
+  });
+  const renderCls = (lifecycle: Lifecycle) =>
+    renderToStaticMarkup(
+      <LifecycleReport
+        lifecycle={lifecycle}
+        f={f}
+        stateLabel={clsState}
+        fieldLabel={clsField}
+        currentUserId={U_ME}
+        idPrefix="category-lifecycle"
+      />,
+    );
+  const SUPER: Lifecycle = {
+    aggregateType: 'Category',
+    aggregateId: ACCOUNT,
+    currentState: 'ARCHIVED',
+    path: ['ACTIVE', 'ARCHIVED'],
+    historyComplete: true,
+    machine: MACHINE_V2,
+    items: [
+      step({ sequence: 1, transition: 'CREATE', toState: 'ACTIVE' }),
+      step({
+        sequence: 2,
+        transition: 'MERGE',
+        fromState: 'ACTIVE',
+        toState: 'ARCHIVED',
+        detailRefs: { mergedInto: EXPENSE.aggregateId, operationId: OP },
+      }),
+    ],
+  };
+  const SUPERMERCADO: Lifecycle = {
+    ...SUPER,
+    currentState: 'ACTIVE',
+    path: ['ACTIVE'],
+    items: [
+      step({ sequence: 1, transition: 'CREATE', toState: 'ACTIVE' }),
+      annotation(2, ['MERGED_FROM'], { mergedFrom: ACCOUNT, operationId: OP, reassigned: 3 }),
+      annotation(3, ['MOVED'], { operationId: OP }),
+    ],
+  };
+
+  it('[TC-AUDIT-LIFECYCLE-028] la transición MERGE se rotula «Fusionar» (Activa → Archivada) y la categoría queda Archivada', () => {
+    const html = render(SUPER, clsState);
+    const entries = (html.match(/<li data-testid="lifecycle-entry"[\s\S]*?<\/li>/g) ?? []).map(textOf);
+    expect(entries[1]).toMatch(/^1\. Fusionar/);
+    expect(entries[1]).toContain('Activa → Archivada');
+    expect(html).toMatch(
+      /data-code="MERGE" data-from="ACTIVE" data-to="ARCHIVED" data-traversed="true" data-order="1"/,
+    );
+    expect(textOf(html)).toContain('Archivada(actual)');
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-028] las anotaciones MERGED_FROM y MOVED se rotulan «Fusión desde» y «Movida»', () => {
+    const html = renderCls(SUPERMERCADO);
+    const entries = (html.match(/<li data-testid="lifecycle-entry"[\s\S]*?<\/li>/g) ?? []).map(textOf);
+    expect(entries[1]).toContain('Cambio descriptivo: Fusión desde');
+    expect(entries[2]).toContain('Cambio descriptivo: Movida');
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-028] los recorridos de la versión 1 (sin MERGE) se leen igual', () => {
+    const html = render(
+      {
+        ...SUPER,
+        machine: { ...MACHINE_V2, machineVersion: 1, transitions: MACHINE_V2.transitions.slice(0, 3) },
+      },
+      clsState,
+    );
+    expect(html).toContain('lifecycle-report');
+    expect(html).not.toContain('data-code="MERGE"');
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-028] la arista MERGE no se superpone con la de archivar en el diagrama', () => {
+    const layout = layoutFor(MACHINE_V2, 'horizontal');
+    const d = (code: string) => layout.edges.find((e) => e.transition === code && !e.loop)!.d;
+    expect(d('MERGE')).not.toBe(d('ARCHIVE'));
+    expect(layout.edges.some((e) => e.transition === 'MERGE' && e.loop)).toBe(true);
   });
 });
 

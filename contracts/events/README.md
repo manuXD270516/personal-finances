@@ -141,6 +141,8 @@ Notas: el agregado de cada evento es `RecurringDefinition` (`OccurrencesGenerate
 | `accounts.AccountClosed.v1` | ACCOUNTS | REPORTING, COMMITMENTS |
 | `accounts.AccountReactivated.v1` | ACCOUNTS | REPORTING |
 | `accounts.AccountArchived.v1` | ACCOUNTS | REPORTING, COMMITMENTS, GOALS |
+| `classification.CategoriesMerged.v1` | CLASSIFICATION | Ninguno (D249) |
+| `classification.CounterpartiesMerged.v1` | CLASSIFICATION | Ninguno (D249) |
 | `classification.CategoryArchived.v1` | CLASSIFICATION | REPORTING, PLANNING, RULES |
 | `transactions.TransactionCreated.v1` | TRANSACTIONS | RULES, COMMITMENTS, REPORTING |
 | `transactions.TransactionUpdated.v1` | TRANSACTIONS | REPORTING |

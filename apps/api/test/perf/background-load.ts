@@ -35,6 +35,18 @@ export function perfOutDir(): string {
   return process.env['PF_PERF_OUT'] ?? fileURLToPath(new URL('../../../../reports/perf/', import.meta.url));
 }
 
+/**
+ * Ruta del JSONL de etiquetas de anomalías del Large Seed (docs/29 §2.3, fuera de la base): `nightly.perf.ts` lo exporta al
+ * sembrar y `anomalies.perf.ts` lo lee (add-spending-anomaly-detection, D483). `PF_PERF_LABELS` la reemplaza; crea el directorio.
+ */
+export function anomalyLabelsPath(): string {
+  const explicit = process.env['PF_PERF_LABELS'];
+  if (explicit) return explicit;
+  const dir = perfOutDir();
+  mkdirSync(dir, { recursive: true });
+  return join(dir, 'anomalies.labels.jsonl');
+}
+
 /** `spendable.perf.ts` a partir de `import.meta.url` del archivo de la suite. */
 export function suiteNameOf(metaUrl: string): string {
   return basename(metaUrl);

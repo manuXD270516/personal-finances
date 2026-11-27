@@ -6,6 +6,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { formatInstant } from '../dashboard/format';
 import { formatDecimal } from '../AuditHistory';
 import { localDateTimeIn, todayIn, zonedLocalToInstant } from '../common/dates';
+import { nextFieldError, useDirtyFields, withFieldError } from '../common/forms';
 import { parseAmount, parseRate, scaleFor, trimRate } from '../common/money';
 import {
   CONVERSION_FEE_TYPES,
@@ -100,6 +101,35 @@ function ConversionForm({
       .then((r) => setRates(r.data?.data ?? []))
       .catch(() => setRates([]));
   }, [ctx.api, ctx.base, pairBase, pairQuote]);
+
+  // Validación de los montos al salir del campo (decisión 4 del change); un monto vacío es válido (basta con dos de los tres).
+  const { isDirty, markDirty } = useDirtyFields();
+  const validateAmountField = (
+    event: 'blur' | 'input',
+    key: 'sourceAmount' | 'targetAmount',
+    raw: string,
+    account: Account | undefined,
+  ) =>
+    setErrors((prev) => {
+      let computed: string | undefined;
+      if (account && raw.trim()) {
+        const parsed = parseAmount(raw, {
+          locale,
+          currency: account.currency,
+          scale: scaleFor(account.currency, ctx.scales),
+        });
+        if (!parsed.ok)
+          computed = t(`errors.amount.${parsed.error}`, {
+            scale: scaleFor(account.currency, ctx.scales),
+            currency: account.currency,
+          });
+      }
+      return withFieldError(
+        prev,
+        key,
+        nextFieldError(event, { dirty: isDirty(key), current: prev[key], computed }),
+      );
+    });
 
   /** Cuerpo común (vista previa y registro) o errores de validación. */
   function build(): { errors: Record<string, string>; body?: Record<string, unknown>; given: number } {
@@ -301,7 +331,12 @@ function ConversionForm({
                 autoComplete="off"
                 style={inputStyle}
                 value={s.sourceAmount}
-                onChange={(e) => set({ sourceAmount: e.target.value })}
+                onChange={(e) => {
+                  markDirty('sourceAmount');
+                  set({ sourceAmount: e.target.value });
+                  validateAmountField('input', 'sourceAmount', e.target.value, source);
+                }}
+                onBlur={() => validateAmountField('blur', 'sourceAmount', s.sourceAmount, source)}
               />
             )}
           </Field>
@@ -340,7 +375,12 @@ function ConversionForm({
                 autoComplete="off"
                 style={inputStyle}
                 value={s.targetAmount}
-                onChange={(e) => set({ targetAmount: e.target.value })}
+                onChange={(e) => {
+                  markDirty('targetAmount');
+                  set({ targetAmount: e.target.value });
+                  validateAmountField('input', 'targetAmount', e.target.value, target);
+                }}
+                onBlur={() => validateAmountField('blur', 'targetAmount', s.targetAmount, target)}
               />
             )}
           </Field>
@@ -388,13 +428,13 @@ function ConversionForm({
           </Field>
         </div>
         {errors['amounts'] ? (
-          <p role="alert" style={{ color: '#cf222e', margin: 0 }}>
+          <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>
             {errors['amounts']}
           </p>
         ) : null}
         <fieldset
           style={{
-            border: '1px solid #d0d7de',
+            border: '1px solid var(--pf-card-border)',
             padding: '0.5rem',
             display: 'grid',
             gap: '0.5rem',

@@ -11,8 +11,8 @@ import {
   mutedStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -186,7 +186,7 @@ export function NotificationPreferencesView({
             onSave?.();
           }}
         >
-          <div style={tableWrapStyle}>
+          <TableRegion label={f.t('prefs.tableCaption')}>
             <table style={tableStyle} data-testid="notification-preferences-table">
               <caption
                 style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}
@@ -230,7 +230,7 @@ export function NotificationPreferencesView({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
 
           <div style={{ display: 'grid', gap: 'var(--pf-space-2)' }}>
             <label style={checkStyle}>

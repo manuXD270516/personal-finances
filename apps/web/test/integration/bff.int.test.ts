@@ -99,7 +99,10 @@ interface ApiCall {
  */
 function fakeApi(userId: () => string) {
   const calls: ApiCall[] = [];
-  const state = { sessionEventsStatus: 204 };
+  const state: { sessionEventsStatus: number; me: Record<string, unknown> } = {
+    sessionEventsStatus: 204,
+    me: {},
+  };
   const impl = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     const headers = new Headers(init?.headers);
@@ -116,7 +119,8 @@ function fakeApi(userId: () => string) {
       headers,
       body,
     });
-    if (url.endsWith('/api/v1/me')) return Response.json({ id: userId(), displayName: 'Owner Demo' });
+    if (url.endsWith('/api/v1/me'))
+      return Response.json({ id: userId(), displayName: 'Owner Demo', ...state.me });
     if (url.endsWith('/api/v1/me/session-events')) {
       return state.sessionEventsStatus === 204
         ? new Response(null, { status: 204 })
@@ -619,6 +623,43 @@ describe('[TC-AUDIT-SESSION-001] el BFF audita el inicio y el cierre de sesión 
     expect(sid).toBeTruthy();
     expect(sessionEvents(api.calls)).toHaveLength(1);
     expect(await sessionRows()).toBe(1);
+  });
+});
+
+describe('[TC-PLATFORM-THEME-012] el callback deja la cookie espejo del tema (add-dark-theme)', () => {
+  async function loginWithProfile(me: Record<string, unknown>, existingCookie?: string) {
+    const { bff, api } = setup();
+    api.state.me = me;
+    const start = await bff.login(new Request(`${APP}/api/bff/auth/login?returnTo=/`));
+    const state = new URL(start.headers.get('location')!).searchParams.get('state');
+    const cookies = [`${LOGIN_COOKIE}=${cookieOf(start, LOGIN_COOKIE)}`, existingCookie]
+      .filter(Boolean)
+      .join('; ');
+    return bff.callback(
+      new Request(`${APP}/api/bff/auth/callback?code=good-code&state=${state}`, {
+        headers: { cookie: cookies },
+      }),
+    );
+  }
+
+  it('con tema «dark» emite pfos_theme=dark (valor exacto, Path=/, SameSite=Lax, sin HttpOnly ni identificadores)', async () => {
+    const cb = await loginWithProfile({ preferences: { theme: 'dark' } });
+    const header = setCookieHeader(cb, 'pfos_theme')!;
+    expect(header.split(';')[0]).toBe('pfos_theme=dark');
+    expect(header).toContain('Path=/');
+    expect(header).toContain('SameSite=Lax');
+    expect(header).not.toContain('HttpOnly');
+    expect(header).not.toContain(userId);
+  });
+
+  it('[TC-PLATFORM-THEME-013] con tema «system», sin tema o con un valor desconocido borra la cookie', async () => {
+    for (const me of [{ preferences: { theme: 'system' } }, {}, { preferences: { theme: 'sepia' } }]) {
+      const cb = await loginWithProfile(me, 'pfos_theme=light');
+      const header = setCookieHeader(cb, 'pfos_theme')!;
+      expect(header.split(';')[0]).toBe('pfos_theme=');
+      expect(header).toContain('Max-Age=0');
+      expect(cb.status).toBe(303);
+    }
   });
 });
 

@@ -103,5 +103,12 @@ export function toRowView(
     // Trade de un exchange: la conversión propuesta por el proveedor se muestra hasta que el usuario la edite.
     conversion: row.edits.conversion ?? row.external?.conversion ?? null,
     accountId: row.accountId,
+    // Solo mientras la fila sigue sin categoría: aceptada, editada o clasificada por una regla ya no se muestra.
+    suggestedCategory:
+      row.suggestedCategory !== null &&
+      row.edits.categoryId === undefined &&
+      (row.proposal?.category?.value ?? null) === null
+        ? row.suggestedCategory
+        : null,
   };
 }

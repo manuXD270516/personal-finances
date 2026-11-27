@@ -330,6 +330,8 @@ export class IdentityController {
       displayName: user.displayName,
       locale: user.locale.value,
       timezone: user.timeZone?.value ?? this.defaults.timeZone,
+      // Preferencias libres de la UI (contrato `Me.preferences`): la web lee `theme` para el tema (add-dark-theme).
+      preferences: user.preferences,
       memberships: workspaces.map((w) => ({
         workspaceId: w.id,
         workspaceName: w.name,

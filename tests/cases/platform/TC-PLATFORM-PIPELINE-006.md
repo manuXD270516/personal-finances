@@ -22,14 +22,14 @@ tags: ["ci", "dependencies", "renovate", "automerge"]
 error_code: null
 preconditions:
   - "Configuración del servicio de actualización versionada en la raíz del repositorio"
-  - "Auto-merge nativo de GitHub activo; main exige los 17 checks con strict y enforce_admins"
+  - "Auto-merge nativo de GitHub activo; main exige los 18 checks con strict y enforce_admins"
 input:
   - update: "TypeScript 6.0.3 -> 7.0.0 (catálogo)"
     expected: "PR propia, fuera del grupo semanal, sin auto-merge aunque todos los checks pasen"
   - update: "versión menor con el check integration en rojo"
     expected: "no se fusiona; queda abierta"
   - update: "parche con automerge permitido y un check pendiente"
-    expected: "no se fusiona hasta que los 17 checks estén en verde con la rama al día"
+    expected: "no se fusiona hasta que los 18 checks estén en verde con la rama al día"
 steps:
   - "Test de política: ninguna regla con automerge activo aplica a actualizaciones major; platformAutomerge activo; ninguna opción que salte checks o protección"
   - "Primera ventana con una major disponible: comprobar que la PR no tiene auto-merge"
@@ -61,3 +61,5 @@ Entonces abre una PR propia fuera del grupo semanal
 - Qué clases sí se fusionan solas depende de la pregunta 4 de design.md; este caso cubre lo que no cambia con la respuesta.
 
 - 2026-10-16: la parte de política está automatizada (`scripts/delivery-policy/test/renovate-policy.test.ts`). Pendiente de verificación manual (tarea 3.3): primera ventana semanal con una PR de grupo en verde y, si hay una major, comprobar que queda abierta sin auto-merge.
+- 2026-11-20: verificado con `gh` que ninguna PR del bot se fusionó con checks en rojo (#200, #201, #202, #203, #204, #218, #235). Sigue sin comprobarse la parte «major abierta sin auto-merge»: no hay ninguna PR major abierta (typescript 7, node 26, openspec 2, @opentelemetry/core 3 y postgres 19 están en el panel #146 como ramas propias sin abrir); tarea 3.3 abierta por eso.
+- 2026-11-21: verificada la parte «major abierta sin auto-merge». Desde el panel #146 se pidió abrir la major de TypeScript 7 y Renovate abrió #249 con la etiqueta `major` y `autoMergeRequest` nulo. La PR quedó en rojo (typecheck, lint, unit y architecture) y no se fusionó; se cerró a mano. Tarea 3.3 cerrada.

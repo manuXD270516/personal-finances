@@ -4,9 +4,12 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemMessage } from '../../errors/error-messages';
+import { RowSuggestion } from '../category-suggestions/RowSuggestion';
+import { acceptSuggestionsPath, type SuggestionKind } from '../category-suggestions/logic';
 import { useCatalogs } from '../transactions/catalogs';
-import { ConfirmPanel, mutedStyle } from '../common/ui';
-import { problemOf, type WorkspaceContext } from '../common/workspace';
+import { useSwapTransition } from '../common/motion';
+import { ConfirmDialog, mutedStyle } from '../common/ui';
+import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import {
   applyDecision,
@@ -81,6 +84,7 @@ export function ReviewStep({
   const { api, base } = ctx;
   const [filter, setFilter] = useState<ReviewFilter>(EMPTY_FILTER);
   const catalogs = useCatalogs(ctx);
+  const sf = useFormat('CategorySuggestions', ctx);
   const [rowErrors, setRowErrors] = useState<Readonly<Record<string, string>>>({});
   const [busyAll, setBusyAll] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
@@ -102,6 +106,7 @@ export function ReviewStep({
   const [approving, setApproving] = useState(false);
   const [serverPending, setServerPending] = useState<number | undefined>();
   const [reload, setReload] = useState(0);
+  const swap = useSwapTransition('import-preview');
 
   useEffect(() => {
     let cancelled = false;
@@ -110,10 +115,13 @@ export function ReviewStep({
       .get<ImportPreview>(previewPath(base, job.id, filterQuery(filter)))
       .then((r) => {
         if (cancelled || !r.data) return;
-        setRows(r.data.rows);
-        setNextCursor(r.data.nextCursor);
-        setSummary(r.data.summary);
-        setProblem(undefined);
+        const preview = r.data;
+        swap(() => {
+          setRows(preview.rows);
+          setNextCursor(preview.nextCursor);
+          setSummary(preview.summary);
+          setProblem(undefined);
+        });
       })
       .catch((err: unknown) => {
         if (!cancelled) setProblem(problemOf(err));
@@ -125,7 +133,7 @@ export function ReviewStep({
       cancelled = true;
     };
     // La versión del import cambia con cada decisión y la lista NO se recarga por eso (se actualiza la fila).
-  }, [api, base, job.id, filter, reload]);
+  }, [api, base, job.id, filter, reload, swap]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor) return;
@@ -269,6 +277,26 @@ export function ReviewStep({
       () => f.t('bulk.reevaluated'),
     );
 
+  /** Acepta, con una acción explícita, las sugerencias de categoría de un nivel (una versión nueva del import). */
+  const acceptSuggestions = (minLevel: 'HIGH' | 'MEDIUM') =>
+    bulkAction(
+      async () => {
+        const r = await api.command<{ accepted: number; version: number }>(
+          'POST',
+          acceptSuggestionsPath(base, job.id),
+          { minLevel },
+          { ifMatch: job.version },
+        );
+        if (r.data) onJobChange({ ...job, version: r.data.version });
+        return r.data?.accepted ?? 0;
+      },
+      (n) => sf.t('import.done', { count: n }),
+    );
+
+  const categoryNameOf = (id: string) => catalogs.categories.find((c) => c.id === id)?.name ?? id;
+  const counterpartyNameOf = (id: string | null) =>
+    id === null ? undefined : catalogs.counterparties.find((c) => c.id === id)?.name;
+
   const confirmMatches = () =>
     bulkAction(
       async () => {
@@ -372,6 +400,7 @@ export function ReviewStep({
           onBulkCategory={(id) => void bulkCategory(id)}
           onReevaluate={() => void reevaluate()}
           onConfirmMatches={() => void confirmMatches()}
+          suggestions={{ f: sf, onAccept: (level) => void acceptSuggestions(level) }}
         />
       ) : null}
       {pipeline ? (
@@ -412,6 +441,7 @@ export function ReviewStep({
           value={filter}
           rules={ruleOptionsOf(rows)}
           onChange={(patch) => setFilter({ ...filter, ...patch })}
+          suggestionLabel={sf.t('import.filter')}
         />
       ) : null}
       {pipeline && hasOccurrenceCandidates(rows) ? (
@@ -437,22 +467,45 @@ export function ReviewStep({
           renderExtras={
             pipeline
               ? (row) =>
-                  hasPipelineData(row) ? (
-                    <RowDetail
-                      row={row}
-                      f={f}
-                      job={job}
-                      canEdit={ctx.canEdit}
-                      catalogs={catalogs}
-                      accountId={job.accountId}
-                      accountCurrency={
-                        catalogs.accounts.find((a) => a.id === job.accountId)?.currency ?? ctx.ws.baseCurrency
-                      }
-                      busy={busyRow === row.id}
-                      error={rowErrors[row.id] || undefined}
-                      onEdit={(r, patch) => void edit(r, patch)}
-                    />
-                  ) : null
+                  !row.suggestedCategory && !hasPipelineData(row) ? null : (
+                    <>
+                      {row.suggestedCategory ? (
+                        <RowSuggestion
+                          f={sf}
+                          suggestion={row.suggestedCategory}
+                          kind={(row.kind === 'INCOME' ? 'INCOME' : 'EXPENSE') as SuggestionKind}
+                          line={row.lineNumber}
+                          categoryName={categoryNameOf}
+                          counterpartyName={counterpartyNameOf}
+                          canEdit={ctx.canEdit}
+                          busy={busyRow === row.id}
+                          onAccept={() =>
+                            void edit(row, {
+                              categoryId: row.suggestedCategory!.categoryId,
+                              acceptedSuggestion: true,
+                            })
+                          }
+                        />
+                      ) : null}
+                      {hasPipelineData(row) ? (
+                        <RowDetail
+                          row={row}
+                          f={f}
+                          job={job}
+                          canEdit={ctx.canEdit}
+                          catalogs={catalogs}
+                          accountId={job.accountId}
+                          accountCurrency={
+                            catalogs.accounts.find((a) => a.id === job.accountId)?.currency ??
+                            ctx.ws.baseCurrency
+                          }
+                          busy={busyRow === row.id}
+                          error={rowErrors[row.id] || undefined}
+                          onEdit={(r, patch) => void edit(r, patch)}
+                        />
+                      ) : null}
+                    </>
+                  )
               : undefined
           }
         />
@@ -471,7 +524,7 @@ export function ReviewStep({
       ) : null}
 
       {confirming && summary && ctx.canEdit ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="import-approve-confirm"
           title={f.t('approve.title')}
           description={f.t('approve.description')}
@@ -482,7 +535,7 @@ export function ReviewStep({
           onCancel={() => setConfirming(false)}
         >
           <ApproveSummary summary={summary} f={f} transactionsHref={transactionsHref} />
-        </ConfirmPanel>
+        </ConfirmDialog>
       ) : (
         <ApproveBar
           f={f}

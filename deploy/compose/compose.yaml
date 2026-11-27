@@ -4,7 +4,7 @@
 #   pnpm stack:up                       # modo A: perfil deps (apps en el host con `pnpm dev`)
 #   pnpm stack:up -- --profile core     # modo B: producto completo en contenedores (mismas imágenes que prod)
 #
-# Perfiles: deps | core | seed | observability | ml | valkey. Los servicios de `deps` declaran también `core`.
+# Perfiles: deps | core | seed | observability | ml | tls | valkey. Los servicios de `deps` declaran también `core`.
 # Contrato de configuración (docs/19 §0.3): un solo `.env` en la raíz con los valores del modo A; en modo B cada
 # servicio de app hereda ese `.env` y aquí solo se sobrescriben las DIRECCIONES (nombres de servicio y puertos
 # canónicos de la red Compose). Puertos de host: `${PF_BIND_ADDR}:${PF_<SVC>_PORT}` (defaults "2 + canónico").
@@ -56,7 +56,7 @@ services:
   # ───────────────────────────── deps ─────────────────────────────
   postgres:
     <<: *deps
-    image: postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    image: postgres:18.7-trixie@sha256:eb63372c1e05c755f55fa30cbd07aecc443676fc6c0fa90b9002d01537841e1a
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${PF_DEV_PG_SUPERUSER_PASSWORD:?run pnpm setup:env}
@@ -83,7 +83,7 @@ services:
 
   object-storage:
     <<: *deps
-    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
     command:
       - mini
       - -dir=/data
@@ -115,7 +115,7 @@ services:
 
   mailpit:
     <<: *deps
-    image: axllent/mailpit:v1.27.7@sha256:cae83a33cd9b9598e4acb210be673dda7e741d5271ed4045310ab456950a136a
+    image: axllent/mailpit:v1.34.0@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: '1'
       MP_SMTP_AUTH_ALLOW_INSECURE: '1'
@@ -335,6 +335,55 @@ services:
       resources:
         limits: { cpus: '1', memory: 512m }
 
+  # ─────────────────── tls-proxy (solo E2E, perfil `tls`) ───────────────────
+  # change add-e2e-https (D516): HTTPS para la web, Keycloak y la subida de archivos del stack de E2E, con la misma
+  # imagen y digest de Caddy que producción (`compose.prod.yaml`: Renovate los actualiza juntos). Autoridad interna
+  # efímera (`local_certs`): `/data` y `/config` en tmpfs, así que la CA y los certificados mueren con el contenedor;
+  # nada se versiona. Cada sitio escucha en el mismo puerto que publica, para que `Host` y redirects coincidan.
+  # Sin HSTS (no debe quedar en el navegador del desarrollador). El stack de desarrollo por omisión no lo levanta.
+  tls-proxy:
+    profiles: [tls]
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    environment:
+      PF_WEB_TLS_PORT: ${PF_WEB_TLS_PORT:-23443}
+      PF_KEYCLOAK_TLS_PORT: ${PF_KEYCLOAK_TLS_PORT:-28443}
+      PF_OBJECT_STORAGE_TLS_PORT: ${PF_OBJECT_STORAGE_TLS_PORT:-29443}
+    volumes:
+      - ./caddy/Caddyfile.e2e:/etc/caddy/Caddyfile:ro
+    ports:
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_WEB_TLS_PORT:-23443}:${PF_WEB_TLS_PORT:-23443}'
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_KEYCLOAK_TLS_PORT:-28443}:${PF_KEYCLOAK_TLS_PORT:-28443}'
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_OBJECT_STORAGE_TLS_PORT:-29443}:${PF_OBJECT_STORAGE_TLS_PORT:-29443}'
+    read_only: true
+    tmpfs:
+      - '/tmp:size=16m'
+      - '/data:size=32m'
+      - '/config:size=8m'
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+      finance-web: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+      object-storage: { condition: service_healthy }
+    healthcheck:
+      # La imagen es Alpine: `wget` de BusyBox; la autoridad es efímera, así que no se valida la cadena aquí.
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-check-certificate -q -O /dev/null https://localhost:$${PF_WEB_TLS_PORT}/api/health/ready',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+      start_interval: 1s
+    stop_grace_period: 10s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 128m }
+
   # ───────────────────────────── seed ─────────────────────────────
   # One-shot: `pnpm db:seed -- --profile=minimal` → `docker compose --profile core run --rm seed seed --profile=…`.
   # Nunca dentro de `up --wait` (un one-shot hoja hace salir 1 a --wait aunque termine en 0, SPIKE-08).
@@ -357,7 +406,7 @@ services:
   # Con este perfil, OTEL_ENABLED=true en `.env` envía trazas/métricas/logs de api y worker a Grafana.
   otel-lgtm:
     profiles: [observability]
-    image: grafana/otel-lgtm:0.34.0@sha256:b966ea107831d526d9eb8fe4d2d86c9e5731392fad9dce8296bcf2072031f07c
+    image: grafana/otel-lgtm:0.41.0@sha256:2e3290657f2f2a256c7a9175f097424a3ac5b54840741ace433e108e109348b6
     restart: unless-stopped
     logging: *default-logging
     volumes:

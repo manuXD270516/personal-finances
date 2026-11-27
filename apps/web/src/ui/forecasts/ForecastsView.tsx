@@ -14,7 +14,7 @@ import {
   sortSeries,
   type ForecastHorizon,
 } from './logic';
-import { FORECASTS_CSS } from './styles';
+import './forecasts.css';
 import type {
   ForecastConfidence,
   ForecastDriver,
@@ -24,6 +24,7 @@ import type {
   ForecastSeries,
   LatestForecast,
 } from './types';
+import { TableRegion } from '../common/ui';
 
 export interface ForecastsViewProps {
   readonly latest: LatestForecast;
@@ -331,7 +332,6 @@ export function ForecastsView(props: ForecastsViewProps) {
   const gaps = points.filter((p) => p.coherenceGap);
   return (
     <div className="pf-fc" data-testid="forecasts-root">
-      <style>{FORECASTS_CSS}</style>
       <header className="pf-fc-header">
         <h2>{f.t('title')}</h2>
         <p className="pf-fc-muted">{f.t('subtitle')}</p>
@@ -458,7 +458,7 @@ export function ForecastsView(props: ForecastsViewProps) {
                       band: f.t('chart.band'),
                     }}
                   />
-                  <div className="pf-fc-table-wrap">
+                  <TableRegion label={f.t('table.caption', { name: seriesLabel(selected, f) })}>
                     <table className="pf-fc-table" data-testid="forecast-table">
                       <caption>{f.t('table.caption', { name: seriesLabel(selected, f) })}</caption>
                       <thead>
@@ -514,7 +514,7 @@ export function ForecastsView(props: ForecastsViewProps) {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </TableRegion>
                 </>
               ) : null}
             </section>

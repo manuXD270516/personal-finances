@@ -15,6 +15,8 @@ level: application
 automation_status: automated
 automated_tests:
   - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/commitments/src/application/card-payment.service.test.ts
+  - packages/contexts/commitments/src/domain/card-payment.test.ts
   - packages/contexts/debt/src/domain/payment-plan-expectation.test.ts
 status: automated
 regression_suite: false
@@ -30,8 +32,9 @@ steps:
   - 'Consultar los próximos 60 días'
 expected_result:
   - '2026-12-15 "Pago de tarjeta · Visa Oro" 333.33 BOB estimado con indicación "cuotas"'
+  - 'La respuesta informa el origen del monto esperado (change fix-phase-4-debt-followups): el pago del 2026-12-15 queda OPEN_CYCLE porque tras la emisión del 2026-10-25 su ciclo es el abierto, y el del 2027-01-15 (333.34 BOB, ciclo posterior) lleva expectedBasis INSTALLMENTS'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-11-26
 ---
 
 # TC-DEBT-CARD-033 — Cuotas futuras de la tarjeta en los próximos pagos
@@ -46,8 +49,10 @@ Las cuotas futuras alimentan Q8 y el comprometido.
 Dado la segunda cuota de "Laptop" en el ciclo que vence el 2026-12-15
 Cuando consulto 60 días
 Entonces aparece 333.33 BOB estimado como cuotas
+Y la respuesta informa que el origen del monto esperado son cuotas programadas
 ```
 
 ## Notas
 
 - Change: `add-credit-cards` (borrador; cifras con `FixedClock` en America/La_Paz).
+- 2026-11-25, change `fix-phase-4-debt-followups` (75): el test automatizado solo comprobaba el monto y `amountType: ESTIMATED`, no la indicación «cuotas». El change agrega el origen del esperado (`expectedBasis`) y el test pasa a comprobarlo (tarea 7.1, hecha el 2026-11-26: el API, el dominio de DEBT y COMMITMENTS y la UI citan este TC).

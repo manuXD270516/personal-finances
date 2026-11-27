@@ -134,6 +134,8 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 31 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Lectura (as-built `add-credit-cards`): `AccountMovementsQuery` (movimientos de la cuenta de tarjeta por fecha y clase), `PendingFlowQuery` (compras pendientes) y `TransactionLinkQuery` (validar la compra de un plan de cuotas). Debt no crea transacciones de tarjeta: el pago es la transferencia del usuario o la del plan de pago que materializa el motor. |
 | 32 | COMMITMENTS | GOALS | C/S | SYNC-TX | `RecurringDefinitionPort` (`createManaged`, `reviseManaged`, `pauseManaged`, `resumeManaged`, `end`): el aporte programado de una meta es una definición `TRANSFER` administrada (`managedBy = GOAL`) que Goals crea y mantiene en su UoW; las acciones de usuario sobre la definición devuelven `RECURRING_MANAGED_EXTERNALLY` y las acciones sobre sus ocurrencias siguen permitidas. COMMITMENTS no depende de GOALS. |
 
+> **Phase 9 (`add-category-suggestions`):** IMPORTS → RULES por `@pf/rules/contracts` (`CategorySuggestionQuery.suggestMany`, `CategorySuggestionFeedbackPort.recordBatch`), síncrono y en la unidad de trabajo del llamador; RULES lee la evidencia por `ClassificationSubjectsQuery.listEvidence` (TRANSACTIONS). Sin relaciones asíncronas nuevas.
+
 ### 3.1 Composición "abrir cuenta con saldo inicial"
 
 Accounts no depende de Transactions (evita ciclo). El endpoint `POST /accounts` con `openingBalance` se implementa en la **capa de composición** (`apps/api`) dentro de una unidad de trabajo: `Accounts.OpenAccount` → `Transactions.RecordOpeningBalance` (que crea el `LedgerAccount` vía get-or-create). Es orquestación de aplicación, no una relación de dominio.
@@ -191,5 +193,7 @@ Traduce `ExternalTransaction` → `StagedTransaction` (monto string + moneda, fe
 
 ## Nota as-built: `add-predicted-cash-flow-band` (Phase 8, 2026-11-13)
 
+- Gastos atípicos (as-built `add-spending-anomaly-detection`): FORECAST lee `ExpenseLineQuery` (TRANSACTIONS) y `ResolvedOccurrencesQuery` (COMMITMENTS) y avisa a NOTIFICATIONS por `NotificationIntakePort` (hecho `SPENDING_ANOMALY`, en proceso y en la misma unidad de trabajo, como `reporting.cash-flow-watch`); todo por `contracts`, sin ciclos y sin consumidores ni conexiones nuevas.
 - Relación REPORTING → FORECAST (fila 22b) en una sola dirección y solo por contratos: `GetCashFlowCalendar` y el resumen del Home llaman a `LatestForecastQuery.getLatest` (una consulta por la corrida vigente) y a `LiquidVariableSpendQuery.spentBetween` en la transacción de la petición; la composición resuelve FORECAST de forma tardía (se compone después de REPORTING). `arch:check` valida que no haya ciclo. Sin consumidores ni conexiones nuevas.
 - COMMITMENTS agrega `accountId` (cuenta de la versión de la definición) a `ResolvedOccurrenceDto` para restar los recurrentes resueltos pagados desde cuentas líquidas.
+- Riesgo de presupuesto (as-built `add-budget-overrun-risk`): REPORTING lee PLANNING (`BudgetVsActualQuery`), COMMITMENTS (ocurrencias pendientes y resueltas) y FORECAST (`LatestForecastQuery`, solo con los pronósticos habilitados) y avisa a NOTIFICATIONS por `NotificationIntakePort` (hecho `BUDGET_OVERRUN_RISK`) desde el paso de avisos de `reporting.cash-flow-watch`; todo por `contracts`, sin ciclos y sin consumidores ni conexiones nuevas (28 + 4 = 32 de 34).

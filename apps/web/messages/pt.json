@@ -3,6 +3,11 @@
     "title": "PFOS — Finanças pessoais",
     "description": "Sistema operacional de finanças pessoais"
   },
+  "NotFound": {
+    "title": "Página não encontrada",
+    "body": "O endereço que você abriu não existe ou não está mais disponível.",
+    "home": "Voltar ao início"
+  },
   "Home": {
     "title": "Início",
     "subtitle": "Seu dinheiro hoje, como vai o mês e seu patrimônio.",
@@ -48,7 +53,14 @@
     "rules": "Regras",
     "reports": "Relatórios",
     "cashFlow": "Fluxo de caixa",
-    "forecasts": "Previsões"
+    "forecasts": "Previsões",
+    "spendingAnomalies": "Despesas atípicas",
+    "notices": {
+      "label": "Avisos",
+      "close": "Fechar",
+      "actionsAvailable": "Ações disponíveis"
+    },
+    "quickAdd": "Registrar"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -108,6 +120,19 @@
       "displayNameRequired": "Informe um nome de exibição.",
       "displayNameTooLong": "O nome admite até 100 caracteres.",
       "timezoneInvalid": "Não é um fuso horário IANA válido (por exemplo America/La_Paz)."
+    },
+    "theme": {
+      "legend": "Tema",
+      "hint": "“Sistema” segue o modo claro ou escuro do seu dispositivo.",
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Escuro"
+    },
+    "install": {
+      "heading": "Aplicativo",
+      "description": "Instale o PFOS neste dispositivo para abri-lo com um toque, como qualquer outro aplicativo.",
+      "button": "Instalar o aplicativo",
+      "iosHint": "No iPhone ou iPad: Compartilhar → Adicionar à Tela de Início."
     }
   },
   "Auth": {
@@ -587,6 +612,11 @@
     "noWorkspace": "Selecione ou crie um espaço de trabalho.",
     "loading": "Carregando…"
   },
+  "Forms": {
+    "errorSummary": {
+      "title": "Há {count, plural, one {# erro} other {# erros}}"
+    }
+  },
   "Accounts": {
     "title": "Contas",
     "actions": "Ações de contas",
@@ -830,7 +860,8 @@
       "resolved": "Resolvidas: {resolved} · pendentes: {pending} · {pct}",
       "notEligibleApart": "Não elegíveis, à parte:",
       "tableLabel": "Cobertura do censo por categoria"
-    }
+    },
+    "infoTip": "Mais informações sobre “{subject}”"
   },
   "Transactions": {
     "backToList": "← Voltar para transações",
@@ -950,6 +981,7 @@
       "remaining": "Restante a distribuir: {amount}"
     },
     "list": {
+      "cardCharge": "Encargo do cartão",
       "title": "Transações",
       "newActions": "Registrar",
       "new": "Novo movimento",
@@ -1091,7 +1123,8 @@
       "customFields": "Campos personalizados",
       "reconciliation": "Conciliação",
       "statementRef": "Extrato de {date} por {balance}",
-      "source": "Origem"
+      "source": "Origem",
+      "editDescriptive": "Editar descrição e notas"
     },
     "history": {
       "title": "Histórico (ciclo de vida)",
@@ -1189,7 +1222,31 @@
       "DEBT": "Dívidas",
       "GOAL": "Meta de poupança",
       "SYSTEM": "Sistema"
-    }
+    },
+    "quick": {
+      "saved": {
+        "EXPENSE": "Despesa de {amount} registrada",
+        "INCOME": "Receita de {amount} registrada",
+        "REFUND": "Reembolso de {amount} registrado",
+        "ADJUSTMENT": "Ajuste de {amount} registrado"
+      },
+      "undo": "Desfazer",
+      "view": "Ver",
+      "voided": "Registro anulado",
+      "undoReason": "Desfeito a partir do aviso de registro",
+      "recordAndDetail": "Registrar e ir para os detalhes"
+    },
+    "managedEdit": {
+      "title": "Editar descrição e notas",
+      "loanManaged": "Este lançamento é administrado pelo empréstimo: só a descrição e as notas podem ser editadas.",
+      "cardManaged": "Administrado pelo cartão: o valor, a conta, a data, a moeda e as categorias não são editados aqui.",
+      "cardManagedNamed": "Administrado pelo cartão {name}: o valor, a conta, a data, a moeda e as categorias não são editados aqui.",
+      "account": "Conta",
+      "currency": "Moeda",
+      "viewCard": "Ver o cartão",
+      "categories": "Categorias"
+    },
+    "infoTip": "Mais informações sobre “{subject}”"
   },
   "Fx": {
     "backToRates": "← Voltar para taxas",
@@ -1432,7 +1489,8 @@
           "REASON_MAX": "O motivo admite até 500 caracteres."
         }
       }
-    }
+    },
+    "infoTip": "Mais informações sobre “{subject}”"
   },
   "Classification": {
     "title": "Classificação",
@@ -1580,9 +1638,60 @@
       "defaultCategoryId": "Categoria padrão",
       "notes": "Notas",
       "website": "Site",
-      "systemCode": "Código de sistema"
+      "systemCode": "Código de sistema",
+      "MERGED_FROM": "Mesclagem de",
+      "MOVED": "Movida"
     },
-    "customFields": "Campos personalizados"
+    "customFields": "Campos personalizados",
+    "merge": {
+      "button": "Mesclar em…",
+      "action": "Mesclar «{name}» em outra",
+      "title": "Mesclar «{name}»",
+      "descriptionCategory": "As referências de «{name}» passarão para a categoria de destino. A mesclagem não pode ser desfeita: «{name}» fica arquivada para sempre.",
+      "descriptionCounterparty": "As referências de «{name}» passarão para a contraparte de destino. A mesclagem não pode ser desfeita: «{name}» fica arquivada para sempre.",
+      "target": "Mesclar em",
+      "targetHint": "Só são oferecidos destinos compatíveis: ativos, não mesclados e diferentes da origem.",
+      "chooseTarget": "Escolha o destino",
+      "noTargets": "Não há um destino compatível.",
+      "loading": "Calculando o impacto…",
+      "previewIntro": "Ao mesclar «{source}» em «{target}», será atualizado o seguinte:",
+      "countsLabel": "Referências que serão atualizadas",
+      "noCounts": "Não há referências para mover.",
+      "counts": {
+        "SPLITS_OPEN": "Divisões de transações que são reatribuídas",
+        "SPLITS_CLOSED_KEPT": "Divisões em períodos fechados que ficam sem alteração",
+        "TRANSACTIONS_OPEN": "Transações que são reatribuídas",
+        "TRANSACTIONS_CLOSED_KEPT": "Transações em períodos fechados que ficam sem alteração",
+        "BUDGET_LINES": "Linhas de orçamento",
+        "TEMPLATES": "Modelos de orçamento",
+        "RECURRING_DEFINITIONS": "Definições recorrentes",
+        "SUBSCRIPTIONS": "Assinaturas",
+        "RULES": "Regras",
+        "DEFAULT_CATEGORY_COUNTERPARTIES": "Contrapartes com esta categoria padrão",
+        "ESSENTIALS": "Categorias essenciais do disponível",
+        "LOANS": "Empréstimos",
+        "CONVERSIONS": "Conversões",
+        "IMPORT_ROWS": "Linhas de importações pendentes",
+        "SUBCATEGORIES_MOVED": "Subcategorias que se movem",
+        "ALIASES_MOVED": "Apelidos que se movem"
+      },
+      "aliasesMoved": "Apelidos que passam para o destino: {aliases}.",
+      "nameBecomesAlias": "O nome «{source}» passará a ser apelido de «{target}».",
+      "conflictsTitle": "Há conflitos que impedem a mesclagem",
+      "conflictsHint": "Resolva os conflitos (por exemplo, remova uma das duas linhas ou renomeie) e tente novamente.",
+      "reasons": {
+        "BUDGET_LINE_EXISTS": "Um plano já tem uma linha de orçamento do destino",
+        "TEMPLATE_LINE_EXISTS": "Um modelo já tem uma linha do destino",
+        "SUBCATEGORY_NAME_TAKEN": "O destino já tem uma subcategoria com o mesmo nome"
+      },
+      "irreversible": "A mesclagem não pode ser desfeita. «{source}» ficará arquivada e marcada como mesclada em «{target}».",
+      "ack": "Entendo que não pode ser desfeita",
+      "confirm": "Mesclar em «{target}»",
+      "confirmEmpty": "Mesclar",
+      "mergedInto": "mesclada em {name}",
+      "doneCategory": "Categoria «{source}» mesclada em «{target}».",
+      "doneCounterparty": "Contraparte «{source}» mesclada em «{target}»."
+    }
   },
   "Lifecycle": {
     "tabs": {
@@ -1664,12 +1773,14 @@
       "Category": {
         "CREATE": "Criar",
         "ARCHIVE": "Arquivar",
-        "UNARCHIVE": "Desarquivar"
+        "UNARCHIVE": "Desarquivar",
+        "MERGE": "Mesclar"
       },
       "Counterparty": {
         "CREATE": "Criar",
         "ARCHIVE": "Arquivar",
-        "UNARCHIVE": "Desarquivar"
+        "UNARCHIVE": "Desarquivar",
+        "MERGE": "Mesclar"
       },
       "Reconciliation": {
         "START": "Iniciar",
@@ -1706,7 +1817,8 @@
       "csv": "Exportar CSV",
       "pdf": "Exportar PDF"
     },
-    "auditLink": "Ver este item na auditoria"
+    "auditLink": "Ver este item na auditoria",
+    "infoTip": "Mais informações sobre “{subject}”"
   },
   "Demo": {
     "title": "Dados de demonstração",
@@ -2225,7 +2337,16 @@
     "suggest": {
       "open": "Sugerir a partir do histórico"
     },
-    "historyRegion": "Histórico de alterações do plano"
+    "historyRegion": "Histórico de alterações do plano",
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "do menor para o maior",
+      "descending": "do maior para o menor",
+      "textAscending": "de A a Z",
+      "textDescending": "de Z a A",
+      "dateAscending": "da mais antiga para a mais recente",
+      "dateDescending": "da mais recente para a mais antiga"
+    }
   },
   "Templates": {
     "title": "Templates de orçamento",
@@ -2618,7 +2739,8 @@
       "openFxFeedStatus": "Ver o estado das taxas automáticas",
       "openFxRate": "Revisar a taxa retida",
       "openCashFlowCalendar": "Ver o calendário de fluxo de caixa",
-      "openHome": "Ir para o início"
+      "openHome": "Ir para o início",
+      "openSpendingAnomalies": "Abrir as despesas atípicas"
     },
     "prefs": {
       "title": "Notificações",
@@ -2651,7 +2773,9 @@
         "FX_RATE_FEED_RECOVERED": "Taxa automática recuperada",
         "FX_RATE_ANOMALY_RETAINED": "Taxa retida por variação anômala",
         "CASH_FLOW_SHORTFALL_RISK": "Risco de déficit no fluxo de caixa",
-        "HOME_DIGEST": "Resumo periódico do início (email)"
+        "HOME_DIGEST": "Resumo periódico do início (email)",
+        "SPENDING_ANOMALY": "Despesas atípicas detectadas (desligado por padrão)",
+        "BUDGET_OVERRUN_RISK": "Risco de estourar um orçamento (desligado por padrão)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalhes (valores e nomes) nos e-mails",
@@ -3423,6 +3547,15 @@
       "statementSave": "Salvar valor do extrato",
       "statementSaved": "O valor do extrato foi salvo.",
       "truncated": "Mostrando as primeiras {limit} cobranças."
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "do menor para o maior",
+      "descending": "do maior para o menor",
+      "textAscending": "de A a Z",
+      "textDescending": "de Z a A",
+      "dateAscending": "da mais antiga para a mais recente",
+      "dateDescending": "da mais recente para a mais antiga"
     }
   },
   "AuditLog": {
@@ -3671,6 +3804,7 @@
     "cardPayment": {
       "label": "Pagamento de cartão · {name}",
       "estimated": "Estimado: ajustado quando a fatura é emitida",
+      "installments": "parcelas",
       "viewCard": "Ver o cartão"
     }
   },
@@ -3772,7 +3906,7 @@
         "credit": "Crédito"
       },
       "formLabel": "Atribuição de colunas",
-      "errorsTitle": "Corrija estes dados para continuar:",
+      "errorsTitle": "Há {count, plural, one {# erro} other {# erros}}",
       "hasHeader": "A primeira linha (depois das que são puladas) é um cabeçalho",
       "skipRows": "Linhas a pular no início",
       "skipRowsHint": "Texto do banco antes do cabeçalho; entre 0 e 50.",
@@ -5073,6 +5207,66 @@
       "description": "Encerra seus planos de pagamento e deixa de emitir faturas e avisos. As faturas e os planos de parcelas continuam disponíveis; as contas mantêm o saldo.",
       "done": "Cartão arquivado.",
       "archivedNotice": "Este cartão está arquivado: você só pode consultá-lo."
+    },
+    "charges": {
+      "title": "Juros e encargos",
+      "caption": "Juros e encargos do ciclo que fecha em {closing}",
+      "empty": "Não há juros nem encargos registrados neste ciclo.",
+      "register": "Registrar juros e encargos",
+      "hint": "Registre o que o banco cobrou: cria uma despesa do cartão com uma parcela por componente e aumenta o que você deve.",
+      "fields": {
+        "date": "Data do encargo",
+        "interest": "Juros ({currency})",
+        "fees": "Tarifas ({currency})",
+        "insurance": "Seguro ({currency})",
+        "taxes": "Impostos ({currency})"
+      },
+      "components": {
+        "interest": "Juros",
+        "fees": "Tarifas",
+        "insurance": "Seguro",
+        "taxes": "Impostos"
+      },
+      "totalShort": "Total",
+      "originShort": "Origem",
+      "actions": "Ações",
+      "origin": {
+        "RECORDED": "Registrado",
+        "ADOPTED": "Adotado de uma despesa"
+      },
+      "total": "Total do encargo: {amount}",
+      "totalPending": "Total do encargo: complete os valores em um formato válido.",
+      "save": "Registrar encargo",
+      "saved": "Encargo registrado.",
+      "cancel": "Cancelar",
+      "void": "Anular",
+      "voidTitle": "Anular o encargo de {amount}",
+      "voidDescription": "Sua transação é anulada com o estorno do lançamento e a dívida volta ao valor anterior.",
+      "voidReason": "Motivo da anulação",
+      "voidConfirm": "Anular encargo",
+      "voided": "Encargo anulado.",
+      "proposal": "O banco informou {amount} a mais que o cálculo do sistema. Se forem juros ou encargos, registre-os.",
+      "useProposal": "Registrar a diferença como encargo",
+      "duplicateWarning": "Há {count} despesa(s) do ciclo em «Juros pagos» ou «Tarifas» que não são encargos. Se for a mesma cobrança, adote-a pelo detalhe para não registrá-la duas vezes:",
+      "errors": {
+        "INVALID": "Informe um valor válido.",
+        "SCALE": "O valor tem mais casas decimais do que a moeda admite.",
+        "NEGATIVE": "O valor não pode ser negativo.",
+        "NO_COMPONENT": "Informe pelo menos um componente maior que zero.",
+        "REQUIRED_DATE": "Informe a data do encargo."
+      },
+      "adopt": {
+        "title": "É um encargo do cartão",
+        "hint": "Divida o valor da despesa em componentes (devem somar o seu valor). Não cria outra transação nem altera o saldo.",
+        "prompt": "Esta despesa é de uma conta de {card}. Se for juros ou encargo do banco, marque-a como encargo para que conte nos relatórios de tarifas e dívidas.",
+        "action": "É um encargo do cartão",
+        "save": "Adotar como encargo",
+        "done": "A despesa agora é um encargo do cartão."
+      }
+    },
+    "transaction": {
+      "badge": "Encargo do cartão",
+      "viewCard": "Ver o cartão"
     },
     "statements": {
       "accountTitle": "Faturas em {currency}",
@@ -6577,10 +6771,11 @@
       "CONVERSION": "Tarifa de conversão",
       "TRANSFER": "Tarifa de transferência",
       "LOAN": "Juros e encargos de empréstimos",
+      "CARD": "Juros e encargos de cartões",
       "FEE_CATEGORY": "Categorias de tarifas",
       "total": "Total",
       "last12": "Últimos 12 períodos completos: {amount}",
-      "cardNote": "Os juros do cartão não são registrados como gasto e não aparecem aqui; o saldo do cartão está na evolução de dívidas.",
+      "cardNote": "Os cartões contam aqui apenas os juros e encargos registrados como encargo do cartão (ou adotados de uma despesa); uma despesa comum em «Juros pagos» não é inferida.",
       "chartTitle": "Total de tarifas por período",
       "chartDesc": "Barras de {n} períodos em {currency}; a tabela a seguir separa cada tipo."
     },
@@ -6612,6 +6807,8 @@
       "principalPaid": "Principal pago",
       "interestPaid": "Juros pagos",
       "chargesPaid": "Encargos pagos",
+      "interestCharged": "Juros cobrados",
+      "chargesCharged": "Outros encargos cobrados",
       "kind": {
         "LOAN": "Empréstimo",
         "CARD": "Cartão"
@@ -6619,7 +6816,7 @@
       "consolidated": "Consolidado em {currency}",
       "chartTitle": "Saldo devedor de {name}",
       "chartDesc": "Linha de {n} meses em {currency}; a tabela a seguir tem os pagamentos.",
-      "cardNote": "Os cartões mostram apenas o saldo devedor."
+      "cardNote": "Os cartões mostram o saldo pendente e os juros e encargos registrados no cartão; o valor pago não é informado."
     },
     "recurring": {
       "caption": "Custo mensal e anual dos compromissos recorrentes ativos",
@@ -6706,6 +6903,15 @@
         "TAG": "uma etiqueta",
         "COUNTERPARTY": "uma contraparte"
       }
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "do menor para o maior",
+      "descending": "do maior para o menor",
+      "textAscending": "de A a Z",
+      "textDescending": "de Z a A",
+      "dateAscending": "da mais antiga para a mais recente",
+      "dateDescending": "da mais recente para a mais antiga"
     }
   },
   "ImportConnections": {
@@ -7183,5 +7389,171 @@
       "link": "Ver as transações",
       "gap": "Uma lacuna de períodos sem movimentos encurtou o histórico usado."
     }
+  },
+  "CategorySuggestions": {
+    "level": {
+      "HIGH": "alta",
+      "MEDIUM": "média"
+    },
+    "chip": {
+      "suggestedLevel": "Sugerida: {category} · confiança {level}",
+      "default": "Categoria padrão da contraparte: {category}",
+      "lastUsed": "Última categoria usada com esta contraparte: {category}",
+      "accepted": "Categoria sugerida aceita: {category}",
+      "accept": "Aceitar",
+      "other": "Outra",
+      "acceptAria": "Aceitar a categoria sugerida {category}",
+      "otherAria": "Escolher outra categoria",
+      "ruleApplies": "Uma regra vai classificar este lançamento ao salvar; por isso nenhuma categoria é sugerida."
+    },
+    "reason": {
+      "kind": {
+        "EXPENSE": "despesas",
+        "INCOME": "receitas",
+        "REFUND": "reembolsos"
+      },
+      "description": "Você escolheu \"{category}\" em {matches} de {support} {kind} parecidos com \"{key}\"",
+      "counterparty": "Você escolheu \"{category}\" em {matches} de {support} {kind} com \"{counterparty}\"",
+      "both": "Você escolheu \"{category}\" em {matches} de {support} {kind} parecidos com \"{key}\" e da mesma contraparte"
+    },
+    "import": {
+      "column": "Sugestão",
+      "suggestedLevel": "Sugerida: {category} · confiança {level}",
+      "accept": "Aceitar",
+      "acceptAria": "Aceitar a categoria sugerida {category} na linha {line}",
+      "acceptHigh": "Aceitar sugestões de confiança alta",
+      "acceptMedium": "Aceitar sugestões de confiança alta e média",
+      "hint": "As sugestões vêm do seu histórico e nunca são aplicadas sozinhas: as linhas que você não aceitar são criadas sem categoria.",
+      "done": "{count} sugestões de categoria aceitas.",
+      "filter": "Com sugestão"
+    },
+    "rate": {
+      "title": "Sugestões de categoria",
+      "intro": "O que você fez com as sugestões de categoria neste mês.",
+      "loading": "Carregando…",
+      "rate": "Taxa de aceitação",
+      "empty": "Ainda não há sugestões resolvidas neste mês.",
+      "summary": "{shown} mostradas · {accepted} aceitas · {corrected} corrigidas · {ignored} ignoradas",
+      "surface": {
+        "MANUAL_ENTRY": "Lançamento manual",
+        "IMPORT": "Importação"
+      },
+      "bySurface": "Por canal",
+      "failed": "Não foi possível ler a taxa de aceitação."
+    }
+  },
+  "BudgetRisk": {
+    "none": "Sem risco calculado",
+    "level": {
+      "EXCEEDED": "Ultrapassada",
+      "LIKELY": "Provável",
+      "POSSIBLE": "Possível",
+      "UNLIKELY": "Improvável",
+      "NOT_AVAILABLE": "Indisponível"
+    },
+    "reason": {
+      "LINE_TYPE": "Linhas fixas e de mínimo não são projetadas",
+      "NO_REFERENCE": "A linha não tem valor planejado",
+      "TOO_EARLY": "Faltam dados do período"
+    },
+    "basis": {
+      "RUN_RATE": "com base no ritmo do período",
+      "FORECAST": "com base na previsão"
+    },
+    "detail": {
+      "projected": "Projeção {amount}",
+      "projectedHigh": "alta {amount}",
+      "date": "estouro estimado por volta de {date}"
+    },
+    "incomplete": "Falta a taxa de algum pagamento conhecido: a projeção está incompleta",
+    "column": "Risco de estourar",
+    "legend": {
+      "intro": "O risco é uma projeção com o ritmo do período ou com a previsão, não uma certeza; não altera nenhum valor do plano.",
+      "possible": "\"Possível\" significa que só ocorreria se o gasto chegar perto do alto do habitual (limite superior do intervalo de 80 % da previsão)."
+    },
+    "sentence": {
+      "likely": "No ritmo atual, {name} ultrapassaria o limite por volta de {date}.",
+      "likelyNoDate": "No ritmo atual, {name} ultrapassaria o limite antes do fim do período.",
+      "likelyForecast": "Segundo a previsão, {name} ultrapassaria o limite por volta de {date}.",
+      "likelyForecastNoDate": "Segundo a previsão, {name} ultrapassaria o limite antes do fim do período.",
+      "possible": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite por volta de {date}.",
+      "possibleNoDate": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite antes do fim do período.",
+      "possibleForecast": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite por volta de {date}.",
+      "possibleForecastNoDate": "Se o gasto em {name} chegar perto do alto do habitual, poderia ultrapassar o limite antes do fim do período."
+    },
+    "home": {
+      "title": "Orçamentos em risco",
+      "subtitle": "Plano de {period}",
+      "figures": "Projeção {projected} de {reference}",
+      "more": "e mais {count, plural, one {# linha} other {# linhas}} em risco no plano"
+    }
+  },
+  "SpendingAnomalies": {
+    "title": "Despesas atípicas",
+    "subtitle": "Despesas que fogem do habitual para a sua categoria ou contraparte, com o motivo. É só um aviso: não altera nenhuma transação nem nenhum valor.",
+    "disclaimer": "A marca só indica que o valor foge do habitual. Se era esperado, descarte-o com «Não é atípico»; você pode restaurá-lo quando quiser.",
+    "loading": "Carregando despesas atípicas…",
+    "disabled": "A detecção de despesas atípicas está desabilitada nesta instalação. Mostra-se o que já havia sido detectado.",
+    "empty": "Não há despesas atípicas abertas neste intervalo.",
+    "emptyFiltered": "Não há despesas atípicas com estes filtros.",
+    "more": "Carregar mais",
+    "noName": "sem nome",
+    "filters": {
+      "label": "Filtros de despesas atípicas",
+      "status": "Estado",
+      "from": "De",
+      "to": "Até",
+      "OPEN": "Abertas",
+      "DISMISSED": "Descartadas",
+      "ALL": "Todas"
+    },
+    "table": {
+      "caption": "Despesas atípicas do espaço de trabalho, da mais recente à mais antiga",
+      "date": "Data",
+      "amount": "Valor",
+      "category": "Categoria",
+      "counterparty": "Contraparte",
+      "reasons": "Motivo",
+      "status": "Estado",
+      "actions": "Ações"
+    },
+    "status": {
+      "OPEN": "Aberta",
+      "DISMISSED": "Descartada"
+    },
+    "reportingAmount": "Equivale a {amount}",
+    "reason": {
+      "CATEGORY_OUTLIER": "{ratio} vezes a mediana de \"{name}\" ({reference} nos últimos 12 meses, {count} despesas)",
+      "COUNTERPARTY_OUTLIER": "{ratio} vezes a mediana de \"{name}\" em \"{category}\" ({reference} nos últimos 12 meses, {count} despesas)",
+      "COUNTERPARTY_OUTLIER_LEGACY": "{ratio} vezes a mediana das suas despesas com \"{name}\" ({reference} nos últimos 12 meses, {count} despesas)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nova \"{name}\", sem despesas nos últimos 12 meses, com valor igual ou maior que o percentil alto das suas despesas ({reference}, {count} despesas)"
+    },
+    "dismiss": {
+      "label": "Não é atípico",
+      "reasonLabel": "Motivo (opcional)",
+      "none": "Sem motivo",
+      "EXPECTED_ONE_OFF": "Despesa pontual esperada",
+      "NOT_UNUSUAL": "É normal para mim",
+      "OTHER": "Outro motivo",
+      "done": "Despesa marcada como não atípica."
+    },
+    "restore": {
+      "label": "Restaurar",
+      "done": "Despesa restaurada entre as atípicas."
+    },
+    "decided": "Descartada em {at}",
+    "decidedReason": "Descartada em {at}: {reason}",
+    "changed": "A transação mudou desde que foi detectada.",
+    "openTransaction": "Ver transação",
+    "mark": {
+      "label": "Atípica",
+      "hint": "Despesa atípica: {reasons}"
+    },
+    "detail": {
+      "title": "Despesa atípica",
+      "intro": "Este valor foge do habitual. Não altera a transação nem nenhum valor.",
+      "open": "Ver as despesas atípicas"
+    },
+    "infoTip": "Mais informações sobre “{subject}”"
   }
 }

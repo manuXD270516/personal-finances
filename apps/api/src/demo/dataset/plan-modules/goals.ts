@@ -1,8 +1,16 @@
 import { dec } from '@pf/shared-kernel';
-import { addDays, addMonthsClamped, dayOfMonth, epochDay, withDay } from '../calendar.js';
+import {
+  addDays,
+  addMonthsClamped,
+  dayOfMonth,
+  epochDay,
+  monthAt,
+  parseDate,
+  withDay,
+  ymd,
+} from '../calendar.js';
 import type { DemoCurrency, DemoMoney, PlanOp } from '../plan-types.js';
 import type { ModuleOp } from '../module-ops.js';
-import { renewalDates } from './commitments.js';
 
 /**
  * Metas del dataset Demo v2 (design.md decisión 5): fechas relativas a la ancla (decisión 4). El aporte mensual de
@@ -26,6 +34,23 @@ export interface GoalsPlan {
   };
   /** Aportes del Fondo de emergencia (fechas de las ocurrencias aprobadas). */
   readonly emergencyContributions: readonly string[];
+}
+
+/**
+ * Fechas de un plan mensual con día fijo (`monthDays: [día]`): cada mes se resuelve desde el día del plan con tope al
+ * último día del mes, igual que la regla de recurrencia del dominio. No se encadena desde la fecha anterior: un día
+ * 31 no debe degradar a 30 tras un mes corto (el 2025-11-30 no implica el 2025-12-30, sino el 2025-12-31).
+ */
+export function monthlyPlanDates(first: string, planDay: number, until: string): string[] {
+  const { y, m } = parseDate(first);
+  const out: string[] = [];
+  for (let i = 0; ; i += 1) {
+    const at = monthAt(y, m, i);
+    const date = withDay(ymd(at.y, at.m, 1), planDay);
+    if (date > until) break;
+    out.push(date);
+  }
+  return out;
 }
 
 export function buildGoals(anchor: string): GoalsPlan {
@@ -73,7 +98,7 @@ export function buildGoals(anchor: string): GoalsPlan {
     withDay(emergencyStart, planDay) >= emergencyStart
       ? withDay(emergencyStart, planDay)
       : withDay(addMonthsClamped(emergencyStart, 1), planDay);
-  for (const date of renewalDates(firstContribution, 'MONTHLY', anchor)) {
+  for (const date of monthlyPlanDates(firstContribution, planDay, anchor)) {
     emergencyContributions.push(date);
     ops.push({
       op: 'occurrence',

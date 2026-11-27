@@ -108,7 +108,7 @@ describe('stack local en contenedores (pfos-test)', () => {
     for (const app of [...APPS, 'migrate', 'otel-lgtm', 'valkey']) expect(all).not.toContain(app);
   });
 
-  it('[TC-PLATFORM-STACK-001] [TC-PLATFORM-MLSERVICE-001] pnpm stack:up -- --profile core deja todo healthy, migrate en 0 y las apps como non-root, sin el servicio de pronósticos', async () => {
+  it('[TC-PLATFORM-STACK-001] [TC-PLATFORM-STACK-013] [TC-PLATFORM-MLSERVICE-001] pnpm stack:up -- --profile core deja todo healthy, migrate en 0 y las apps como non-root, sin el servicio de pronósticos', async () => {
     const up = await pnpm('stack:up', ['--profile', 'core'], processEnv);
     expect(up.code, up.stderr + up.stdout).toBe(0);
     timings['core_up_on_top_of_deps'] = up.ms;
@@ -126,6 +126,9 @@ describe('stack local en contenedores (pfos-test)', () => {
     });
     expect((await http(`${api}/health/live`)).status).toBe(200);
     expect((await http(`${web}/api/health/ready`)).status).toBe(200);
+    // Sin el perfil `tls` (add-e2e-https) no existe el proxy TLS: el stack de desarrollo sigue por http.
+    expect((await serviceStates(ctx)).map((x) => x.Service)).not.toContain('tls-proxy');
+    expect(env['WEB_PUBLIC_URL']).toMatch(/^http:[/][/]/);
 
     for (const svc of APPS) {
       const name = (await stateOf(ctx, svc))!.Name;
@@ -212,45 +215,66 @@ describe('stack local en contenedores (pfos-test)', () => {
     const effects = async (key: string) =>
       Number((await sql(ctx, `SELECT count(*) FROM platform.diagnostic_probe WHERE key = '${key}'`))[0]);
 
-    const first = await post('sigterm-in-flight');
-    await waitUntil(async () => ((await jobState(first)) === 'active' ? true : undefined), 30_000, 100);
+    try {
+      const first = await post('sigterm-in-flight');
+      await waitUntil(async () => ((await jobState(first)) === 'active' ? true : undefined), 30_000, 100);
 
-    const workerName = (await stateOf(ctx, 'finance-worker'))!.Name;
-    const stopStarted = Date.now();
-    const stopping = compose(['*'], ['stop', 'finance-worker'], { mode: 'capture' }, ctx); // SIGTERM (grace 45 s)
-    await new Promise((r) => setTimeout(r, 700));
-    const second = await post('sigterm-after-signal');
-    const stopped = await stopping;
-    timings['worker_stop_with_job_in_flight'] = Date.now() - stopStarted;
-    expect(stopped.code).toBe(0);
+      const workerName = (await stateOf(ctx, 'finance-worker'))!.Name;
+      const stopStarted = Date.now();
+      // Solo el log de ESTE apagado: el contenedor puede traer líneas de apagados anteriores.
+      const since = new Date(stopStarted - 1_000).toISOString();
+      const shutdownLog = async () => {
+        const logs = await run('docker', ['logs', '--since', since, workerName], { mode: 'capture' });
+        return (logs.stdout + logs.stderr).split(/\r?\n/);
+      };
+      const stopping = compose(['*'], ['stop', 'finance-worker'], { mode: 'capture' }, ctx); // SIGTERM (grace 45 s)
+      // Determinista: el segundo job se encola solo cuando el worker ya registró la señal (un `setTimeout` fijo
+      // dependía de la velocidad del host: en un runner lento `compose stop` entregaba el SIGTERM después).
+      await waitUntil(
+        async () => ((await shutdownLog()).some((l) => l.includes('"shutdown started"')) ? true : undefined),
+        30_000,
+        100,
+      );
+      const second = await post('sigterm-after-signal');
+      const stopped = await stopping;
+      timings['worker_stop_with_job_in_flight'] = Date.now() - stopStarted;
+      expect(stopped.code).toBe(0);
 
-    expect(await containerInspect(workerName, '{{.State.ExitCode}}')).toBe('0');
-    expect(timings['worker_stop_with_job_in_flight']).toBeLessThan(45_000);
-    // El job en curso terminó (efecto confirmado exactamente una vez) antes de salir…
-    expect(await jobState(first)).toBe('completed');
-    expect(await effects('sigterm-in-flight')).toBe(1);
-    // …y el encolado tras la señal no se tomó: sigue en cola, sin efecto.
-    expect(await jobState(second)).toBe('created');
-    expect(await effects('sigterm-after-signal')).toBe(0);
+      expect(await containerInspect(workerName, '{{.State.ExitCode}}')).toBe('0');
+      expect(timings['worker_stop_with_job_in_flight']).toBeLessThan(45_000);
+      // El job en curso terminó (efecto confirmado exactamente una vez) antes de salir…
+      expect(await jobState(first)).toBe('completed');
+      expect(await effects('sigterm-in-flight')).toBe(1);
+      // …y el encolado tras la señal no se tomó: sigue en cola, sin efecto.
+      expect(await jobState(second)).toBe('created');
+      expect(await effects('sigterm-after-signal')).toBe(0);
 
-    const logs = await run('docker', ['logs', workerName], { mode: 'capture' });
-    const lines = (logs.stdout + logs.stderr).split(/\r?\n/);
-    const shutdownAt = lines.findIndex((l) => l.includes('"shutdown started"'));
-    const completedAt = lines.findIndex((l) => l.includes(first) && l.includes('"job completed"'));
-    expect(shutdownAt).toBeGreaterThanOrEqual(0);
-    expect(completedAt).toBeGreaterThan(shutdownAt);
-    expect(lines.some((l) => l.includes('"shutdown completed"'))).toBe(true);
+      const lines = await shutdownLog();
+      const shutdownAt = lines.findIndex((l) => l.includes('"shutdown started"'));
+      const completedAt = lines.findIndex((l) => l.includes(first) && l.includes('"job completed"'));
+      expect(shutdownAt).toBeGreaterThanOrEqual(0);
+      expect(completedAt).toBeGreaterThan(shutdownAt);
+      expect(lines.some((l) => l.includes('"shutdown completed"'))).toBe(true);
 
-    const restart = await compose(
-      ['*'],
-      ['up', '-d', '--wait', '--no-deps', 'finance-worker'],
-      { mode: 'capture' },
-      ctx,
-    );
-    expect(restart.code, restart.stderr).toBe(0);
-    await waitUntil(async () => ((await jobState(second)) === 'completed' ? true : undefined), 60_000);
-    expect(await effects('sigterm-after-signal')).toBe(1);
-    expect(await effects('sigterm-in-flight')).toBe(1);
+      const restart = await compose(
+        ['*'],
+        ['up', '-d', '--wait', '--no-deps', 'finance-worker'],
+        { mode: 'capture' },
+        ctx,
+      );
+      expect(restart.code, restart.stderr).toBe(0);
+      await waitUntil(async () => ((await jobState(second)) === 'completed' ? true : undefined), 60_000);
+      expect(await effects('sigterm-after-signal')).toBe(1);
+      expect(await effects('sigterm-in-flight')).toBe(1);
+    } finally {
+      // Pase lo que pase el worker vuelve a quedar arriba: si no, STACK-004 y las demás pruebas heredan un worker parado.
+      await compose(
+        ['*'],
+        ['up', '-d', '--wait', '--no-deps', 'finance-worker'],
+        { mode: 'capture' },
+        ctx,
+      ).catch(() => undefined);
+    }
   });
 
   it('[TC-PLATFORM-STACK-004] backup:local y restore:local devuelven base y object storage al estado respaldado', async () => {

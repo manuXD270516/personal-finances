@@ -166,7 +166,9 @@ export function NotificationDetailView({
                               ? f.t('detail.openCashFlowCalendar')
                               : n.link.kind === 'HOME_DIGEST'
                                 ? f.t('detail.openHome')
-                                : f.t('detail.openBudgetLine', { period })}
+                                : n.link.kind === 'SPENDING_ANOMALIES'
+                                  ? f.t('detail.openSpendingAnomalies')
+                                  : f.t('detail.openBudgetLine', { period })}
           </a>
         </p>
       ) : null}

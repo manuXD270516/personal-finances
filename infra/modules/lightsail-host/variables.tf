@@ -44,9 +44,9 @@ variable "swap_size_mb" {
 }
 
 variable "auto_snapshot_time_utc" {
-  description = "Hora (UTC, HH:00) del snapshot automático diario de Lightsail (retiene 7). 06:00 UTC = 02:00 La Paz."
+  description = "Hora (UTC, HH:00) del snapshot automático diario de Lightsail (retiene 7). 10:00 UTC = 06:00 La Paz, fuera de 06:00–07:30 UTC (backups) y del reinicio de 08:30 UTC."
   type        = string
-  default     = "06:00"
+  default     = "10:00"
 }
 
 variable "tags" {

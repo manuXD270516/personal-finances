@@ -1,4 +1,4 @@
-import type { LocalDate, Money } from '@pf/shared-kernel';
+import { Money, type LocalDate } from '@pf/shared-kernel';
 import type {
   CardAccountState,
   CardInstallmentPlanState,
@@ -6,7 +6,12 @@ import type {
   CycleFigures,
   MinimumPaymentRuleSpec,
 } from '../domain/index.js';
-import { resolveNextDue, type NextDue } from '../domain/index.js';
+import {
+  proposeChargeFromDifference,
+  resolveNextDue,
+  type CardChargeState,
+  type NextDue,
+} from '../domain/index.js';
 import type { AccountView, CycleView, UtilizationScope } from './card-engine.js';
 import type { StatementRecord } from './card-ports.js';
 
@@ -58,6 +63,52 @@ export interface CardStatementView {
   readonly remainingMinimum: MoneyView;
   readonly consistent: boolean;
   readonly version: number | null;
+  /** Cargos vigentes del ciclo (add-card-interest-ledger-portions); solo en el detalle y la lista de estados de cuenta. */
+  readonly charges?: readonly CardChargeView[];
+  /** Propuesta de registrar como cargo la diferencia con el banco (solo lectura); `null` si no corresponde. */
+  readonly chargeProposal: { readonly businessDate: string; readonly total: MoneyView } | null;
+}
+
+/** Cargo de una tarjeta tal como lo publica la API. */
+export interface CardChargeView {
+  readonly id: string;
+  readonly cardId: string;
+  readonly accountId: string;
+  readonly currency: string;
+  readonly businessDate: string;
+  readonly interest: MoneyView;
+  readonly fees: MoneyView;
+  readonly insurance: MoneyView;
+  readonly taxes: MoneyView;
+  readonly total: MoneyView;
+  readonly origin: CardChargeState['origin'];
+  readonly status: CardChargeState['status'];
+  readonly transactionId: string;
+  readonly voidReason: string | null;
+  readonly createdAt: string;
+  readonly version: number;
+}
+
+export function cardChargeView(s: CardChargeState): CardChargeView {
+  const money = (v: Money): MoneyView => ({ amount: v.toFixed(), currency: s.currency.code });
+  return {
+    id: s.id,
+    cardId: s.cardId,
+    accountId: s.accountId,
+    currency: s.currency.code,
+    businessDate: s.businessDate,
+    interest: money(s.interest),
+    fees: money(s.fees),
+    insurance: money(s.insurance),
+    taxes: money(s.taxes),
+    total: money(s.interest.add(s.fees).add(s.insurance).add(s.taxes)),
+    origin: s.origin,
+    status: s.status,
+    transactionId: s.transactionId,
+    voidReason: s.voidReason,
+    createdAt: s.createdAt,
+    version: s.version,
+  };
 }
 
 export interface CardUtilizationView {
@@ -211,7 +262,25 @@ export function statementView(
     remainingMinimum: standing ? m(standing.remainingMinimum) : zero,
     consistent: cv.current.consistent,
     version: record?.version ?? null,
+    chargeProposal: proposalView(record, cv),
   };
+}
+
+/** Propuesta de cargo desde la diferencia con el banco (Could): nunca crea nada, solo informa fecha y total. */
+function proposalView(record: StatementRecord | null, cv: CycleView): CardStatementView['chargeProposal'] {
+  if (!record || record.reportedBilledBalance === null) return null;
+  const currency = cv.current.billedBalance.currency;
+  const proposal = proposeChargeFromDifference({
+    reportedBilledBalance: Money.parse(record.reportedBilledBalance, currency),
+    currentBilledBalance: cv.current.billedBalance,
+    closingDate: cv.cycle.closing.toString(),
+  });
+  return proposal
+    ? {
+        businessDate: proposal.businessDate,
+        total: { amount: proposal.total.toFixed(), currency: currency.code },
+      }
+    : null;
 }
 
 export function utilizationView(scope: UtilizationScope): CardUtilizationView {

@@ -10,21 +10,6 @@ import type { ForecastPoint } from './types';
  * (NFR-USAB-105) la pinta la vista. La geometría usa enteros exactos (`ratioBetween`); las cifras que se leen salen de
  * los strings decimales.
  */
-export const FORECAST_CHART_CSS = `
-.pf-fcc-figure{display:grid;gap:0.5rem;min-width:0;margin:0}
-.pf-fcc-svg{width:100%;height:auto;display:block;overflow:visible}
-.pf-fcc-axis{stroke:var(--pf-border-strong);stroke-width:1}
-.pf-fcc-grid{stroke:var(--pf-border);stroke-width:1}
-.pf-fcc-tick{fill:var(--pf-fg-muted);font-size:11px;font-variant-numeric:tabular-nums}
-.pf-fcc-band{fill:var(--pf-primary);fill-opacity:0.14;stroke:var(--pf-primary);stroke-width:1.5;stroke-dasharray:5 4}
-.pf-fcc-line{stroke:var(--pf-primary);stroke-width:2.5;fill:none}
-.pf-fcc-dot{fill:var(--pf-bg);stroke:var(--pf-primary);stroke-width:2.5}
-.pf-fcc-dot[data-selected="true"]{fill:var(--pf-primary)}
-.pf-fcc-legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0.25rem 1rem;font-size:0.875rem;color:var(--pf-fg-muted)}
-.pf-fcc-legend li{display:inline-flex;align-items:center;gap:0.375rem}
-.pf-fcc-swatch{display:inline-block;width:1.5rem;height:0.75rem;border:1.5px dashed var(--pf-primary);background:color-mix(in srgb,var(--pf-primary) 14%,transparent)}
-.pf-fcc-swatch[data-kind="expected"]{height:0;border:0;border-top:3px solid var(--pf-primary);background:none}
-`;
 
 const W = 640;
 const G = { left: 84, right: 16, top: 16, bottom: 34, height: 260 } as const;

@@ -6,7 +6,7 @@ import { ProblemMessage } from '../../../errors/ProblemMessage';
 import { isZeroAmount } from '../../common/money';
 import type { Account, Page, Transaction } from '../../common/types';
 import {
-  ConfirmPanel,
+  ConfirmDialog,
   Field,
   cellStyle,
   formStyle,
@@ -15,8 +15,8 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../../common/workspace';
 import { formatMoney, formatSignedMoney } from '../../dashboard/format';
@@ -37,6 +37,7 @@ import {
   type InstallmentForm,
   type PlanForm,
 } from './logic';
+import { ChargesSection } from './CardCharges';
 import { StatementStatusBadge } from './parts';
 import {
   CARD_MATERIALIZATION_MODES,
@@ -55,7 +56,12 @@ interface PanelProps {
   readonly onChanged: (message: string) => void;
 }
 
-const sectionGap = { display: 'grid', gap: 'var(--pf-space-3)' } as const;
+// `minmax(0, 1fr)`: una tabla ancha (cifras del estado de cuenta, cargos) se desplaza dentro de su contenedor y no ensancha la página.
+const sectionGap = {
+  display: 'grid',
+  gap: 'var(--pf-space-3)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+} as const;
 
 // ───────────────────────────── Estados de cuenta ─────────────────────────────
 
@@ -82,7 +88,7 @@ export function FiguresTable({ statement, f }: { statement: CardStatement; f: Fo
   const changed = new Set(changedFigures(statement));
   const rows = FIGURE_KEYS.filter((k) => ALWAYS.includes(k) || !isZeroAmount(current[k].amount));
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('statements.figuresRegion')}>
+    <TableRegion label={f.t('statements.figuresRegion')}>
       <table style={tableStyle} data-testid="statement-figures">
         <caption className="pf-sr-only">
           {f.t('statements.figuresCaption', {
@@ -142,7 +148,7 @@ export function FiguresTable({ statement, f }: { statement: CardStatement; f: Fo
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -266,6 +272,7 @@ export function StatementItem({
   open,
   highlight,
   form,
+  charges,
 }: {
   statement: CardStatement;
   f: FormatContext;
@@ -273,6 +280,8 @@ export function StatementItem({
   highlight: boolean;
   /** Formulario de montos del banco (solo EDITOR/OWNER y estado emitido). */
   form?: ReactNode;
+  /** Cargos del ciclo (intereses, comisiones, seguro e impuestos) con su alta y anulación. */
+  charges?: ReactNode;
 }) {
   const changed = changedFigures(statement);
   const reported = statement.reported;
@@ -384,6 +393,7 @@ export function StatementItem({
             ) : null}
           </dl>
         ) : null}
+        {charges}
         {form}
       </div>
     </details>
@@ -458,6 +468,17 @@ export function StatementsPanel({
                   f={f}
                   open={highlightId ? s.id === highlightId : i === 0}
                   highlight={highlightId !== undefined && s.id === highlightId}
+                  charges={
+                    <ChargesSection
+                      ctx={ctx}
+                      card={card}
+                      statement={s}
+                      onChanged={(message) => {
+                        setTick((n) => n + 1);
+                        onChanged(message);
+                      }}
+                    />
+                  }
                   form={
                     ctx.canEdit && canReportBank(s) && card.status === 'ACTIVE' ? (
                       <ReportedForm
@@ -765,7 +786,7 @@ function PlanSection({
         />
       ) : null}
       {mode === 'disable' ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="plan-disable-panel"
           title={f.t('plan.disableTitle')}
           description={f.t('plan.disableDescription')}
@@ -810,7 +831,7 @@ export function PlanPanel({ ctx, card, accounts, onChanged }: PanelProps & { acc
 /** Tabla de cuotas de un plan: número, cierre, vencimiento, capital, interés proyectado y total. */
 export function InstallmentsTable({ plan, f }: { plan: CardInstallmentPlan; f: FormatContext }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('installments.region')}>
+    <TableRegion label={f.t('installments.region')} tall>
       <table style={tableStyle} data-testid="installments-table">
         <caption className="pf-sr-only">
           {f.t('installments.caption', { count: plan.installmentCount })}
@@ -852,7 +873,7 @@ export function InstallmentsTable({ plan, f }: { plan: CardInstallmentPlan; f: F
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -1134,7 +1155,7 @@ export function InstallmentsPanel({ ctx, card, onChanged }: PanelProps) {
         ))
       )}
       {cancelling ? (
-        <ConfirmPanel
+        <ConfirmDialog
           testId="installment-cancel-panel"
           title={f.t('installments.cancelTitle')}
           description={f.t('installments.cancelDescription')}
@@ -1162,7 +1183,7 @@ export function FutureChargesTable({
   f: FormatContext;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('future.region')}>
+    <TableRegion label={f.t('future.region')}>
       <table style={tableStyle} data-testid="future-table">
         <caption className="pf-sr-only">{f.t('future.caption')}</caption>
         <thead>
@@ -1206,7 +1227,7 @@ export function FutureChargesTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

@@ -1,7 +1,9 @@
 import { unitOfWorkKysely } from '@pf/platform/api';
-import { DomainError, dec } from '@pf/shared-kernel';
+import { DomainError, Money, currency as makeCurrency, dec } from '@pf/shared-kernel';
 import { sql } from 'kysely';
 import type {
+  CardChargeFilter,
+  CardChargeRepository,
   CardRepository,
   InstallmentPlanRepository,
   ReminderRepository,
@@ -10,6 +12,7 @@ import type {
   UtilizationRepository,
 } from '../application/card-ports.js';
 import {
+  CardCharge,
   CardInstallmentPlan,
   CreditCard,
   type CardAccountState,
@@ -689,5 +692,153 @@ export class PgReminderRepository implements ReminderRepository {
               ${i.emittedAt}::timestamptz, ${i.eventId})
       ON CONFLICT (workspace_id, card_account_id, closing_date) DO NOTHING`.execute(db());
     return Number(result.numAffectedRows ?? 0) === 1;
+  }
+}
+
+// ───────────────────────────────────────────────────────────── cargos de tarjeta
+
+interface ChargeRow {
+  id: string;
+  workspace_id: string;
+  card_id: string;
+  card_account_id: string;
+  account_id: string;
+  transaction_id: string;
+  business_date: string;
+  currency: string;
+  scale: number;
+  interest: string;
+  fees: string;
+  insurance: string;
+  taxes: string;
+  origin: 'RECORDED' | 'ADOPTED';
+  status: 'ACTIVE' | 'VOIDED';
+  void_reason: string | null;
+  created_at: string;
+  created_by: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  version: number;
+}
+
+const CHARGE_COLUMNS = sql`
+  k.id, k.workspace_id, k.card_id, k.card_account_id, k.account_id, k.transaction_id,
+  ${D('k.business_date')} AS business_date, k.currency, c.scale, k.interest, k.fees, k.insurance, k.taxes, k.origin,
+  k.status, k.void_reason, ${ISO('k.created_at')} AS created_at, k.created_by,
+  ${ISO('k.voided_at')} AS voided_at, k.voided_by, k.version`;
+
+const toCharge = (r: ChargeRow): CardCharge => {
+  const currency = makeCurrency(r.currency, Number(r.scale));
+  const m = (v: string) => Money.parse(money(v, Number(r.scale)), currency);
+  return CardCharge.rehydrate({
+    id: r.id,
+    workspaceId: r.workspace_id,
+    cardId: r.card_id,
+    cardAccountId: r.card_account_id,
+    accountId: r.account_id,
+    transactionId: r.transaction_id,
+    businessDate: r.business_date,
+    currency,
+    interest: m(r.interest),
+    fees: m(r.fees),
+    insurance: m(r.insurance),
+    taxes: m(r.taxes),
+    origin: r.origin,
+    status: r.status,
+    voidReason: r.void_reason,
+    createdAt: r.created_at,
+    createdBy: r.created_by,
+    voidedAt: r.voided_at,
+    voidedBy: r.voided_by,
+    version: Number(r.version),
+  });
+};
+
+const encodeChargeCursor = (date: string, id: string): string =>
+  Buffer.from(JSON.stringify([date, id]), 'utf8').toString('base64url');
+function decodeChargeCursor(cursor: string): { date: string; id: string } {
+  try {
+    const [date, id] = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as [string, string];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || typeof id !== 'string') throw new Error('shape');
+    return { date, id };
+  } catch {
+    throw new DomainError('VALIDATION_FAILED', 'cursor is not valid').at('/after');
+  }
+}
+
+export class PgCardChargeRepository implements CardChargeRepository {
+  async insert(charge: CardCharge): Promise<void> {
+    const s = charge.snapshot;
+    await sql`
+      INSERT INTO debt.card_charge (
+        id, workspace_id, card_id, card_account_id, account_id, transaction_id, business_date, currency,
+        interest, fees, insurance, taxes, origin, status, created_at, created_by, version)
+      VALUES (${s.id}, ${s.workspaceId}, ${s.cardId}, ${s.cardAccountId}, ${s.accountId}, ${s.transactionId},
+              ${s.businessDate}::date, ${s.currency.code}, ${s.interest.toFixed()}, ${s.fees.toFixed()},
+              ${s.insurance.toFixed()}, ${s.taxes.toFixed()}, ${s.origin}, ${s.status}, ${s.createdAt}::timestamptz,
+              ${s.createdBy}, ${s.version})`.execute(db());
+  }
+
+  async findById(workspaceId: string, id: string, options: { lock?: 'update' } = {}) {
+    const lock = options.lock === 'update' ? sql`FOR UPDATE OF k` : sql``;
+    const { rows } = await sql<ChargeRow>`
+      SELECT ${CHARGE_COLUMNS} FROM debt.card_charge k JOIN fx.currency c ON c.code = k.currency
+       WHERE k.workspace_id = ${workspaceId} AND k.id = ${id} ${lock}`.execute(db());
+    return rows[0] ? toCharge(rows[0]) : null;
+  }
+
+  async findActiveByTransaction(workspaceId: string, transactionId: string) {
+    const { rows } = await sql<ChargeRow>`
+      SELECT ${CHARGE_COLUMNS} FROM debt.card_charge k JOIN fx.currency c ON c.code = k.currency
+       WHERE k.workspace_id = ${workspaceId} AND k.transaction_id = ${transactionId} AND k.status = 'ACTIVE'`.execute(
+      db(),
+    );
+    return rows[0] ? toCharge(rows[0]) : null;
+  }
+
+  async saveVoid(charge: CardCharge): Promise<boolean> {
+    const s = charge.snapshot;
+    const result = await sql`
+      UPDATE debt.card_charge
+         SET status = ${s.status}, void_reason = ${s.voidReason}, voided_at = ${s.voidedAt}::timestamptz,
+             voided_by = ${s.voidedBy}, version = ${s.version}
+       WHERE workspace_id = ${s.workspaceId} AND id = ${s.id} AND version = ${s.version - 1}`.execute(db());
+    return Number(result.numAffectedRows ?? 0) === 1;
+  }
+
+  async list(workspaceId: string, filter: CardChargeFilter) {
+    const limit = Math.min(Math.max(filter.limit, 1), 200);
+    const after = filter.after ? decodeChargeCursor(filter.after) : null;
+    const accounts =
+      filter.cardAccountIds === undefined
+        ? sql``
+        : sql`AND k.card_account_id = ANY(${[...filter.cardAccountIds]}::uuid[])`;
+    const from = filter.from ? sql`AND k.business_date >= ${filter.from}::date` : sql``;
+    const to = filter.to ? sql`AND k.business_date <= ${filter.to}::date` : sql``;
+    const status = filter.status ? sql`AND k.status = ${filter.status}` : sql``;
+    const cursor = after
+      ? sql`AND (k.business_date, k.id) < (${after.date}::date, ${after.id}::uuid)`
+      : sql``;
+    const { rows } = await sql<ChargeRow>`
+      SELECT ${CHARGE_COLUMNS} FROM debt.card_charge k JOIN fx.currency c ON c.code = k.currency
+       WHERE k.workspace_id = ${workspaceId} AND k.card_id = ${filter.cardId} ${accounts} ${from} ${to} ${status} ${cursor}
+       ORDER BY k.business_date DESC, k.id DESC
+       LIMIT ${limit + 1}`.execute(db());
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+      items: page.map(toCharge),
+      nextCursor: rows.length > limit && last ? encodeChargeCursor(last.business_date, last.id) : null,
+    };
+  }
+
+  async activeForAccounts(workspaceId: string, cardAccountIds: readonly string[], from: string, to: string) {
+    if (cardAccountIds.length === 0) return [];
+    const { rows } = await sql<ChargeRow>`
+      SELECT ${CHARGE_COLUMNS} FROM debt.card_charge k JOIN fx.currency c ON c.code = k.currency
+       WHERE k.workspace_id = ${workspaceId} AND k.card_account_id = ANY(${[...cardAccountIds]}::uuid[])
+         AND k.status = 'ACTIVE' AND k.business_date BETWEEN ${from}::date AND ${to}::date
+       ORDER BY k.business_date, k.id`.execute(db());
+    return rows.map(toCharge);
   }
 }

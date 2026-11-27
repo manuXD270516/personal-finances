@@ -5,12 +5,27 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { routing } from '../../i18n/routing';
 import { ProblemMessage } from '../errors/ProblemMessage';
+import { useFocusFirstErrorOnSubmit } from './common/forms';
+import { installStore } from './common/install';
+import { NoticeRegion, NoticesProvider } from './common/notices';
 import { WorkspaceSelector } from './identity/IdentityViews';
 import { switchLocalePath, type UiLocale } from './identity/logic';
 import { localized, useSession } from './session-context';
 import { NotificationBell } from './notifications/NotificationBell';
 import { RecurringNavCount } from './recurring/RecurringNavCount';
-import { activeNav, initialOf, isNotificationsRoute, NAV_ITEMS, type NavKey } from './shell/nav';
+import {
+  activeNav,
+  initialOf,
+  isNotificationsRoute,
+  NAV_ITEMS,
+  NEW_TRANSACTION_PATH,
+  showQuickAdd,
+  type NavKey,
+} from './shell/nav';
+
+// `beforeinstallprompt` llega una sola vez y puede adelantarse al botón de Mis preferencias: la escucha se registra al
+// cargar el módulo del marco (change add-pwa-install, decisión 4).
+installStore.start();
 
 /** Nombre de cada idioma de la UI en el catálogo `Locales`. */
 const LOCALE_NAME: Record<UiLocale, 'es-BO' | 'en-US' | 'pt-BR'> = { es: 'es-BO', en: 'en-US', pt: 'pt-BR' };
@@ -31,11 +46,14 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const navId = useId();
 
+  // Tras un envío rechazado por la validación, el foco va al resumen o al primer campo inválido (decisión 2 del change).
+  useFocusFirstErrorOnSubmit();
+
   // En móvil, el panel de navegación se cierra al cambiar de ruta.
   useEffect(() => setNavOpen(false), [pathname]);
 
   const frame = (body: ReactNode, bar?: ReactNode, nav?: ReactNode) => (
-    <>
+    <NoticesProvider>
       <a className="pf-skip" href="#contenido">
         {t('skipToContent')}
       </a>
@@ -71,8 +89,10 @@ export function AppFrame({ children }: { children: ReactNode }) {
         <main id="contenido" tabIndex={-1} className="pf-main">
           <div className="pf-main-inner">{body}</div>
         </main>
+        {/* Región de avisos persistente: montada también mientras carga (change add-quick-capture). */}
+        <NoticeRegion />
       </div>
-    </>
+    </NoticesProvider>
   );
 
   if (state.status === 'loading') return frame(<p data-testid="loading">{t('loading')}</p>);
@@ -114,6 +134,13 @@ export function AppFrame({ children }: { children: ReactNode }) {
           }}
         />
       </div>
+      {showQuickAdd(pathname, active?.role) ? (
+        // Acceso directo al alta (add-quick-capture): solo quien puede editar y no dentro del alta.
+        <a className="pf-quick-add" href={localized(locale, NEW_TRANSACTION_PATH)}>
+          <span aria-hidden="true">＋</span>
+          <span className="pf-quick-add-label">{t('quickAdd')}</span>
+        </a>
+      ) : null}
       <NotificationBell
         href={localized(locale, '/notificaciones')}
         current={isNotificationsRoute(pathname)}
@@ -289,6 +316,7 @@ const NAV_PATHS: Record<NavKey, string> = {
   recurring: 'M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5',
   cashFlow: 'M3 17l5-6 4 3 4-7 5 5M3 21h18',
   forecasts: 'M3 20V4M3 20h18M7 15l4-4 3 3 6-7M7 9v3M11 7v3M14 9v3M20 5v3',
+  spendingAnomalies: 'M3 20h18M6 17l4-5 3 3 5-7M18 8h-3m3 0v3',
   goals: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
   debt: 'M3 6h18v12H3zM3 10h18M7 15h4M15 15h2',
   reports: 'M4 20V10M10 20V4M16 20v-7M22 20H2',

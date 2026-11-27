@@ -309,7 +309,7 @@ export function TrendsView({ f, data, onDrill }: ViewProps<TrendsReport>) {
 
 // ───────────────────────────────────────────── 14. comisiones
 
-const FEE_TYPES = ['CONVERSION', 'TRANSFER', 'LOAN', 'FEE_CATEGORY'] as const;
+const FEE_TYPES = ['CONVERSION', 'TRANSFER', 'LOAN', 'CARD', 'FEE_CATEGORY'] as const;
 
 export function FeesView({ f, data }: ViewProps<FeesReport>) {
   if (data.months.length === 0) return empty(f);
@@ -439,6 +439,7 @@ export function DebtsView({ f, data }: ViewProps<DebtsReport>) {
               f.t('debts.principalPaid'),
               f.t('debts.interestPaid'),
               f.t('debts.chargesPaid'),
+              ...(hasCard ? [f.t('debts.interestCharged'), f.t('debts.chargesCharged')] : []),
             ]}
           >
             {d.months.map((m) => (
@@ -448,6 +449,12 @@ export function DebtsView({ f, data }: ViewProps<DebtsReport>) {
                 <Td>{m.principalPaid ? formatMoney(m.principalPaid, f.locale) : '—'}</Td>
                 <Td>{m.interestPaid ? formatMoney(m.interestPaid, f.locale) : '—'}</Td>
                 <Td>{m.chargesPaid ? formatMoney(m.chargesPaid, f.locale) : '—'}</Td>
+                {hasCard ? (
+                  <>
+                    <Td>{m.interestCharged ? formatMoney(m.interestCharged, f.locale) : '—'}</Td>
+                    <Td>{m.chargesCharged ? formatMoney(m.chargesCharged, f.locale) : '—'}</Td>
+                  </>
+                ) : null}
               </tr>
             ))}
           </DataTable>
@@ -461,6 +468,7 @@ export function DebtsView({ f, data }: ViewProps<DebtsReport>) {
           f.t('debts.outstanding'),
           f.t('debts.principalPaid'),
           f.t('debts.interestPaid'),
+          ...(hasCard ? [f.t('debts.interestCharged')] : []),
         ]}
       >
         {data.consolidated.map((c) => (
@@ -475,6 +483,11 @@ export function DebtsView({ f, data }: ViewProps<DebtsReport>) {
             <Td>
               <ConsolidatedCell amount={c.interestPaid} f={f} />
             </Td>
+            {hasCard ? (
+              <Td>
+                <ConsolidatedCell amount={c.interestCharged} f={f} />
+              </Td>
+            ) : null}
           </tr>
         ))}
       </DataTable>

@@ -347,7 +347,7 @@ export function AccountForm({
         {t('form.includeInNetWorth')}
       </label>
       {!editing ? (
-        <fieldset style={{ ...rowStyle, border: '1px solid #d0d7de', padding: '0.5rem' }}>
+        <fieldset style={{ ...rowStyle, border: '1px solid var(--pf-card-border)', padding: '0.5rem' }}>
           <legend>{t('form.openingTitle')}</legend>
           <Field
             label={t('form.openingAmount', { currency: s.currency })}

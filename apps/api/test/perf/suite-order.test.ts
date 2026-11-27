@@ -23,6 +23,8 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
       'upcoming-payments',
       'subscriptions',
       'forecast',
+      'anomalies',
+      'budget-risk',
     ];
     for (const s of latency) expect(idx(s)).toBeLessThan(idx('commitments'));
     expect(idx('commitments')).toBeLessThan(idx('throughput'));
@@ -46,6 +48,9 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
       paths[10]!,
       paths[11]!,
       paths[12]!,
+      paths[13]!,
+      paths[14]!,
+      paths[15]!,
     ];
     expect(orderPerfSuites(shuffled, (p) => p)).toEqual(paths);
     expect(orderPerfSuites([...paths].reverse(), (p) => p)).toEqual(paths);
@@ -70,5 +75,34 @@ describe('orden determinista de las suites de perf (investigate-perf-under-load 
     expect(suite).toContain('FORECAST_PERF_SERVICE_URL');
     expect(suite).toMatch(/runForecastRunner\(forecasting,/u);
     expect(suite).toMatch(/expect\(elapsed\)\.toBeLessThanOrEqual\(BUDGET_MS\)/u);
+  });
+
+  it('[TC-FORECAST-ANOMALY-026] anomalies.perf.ts mide la pasada diaria con el umbral de 10 s de NFR-PERF-012 y la evaluación contra las etiquetas del Large Seed, dentro de la lista de suites', () => {
+    const dir = fileURLToPath(new URL('.', import.meta.url));
+    const suite = readFileSync(`${dir}anomalies.perf.ts`, 'utf8');
+    expect(PERF_SUITE_ORDER).toContain('anomalies.perf.ts');
+    expect(suite).toMatch(/const PASS_BUDGET_MS = 10_000;/u);
+    expect(suite).toContain('[TC-FORECAST-ANOMALY-026]');
+    expect(suite).toContain('[TC-FORECAST-ANOMALY-025]');
+    // Fila BLOQUEANTE (D514, que levanta la fila informativa de D488): precisión ≥ 0.80 y recall ≥ 0.85 a escala completa;
+    // etiquetas exportadas por el seed del nightly e informe publicado siempre.
+    expect(suite).toContain('fila bloqueante, D514');
+    expect(suite).toMatch(/join\(perfOutDir\(\), 'anomalies\.json'\)/u);
+    expect(suite).toMatch(/toBeGreaterThanOrEqual\(0\.8\)/u);
+    expect(suite).toMatch(/toBeGreaterThanOrEqual\(0\.85\)/u);
+    expect(suite).not.toContain('fila informativa');
+    expect(suite).not.toMatch(/toBeGreaterThanOrEqual\(0\.6\)/u);
+    expect(readFileSync(`${dir}nightly.perf.ts`, 'utf8')).toContain('labelsOut: anomalyLabelsPath()');
+  });
+
+  it('[TC-REPORTING-INSIGHT-017] budget-risk.perf.ts mide el riesgo de un plan de 40 líneas y el Home con el umbral de 300 ms, dentro de la lista de suites', () => {
+    const dir = fileURLToPath(new URL('.', import.meta.url));
+    const suite = readFileSync(`${dir}budget-risk.perf.ts`, 'utf8');
+    expect(PERF_SUITE_ORDER).toContain('budget-risk.perf.ts');
+    expect(suite).toMatch(/const RISK_BUDGET_MS = 300;/u);
+    expect(suite).toMatch(/const LINES = 40;/u);
+    expect(suite).toMatch(/const EXPENSES = 3000;/u);
+    expect(suite).toContain('[TC-REPORTING-INSIGHT-017]');
+    expect(suite).toMatch(/expect\(p95\(times\)\)\.toBeLessThanOrEqual\(HOME_BUDGET_MS\)/u);
   });
 });

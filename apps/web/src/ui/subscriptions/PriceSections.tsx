@@ -13,8 +13,8 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import { formatMoney } from '../dashboard/format';
@@ -55,7 +55,7 @@ export function PriceHistoryTable({
   const inForce = priceInForce(history, today);
   const byId = new Map(history.map((p) => [p.id, p]));
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={f.t('history.caption')}>
       <table style={tableStyle} data-testid="price-history">
         <caption className="pf-sr-only">{f.t('history.caption')}</caption>
         <thead>
@@ -134,7 +134,7 @@ export function PriceHistoryTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

@@ -31,7 +31,7 @@ services:
   # ─────────────────────────── edge ───────────────────────────
   caddy:
     profiles: [core]
-    image: caddy:2.11.6-alpine@sha256:d44355d3c2149dc580ce2cac735955d1c08d3d00882c30489c241aa51a5c10d9
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     restart: unless-stopped
     environment:
       PF_DOMAIN_APP: ${PF_DOMAIN_APP:?definir en /etc/pfos/pfos.env}
@@ -127,8 +127,15 @@ services:
     profiles: !override [dev-only]
 
   keycloak:
+    # Imagen propia con build optimizado (docker/keycloak.Dockerfile, C7): el digest de `pfos-keycloak` viaja en
+    # release.env (PFOS_KEYCLOAK_IMAGE) como el de finance-ml. Sin él (releases viejos, rollback) cae en la imagen
+    # oficial, que rehace el build de Quarkus en cada arranque: más lento y con más pico de memoria, pero funciona.
+    image: ${PFOS_KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.8.2@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3}
+    pull_policy: missing
     # Modo producción (no `start-dev`): TLS termina en Caddy (cabeceras X-Forwarded-*), caché local (un nodo,
     # sin JGroups) y realm de producción SIN usuarios demo (se importa solo la primera vez).
+    # Sin `--optimized` a propósito: con la imagen propia las opciones de build (db, health, cache) coinciden con las
+    # horneadas y Keycloak no reconstruye; con la imagen oficial de respaldo sí lo haría, en vez de fallar.
     command:
       !override [
         'start',
@@ -144,7 +151,9 @@ services:
       KC_HOSTNAME_ADMIN: http://localhost:${PF_KEYCLOAK_PORT}
       KC_DB_POOL_MAX_SIZE: '10'
       # Heap acotado para 2 GB (SPIKE-06: funciona con 512 MiB; 545–581 MiB medidos con límite de 1 GiB).
-      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=20 -XX:+UseSerialGC
+      # Sin `-XX:+UseSerialGC`: kc.sh 26.8 ya fija `-XX:+UseG1GC` en JAVA_OPTS y la JVM aborta con «Multiple garbage
+      # collectors selected» (el contenedor no arrancaba). Se mide con G1 (ver PR de C7).
+      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=20
       PF_OIDC_CLIENT_SECRET: ${PF_DEV_OIDC_CLIENT_SECRET}
       PF_DEV_OIDC_CLIENT_SECRET: !reset null
       PF_DEV_KC_OWNER_PASSWORD: !reset null
@@ -189,6 +198,11 @@ services:
     build: !reset null
     pull_policy: missing
     read_only: true # la credencial del servicio de pronósticos es un `file` del host (en desarrollo es `content`)
+    # Clave PRIVADA de las conexiones (D342, C10): solo el worker la monta, de solo lectura, 0400 del uid 1000 (pfos-deploy.sh la crea
+    # vacía si falta). `finance-api` solo lleva la clave pública. Con la variable CONNECTION_CREDENTIALS_PRIVATE_KEYS_FILE de pfos.env.
+    configs:
+      - source: connection-credentials-keys
+        target: /run/pfos/connection-credentials.keys
     environment:
       <<: *prod-app-env
       # Sin proveedor de email elegido (docs/33 D87, add-alerts): solo notificaciones in-app. Sin mailpit en producción.
@@ -239,3 +253,7 @@ volumes:
 configs:
   ml-service-token: !override
     file: /etc/pfos/ml-service-token
+  # Clave privada de las conexiones con exchanges: archivo del host, solo en `finance-worker` (arriba). Un `file` es un bind mount de
+  # solo lectura que conserva dueño y permisos del host; `pfos-deploy.sh` lo crea vacío (1000:1000, 0400) si falta.
+  connection-credentials-keys:
+    file: /etc/pfos/connection-credentials.keys

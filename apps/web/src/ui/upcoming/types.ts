@@ -20,6 +20,8 @@ export interface UpcomingPaymentItem {
   readonly status: UpcomingItemStatus;
   readonly daysOverdue?: number;
   readonly amountType: UpcomingAmountType;
+  /** Origen del esperado de un pago de tarjeta; ausente en los demás pagos. */
+  readonly expectedBasis?: 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS' | undefined;
   readonly amount: Money | null;
   readonly range?: { readonly min: Money; readonly max: Money };
   readonly estimated: boolean;

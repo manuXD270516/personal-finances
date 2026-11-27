@@ -63,7 +63,7 @@ const vehicleLoan = (accounts: { bank: string }, overrides: Record<string, unkno
 });
 
 test.describe('Préstamos (debt/loans)', () => {
-  test('[TC-DEBT-LOAN-001] [TC-DEBT-LOAN-012] [TC-DEBT-LOAN-019] [TC-DEBT-LOAN-035] [TC-DEBT-LOAN-040] registrar el préstamo vehicular, desembolsar, ver la cuota como compromiso y pagar la cuota 1', async ({
+  test('[TC-TRANSACTIONS-MANAGEDEDIT-001] [TC-DEBT-LOAN-001] [TC-DEBT-LOAN-012] [TC-DEBT-LOAN-019] [TC-DEBT-LOAN-035] [TC-DEBT-LOAN-040] registrar el préstamo vehicular, desembolsar, ver la cuota como compromiso y pagar la cuota 1', async ({
     browser,
   }) => {
     test.setTimeout(240_000);
@@ -158,6 +158,23 @@ test.describe('Préstamos (debt/loans)', () => {
     await expect(page.getByTestId('tx-loan-link')).toHaveAttribute('href', new RegExp(`/debts/${loanId}$`));
     await expect(page.getByTestId('tx-loan-breakdown')).toContainText('479,17 BOB');
     await expect(page.getByRole('button', { name: /^Anular/ })).toHaveCount(0);
+    expect(await seriousViolations(page)).toEqual([]);
+
+    // Edición descriptiva (TC-TRANSACTIONS-MANAGEDEDIT-001): solo descripción y notas; el monto y el asiento no cambian.
+    const paymentTx = payments[0]!.transactionId;
+    await page.getByRole('button', { name: 'Editar descripción y notas' }).click();
+    const managed = page.getByTestId('managed-edit-form');
+    await expect(managed.locator('[name="description"]')).toBeVisible();
+    await expect(managed.locator('[name="notes"]')).toBeVisible();
+    await expect(managed.locator('[name="amount"]')).toHaveCount(0);
+    await expect(managed.locator('[name="accountId"]')).toHaveCount(0);
+    await managed.locator('[name="notes"]').fill('pagado en ventanilla');
+    await managed.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Cambios guardados' })).toBeVisible();
+    const edited = await api(page, 'GET', `${W}/transactions/${paymentTx}`);
+    expect(edited['notes']).toBe('pagado en ventanilla');
+    expect((edited['amount'] as Money).amount).toBe('2342.02');
+    expect(Number(edited['version'])).toBeGreaterThan(Number(tx['version']));
     expect(await seriousViolations(page)).toEqual([]);
 
     // Recorrido del préstamo.

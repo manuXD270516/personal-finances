@@ -390,10 +390,13 @@ describe('Campana: sondeo del contador', () => {
     const api = { get, command: vi.fn() };
     const first = await fetchUnreadCount(api, '/workspaces/w1');
     expect(first).toEqual({ unread: 4, etag: '"a"' });
-    expect(get).toHaveBeenCalledWith('/workspaces/w1/notifications/unread-count', {});
+    expect(get).toHaveBeenCalledWith('/workspaces/w1/notifications/unread-count', { background: true });
     const second = await fetchUnreadCount(api, '/workspaces/w1', first.etag);
     expect(second.unread).toBeUndefined();
-    expect(get).toHaveBeenLastCalledWith('/workspaces/w1/notifications/unread-count', { etag: '"a"' });
+    expect(get).toHaveBeenLastCalledWith('/workspaces/w1/notifications/unread-count', {
+      etag: '"a"',
+      background: true,
+    });
   });
 });
 

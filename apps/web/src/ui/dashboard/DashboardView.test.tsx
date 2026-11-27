@@ -28,7 +28,7 @@ const section = (html: string, testId: string): string => {
   if (!m) throw new Error(`sin sección ${testId}`);
   return m[0];
 };
-const text = (html: string) => html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, '');
+const text = (html: string) => html.replace(/<[^>]+>/g, '');
 /** Elemento `<li data-testid="top-category">` de una categoría (no anidan otros `<li>`). */
 const categoryRow = (html: string, name: string): string => {
   const rows = html.match(/<li data-testid="top-category"[\s\S]*?<\/li>/g) ?? [];
@@ -269,9 +269,15 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
     expect(month).toBeGreaterThan(html.indexOf('data-testid="liquid-balance"'));
     expect(month).toBeLessThan(html.indexOf('data-testid="net-worth"'));
     // Tokens del sistema de diseño (docs/28 §5) y rejilla mobile-first.
-    expect(html).toContain('--pf-fin-warning:#B45309');
-    expect(html).toContain('@media (min-width:768px)');
-    expect(html).toContain('prefers-reduced-motion');
+    // Hoja estática (la CSP no admite <style> en línea sin nonce; [TC-SECURITY-CSP-006]).
+    expect(html).not.toContain('<style');
+    const css = readFileSync(new URL('./home.css', import.meta.url), 'utf8');
+    // Los tokens viven en la hoja global; `.pf-home` ya no los redeclara (add-dark-theme, [TC-PLATFORM-THEME-018]).
+    expect(css).not.toMatch(/--pf-fin-warning\s*:/);
+    const globals = readFileSync(new URL('../../../app/globals.css', import.meta.url), 'utf8');
+    expect(globals).toMatch(/--pf-fin-warning:\s*#b45309/i);
+    expect(css).toMatch(/@media \(min-width:\s*48em\)/);
+    expect(css).toContain('prefers-reduced-motion');
   });
 
   it('[TC-REPORTING-KPI-006] categorías en el orden de la API, numeradas, con barras decorativas proporcionales a la mayor', () => {

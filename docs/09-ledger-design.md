@@ -279,6 +279,8 @@ Pago de la tarjeta desde Banco BOB (transferencia ASSET→LIABILITY):
 
 Nota as-built (`add-loans`): si el principal del pago es 0 (por ejemplo, una cuota que solo cubre interés y cargos) la pata del pasivo se **omite** (un posting nulo viola `posting_nonzero`); si el desembolso no retiene comisión, no hay split ni pata de gasto. Ambos asientos los crea Transactions por el puerto `LoanTransactionsPort` como transacciones administradas `LOAN_DISBURSEMENT` / `LOAN_PAYMENT` (`source = DEBT`); el componente de gasto de un pago cumple Σ splits = monto − principal (INV-021 ampliado).
 
+Nota as-built (`add-card-interest-ledger-portions`): los intereses, comisiones, seguro e impuestos que cobra el banco a una tarjeta son un gasto `EXPENSE` posteado en la cuenta de la tarjeta (el pasivo aumenta por la suma) con **una porción por componente** en su categoría de sistema (`INTEREST`, `FEES`, `INSURANCE`, `TAXES`) y la marca `debt_role = CARD_CHARGE` (y `debt_card_id`) en la transacción; no es un `kind` nuevo, así que cuenta igual que cualquier gasto (presupuestos, Q3, pronósticos, resumen de deudas) y solo cambia su identificación. Es una transacción administrada por la tarjeta (`source = DEBT` si lo registró DEBT; si se adoptó conserva su `source` y su `externalRef`): solo se editan sus datos descriptivos y se anula únicamente desde la tarjeta con la reversa del asiento (`TRANSACTION_MANAGED_EXTERNALLY` con `details.managedBy = CREDIT_CARD` y `details.cardId`). Adoptar un gasto existente es una revisión de la transacción que reemplaza sus porciones (sin transacción nueva ni cambio de saldo; reclasificación en el sitio si la forma de las porciones no cambia, reversa más asiento nuevo si cambia).
+
 ### 6.10 Aporte a meta de ahorro
 
 **Real** (transferencia a cuenta vinculada a la meta): 1,000.00 BOB Banco → Caja de ahorro BOB.
@@ -593,8 +595,11 @@ CREATE TRIGGER posting_immutable BEFORE UPDATE OR DELETE ON ledger.posting
 --    BEFORE INSERT ON ledger.journal_entry: rechaza (PF004, PERIOD_CLOSED) si existe period_lock para (workspace_id, to_char(entry_date,'YYYY-MM'))
 -- SQLSTATE propios: PF001 desbalanceado, PF002 contexto de workspace ausente (RLS, la consulta falla), PF003 mutación prohibida,
 --                   PF004 periodo cerrado, PF005 menos de 2 postings (docs/08 §10; rev. 2026-10-02, docs/31 D19).
---   En la migración real (20261003170000_ledger_core.sql) el chequeo PF005 es un constraint trigger diferido propio
---   sobre ledger.journal_entry (assert_entry_has_postings) y PF001 queda en el trigger de ledger.posting.
+--   En la migración real (20261003170000_ledger_core.sql) el chequeo PF005 era un constraint trigger diferido propio
+--   sobre ledger.journal_entry (assert_entry_has_postings) y PF001 estaba en el trigger de ledger.posting. Desde la migración
+--   20261120100000 (ADR-0034) ambos los valida por conjunto ledger.validate_pending_entries(), un constraint trigger diferido
+--   por transacción sobre ledger.pending_check_sentinel; recolectores por sentencia en journal_entry y posting encolan los
+--   asientos tocados (docs/08 §10). Misma semántica: al confirmar, estados intermedios admitidos, mismos SQLSTATE.
 
 -- 5) Reversa única
 --    ledger.entry_reversal(original_entry_id PRIMARY KEY, reversal_entry_id UNIQUE)

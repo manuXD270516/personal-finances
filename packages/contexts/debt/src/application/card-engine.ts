@@ -38,7 +38,7 @@ import {
   type ThresholdState,
   type Utilization,
 } from '../domain/index.js';
-import type { CardDeps, StatementRecord } from './card-ports.js';
+import { CARD_CYCLE_MISMATCH_METRIC, type CardDeps, type StatementRecord } from './card-ports.js';
 
 export const CARD_AGGREGATE = 'CreditCard';
 
@@ -252,6 +252,9 @@ export class CardEngine {
         paymentsAfterClose,
       };
     });
+    // Un ciclo que no cuadra no se esconde: la vista lo marca (`consistent = false`) y se cuenta (design de add-credit-cards).
+    const mismatches = views.filter((v) => !v.current.consistent).length;
+    if (mismatches > 0) deps.metrics?.increment(CARD_CYCLE_MISMATCH_METRIC, {}, mismatches);
     return {
       account,
       currency,
@@ -645,9 +648,15 @@ export class CardEngine {
       const amounts = list.filter((e): e is Extract<PlanExpectation, { amount: Money }> => 'amount' in e);
       if (amounts.length > 0) {
         const sum = amounts.reduce((acc, e) => acc.add(e.amount), Money.zero(view.currency));
+        const bases = new Set(amounts.map((e) => e.basis));
+        const basis =
+          bases.size === 1
+            ? amounts[0]?.basis
+            : (['STATEMENT', 'OPEN_CYCLE'] as const).find((b) => bases.has(b));
         wanted = {
           type: amounts.some((e) => e.type === 'ESTIMATED') ? 'ESTIMATED' : 'FIXED',
           amount: sum,
+          ...(basis ? { basis } : {}),
         };
       } else if (list.every((e) => e.type === 'SKIP')) {
         const reasons = list.map((e) => (e as Extract<PlanExpectation, { type: 'SKIP' }>).reason);
@@ -670,7 +679,11 @@ export class CardEngine {
         continue;
       }
       if (
-        sameExpectation(wanted, { type: occ.expected.type, amount: occ.expected.amount }, view.currency.scale)
+        sameExpectation(
+          wanted,
+          { type: occ.expected.type, amount: occ.expected.amount, basis: occ.expectedBasis },
+          view.currency.scale,
+        )
       )
         continue;
       await deps.recurring.setExpected({
@@ -679,7 +692,13 @@ export class CardEngine {
         definitionId: plan.definitionId,
         key: occ.key,
         expectation:
-          wanted.type === 'NONE' ? { type: 'NONE' } : { type: wanted.type, amount: wanted.amount.toFixed() },
+          wanted.type === 'NONE'
+            ? { type: 'NONE' }
+            : {
+                type: wanted.type,
+                amount: wanted.amount.toFixed(),
+                ...(wanted.basis ? { basis: wanted.basis } : {}),
+              },
       });
       changes += 1;
     }
