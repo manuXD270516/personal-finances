@@ -12,9 +12,11 @@ invariants: []
 priority: low
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/brand/pwa.test.tsx
+  - tests/e2e/specs/pwa.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["pwa"]
@@ -49,4 +51,4 @@ Entonces cada uno responde con estado 200, tipo de imagen PNG y las dimensiones 
 ## Notas
 
 - Change `add-pwa-install` (lote L6 de docs/78; decisiones en docs/79, preguntas en docs/85). Lo implementa el agente `frontend` (D512). Datos ficticios; ningún dato real del owner.
-- Parte unitaria en `src/ui/brand/icons.test.ts` (firma y dimensiones de los PNG).
+- Parte unitaria en `src/ui/brand/pwa.test.tsx` (firma y dimensiones de los PNG).

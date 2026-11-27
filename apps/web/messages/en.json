@@ -127,6 +127,12 @@
       "system": "System",
       "light": "Light",
       "dark": "Dark"
+    },
+    "install": {
+      "heading": "App",
+      "description": "Install PFOS on this device to open it with one tap, like any other app.",
+      "button": "Install the app",
+      "iosHint": "On iPhone or iPad: Share → Add to Home Screen."
     }
   },
   "Auth": {

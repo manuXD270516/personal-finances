@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/pwa.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["pwa", "csp"]

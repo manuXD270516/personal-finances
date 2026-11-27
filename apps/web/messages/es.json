@@ -127,6 +127,12 @@
       "system": "Sistema",
       "light": "Claro",
       "dark": "Oscuro"
+    },
+    "install": {
+      "heading": "Aplicación",
+      "description": "Instala PFOS en este dispositivo para abrirla con un toque, como cualquier otra aplicación.",
+      "button": "Instalar la aplicación",
+      "iosHint": "En iPhone o iPad: Compartir → Agregar a pantalla de inicio."
     }
   },
   "Auth": {
