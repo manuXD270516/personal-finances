@@ -1133,6 +1133,9 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     revision: 'plain',
     journalEntryId: 'plain',
     bulkOperationId: 'plain',
+    // Fusión de categorías y contrapartes (add-category-and-counterparty-merge): dato que cambió y operación.
+    categoryId: 'plain',
+    mergeOperationId: 'plain',
     // Conciliación (add-reconciliation, docs/33 D74): modo (`STATEMENT` | `WITHOUT_STATEMENT`) y sesión del ajuste.
     reconciliationMode: 'plain',
     reconciliationId: 'plain',

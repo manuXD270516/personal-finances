@@ -285,14 +285,14 @@ afterAll(async () => {
 });
 
 describe('Máquinas Category y Counterparty (GET W/lifecycle-machines/{aggregateType})', () => {
-  it('[TC-AUDIT-LIFECYCLE-014] ACTIVE/ARCHIVED sin terminales, CREATE/ARCHIVE/UNARCHIVE con guarda, sin MERGE; contrato válido', async () => {
+  it('[TC-AUDIT-LIFECYCLE-014] ACTIVE/ARCHIVED sin terminales, CREATE/ARCHIVE/UNARCHIVE/MERGE (versión 2) con guarda; contrato válido', async () => {
     for (const type of ['Category', 'Counterparty']) {
       const r = await get(viewer, `/lifecycle-machines/${type}`);
       expect(r.status, JSON.stringify(r.body)).toBe(200);
       expect(contract().validateResponse('getLifecycleMachine', 200, r.body)).toEqual([]);
       expect(r.body).toMatchObject({
         aggregateType: type,
-        machineVersion: 1,
+        machineVersion: 2,
         states: [
           { code: 'ACTIVE', terminal: false },
           { code: 'ARCHIVED', terminal: false },
@@ -303,6 +303,7 @@ describe('Máquinas Category y Counterparty (GET W/lifecycle-machines/{aggregate
         ['CREATE', [], ['ACTIVE']],
         ['ARCHIVE', ['ACTIVE'], ['ARCHIVED']],
         ['UNARCHIVE', ['ARCHIVED'], ['ACTIVE']],
+        ['MERGE', ['ACTIVE', 'ARCHIVED'], ['ARCHIVED']],
       ]);
       expect(ts.every((t) => typeof t['guard'] === 'string' && (t['guard'] as string).length > 0)).toBe(true);
       expect((ts.find((t) => t['code'] === 'ARCHIVE') as Json)['events']).toEqual(

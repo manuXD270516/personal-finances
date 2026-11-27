@@ -2704,6 +2704,94 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/categories/{categoryId}/merge-preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryId'
+    get:
+      tags: [Classification]
+      operationId: previewCategoryMerge
+      summary: Preview the merge of a category into another one (read-only)
+      description: |
+        Counts the references that would move to the target, the ones that keep the source because their business date
+        falls in a closed period, and the conflicts that block the merge (design decisions 3, 4 and 7). Changes nothing.
+        The validation rules of the merge apply: a rejected pair answers with the code the merge would answer.
+      x-openspec-capability: classification/categories
+      x-required-role: VIEWER
+      parameters:
+        - name: targetId
+          in: query
+          required: true
+          description: The category that receives the references.
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Impact of the merge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryMergePreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'SYSTEM_CATEGORY_IMMUTABLE (the source is a system category), CATEGORY_ARCHIVED (the target is archived), CATEGORY_MERGED (the source or the target was already merged).'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CATEGORY_KIND_MISMATCH (different movement kinds), CATEGORY_DEPTH_EXCEEDED (the target is a subcategory and the source has active subcategories), REFERENCE_NOT_FOUND.'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/categories/{categoryId}/merge:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryId'
+    post:
+      tags: [Classification]
+      operationId: mergeCategory
+      summary: Merge a category into another one (atomic; the source stays archived and marked as merged)
+      description: |
+        Moves every live reference to the source onto the target in one unit of work (transactions of open or reopened
+        periods, plans, templates, recurring definitions, subscriptions, rules, imports not yet persisted, essentials,
+        loans and conversions as applicable). Closed periods keep the source (D494); ledger entries never change.
+        The source ends `ARCHIVED` with `mergedInto` and cannot be unarchived or merged again. The merge cannot be undone.
+        Conflicts block it: a plan already has a line of the target (`BUDGET_LINE_EXISTS`), a template already has a line of the target (`TEMPLATE_LINE_EXISTS`) or two subcategories share a name (`SUBCATEGORY_NAME_TAKEN`). A repeated request with the same `Idempotency-Key` returns the stored result.
+        Costly operation (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`); an idempotent
+        replay does not consume the quota.
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryMergeRequest' }
+      responses:
+        '200':
+          description: Merge applied (or the stored result of an idempotent replay)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryMergeResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'SYSTEM_CATEGORY_IMMUTABLE (the source is a system category), CATEGORY_ARCHIVED, CATEGORY_MERGED (problem includes `mergedInto`), CLASSIFICATION_MERGE_CONFLICT (problem includes `conflicts`), IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CATEGORY_KIND_MISMATCH (different movement kinds), CATEGORY_DEPTH_EXCEEDED (the target is a subcategory and the source has active subcategories), REFERENCE_NOT_FOUND.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/categories/{categoryId}/unarchive:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -3354,6 +3442,88 @@ paths:
           description: 'INVALID_STATUS_TRANSITION (already archived).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}/merge-preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    get:
+      tags: [Classification]
+      operationId: previewCounterpartyMerge
+      summary: Preview the merge of a counterparty into another one (read-only)
+      description: |
+        Counts the references that would move to the target, the ones that keep the source because their business date
+        falls in a closed period, and the conflicts that block the merge (design decisions 3, 4 and 7). Changes nothing.
+        The validation rules of the merge apply: a rejected pair answers with the code the merge would answer.
+      x-openspec-capability: classification/counterparties
+      x-required-role: VIEWER
+      parameters:
+        - name: targetId
+          in: query
+          required: true
+          description: The counterparty that receives the references.
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Impact of the merge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CounterpartyMergePreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'COUNTERPARTY_ARCHIVED (the target is archived), COUNTERPARTY_MERGED (the source or the target was already merged).'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}/merge:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    post:
+      tags: [Classification]
+      operationId: mergeCounterparty
+      summary: Merge a counterparty into another one (atomic; the source stays archived and marked as merged)
+      description: |
+        Moves every live reference to the source onto the target in one unit of work (transactions of open or reopened
+        periods, plans, templates, recurring definitions, subscriptions, rules, imports not yet persisted, essentials,
+        loans and conversions as applicable). Closed periods keep the source (D494); ledger entries never change.
+        The source ends `ARCHIVED` with `mergedInto` and cannot be unarchived or merged again. The merge cannot be undone.
+        Conflicts block it: the code is shared with the category merge; no participant reports conflicts for counterparties today. A repeated request with the same `Idempotency-Key` returns the stored result.
+        Costly operation (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`); an idempotent
+        replay does not consume the quota.
+      x-openspec-capability: classification/counterparties
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CounterpartyMergeRequest' }
+      responses:
+        '200':
+          description: Merge applied (or the stored result of an idempotent replay)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CounterpartyMergeResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'COUNTERPARTY_ARCHIVED, COUNTERPARTY_MERGED (problem includes `mergedInto`), CLASSIFICATION_MERGE_CONFLICT (problem includes `conflicts`), IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
@@ -16387,6 +16557,9 @@ components:
         - CATEGORY_GROUP_NOT_EMPTY          # 409
         - SYSTEM_CATEGORY_IMMUTABLE         # 409
         - COUNTERPARTY_ALIAS_TAKEN          # 409
+        - CLASSIFICATION_MERGE_CONFLICT     # 409 (details: conflicts[])
+        - CATEGORY_MERGED                   # 409 (mergedInto)
+        - COUNTERPARTY_MERGED               # 409 (mergedInto)
         - NAME_TAKEN                        # 409 (+ existingId for counterparties)
         # classification: custom fields (Phase 2, add-custom-fields)
         - CUSTOM_FIELD_KEY_TAKEN            # 409 (an active definition uses the key)
@@ -18725,7 +18898,114 @@ components:
         icon: { type: [string, 'null'] }
         sortOrder: { type: integer }
         archivedAt: { type: [string, 'null'], format: date-time }
+        mergedInto: { $ref: '#/components/schemas/MergedInto' }
         version: { $ref: '#/components/schemas/Version' }
+    MergedInto:
+      description: The target a merged category or counterparty was merged into; null if it was not merged. A merged one is archived for good.
+      type: [object, 'null']
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+    MergeCount:
+      type: object
+      required: [key, count]
+      properties:
+        key:
+          type: string
+          description: Kind of reference counted. Open set - clients must tolerate unknown values.
+          x-extensible-enum:
+            - SPLITS_OPEN
+            - SPLITS_CLOSED_KEPT
+            - TRANSACTIONS_OPEN
+            - TRANSACTIONS_CLOSED_KEPT
+            - BUDGET_LINES
+            - TEMPLATES
+            - RECURRING_DEFINITIONS
+            - SUBSCRIPTIONS
+            - RULES
+            - DEFAULT_CATEGORY_COUNTERPARTIES
+            - ESSENTIALS
+            - LOANS
+            - CONVERSIONS
+            - IMPORT_ROWS
+            - SUBCATEGORIES_MOVED
+            - ALIASES_MOVED
+        count: { type: integer, minimum: 0 }
+    MergeConflictRef:
+      type: object
+      required: [kind, id, label]
+      properties:
+        kind: { type: string, description: 'Kind of the conflicting item, e.g. BUDGET_LINE, BUDGET_TEMPLATE_LINE, CATEGORY' }
+        id: { $ref: '#/components/schemas/Uuid' }
+        label: { type: string }
+    MergeConflict:
+      type: object
+      required: [reason, refs]
+      properties:
+        reason:
+          type: string
+          description: Why the merge is blocked. Open set - clients must tolerate unknown values.
+          x-extensible-enum: [BUDGET_LINE_EXISTS, TEMPLATE_LINE_EXISTS, SUBCATEGORY_NAME_TAKEN]
+        refs:
+          type: array
+          items: { $ref: '#/components/schemas/MergeConflictRef' }
+    CategoryMergeRequest:
+      type: object
+      additionalProperties: false
+      required: [targetCategoryId]
+      properties:
+        targetCategoryId: { $ref: '#/components/schemas/Uuid' }
+    CounterpartyMergeRequest:
+      type: object
+      additionalProperties: false
+      required: [targetCounterpartyId]
+      properties:
+        targetCounterpartyId: { $ref: '#/components/schemas/Uuid' }
+    CategoryMergePreview:
+      type: object
+      required: [source, target, counts, conflicts]
+      properties:
+        source: { $ref: '#/components/schemas/Category' }
+        target: { $ref: '#/components/schemas/Category' }
+        counts:
+          type: array
+          items: { $ref: '#/components/schemas/MergeCount' }
+        conflicts:
+          type: array
+          items: { $ref: '#/components/schemas/MergeConflict' }
+    CounterpartyMergePreview:
+      type: object
+      required: [source, target, counts, conflicts]
+      properties:
+        source: { $ref: '#/components/schemas/Counterparty' }
+        target: { $ref: '#/components/schemas/Counterparty' }
+        counts:
+          type: array
+          items: { $ref: '#/components/schemas/MergeCount' }
+        conflicts:
+          type: array
+          items: { $ref: '#/components/schemas/MergeConflict' }
+    CategoryMergeResult:
+      type: object
+      required: [source, target, counts, operationId]
+      properties:
+        source: { $ref: '#/components/schemas/Category' }
+        target: { $ref: '#/components/schemas/Category' }
+        counts:
+          type: array
+          items: { $ref: '#/components/schemas/MergeCount' }
+        operationId: { $ref: '#/components/schemas/Uuid' }
+    CounterpartyMergeResult:
+      type: object
+      required: [source, target, counts, operationId]
+      properties:
+        source: { $ref: '#/components/schemas/Counterparty' }
+        target: { $ref: '#/components/schemas/Counterparty' }
+        counts:
+          type: array
+          items: { $ref: '#/components/schemas/MergeCount' }
+        operationId: { $ref: '#/components/schemas/Uuid' }
     CategoryCreate:
       type: object
       additionalProperties: false
@@ -18943,6 +19223,7 @@ components:
         website: { type: [string, 'null'], format: uri }
         notes: { type: [string, 'null'] }
         archivedAt: { type: [string, 'null'], format: date-time }
+        mergedInto: { $ref: '#/components/schemas/MergedInto' }
         version: { $ref: '#/components/schemas/Version' }
     CounterpartyCreate:
       type: object

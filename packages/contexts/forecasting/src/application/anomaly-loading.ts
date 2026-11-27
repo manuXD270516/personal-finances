@@ -9,6 +9,7 @@ import {
   type ExactRate,
   type Instant,
 } from '@pf/shared-kernel';
+import { withMergedCategories } from './merge-history.js';
 import type { ValuedExpense } from '../domain/index.js';
 import type { AnomalyDeps, ExpenseLineInput } from './anomaly-ports.js';
 
@@ -72,15 +73,17 @@ function valueOf(
  * a la moneda de reporte con la tasa de su fecha (sin tasa, `expense = null`; nunca 1:1). Lecturas en serie.
  */
 export async function loadExpenses(
-  deps: Pick<AnomalyDeps, 'expenses' | 'resolved' | 'categories' | 'rates' | 'settings'>,
+  deps: Pick<AnomalyDeps, 'expenses' | 'resolved' | 'categories' | 'categoryMerge' | 'rates' | 'settings'>,
   workspaceId: string,
   ws: { readonly timeZone: string; readonly reportingCurrency: string; readonly reportingScale: number },
   range: { readonly from: string; readonly to: string },
   now: Instant,
 ): Promise<{ readonly target: Currency; readonly items: readonly LoadedExpense[] }> {
   const target = makeCurrency(ws.reportingCurrency, ws.reportingScale);
-  const rawLines = await deps.expenses.listExpenseLines(workspaceId, range.from, range.to);
-  if (rawLines.length === 0) return { target, items: [] };
+  const listed = await deps.expenses.listExpenseLines(workspaceId, range.from, range.to);
+  if (listed.length === 0) return { target, items: [] };
+  // D496: la historia de una categoría fusionada cuenta como la de su destino.
+  const rawLines = await withMergedCategories(deps.categoryMerge, workspaceId, listed);
   const linked = await deps.resolved.transactionIds(workspaceId, range.from, range.to);
   const lines = rawLines.filter((l) => !linked.has(l.transactionId));
   const catalog = await deps.categories.catalog(workspaceId);

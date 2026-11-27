@@ -21,3 +21,15 @@ export const invalidTransition = (detail: string): DomainError =>
 
 export const validation = (detail: string, pointer: string): DomainError =>
   new DomainError('VALIDATION_FAILED', detail).at(pointer);
+
+/** `CATEGORY_MERGED` indica la destino (`details.mergedInto`) en la que se fusionó la categoría. */
+export const categoryMerged = (mergedIntoId: string | null): DomainError =>
+  new DomainError('CATEGORY_MERGED', 'the category was merged into another one', {
+    details: { mergedInto: mergedIntoId },
+  });
+
+/** `COUNTERPARTY_MERGED` indica la destino (`details.mergedInto`) en la que se fusionó la contraparte. */
+export const counterpartyMerged = (mergedIntoId: string | null): DomainError =>
+  new DomainError('COUNTERPARTY_MERGED', 'the counterparty was merged into another one', {
+    details: { mergedInto: mergedIntoId },
+  });

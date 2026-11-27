@@ -8,7 +8,11 @@ import type {
   LifecyclePort,
   LifecycleQuery,
 } from '@pf/audit/contracts';
-import type { ClassificationLookup, ClassificationValidator } from '@pf/classification/contracts';
+import type {
+  ClassificationLookup,
+  ClassificationMergeParticipant,
+  ClassificationValidator,
+} from '@pf/classification/contracts';
 import type { FxConversionPricingPort } from '@pf/fx/contracts';
 import type { LedgerOpeningBalanceQuery, LedgerPostingPort } from '@pf/ledger/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -41,6 +45,7 @@ import {
   PgNominalPortionQuery,
 } from '../infrastructure/pg-nominal-flows.js';
 import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
+import { PgTransactionsMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
 import { PgAccountMovementsQuery, systemCategoryCodesFrom } from '../infrastructure/pg-account-movements.js';
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
@@ -266,6 +271,16 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
  * Lecturas de COMMITMENTS para procesos sin comandos (el worker; add-recurrence-engine): vincular y pendientes leen
  * solo en la unidad de trabajo del llamador, sin puertos de escritura.
  */
+/**
+ * Participante de TRANSACTIONS en la fusión de categorías y contrapartes (add-category-and-counterparty-merge): corre
+ * en la unidad de trabajo de la fusión y deja una anotación en el recorrido de cada transacción reasignada.
+ */
+export function createClassificationMergeParticipant(
+  lifecycle: LifecyclePort,
+): ClassificationMergeParticipant {
+  return new PgTransactionsMergeParticipant(lifecycle);
+}
+
 export function createPendingFlowQuery(pool: Pool): PendingFlowQuery {
   return new PgPendingFlowQuery(new PgTransactionsUnitOfWork(pool), pgCurrencyCatalog);
 }

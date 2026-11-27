@@ -736,6 +736,8 @@ erDiagram
 
 As-built `add-classification` (migración `20261003173000_classification_schema.sql`; rev. 2026-10-04, D7–D9): la unicidad de nombres usa `normalized_name` (minúsculas, sin acentos, espacios colapsados; la llena la aplicación) en lugar de `lower(name)`. **Nunca hay hard delete** de categorías, grupos, tags ni counterparties (D7, INV-019): `pf_app` solo tiene `SELECT, INSERT, UPDATE` y el borrado es archivar (`archived_at`, `archived_by`); `DELETE` sobre el recurso API ⇒ 405. Las categorías de sistema (11 `system_code`, D9) se provisionan por workspace, de forma síncrona al crearlo; su nombre visible sale de `category_name_i18n`.
 
+As-built `add-category-and-counterparty-merge` (Phase 9; migraciones `20261127120000_classification_merge.sql`, `20261127120100_commitments_definition_version_merge_update.sql` y `20261127120200_txn_conversion_provider_merge_grant.sql`): `category` y `counterparty` suman `merged_into_id uuid NULL` (FK compuesta `(merged_into_id, workspace_id)` a la misma tabla) y `merged_at timestamptz NULL`, con `CHECK (merged_into_id IS NULL OR merged_into_id <> id)`, `CHECK ((merged_into_id IS NULL) = (merged_at IS NULL))` y `CHECK (merged_into_id IS NULL OR archived_at IS NOT NULL)`. Una fusionada queda archivada de forma permanente. Dos excepciones estrechas de inmutabilidad que la fusión necesita: `commitments.recurring_definition_version` solo admite `UPDATE` de `category_id` y `counterparty_id` (disparador de guarda y privilegio de columna) y `txn.conversion_detail` solo de `provider_counterparty_id` (privilegio de columna).
+
 ### 5.6 `planning` — Periods, Budgets, Templates, Month closing (Phase 2)
 
 ```mermaid

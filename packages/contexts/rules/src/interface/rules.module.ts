@@ -2,6 +2,8 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import type { AuditPort } from '@pf/audit/contracts';
 import type {
   CategoryCatalogQuery,
+  CategoryMergeQuery,
+  ClassificationMergeParticipant,
   ClassificationValidator,
   CounterpartyCatalogQuery,
 } from '@pf/classification/contracts';
@@ -24,6 +26,7 @@ import {
   type WorkspaceToday,
 } from '../application/ports/index.js';
 import { CategorySuggestionService } from '../application/category-suggestions.js';
+import { RulesMergeParticipant } from '../application/classification-merge.participant.js';
 import { RuleProposalsService } from '../application/rule-proposals.service.js';
 import { RulesQueries } from '../application/rules.queries.js';
 import { RulesService } from '../application/rules.service.js';
@@ -70,6 +73,8 @@ export interface RulesRuntimeOptions {
   };
   /** Contadores `rules_category_suggestion_*` (sin descripciones ni montos). */
   readonly metrics?: RulesMetricsPort;
+  /** D496: resuelve la categoría fusionada hacia su destino al leer la evidencia de las sugerencias. */
+  readonly categoryMerge?: CategoryMergeQuery;
 }
 
 export interface RulesRuntime {
@@ -85,6 +90,8 @@ export interface RulesRuntime {
   readonly suggestionQuery: CategorySuggestionQuery;
   /** Puerto público con el que Imports registra los resultados al aprobar (`CATEGORY_SUGGESTION_FEEDBACK_PORT`). */
   readonly suggestionFeedback: CategorySuggestionFeedbackPort;
+  /** Participante de RULES en la fusión de categorías y contrapartes (add-category-and-counterparty-merge). */
+  readonly mergeParticipant: ClassificationMergeParticipant;
 }
 
 /** Composición de RULES sobre PostgreSQL y los contratos públicos de CLASSIFICATION y TRANSACTIONS. */
@@ -113,6 +120,7 @@ export function createRulesRuntime(options: RulesRuntimeOptions): RulesRuntime {
       categorySuggest: { ...DEFAULT_RULES_SETTINGS.categorySuggest, ...options.settings?.categorySuggest },
     },
     ...(options.metrics ? { metrics: options.metrics } : {}),
+    ...(options.categoryMerge ? { categoryMerge: options.categoryMerge } : {}),
   };
   const queries = new RulesQueries(deps);
   const categorySuggestions = new CategorySuggestionService(deps, queries);
@@ -127,6 +135,7 @@ export function createRulesRuntime(options: RulesRuntimeOptions): RulesRuntime {
     categorySuggestions,
     suggestionQuery: { suggestMany: (input) => categorySuggestions.suggestMany(input) },
     suggestionFeedback: { recordBatch: (input) => categorySuggestions.recordBatch(input) },
+    mergeParticipant: new RulesMergeParticipant(deps),
   };
 }
 

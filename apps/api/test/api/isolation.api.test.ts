@@ -283,6 +283,8 @@ function bodyFor(op: ContractOperation): unknown {
     updateCategory: { name: 'Hackeada' },
     updateTag: { name: 'hackeado' },
     updateCounterparty: { name: 'Hackeado' },
+    mergeCategory: { targetCategoryId: randomUUID() },
+    mergeCounterparty: { targetCounterpartyId: randomUUID() },
     supersedeFxRate: { value: '7.10', reason: 'intento cruzado' },
     reviewFxRateAnomaly: { decision: 'CONFIRM', reason: 'intento cruzado' },
   };
@@ -291,6 +293,9 @@ function bodyFor(op: ContractOperation): unknown {
 
 const QUERY: Record<string, string> = {
   getCounterpartyCategorySuggestion: '?kind=EXPENSE',
+  // Fusión (add-category-and-counterparty-merge): la vista previa exige la destino.
+  previewCategoryMerge: `?targetId=${randomUUID()}`,
+  previewCounterpartyMerge: `?targetId=${randomUUID()}`,
   // Exportación del recorrido (docs/31 D52): `format` es obligatorio.
   exportTransactionLifecycle: '?format=csv',
   exportAccountLifecycle: '?format=pdf',

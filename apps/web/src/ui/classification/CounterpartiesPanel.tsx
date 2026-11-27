@@ -8,7 +8,8 @@ import type { FormatContext } from '../dashboard/types';
 import { categoryOptions } from '../transactions/catalogs';
 import { ClassificationDetail, type DetailMode } from './ClassificationDetail';
 import type { ClassificationData, Run } from './types';
-import { parseAliases } from './logic';
+import { counterpartyMergeTargets, parseAliases } from './logic';
+import { MergeDialog } from './MergeDialog';
 
 export const COUNTERPARTY_KINDS = [
   'MERCHANT',
@@ -197,7 +198,7 @@ export function CounterpartyFields({
   );
 }
 
-function CounterpartyRow({
+export function CounterpartyRow({
   c,
   f,
   ctx,
@@ -224,6 +225,7 @@ function CounterpartyRow({
   });
   const [draft, setDraft] = useState<Draft>(toDraft);
   const [error, setError] = useState<string | undefined>();
+  const [merging, setMerging] = useState(false);
   return (
     <div style={{ display: 'grid', gap: '0.25rem' }}>
       <CounterpartySummary c={c} f={f} categoryName={categoryName} />
@@ -241,24 +243,36 @@ function CounterpartyRow({
           >
             {t('edit')}
           </button>
-          <button
-            type="button"
-            aria-label={t(c.archivedAt ? 'unarchiveNamed' : 'archiveNamed', { name: c.name })}
-            onClick={() =>
-              void run(
-                () =>
-                  ctx.api.command(
-                    'POST',
-                    `${ctx.base}/counterparties/${c.id}/${c.archivedAt ? 'unarchive' : 'archive'}`,
-                    undefined,
-                    { ifMatch: c.version, idempotent: false },
-                  ),
-                t(c.archivedAt ? 'unarchived' : 'archived', { name: c.name }),
-              )
-            }
-          >
-            {c.archivedAt ? t('unarchive') : t('archive')}
-          </button>
+          {!c.mergedInto ? (
+            <button
+              type="button"
+              aria-label={t(c.archivedAt ? 'unarchiveNamed' : 'archiveNamed', { name: c.name })}
+              onClick={() =>
+                void run(
+                  () =>
+                    ctx.api.command(
+                      'POST',
+                      `${ctx.base}/counterparties/${c.id}/${c.archivedAt ? 'unarchive' : 'archive'}`,
+                      undefined,
+                      { ifMatch: c.version, idempotent: false },
+                    ),
+                  t(c.archivedAt ? 'unarchived' : 'archived', { name: c.name }),
+                )
+              }
+            >
+              {c.archivedAt ? t('unarchive') : t('archive')}
+            </button>
+          ) : null}
+          {!c.mergedInto ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-label={t('merge.action', { name: c.name })}
+              onClick={() => setMerging(true)}
+            >
+              {t('merge.button')}
+            </button>
+          ) : null}
         </span>
       ) : null}
       <span>
@@ -271,6 +285,18 @@ function CounterpartyRow({
           {t('lifecycle')}
         </button>
       </span>
+      {merging ? (
+        <MergeDialog
+          kind="counterparty"
+          ctx={ctx}
+          f={f}
+          source={c}
+          targets={[{ label: '', options: counterpartyMergeTargets(data.counterparties, c) }]}
+          aliases={c.aliases ?? []}
+          run={run}
+          onClose={() => setMerging(false)}
+        />
+      ) : null}
       {mode ? (
         <ClassificationDetail
           ctx={ctx}
@@ -343,6 +369,12 @@ export function CounterpartySummary({
     <span>
       <strong>{c.name}</strong> <span style={mutedStyle}>({t(`counterpartyKinds.${c.kind}`)})</span>{' '}
       {c.archivedAt ? <span style={badgeStyle}>{t('archivedBadge')}</span> : null}
+      {c.mergedInto ? (
+        <span style={badgeStyle} data-testid="counterparty-merged-into">
+          {' '}
+          {t('merge.mergedInto', { name: c.mergedInto.name })}
+        </span>
+      ) : null}
       {c.aliases && c.aliases.length > 0 ? (
         <span style={{ ...mutedStyle, display: 'block' }} data-testid="counterparty-aliases">
           {t('aliasesList', { aliases: c.aliases.join(', ') })}

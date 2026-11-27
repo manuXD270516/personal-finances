@@ -1,3 +1,4 @@
+import { withMergedCategories } from './merge-history.js';
 import {
   FinancialPeriodCalendar,
   FlowValuation,
@@ -195,7 +196,11 @@ export class ExecuteForecastRun {
     };
     if (!range) return empty;
     // Lecturas en serie: nunca consultas en paralelo sobre el mismo cliente.
-    const rows = await deps.flows.loadFlows(workspaceId, range.dateFrom, range.dateTo);
+    const rows = await withMergedCategories(
+      deps.categoryMerge,
+      workspaceId,
+      await deps.flows.loadFlows(workspaceId, range.dateFrom, range.dateTo),
+    );
     const loanComponents = await deps.flows.loadLoanComponents(workspaceId, range.dateFrom, range.dateTo);
     const resolvedOut = await deps.known.listResolved(workspaceId, range.dateFrom, range.dateTo, 'OUTFLOW');
     const resolvedIn = await deps.known.listResolved(workspaceId, range.dateFrom, range.dateTo, 'INFLOW');

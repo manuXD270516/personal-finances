@@ -5,17 +5,20 @@ spec: classification/categories
 related_specs: []
 requirement: "Una categoría fusionada no se desarchiva ni se vuelve a fusionar"
 scenario: "Fusionar de nuevo una categoría fusionada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/classification/src/application/merge.service.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories"]
 error_code: "CATEGORY_MERGED"
@@ -27,7 +30,7 @@ steps:
 expected_result:
   - "se rechaza con CATEGORY_MERGED sin cambios"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-020 — Fusionar de nuevo una categoría fusionada se rechaza con CATEGORY_MERGED

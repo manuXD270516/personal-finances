@@ -5,17 +5,18 @@ spec: classification/categories
 related_specs: ["forecast/anomaly-detection"]
 requirement: "Continuidad de la historia de una categoría fusionada en los análisis"
 scenario: "Gasto atípico con la historia de la origen"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007", "FR-FORECAST-010"]
 nfr: []
 invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/application/category-merge.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge", "categories", "anomalies"]
 error_code: null
@@ -30,7 +31,7 @@ expected_result:
   - "el gasto se evalúa con una historia de 12 gastos de \"Supermercado\""
   - "el gasto atípico marcado antes de la fusión no cambia"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-029 — La detección de gastos atípicos evalúa con la historia de la origen fusionada

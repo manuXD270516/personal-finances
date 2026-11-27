@@ -5,17 +5,19 @@ spec: classification/counterparties
 related_specs: ["commitments/subscriptions","debt/loans","rules/rule-engine"]
 requirement: "Referencias a la contraparte fusionada en otros contextos"
 scenario: "Suscripción, préstamo y regla"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-013","FR-COMMITMENTS-012","FR-DEBT-001","FR-RULES-001"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/rules/src/application/classification-merge.participant.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","counterparties","subscriptions","loans","rules"]
 error_code: null
@@ -29,7 +31,7 @@ expected_result:
   - "\"Préstamo vehicular\" tiene como prestamista a \"Banco Uno\""
   - "\"BANCO UNO\" tiene una versión nueva con SET_COUNTERPARTY \"Banco Uno\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-026 — Suscripción, préstamo y regla pasan a la contraparte destino

@@ -5,17 +5,20 @@ spec: classification/categories
 related_specs: []
 requirement: "Fusión de una categoría con subcategorías"
 scenario: "Subcategoría con un nombre que ya usa la destino"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-CLASSIFICATION-001"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/classification/src/application/merge.service.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","hierarchy"]
 error_code: "CLASSIFICATION_MERGE_CONFLICT"
@@ -28,7 +31,7 @@ expected_result:
   - "se rechaza con CLASSIFICATION_MERGE_CONFLICT con el motivo SUBCATEGORY_NAME_TAKEN para \"Agua\""
   - "nada cambia"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-013 — Una subcategoría con nombre repetido en la destino bloquea la fusión

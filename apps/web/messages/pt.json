@@ -1629,9 +1629,60 @@
       "defaultCategoryId": "Categoria padrão",
       "notes": "Notas",
       "website": "Site",
-      "systemCode": "Código de sistema"
+      "systemCode": "Código de sistema",
+      "MERGED_FROM": "Mesclagem de",
+      "MOVED": "Movida"
     },
-    "customFields": "Campos personalizados"
+    "customFields": "Campos personalizados",
+    "merge": {
+      "button": "Mesclar em…",
+      "action": "Mesclar «{name}» em outra",
+      "title": "Mesclar «{name}»",
+      "descriptionCategory": "As referências de «{name}» passarão para a categoria de destino. A mesclagem não pode ser desfeita: «{name}» fica arquivada para sempre.",
+      "descriptionCounterparty": "As referências de «{name}» passarão para a contraparte de destino. A mesclagem não pode ser desfeita: «{name}» fica arquivada para sempre.",
+      "target": "Mesclar em",
+      "targetHint": "Só são oferecidos destinos compatíveis: ativos, não mesclados e diferentes da origem.",
+      "chooseTarget": "Escolha o destino",
+      "noTargets": "Não há um destino compatível.",
+      "loading": "Calculando o impacto…",
+      "previewIntro": "Ao mesclar «{source}» em «{target}», será atualizado o seguinte:",
+      "countsLabel": "Referências que serão atualizadas",
+      "noCounts": "Não há referências para mover.",
+      "counts": {
+        "SPLITS_OPEN": "Divisões de transações que são reatribuídas",
+        "SPLITS_CLOSED_KEPT": "Divisões em períodos fechados que ficam sem alteração",
+        "TRANSACTIONS_OPEN": "Transações que são reatribuídas",
+        "TRANSACTIONS_CLOSED_KEPT": "Transações em períodos fechados que ficam sem alteração",
+        "BUDGET_LINES": "Linhas de orçamento",
+        "TEMPLATES": "Modelos de orçamento",
+        "RECURRING_DEFINITIONS": "Definições recorrentes",
+        "SUBSCRIPTIONS": "Assinaturas",
+        "RULES": "Regras",
+        "DEFAULT_CATEGORY_COUNTERPARTIES": "Contrapartes com esta categoria padrão",
+        "ESSENTIALS": "Categorias essenciais do disponível",
+        "LOANS": "Empréstimos",
+        "CONVERSIONS": "Conversões",
+        "IMPORT_ROWS": "Linhas de importações pendentes",
+        "SUBCATEGORIES_MOVED": "Subcategorias que se movem",
+        "ALIASES_MOVED": "Apelidos que se movem"
+      },
+      "aliasesMoved": "Apelidos que passam para o destino: {aliases}.",
+      "nameBecomesAlias": "O nome «{source}» passará a ser apelido de «{target}».",
+      "conflictsTitle": "Há conflitos que impedem a mesclagem",
+      "conflictsHint": "Resolva os conflitos (por exemplo, remova uma das duas linhas ou renomeie) e tente novamente.",
+      "reasons": {
+        "BUDGET_LINE_EXISTS": "Um plano já tem uma linha de orçamento do destino",
+        "TEMPLATE_LINE_EXISTS": "Um modelo já tem uma linha do destino",
+        "SUBCATEGORY_NAME_TAKEN": "O destino já tem uma subcategoria com o mesmo nome"
+      },
+      "irreversible": "A mesclagem não pode ser desfeita. «{source}» ficará arquivada e marcada como mesclada em «{target}».",
+      "ack": "Entendo que não pode ser desfeita",
+      "confirm": "Mesclar em «{target}»",
+      "confirmEmpty": "Mesclar",
+      "mergedInto": "mesclada em {name}",
+      "doneCategory": "Categoria «{source}» mesclada em «{target}».",
+      "doneCounterparty": "Contraparte «{source}» mesclada em «{target}»."
+    }
   },
   "Lifecycle": {
     "tabs": {
@@ -1713,12 +1764,14 @@
       "Category": {
         "CREATE": "Criar",
         "ARCHIVE": "Arquivar",
-        "UNARCHIVE": "Desarquivar"
+        "UNARCHIVE": "Desarquivar",
+        "MERGE": "Mesclar"
       },
       "Counterparty": {
         "CREATE": "Criar",
         "ARCHIVE": "Arquivar",
-        "UNARCHIVE": "Desarquivar"
+        "UNARCHIVE": "Desarquivar",
+        "MERGE": "Mesclar"
       },
       "Reconciliation": {
         "START": "Iniciar",

@@ -1629,9 +1629,60 @@
       "defaultCategoryId": "Default category",
       "notes": "Notes",
       "website": "Website",
-      "systemCode": "System code"
+      "systemCode": "System code",
+      "MERGED_FROM": "Merged from",
+      "MOVED": "Moved"
     },
-    "customFields": "Custom fields"
+    "customFields": "Custom fields",
+    "merge": {
+      "button": "Merge into…",
+      "action": "Merge «{name}» into another",
+      "title": "Merge «{name}»",
+      "descriptionCategory": "The references of «{name}» will move to the target category. A merge cannot be undone: «{name}» stays archived for good.",
+      "descriptionCounterparty": "The references of «{name}» will move to the target counterparty. A merge cannot be undone: «{name}» stays archived for good.",
+      "target": "Merge into",
+      "targetHint": "Only compatible targets are offered: active, not merged and different from the source.",
+      "chooseTarget": "Choose the target",
+      "noTargets": "There is no compatible target.",
+      "loading": "Calculating the impact…",
+      "previewIntro": "Merging «{source}» into «{target}» will update the following:",
+      "countsLabel": "References that will be updated",
+      "noCounts": "There are no references to move.",
+      "counts": {
+        "SPLITS_OPEN": "Transaction splits that are reassigned",
+        "SPLITS_CLOSED_KEPT": "Splits in closed periods that stay unchanged",
+        "TRANSACTIONS_OPEN": "Transactions that are reassigned",
+        "TRANSACTIONS_CLOSED_KEPT": "Transactions in closed periods that stay unchanged",
+        "BUDGET_LINES": "Budget lines",
+        "TEMPLATES": "Budget templates",
+        "RECURRING_DEFINITIONS": "Recurring definitions",
+        "SUBSCRIPTIONS": "Subscriptions",
+        "RULES": "Rules",
+        "DEFAULT_CATEGORY_COUNTERPARTIES": "Counterparties with this default category",
+        "ESSENTIALS": "Essential categories of the spendable amount",
+        "LOANS": "Loans",
+        "CONVERSIONS": "Conversions",
+        "IMPORT_ROWS": "Pending import rows",
+        "SUBCATEGORIES_MOVED": "Subcategories that move",
+        "ALIASES_MOVED": "Aliases that move"
+      },
+      "aliasesMoved": "Aliases that move to the target: {aliases}.",
+      "nameBecomesAlias": "The name «{source}» will become an alias of «{target}».",
+      "conflictsTitle": "Conflicts prevent the merge",
+      "conflictsHint": "Resolve the conflicts (for example, remove one of the two lines or rename) and try again.",
+      "reasons": {
+        "BUDGET_LINE_EXISTS": "A plan already has a budget line for the target",
+        "TEMPLATE_LINE_EXISTS": "A template already has a line for the target",
+        "SUBCATEGORY_NAME_TAKEN": "The target already has a subcategory with the same name"
+      },
+      "irreversible": "A merge cannot be undone. «{source}» will be archived and marked as merged into «{target}».",
+      "ack": "I understand this cannot be undone",
+      "confirm": "Merge into «{target}»",
+      "confirmEmpty": "Merge",
+      "mergedInto": "merged into {name}",
+      "doneCategory": "Category «{source}» merged into «{target}».",
+      "doneCounterparty": "Counterparty «{source}» merged into «{target}»."
+    }
   },
   "Lifecycle": {
     "tabs": {
@@ -1713,12 +1764,14 @@
       "Category": {
         "CREATE": "Create",
         "ARCHIVE": "Archive",
-        "UNARCHIVE": "Unarchive"
+        "UNARCHIVE": "Unarchive",
+        "MERGE": "Merge"
       },
       "Counterparty": {
         "CREATE": "Create",
         "ARCHIVE": "Archive",
-        "UNARCHIVE": "Unarchive"
+        "UNARCHIVE": "Unarchive",
+        "MERGE": "Merge"
       },
       "Reconciliation": {
         "START": "Start",

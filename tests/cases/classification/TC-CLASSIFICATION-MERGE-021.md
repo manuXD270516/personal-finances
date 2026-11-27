@@ -5,17 +5,21 @@ spec: classification/counterparties
 related_specs: ["transactions/transaction-recording"]
 requirement: "Fusionar contrapartes"
 scenario: "Fusionar HIPERMAXI S.A. en Hipermaxi"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-013","FR-CLASSIFICATION-010","FR-AUDIT-001"]
 nfr: []
 invariants: ["INV-019","INV-021"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - apps/web/src/ui/classification/merge.test.tsx
+  - packages/contexts/classification/src/application/merge.service.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","counterparties","aliases"]
 error_code: null
@@ -31,7 +35,7 @@ expected_result:
   - "\"Hipermaxi\" tiene los alias \"hipermaxi sa\" y \"HIPERMAXI S.A.\", y la descripción se reconoce como \"Hipermaxi\""
   - "\"HIPERMAXI S.A.\" queda ARCHIVED con mergedInto \"Hipermaxi\" y el número de asientos no cambia"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-021 — Fusionar HIPERMAXI S.A. en Hipermaxi mueve gastos y alias

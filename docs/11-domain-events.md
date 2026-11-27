@@ -311,7 +311,8 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `imports.ImportRevertRequested.v1` (**schema publicado**, add-import-pipeline) | IMPORTS | IMPORTS (worker, `imports.persist`) | `RevertImport` (misma transacción que `REVERTING` y la auditoría) | `importJobId, accountId, allowPartial, toVoid, blocked` | inbox + estado del job y de cada transacción (las ya anuladas se saltan) | N |
 | `imports.ImportReverted.v1` (**schema publicado**, add-import-pipeline) | IMPORTS | ninguno obligatorio | Fin del deshacer (`ROLLED_BACK` o `PARTIALLY_ROLLED_BACK`) | `importJobId, accountId, voided, alreadyVoided, blocked, status` | `(importJobId, status, aggregateVersion)` | N |
 | `forecast.ForecastGenerated.v1` | FORECAST | NOTIFY, REPORTING | Corrida exitosa | `forecastRunId, scope, horizonMonths, modelName, modelVersion, summary` | `forecastRunId` | N |
-| `classification.CategoriesMerged.v1` | CLASSIFICATION | TRANSACTIONS, PLANNING, RULES, REPORTING | `MergeCategories` | `sourceCategoryIds[], targetCategoryId` | `(targetCategoryId, aggregateVersion)` | N |
+| `classification.CategoriesMerged.v1` | CLASSIFICATION | Ninguno (la fusión es síncrona por puerto, D249) | `MergeCategories` | `sourceCategoryId, targetCategoryId, movedSubcategoryIds[], counts[], operationId, mergedAt` (una origen por operación) | `(sourceCategoryId, aggregateVersion)` | N |
+| `classification.CounterpartiesMerged.v1` | CLASSIFICATION | Ninguno (D249) | `MergeCounterparties` | `sourceCounterpartyId, targetCounterpartyId, movedAliases[], counts[], operationId, mergedAt` | `(sourceCounterpartyId, aggregateVersion)` | N |
 
 ## 4. Versionado y evolución
 

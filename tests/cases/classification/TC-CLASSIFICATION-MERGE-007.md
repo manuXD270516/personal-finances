@@ -5,17 +5,18 @@ spec: classification/categories
 related_specs: ["platform/api-conventions"]
 requirement: "Fusionar categorías"
 scenario: "Repetir la misma fusión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007"]
 nfr: []
 invariants: ["INV-019"]
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","idempotency"]
 error_code: null
@@ -28,7 +29,7 @@ expected_result:
   - "responde el mismo resultado guardado"
   - "\"Supermercado\" sigue sumando 1560.50 BOB en noviembre de 2026 y no hay registros de auditoría nuevos"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-007 — Repetir la fusión con la misma clave de idempotencia no reasigna dos veces

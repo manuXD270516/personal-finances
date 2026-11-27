@@ -1,7 +1,7 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountCatalogQuery, AccountsQueryPort } from '@pf/accounts/contracts';
 import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
-import type { ClassificationValidator } from '@pf/classification/contracts';
+import type { ClassificationMergeParticipant, ClassificationValidator } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import { pgExistingIds, runWithRequestContext } from '@pf/platform/api';
@@ -87,6 +87,7 @@ import {
   SUBSCRIPTIONS_SERVICE,
   SubscriptionsController,
 } from './subscriptions-http.js';
+import { PgCommitmentsMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 
 /** Horizonte de generación por omisión (`COMMITMENTS_HORIZON_DAYS`, D125). */
 export const DEFAULT_HORIZON_DAYS = 90;
@@ -574,3 +575,11 @@ export type { SubscriptionDailyService } from '../application/subscription-daily
 export const subscriptionExistenceQuery: SubscriptionExistenceQuery = {
   existing: pgExistingIds('commitments.subscription'),
 };
+
+/**
+ * Participante de COMMITMENTS en la fusión de categorías y contrapartes (add-category-and-counterparty-merge):
+ * definiciones recurrentes (como anotación, sin versión nueva) y suscripciones; corre en la unidad de trabajo de la fusión.
+ */
+export function createClassificationMergeParticipant(): ClassificationMergeParticipant {
+  return new PgCommitmentsMergeParticipant();
+}

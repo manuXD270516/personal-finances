@@ -1629,9 +1629,60 @@
       "defaultCategoryId": "Categoría por defecto",
       "notes": "Notas",
       "website": "Sitio web",
-      "systemCode": "Código de sistema"
+      "systemCode": "Código de sistema",
+      "MERGED_FROM": "Fusión desde",
+      "MOVED": "Movida"
     },
-    "customFields": "Campos personalizados"
+    "customFields": "Campos personalizados",
+    "merge": {
+      "button": "Fusionar en…",
+      "action": "Fusionar «{name}» en otra",
+      "title": "Fusionar «{name}»",
+      "descriptionCategory": "Las referencias de «{name}» pasarán a la categoría de destino. La fusión no se deshace: «{name}» queda archivada para siempre.",
+      "descriptionCounterparty": "Las referencias de «{name}» pasarán a la contraparte de destino. La fusión no se deshace: «{name}» queda archivada para siempre.",
+      "target": "Fusionar en",
+      "targetHint": "Solo se ofrecen destinos compatibles: activas, no fusionadas y distintas de la origen.",
+      "chooseTarget": "Elige el destino",
+      "noTargets": "No hay un destino compatible.",
+      "loading": "Calculando el impacto…",
+      "previewIntro": "Al fusionar «{source}» en «{target}» se actualizará lo siguiente:",
+      "countsLabel": "Referencias que se actualizan",
+      "noCounts": "No hay referencias que mover.",
+      "counts": {
+        "SPLITS_OPEN": "Porciones de transacciones que se reasignan",
+        "SPLITS_CLOSED_KEPT": "Porciones en periodos cerrados que quedan sin cambios",
+        "TRANSACTIONS_OPEN": "Transacciones que se reasignan",
+        "TRANSACTIONS_CLOSED_KEPT": "Transacciones en periodos cerrados que quedan sin cambios",
+        "BUDGET_LINES": "Líneas de presupuesto",
+        "TEMPLATES": "Plantillas de presupuesto",
+        "RECURRING_DEFINITIONS": "Definiciones recurrentes",
+        "SUBSCRIPTIONS": "Suscripciones",
+        "RULES": "Reglas",
+        "DEFAULT_CATEGORY_COUNTERPARTIES": "Contrapartes con esta categoría por defecto",
+        "ESSENTIALS": "Categorías esenciales del disponible",
+        "LOANS": "Préstamos",
+        "CONVERSIONS": "Conversiones",
+        "IMPORT_ROWS": "Filas de importaciones pendientes",
+        "SUBCATEGORIES_MOVED": "Subcategorías que se mueven",
+        "ALIASES_MOVED": "Alias que se mueven"
+      },
+      "aliasesMoved": "Alias que pasan a la destino: {aliases}.",
+      "nameBecomesAlias": "El nombre «{source}» pasará a ser alias de «{target}».",
+      "conflictsTitle": "Hay conflictos que impiden la fusión",
+      "conflictsHint": "Resuelve los conflictos (por ejemplo, quita una de las dos líneas o renombra) y vuelve a intentarlo.",
+      "reasons": {
+        "BUDGET_LINE_EXISTS": "Un plan ya tiene una línea de presupuesto de la destino",
+        "TEMPLATE_LINE_EXISTS": "Una plantilla ya tiene una línea de la destino",
+        "SUBCATEGORY_NAME_TAKEN": "La destino ya tiene una subcategoría con el mismo nombre"
+      },
+      "irreversible": "La fusión no se puede deshacer. «{source}» quedará archivada y marcada como fusionada en «{target}».",
+      "ack": "Entiendo que no se puede deshacer",
+      "confirm": "Fusionar en «{target}»",
+      "confirmEmpty": "Fusionar",
+      "mergedInto": "fusionada en {name}",
+      "doneCategory": "Categoría «{source}» fusionada en «{target}».",
+      "doneCounterparty": "Contraparte «{source}» fusionada en «{target}»."
+    }
   },
   "Lifecycle": {
     "tabs": {
@@ -1713,12 +1764,14 @@
       "Category": {
         "CREATE": "Crear",
         "ARCHIVE": "Archivar",
-        "UNARCHIVE": "Desarchivar"
+        "UNARCHIVE": "Desarchivar",
+        "MERGE": "Fusionar"
       },
       "Counterparty": {
         "CREATE": "Crear",
         "ARCHIVE": "Archivar",
-        "UNARCHIVE": "Desarchivar"
+        "UNARCHIVE": "Desarchivar",
+        "MERGE": "Fusionar"
       },
       "Reconciliation": {
         "START": "Iniciar",
