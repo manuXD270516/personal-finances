@@ -3,6 +3,7 @@ import { contentTypeAllowed, csrfTokenFor, csrfTokenValid, isSafeMethod, originA
 import { OidcGrantRejected, pkce, type OidcClient, type OidcTokens } from './oidc-client';
 import { hashSid, newOpaqueId } from './session-crypto';
 import type { ActiveSession, SessionStore, SessionTimeouts, TokenSet } from './session-store';
+import { themeCookieHeader, themeFromMeBody, type ThemePreference } from '../ui/common/theme';
 
 /**
  * BFF de finance-web (ADR-0010 enmienda, ADR-0019, design §2): login OIDC Authorization Code + PKCE, sesión
@@ -214,10 +215,15 @@ export class Bff {
 
     // Provisión JIT: el primer request autenticado a finance-api crea el usuario y su workspace personal.
     let userId: string | undefined;
+    let theme: ThemePreference | undefined;
     try {
       const me = await this.callApi('GET', '/api/v1/me', tokenSet.accessToken);
-      if (me.ok) userId = ((await me.json()) as { id?: unknown }).id as string | undefined;
-      else await me.body?.cancel();
+      if (me.ok) {
+        const body = (await me.json()) as { id?: unknown };
+        userId = body.id as string | undefined;
+        // Cookie espejo del tema (add-dark-theme, decisión 6): sale del mismo cuerpo, sin una llamada extra.
+        theme = themeFromMeBody(body);
+      } else await me.body?.cancel();
     } catch (err) {
       this.deps.logger?.error({ err: errorName(err) }, 'finance-api unavailable during login');
     }
@@ -245,6 +251,12 @@ export class Bff {
     });
     headers.append('set-cookie', cookie(SESSION_COOKIE, sid));
     headers.append('set-cookie', clearCookie(LOGIN_COOKIE));
+    // Un error al leer el tema no impide el login: sin `theme`, la cookie existente se deja como está.
+    if (theme)
+      headers.append(
+        'set-cookie',
+        themeCookieHeader(theme, new URL(this.settings.appOrigin).protocol === 'https:'),
+      );
     return new Response(null, { status: 303, headers });
   }
 

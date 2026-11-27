@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../bff/finance-api-client';
 import { ProblemMessage } from '../errors/ProblemMessage';
 import { AuditHistory } from './AuditHistory';
+import { applyThemePreference } from './common/theme-client';
+import { themeFromMeBody } from './common/theme';
 import { pageStyle } from './common/ui';
 import { PreferencesView, WorkspaceSettingsView, type FormNotice } from './identity/IdentityViews';
 import {
@@ -256,6 +258,7 @@ export function PreferencesForm() {
     displayName: me?.displayName ?? '',
     locale: me?.locale ?? 'es-BO',
     timezone: me?.timezone ?? '',
+    theme: me ? themeFromMeBody(me) : 'system',
   }));
   const [errors, setErrors] = useState<Partial<Record<PreferencesField, PreferencesError>>>({});
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
@@ -270,7 +273,12 @@ export function PreferencesForm() {
     const key = `${me.id}:${me.version}`;
     if (shownVersion.current !== key) {
       shownVersion.current = key;
-      setForm({ displayName: me.displayName, locale: me.locale, timezone: me.timezone });
+      setForm({
+        displayName: me.displayName,
+        locale: me.locale,
+        timezone: me.timezone,
+        theme: themeFromMeBody(me),
+      });
       setErrors({});
     }
     if (pendingNotice.current) {
@@ -296,7 +304,7 @@ export function PreferencesForm() {
     setProblem(undefined);
     setNotice(undefined);
     const built = buildPreferencesPatch(
-      { displayName: me.displayName, locale: me.locale, timezone: me.timezone },
+      { displayName: me.displayName, locale: me.locale, timezone: me.timezone, theme: themeFromMeBody(me) },
       form,
     );
     if (!built.ok) {
@@ -311,6 +319,8 @@ export function PreferencesForm() {
     setBusy(true);
     try {
       await api.command('PATCH', '/me', built.patch, { ifMatch: me.version });
+      // Con `200`, el tema nuevo se aplica en el mismo tick (cookie espejo + `data-theme`), sin recargar.
+      if (built.patch.preferences) applyThemePreference(built.patch.preferences.theme);
       const target = uiLocaleFor(form.locale);
       if (built.patch.locale !== undefined && target !== locale) {
         // Cookie de next-intl: sin ella, una ruta sin prefijo volvería a negociar el idioma anterior.
