@@ -3,6 +3,7 @@ import type { AccountCatalogQuery, AccountProvisioningPort, AccountsQueryPort } 
 import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type {
   CategoryCatalogQuery,
+  ClassificationMergeParticipant,
   ClassificationValidator,
   CounterpartyCatalogQuery,
 } from '@pf/classification/contracts';
@@ -525,9 +526,15 @@ export {
   LOAN_PORTFOLIO_QUERY,
   LOAN_SCHEDULE_QUERY,
 } from '../contracts/index.js';
+import { PgDebtMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 export type { OutboxPort } from '../application/ports/index.js';
 
 /** LoanExistenceQuery: ids existentes en el workspace (`debt.loan`, bajo RLS en la unidad de trabajo en curso). */
 export const loanExistenceQuery: LoanExistenceQuery = {
   existing: pgExistingIds('debt.loan'),
 };
+
+/** Participante de DEBT en la fusión de contrapartes (add-category-and-counterparty-merge): prestamista de los préstamos. */
+export function createClassificationMergeParticipant(): ClassificationMergeParticipant {
+  return new PgDebtMergeParticipant();
+}

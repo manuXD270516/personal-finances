@@ -5,17 +5,19 @@ spec: classification/counterparties
 related_specs: []
 requirement: "Fusionar contrapartes"
 scenario: "Categoría por defecto heredada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-013","FR-CLASSIFICATION-011"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/merge.service.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","counterparties"]
 error_code: null
@@ -27,7 +29,7 @@ steps:
 expected_result:
   - "\"Hipermaxi\" tiene \"Supermercado\" como categoría por defecto"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-022 — La destino sin categoría por defecto hereda la de la origen

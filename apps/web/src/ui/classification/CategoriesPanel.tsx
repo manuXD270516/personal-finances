@@ -8,7 +8,8 @@ import type { FormatContext } from '../dashboard/types';
 import type { ClassificationData, Run } from './types';
 import { ClassificationDetail, type DetailMode } from './ClassificationDetail';
 import { ColorField, ColorSwatch, IconField, IconGlyph } from './fields';
-import { activeSiblings, categoryTree, moveBy, moveTo } from './logic';
+import { MergeDialog } from './MergeDialog';
+import { activeSiblings, categoryMergeTargets, categoryTree, moveBy, moveTo } from './logic';
 
 const KINDS = ['EXPENSE', 'INCOME'] as const;
 const DRAG_TYPE = 'application/x-pfos-category';
@@ -31,6 +32,7 @@ export function CategoriesPanel({
   const [form, setForm] = useState({ groupId: '', parentId: '', name: '', icon: '', color: '' });
   const [group, setGroup] = useState({ name: '', kind: 'EXPENSE' as (typeof KINDS)[number] });
   const [dragged, setDragged] = useState<string | null>(null);
+  const [mergeSource, setMergeSource] = useState<Category | null>(null);
   const groupId = form.groupId || activeGroups[0]?.id || '';
   const parents = categories.filter(
     (c) => !c.parentId && c.groupId === groupId && !c.archivedAt && !c.isSystem,
@@ -108,6 +110,7 @@ export function CategoriesPanel({
       count: ids.length,
       onMove: (delta: -1 | 1) => reorder(c, moveBy(ids, c.id, delta)),
       onToggle: () => toggleArchive(c),
+      onMerge: () => setMergeSource(c),
       onSave: (patch: { name?: string; icon: string | null; color: string | null }) => save(c, patch),
       drag:
         ctx.canEdit && !c.archivedAt
@@ -300,6 +303,17 @@ export function CategoriesPanel({
           </ul>
         </section>
       ))}
+      {mergeSource ? (
+        <MergeDialog
+          kind="category"
+          ctx={ctx}
+          f={f}
+          source={mergeSource}
+          targets={categoryMergeTargets(groups, categories, mergeSource)}
+          run={run}
+          onClose={() => setMergeSource(null)}
+        />
+      ) : null}
     </section>
   );
 }
@@ -308,7 +322,8 @@ export function CategoriesPanel({
  * Fila de una categoría: icono y color decorativos, nombre, marcas (sistema protegida, archivada) y acciones:
  * editar, subir/bajar (alternativa por teclado a arrastrar), archivar/desarchivar y "Recorrido" (todos los roles,
  * docs/31 D52). Editar y Recorrido abren el detalle en pestañas. Las de sistema solo cambian icono, color y orden
- * (`SYSTEM_CATEGORY_IMMUTABLE`).
+ * (`SYSTEM_CATEGORY_IMMUTABLE`). «Fusionar en…» (OWNER/EDITOR; no las de sistema ni las ya fusionadas) abre el diálogo
+ * de fusión; una fusionada muestra «fusionada en <destino>» y no se puede desarchivar.
  */
 export function CategoryRow({
   c,
@@ -319,6 +334,7 @@ export function CategoryRow({
   count,
   onMove,
   onToggle,
+  onMerge,
   onSave,
 }: {
   c: Category;
@@ -330,6 +346,8 @@ export function CategoryRow({
   count: number;
   onMove: (delta: -1 | 1) => void;
   onToggle: () => void;
+  /** Abre el diálogo «Fusionar en…» (si falta, la acción no se ofrece). */
+  onMerge?: () => void;
   onSave: (patch: { name?: string; icon: string | null; color: string | null }) => Promise<boolean>;
   /** Manejadores de arrastre del `<li>` contenedor (no los usa la fila). */
   drag?: unknown;
@@ -356,6 +374,11 @@ export function CategoryRow({
         </span>
         {c.isSystem ? <span style={badgeStyle}>{t('system')}</span> : null}
         {archived ? <span style={badgeStyle}>{t('archivedBadge')}</span> : null}
+        {c.mergedInto ? (
+          <span style={badgeStyle} data-testid="category-merged-into">
+            {t('merge.mergedInto', { name: c.mergedInto.name })}
+          </span>
+        ) : null}
         {canEdit ? (
           <>
             {!archived ? (
@@ -389,13 +412,18 @@ export function CategoryRow({
             >
               {t('edit')}
             </button>
-            {!c.isSystem ? (
+            {!c.isSystem && !c.mergedInto ? (
               <button
                 type="button"
                 aria-label={t(archived ? 'unarchiveNamed' : 'archiveNamed', { name: c.name })}
                 onClick={onToggle}
               >
                 {archived ? t('unarchive') : t('archive')}
+              </button>
+            ) : null}
+            {!c.isSystem && !c.mergedInto && onMerge ? (
+              <button type="button" aria-label={t('merge.action', { name: c.name })} onClick={onMerge}>
+                {t('merge.button')}
               </button>
             ) : null}
           </>

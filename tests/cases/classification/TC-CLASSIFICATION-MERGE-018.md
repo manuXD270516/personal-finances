@@ -5,17 +5,18 @@ spec: classification/categories
 related_specs: ["imports/import-pipeline"]
 requirement: "Referencias a la categoría fusionada en otros contextos"
 scenario: "Importación en revisión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-IMPORTS-003"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","imports"]
 error_code: null
@@ -29,7 +30,7 @@ expected_result:
   - "la fila queda clasificada en \"Supermercado\""
   - "el gasto de 85.50 BOB se registra en \"Supermercado\" sin CATEGORY_ARCHIVED"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-018 — La fila de una importación en revisión pasa a la destino y se aprueba en ella

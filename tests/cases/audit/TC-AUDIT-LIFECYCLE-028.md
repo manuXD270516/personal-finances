@@ -5,17 +5,20 @@ spec: audit/lifecycle-timeline
 related_specs: ["classification/categories"]
 requirement: "Fusión en el recorrido de categorías y contrapartes"
 scenario: "Recorrido de una categoría fusionada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-AUDIT-009","FR-AUDIT-010","FR-CLASSIFICATION-007"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - apps/web/src/ui/lifecycle/lifecycle.test.tsx
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["lifecycle","merge","categories"]
 error_code: null
@@ -29,7 +32,7 @@ expected_result:
   - "el de \"Super\" tiene CREATE (a ACTIVE) y MERGE (ACTIVE a ARCHIVED) con la destino \"Supermercado\"; estado actual ARCHIVED"
   - "el de \"Supermercado\" tiene la anotación MERGED_FROM con \"Super\" y 3 porciones, con el mismo operationId"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-AUDIT-LIFECYCLE-028 — Recorrido de Super fusionada y anotación en Supermercado

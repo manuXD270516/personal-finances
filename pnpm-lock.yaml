@@ -1096,6 +1096,9 @@ importers:
       '@pf/audit':
         specifier: workspace:*
         version: link:../audit
+      '@pf/classification':
+        specifier: workspace:*
+        version: link:../classification
       '@pf/identity':
         specifier: workspace:*
         version: link:../identity

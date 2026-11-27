@@ -36,9 +36,13 @@ describe('Arquitectura del recorrido de CLASSIFICATION (docs/31 D52)', () => {
       ['../domain/counterparty.ts', 'Counterparty'],
     ] as const) {
       const all = methods(read(file), cls);
-      const changing = all.filter((m) => m.name !== 'create' && /archivedAt: (at|null)/.test(m.body));
-      expect(changing.map((m) => m.name).sort(), cls).toEqual(['archive', 'unarchive']);
-      for (const m of changing) expect(m.body, `${cls}.${m.name}`).toMatch(/this\.mark\('(UN)?ARCHIVE'\)/);
+      const changing = all.filter(
+        (m) => m.name !== 'create' && /archivedAt: (at|null|this\.s\.archivedAt \?\? at)/.test(m.body),
+      );
+      expect(changing.map((m) => m.name).sort(), cls).toEqual(['archive', 'merge', 'unarchive']);
+      for (const m of changing) {
+        expect(m.body, `${cls}.${m.name}`).toMatch(/this\.mark\('((UN)?ARCHIVE|MERGE)'\)/);
+      }
       // La creación marca CREATE.
       expect(all.find((m) => m.name === 'create')?.body, `${cls}.create`).toMatch(/\.mark\('CREATE'\)/);
     }

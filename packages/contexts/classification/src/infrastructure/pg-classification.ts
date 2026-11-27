@@ -3,9 +3,11 @@ import { PgUnitOfWork, unitOfWorkKysely } from '@pf/platform/api';
 import { DomainError, type Clock } from '@pf/shared-kernel';
 import { sql, type Generated, type Kysely, type Selectable } from 'kysely';
 import type { Pool } from 'pg';
+import type { ClassificationMergeParticipant } from '../contracts/merge.js';
 import type {
   AuditPort,
   ClassificationDeps,
+  ClosedPeriodRangesPort,
   DefaultCatalog,
   DefaultCatalogSource,
   IdGenerator,
@@ -56,6 +58,8 @@ interface CategoryTable extends Common {
   icon: string | null;
   color: string | null;
   sort_order: number;
+  merged_into_id: string | null;
+  merged_at: Date | null;
 }
 
 interface TagTable extends Common {
@@ -72,6 +76,8 @@ interface CounterpartyTable extends Common {
   default_category_id: string | null;
   notes: string | null;
   website: string | null;
+  merged_into_id: string | null;
+  merged_at: Date | null;
 }
 
 interface AliasTable {
@@ -214,6 +220,8 @@ export class PgCategoryRepository implements Repository<Category> {
       color: r.color,
       sortOrder: r.sort_order,
       archivedAt: iso(r.archived_at),
+      mergedIntoId: r.merged_into_id,
+      mergedAt: iso(r.merged_at),
       version: r.version,
     });
   }
@@ -254,6 +262,8 @@ export class PgCategoryRepository implements Repository<Category> {
           color: c.color,
           sort_order: c.sortOrder,
           archived_at: ts(c.archivedAt),
+          merged_into_id: c.mergedIntoId,
+          merged_at: ts(c.mergedAt),
           version: c.version,
         })
         .execute(),
@@ -273,6 +283,8 @@ export class PgCategoryRepository implements Repository<Category> {
           color: c.color,
           sort_order: c.sortOrder,
           archived_at: ts(c.archivedAt),
+          merged_into_id: c.mergedIntoId,
+          merged_at: ts(c.mergedAt),
           version: c.version,
           updated_at: now,
         })
@@ -486,6 +498,8 @@ export class PgCounterpartyRepository implements Repository<Counterparty> {
         notes: r.notes,
         website: r.website,
         archivedAt: iso(r.archived_at),
+        mergedIntoId: r.merged_into_id,
+        mergedAt: iso(r.merged_at),
         version: r.version,
       }),
     );
@@ -548,6 +562,8 @@ export class PgCounterpartyRepository implements Repository<Counterparty> {
           notes: c.notes,
           website: c.website,
           archived_at: ts(c.archivedAt),
+          merged_into_id: c.mergedIntoId,
+          merged_at: ts(c.mergedAt),
           version: c.version,
         })
         .execute(),
@@ -568,6 +584,8 @@ export class PgCounterpartyRepository implements Repository<Counterparty> {
           notes: c.notes,
           website: c.website,
           archived_at: ts(c.archivedAt),
+          merged_into_id: c.mergedIntoId,
+          merged_at: ts(c.mergedAt),
           version: c.version,
           updated_at: now,
         })
@@ -598,6 +616,9 @@ export const noTransactionsYet: LastCategoryUsedQueryPort = {
   lastCategoryUsed: async () => null,
 };
 
+/** Sin periodos cerrados (procesos de solo lectura que no fusionan): el composition root lo sustituye. */
+export const noClosedPeriods: ClosedPeriodRangesPort = { closedRanges: async () => [] };
+
 /** UUIDv7 (RFC 9562): 48 bits de milisegundos + aleatorio. */
 export const uuidV7: IdGenerator = {
   next(): string {
@@ -616,6 +637,8 @@ export function pgClassificationDeps(input: {
   readonly lifecycleQuery: LifecycleQuery;
   readonly clock: Clock;
   readonly lastCategoryUsed?: LastCategoryUsedQueryPort;
+  readonly closedPeriods?: ClosedPeriodRangesPort;
+  readonly mergeParticipants?: readonly ClassificationMergeParticipant[];
   readonly ids?: IdGenerator;
 }): ClassificationDeps {
   return {
@@ -631,6 +654,8 @@ export function pgClassificationDeps(input: {
     lifecycle: input.lifecycle,
     lifecycleQuery: input.lifecycleQuery,
     lastCategoryUsed: input.lastCategoryUsed ?? noTransactionsYet,
+    closedPeriods: input.closedPeriods ?? noClosedPeriods,
+    mergeParticipants: input.mergeParticipants ?? [],
     catalogs: defaultCatalogs,
     ids: input.ids ?? uuidV7,
     clock: input.clock,

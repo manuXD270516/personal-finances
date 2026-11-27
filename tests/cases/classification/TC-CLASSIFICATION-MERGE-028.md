@@ -5,17 +5,19 @@ spec: classification/categories
 related_specs: ["planning/month-closing"]
 requirement: "Continuidad de la historia de una categoría fusionada en los análisis"
 scenario: "Serie de pronóstico con meses cerrados de la origen"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007", "FR-FORECAST-001"]
 nfr: []
 invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/src/identity/merge-participants.architecture.test.ts
+  - packages/contexts/forecasting/src/application/category-merge.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge", "categories", "forecast", "closed-periods"]
 error_code: null
@@ -30,7 +32,7 @@ expected_result:
   - "la serie de \"Supermercado\" tiene 100.00 BOB en cada mes de mayo a octubre de 2026"
   - "el reporte de octubre de 2026 sigue mostrando \"Super\" = 100.00 BOB"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-028 — La serie de pronóstico de la destino incluye los meses cerrados de la origen fusionada

@@ -7,3 +7,4 @@ export * from './counterparty.js';
 export * from './classification-lifecycle.js';
 export * from './custom-field-value.js';
 export * from './custom-field.js';
+export * from './merge-policy.js';

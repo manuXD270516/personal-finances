@@ -11,7 +11,17 @@ import {
 import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
 import type { AccountsRuntime } from '@pf/accounts/interface/accounts.module';
 import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
-import { CLASSIFICATION_AUDIT_POLICY, type CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import {
+  CLASSIFICATION_AUDIT_POLICY,
+  type ClassificationMergeParticipant,
+  type CounterpartyCatalogQuery,
+} from '@pf/classification/contracts';
+import { createClassificationMergeParticipant as commitmentsMergeParticipant } from '@pf/commitments/interface/commitments.module';
+import { createClassificationMergeParticipant as debtMergeParticipant } from '@pf/debt/interface/debt.module';
+import { createClassificationMergeParticipant as importsMergeParticipant } from '@pf/imports/interface/imports.module';
+import { createClassificationMergeParticipant as planningMergeParticipant } from '@pf/planning/interface/planning.module';
+import { createClassificationMergeParticipant as reportingMergeParticipant } from '@pf/reporting/interface/reporting.module';
+import { createClassificationMergeParticipant as transactionsMergeParticipant } from '@pf/transactions/interface/transactions.module';
 import { COMMITMENTS_AUDIT_POLICY } from '@pf/commitments/contracts';
 import { importsPortsFor, type DocumentsRef } from '../imports/imports-wiring.js';
 import {
@@ -486,6 +496,10 @@ export function financeRuntimes(input: {
     rules?: RulesRuntime;
     forecasting?: ForecastingRuntime;
   } = {};
+  // Fusión de categorías y contrapartes (add-category-and-counterparty-merge): CLASSIFICATION define el puerto y cada
+  // contexto dueño de una referencia lo implementa. La lista se llena (en orden fijo) cuando todos están compuestos; los
+  // periodos cerrados se leen del catálogo público de PLANNING (referencia diferida, como `categoryUsage`).
+  const mergeParticipants: ClassificationMergeParticipant[] = [];
   const classification = createClassificationRuntime({
     pool: input.pool,
     clock: input.clock,
@@ -497,6 +511,13 @@ export function financeRuntimes(input: {
     lastCategoryUsed: {
       lastCategoryUsed: (query) => deferred.categoryUsage?.lastCategoryUsed(query) ?? Promise.resolve(null),
     },
+    closedPeriods: {
+      closedRanges: async (workspaceId) =>
+        (
+          await (deferred.periods?.listPeriods({ workspaceId, statuses: ['CLOSED'] }) ?? Promise.resolve([]))
+        ).map((p) => ({ from: p.periodStart, to: p.periodEnd })),
+    },
+    mergeParticipants,
   });
   // FX (add-manual-conversions): catálogo, tasas manuales y pricing de conversiones; moneda de reporte de IDENTITY.
   const fx = createFxRuntime({
@@ -588,6 +609,7 @@ export function financeRuntimes(input: {
     calendar: workspaceCalendar(input.pool, input.clock, input.config.APP_TIMEZONE),
     settings: rulesSettingsFrom(input.config),
     metrics: rulesCounters,
+    categoryMerge: classification.categoryMerge,
   });
   deferred.rules = rules;
   // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
@@ -956,6 +978,8 @@ export function financeRuntimes(input: {
     lifecycle: input.lifecycle,
     lifecycleQuery: input.lifecycleQuery,
     outbox: classificationOutbox(writer),
+    // D496: la historia de una categoría fusionada cuenta como la de su destino en las series y los gastos atípicos.
+    categoryMerge: classification.categoryMerge,
     workspaces: identityActiveWorkspaces(input.pool),
     ...forecastingReadPorts({
       calendar: actorCalendar,
@@ -1015,6 +1039,17 @@ export function financeRuntimes(input: {
     ...(input.banking ? { banking: input.banking } : {}),
     systemCategories: feesCategoryPort(classification.queries),
   });
+  // Orden fijo de la fusión: TRANSACTIONS, PLANNING, COMMITMENTS, RULES, REPORTING, DEBT e IMPORTS. Se aplican de a uno,
+  // nunca en paralelo sobre el mismo cliente; la lista cerrada la verifica un test de arquitectura.
+  mergeParticipants.push(
+    transactionsMergeParticipant(input.lifecycle),
+    planningMergeParticipant(),
+    commitmentsMergeParticipant(),
+    rules.mergeParticipant,
+    reportingMergeParticipant(),
+    debtMergeParticipant(),
+    importsMergeParticipant(),
+  );
   return {
     classification,
     fx,

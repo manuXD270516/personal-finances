@@ -77,6 +77,13 @@ export const ERROR_CATALOG = {
   CATEGORY_GROUP_NOT_EMPTY: { status: 409, title: 'Category group is not empty' },
   SYSTEM_CATEGORY_IMMUTABLE: { status: 409, title: 'System categories are immutable' },
   COUNTERPARTY_ALIAS_TAKEN: { status: 409, title: 'Counterparty alias already in use' },
+  // classification: fusión de categorías y contrapartes (Phase 9, add-category-and-counterparty-merge)
+  CLASSIFICATION_MERGE_CONFLICT: {
+    status: 409,
+    title: 'The merge has conflicts that must be resolved first',
+  },
+  CATEGORY_MERGED: { status: 409, title: 'Category was merged into another one' },
+  COUNTERPARTY_MERGED: { status: 409, title: 'Counterparty was merged into another one' },
   NAME_TAKEN: { status: 409, title: 'Name already in use' },
   // classification: custom fields (Phase 2, add-custom-fields)
   CUSTOM_FIELD_KEY_TAKEN: { status: 409, title: 'Custom field key already in use' },

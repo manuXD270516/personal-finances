@@ -5,17 +5,19 @@ spec: classification/categories
 related_specs: ["classification/counterparties","reporting/dashboard"]
 requirement: "Referencias a la categoría fusionada en otros contextos"
 scenario: "Contraparte y categorías esenciales"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/classification/src/application/merge.service.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","spendable"]
 error_code: null
@@ -28,7 +30,7 @@ expected_result:
   - "\"Hipermaxi\" tiene \"Supermercado\" como categoría por defecto"
   - "los esenciales del disponible son solo \"Supermercado\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-017 — Categoría por defecto de la contraparte y esenciales sin duplicar

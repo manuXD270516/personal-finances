@@ -5,17 +5,20 @@ spec: classification/categories
 related_specs: ["planning/budgets"]
 requirement: "Vista previa de la fusión de categorías"
 scenario: "Plan con líneas de las dos categorías"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-PLANNING-008"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - apps/web/src/ui/classification/merge.test.tsx
+  - packages/contexts/classification/src/application/merge.service.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","budgets"]
 error_code: "CLASSIFICATION_MERGE_CONFLICT"
@@ -29,7 +32,7 @@ expected_result:
   - "la fusión responde 409 CLASSIFICATION_MERGE_CONFLICT con ese conflicto en los detalles"
   - "las dos líneas, las porciones y \"Super\" quedan como estaban"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-009 — Plan con líneas de las dos categorías bloquea la fusión con CLASSIFICATION_MERGE_CONFLICT

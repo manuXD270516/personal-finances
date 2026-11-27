@@ -328,6 +328,8 @@ export interface Category {
   readonly icon?: string | null;
   readonly sortOrder: number;
   readonly archivedAt?: string | null;
+  /** Destino de la fusión: una fusionada queda archivada para siempre (no se desarchiva). */
+  readonly mergedInto?: { readonly id: string; readonly name: string } | null;
   readonly version: number;
 }
 
@@ -355,6 +357,7 @@ export interface Counterparty {
   readonly defaultCategoryId?: string | null;
   readonly aliases?: readonly string[];
   readonly archivedAt?: string | null;
+  readonly mergedInto?: { readonly id: string; readonly name: string } | null;
   readonly version: number;
 }
 

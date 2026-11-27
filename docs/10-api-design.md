@@ -277,6 +277,9 @@ Content-Type: application/json
 | classification | `CATEGORY_GROUP_NOT_EMPTY` | 409 | Un grupo solo se archiva si todas sus categorías están archivadas |
 | classification | `SYSTEM_CATEGORY_IMMUTABLE` | 409 | Categorías de sistema no se archivan |
 | classification | `COUNTERPARTY_ALIAS_TAKEN` | 409 | Alias (normalizado) ya usado por otra counterparty del workspace |
+| classification | `CLASSIFICATION_MERGE_CONFLICT` | 409 | La fusión tiene conflictos (`conflicts[]`: `BUDGET_LINE_EXISTS`, `TEMPLATE_LINE_EXISTS`, `SUBCATEGORY_NAME_TAKEN`); no cambia nada |
+| classification | `CATEGORY_MERGED` | 409 | La categoría ya se fusionó (no se desarchiva ni se vuelve a fusionar); `mergedInto` indica la destino |
+| classification | `COUNTERPARTY_MERGED` | 409 | Ídem para contrapartes |
 | classification | `NAME_TAKEN` | 409 | Nombre duplicado (en counterparties el problem incluye `existingId`) |
 | fx | `FX_RATE_NOT_FOUND` | 422 | Sin tasa para el par/fecha requerida |
 | fx | `FX_RATE_ALREADY_SUPERSEDED` | 409 | La versión de la tasa ya fue reemplazada (`POST …/supersede`) |

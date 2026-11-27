@@ -1,3 +1,4 @@
+import type { ClassificationMergeParticipant } from '@pf/classification/contracts';
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountsQueryPort } from '@pf/accounts/contracts';
 import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
@@ -576,9 +577,15 @@ export const importJobExistenceQuery: ImportJobExistenceQuery = {
 
 import { IMPORT_JOB_LIFECYCLE } from '../domain/import-job.js';
 import { CONNECTION_LIFECYCLE } from '../domain/banking/connection.js';
+import { PgImportsMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 
 /** Máquina `ImportJob` declarada (dato puro) para el recorrido (add-lifecycle-timeline, add-import-pipeline). */
 export const IMPORT_JOB_LIFECYCLE_MACHINE = IMPORT_JOB_LIFECYCLE.definition;
 
 /** Máquina `ImportConnection` declarada (dato puro) para el recorrido (add-banking-providers, D52). */
 export const IMPORT_CONNECTION_LIFECYCLE_MACHINE = CONNECTION_LIFECYCLE.definition;
+
+/** Participante de IMPORTS en la fusión de categorías y contrapartes (add-category-and-counterparty-merge): filas aún no persistidas. */
+export function createClassificationMergeParticipant(): ClassificationMergeParticipant {
+  return new PgImportsMergeParticipant();
+}
