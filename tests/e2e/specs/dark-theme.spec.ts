@@ -119,7 +119,7 @@ test.describe('Tema oscuro (platform/web-interface)', () => {
     const { context, page } = await newFinanceUser(browser, 'tema-002');
     await page.emulateMedia({ colorScheme: 'light' });
     await go(page, '/transacciones');
-    const search = page.getByLabel('Buscar por descripción');
+    const search = page.getByRole('search').getByLabel('Buscar', { exact: true });
     await search.fill('super');
     expect((await bodyColors(page)).bg).toBe(LIGHT.bg);
     await page.evaluate(() => {
