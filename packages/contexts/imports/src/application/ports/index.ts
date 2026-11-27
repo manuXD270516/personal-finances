@@ -248,6 +248,8 @@ export interface StagingRepository {
       readonly decision: Decision | null;
     }[]
   >;
+  /** Hasta `limit` registros posteriores al encabezado (el primero por línea), en orden de línea: la muestra al retomar. */
+  sampleRaw(workspaceId: string, jobId: string, limit: number): Promise<readonly (readonly string[])[]>;
   /** Escribe la normalización de las filas de datos y deja sin clasificar (NULL) las de `resetIds`. */
   applyNormalization(
     workspaceId: string,

@@ -304,7 +304,7 @@ describe('GetSpendable: segunda vista, periodo y frescura', () => {
     expect((await spendable()).period.label).toBe('2026-10');
   });
 
-  it('[TC-REPORTING-SPENDABLE-011] sin periodo que cubra hoy usa el mes calendario y no consulta el plan', async () => {
+  it('[TC-REPORTING-SPENDABLE-016] sin periodo que cubra hoy usa el mes calendario y no consulta el plan', async () => {
     mem.periods.length = 0;
     const s = await spendable();
     expect(s.period).toEqual({ id: null, label: '2026-10', start: '2026-10-01', end: '2026-10-31' });
@@ -332,6 +332,32 @@ describe('GetSpendable: segunda vista, periodo y frescura', () => {
 });
 
 describe('GetSpendable: tarjetas sin pago programado y resumen del Home', () => {
+  it('[TC-REPORTING-SPENDABLE-017] el aviso de una tarjeta sin pago programado no cambia el disponible', async () => {
+    const withPayment = await spendable();
+    expect(withPayment.cardsWithoutPaymentCount).toBe(0);
+    const idx = mem.spendableItems.findIndex((i) => i.name === 'Pago Tarjeta X');
+    mem.spendableItems.splice(idx, 1);
+    const without = await spendable();
+    expect(without.cardsWithoutPaymentCount).toBe(1);
+    // quitar el pago libera su monto del comprometido: el aviso en sí no suma ni resta
+    expect(text(without.consolidated.total)).toBe('8021.00 BOB');
+  });
+
+  it('[TC-REPORTING-SPENDABLE-018] un pago programado menor que el mínimo igual cuenta como programado (D213, D491)', async () => {
+    mem.spendableItems.splice(
+      mem.spendableItems.findIndex((i) => i.name === 'Pago Tarjeta X'),
+      1,
+    );
+    item('Pago Tarjeta X', '2026-10-25', bob('200.00'), {
+      kind: 'TRANSFER',
+      toAccountId: 'tarjeta-x',
+      targetLiquid: false,
+    });
+    const s = await spendable();
+    expect(s.cardsWithoutPaymentCount).toBe(0);
+    expect(s.committedItems.map((i) => i.name)).toContain('Pago Tarjeta X');
+  });
+
   it('[TC-REPORTING-SPENDABLE-002] una tarjeta con saldo adeudado sin pago programado se cuenta; con "Pago Tarjeta X" no', async () => {
     expect((await spendable()).cardsWithoutPaymentCount).toBe(0);
     mem.spendableItems.splice(

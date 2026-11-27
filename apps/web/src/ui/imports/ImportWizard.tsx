@@ -19,6 +19,7 @@ import {
   isCancellable,
   isPolling,
   mappingFormOf,
+  resumedCreated,
   stepOf,
   type MappingErrors,
   type MappingForm,
@@ -31,7 +32,7 @@ import { AlreadyImportedWarning, ResultStep } from './ResultPanels';
 import { StepIndicator } from './StepIndicator';
 import { UploadStep } from './UploadStep';
 import { useAccounts } from './useAccounts';
-import type { ImportCreated, ImportJob, ImportMapped, ImportPreviewSummary } from './types';
+import type { ImportCreated, ImportJob, ImportJobDetail, ImportMapped, ImportPreviewSummary } from './types';
 import { AttachmentsSection } from '../documents/AttachmentsSection';
 import { reasonKey } from '../documents/logic';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
@@ -114,12 +115,18 @@ export function ImportWizard({
     if (!importId) return;
     let cancelled = false;
     ctx.api
-      .get<ImportJob>(importPath(ctx.base, importId))
+      .get<ImportJobDetail>(importPath(ctx.base, importId))
       .then((r) => {
         if (cancelled || !r.data) return;
         etag.current = r.etag;
         setJob(r.data);
-        setForm(mappingFormOf(r.data.mapping));
+        const resumed = resumedCreated(r.data);
+        if (resumed) {
+          setCreated(resumed);
+          setForm(initialMappingOf(resumed));
+        } else {
+          setForm(mappingFormOf(r.data.mapping));
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) setProblem(problemOf(err));

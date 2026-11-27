@@ -38,6 +38,8 @@ export interface FakeOccurrence {
   status: ManagedOccurrenceDto['status'];
   expected: { type: string; amount: string | null };
   editedByUser: boolean;
+  /** Origen del esperado fijado por el administrador (`null` si no lo informó). */
+  basis: ManagedOccurrenceDto['expectedBasis'];
   skipReason: string | null;
 }
 
@@ -377,6 +379,7 @@ export class CardWorld {
           !e || e.type === 'NONE'
             ? { type: 'VARIABLE', amount: null }
             : { type: e.type, amount: e.amount ?? null };
+        occ.basis = e && e.type !== 'NONE' ? (e.basis ?? null) : null;
       },
       skip: async (input) => {
         world.calls.push({ method: 'skip', input });
@@ -405,6 +408,7 @@ export class CardWorld {
             },
             transactionId: null,
             editedByUser: o.editedByUser,
+            expectedBasis: o.basis,
             skipReason: o.skipReason,
           }));
       },
@@ -570,6 +574,7 @@ export class CardWorld {
           status: 'SCHEDULED',
           expected: { type: 'VARIABLE', amount: null },
           editedByUser: false,
+          basis: null,
           skipReason: null,
         });
       }

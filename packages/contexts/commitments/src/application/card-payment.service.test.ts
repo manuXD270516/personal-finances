@@ -570,6 +570,33 @@ describe('Monto esperado fijado por el administrador', () => {
     });
   });
 
+  it('[TC-DEBT-CARD-033] el origen del esperado se guarda con el administrador y se limpia al editar el usuario, sin origen o al reemplazar', async () => {
+    const s = setup();
+    const { definitionId } = await createPlan(s);
+    const range = { workspaceId: WS, definitionId, from: '2026-11-01', to: '2026-11-30' };
+    await set(s, definitionId, '2026-11-15', { type: 'ESTIMATED', amount: '333.33', basis: 'INSTALLMENTS' });
+    expect((await s.port.listOccurrences(range))[0]).toMatchObject({ expectedBasis: 'INSTALLMENTS' });
+    // mismo monto con otro origen: se actualiza solo el origen
+    await set(s, definitionId, '2026-11-15', { type: 'ESTIMATED', amount: '333.33', basis: 'OPEN_CYCLE' });
+    expect((await s.port.listOccurrences(range))[0]).toMatchObject({ expectedBasis: 'OPEN_CYCLE' });
+    // un esperado sin origen lo limpia
+    await set(s, definitionId, '2026-11-15', { type: 'ESTIMATED', amount: '400.00' });
+    expect((await s.port.listOccurrences(range))[0]).toMatchObject({ expectedBasis: null });
+    await set(s, definitionId, '2026-11-15', { type: 'FIXED', amount: '400.00', basis: 'STATEMENT' });
+    const occ = onDate(s, definitionId, '2026-11-15');
+    await s.occs.edit({
+      workspaceId: WS,
+      userId: USER,
+      occurrenceId: occ.id,
+      expectedVersion: occ.version,
+      expectedAmount: bob('450.00'),
+    });
+    expect((await s.port.listOccurrences(range))[0]).toMatchObject({
+      editedByUser: true,
+      expectedBasis: null,
+    });
+  });
+
   it('[TC-DEBT-CARD-030] valida montos y tipo; el contrato legado con amount sigue marcando el ajuste', async () => {
     const s = setup();
     const { definitionId } = await createPlan(s);

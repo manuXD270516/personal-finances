@@ -671,6 +671,19 @@ describe('Q8 y Pagos recurrentes: pago de tarjeta', () => {
     expect(html).toContain('href="/es/debts/tarjetas/card-1"');
   });
 
+  it('[TC-REPORTING-UPCOMING-023] [TC-REPORTING-UPCOMING-024] [TC-REPORTING-UPCOMING-025] la indicación «cuotas» solo aparece con el origen INSTALLMENTS', () => {
+    const render = (over: Partial<UpcomingPaymentItem>) =>
+      renderToStaticMarkup(<ItemName item={item(over)} f={fu} href={href} />);
+    const installments = render({ expectedBasis: 'INSTALLMENTS' });
+    expect(installments).toContain('data-testid="card-payment-installments"');
+    expect(textOf(installments)).toMatch(/Estimado.* · cuotas/);
+    expect(render({ expectedBasis: 'OPEN_CYCLE' })).not.toContain('card-payment-installments');
+    expect(render({ expectedBasis: 'STATEMENT', estimated: false, amountType: 'FIXED' })).not.toContain(
+      'card-payment-installments',
+    );
+    expect(render({})).not.toContain('card-payment-installments');
+  });
+
   it('antes de cargar las tarjetas se reconoce por el prefijo y no hay enlace; un pago común no cambia', () => {
     const html = renderToStaticMarkup(<ItemName item={item({ estimated: false })} f={fu} href={href} />);
     expect(textOf(html)).toMatch(/Pago de tarjeta · Visa Oro/);

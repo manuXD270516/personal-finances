@@ -32,8 +32,9 @@ import { VoidImpactNotice } from '../goals/VoidImpact';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { MatchSuggestionsNotice } from '../recurring/MatchSuggestionsPanel';
 import { useCatalogs } from './catalogs';
-import { availableActions } from './logic';
+import { availableActions, isManagedTransaction as isManaged } from './logic';
 import { initialAccount, readLastAccount } from './last-account';
+import { ManagedEditForm } from './ManagedEditForm';
 import { TransactionForm, type RecordKind } from './TransactionForm';
 import { isWithoutStatement } from '../reconciliation/logic';
 import type { TransactionLifecycle } from '../lifecycle/types';
@@ -497,9 +498,9 @@ function Detail({
                 {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
                 {ctx.canEdit ? (
                   <div style={rowStyle} role="group" aria-label={t('detail.actions')}>
-                    {actions.edit && RECORD.includes(tx.kind) ? (
+                    {actions.edit && (RECORD.includes(tx.kind) || isManaged(tx)) ? (
                       <button type="button" onClick={() => setEditing(true)} disabled={editing || busy}>
-                        {t('detail.edit')}
+                        {isManaged(tx) ? t('detail.editDescriptive') : t('detail.edit')}
                       </button>
                     ) : null}
                     {RECORD.includes(tx.kind) && tx.kind !== 'ADJUSTMENT' ? (
@@ -630,7 +631,21 @@ function Detail({
                     ) : null}
                   </ConfirmDialog>
                 ) : null}
-                {editing && catalogs.loaded ? (
+                {editing && catalogs.loaded && isManaged(tx) ? (
+                  <ManagedEditForm
+                    ctx={ctx}
+                    tx={tx}
+                    catalogs={catalogs}
+                    onCancel={() => setEditing(false)}
+                    onSaved={(next) => {
+                      setTx(next);
+                      setEditing(false);
+                      setStatus(t('detail.done.edited'));
+                      load();
+                    }}
+                  />
+                ) : null}
+                {editing && catalogs.loaded && !isManaged(tx) ? (
                   <TransactionForm
                     ctx={ctx}
                     catalogs={catalogs}

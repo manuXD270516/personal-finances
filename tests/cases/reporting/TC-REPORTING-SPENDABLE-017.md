@@ -5,16 +5,17 @@ spec: reporting/dashboard
 related_specs: ["commitments/recurrence-engine", "debt/credit-cards"]
 requirement: "Aviso de tarjetas sin pago programado en el disponible"
 scenario: "Tarjeta con saldo adeudado sin pago programado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016", "FR-COMMITMENTS-011", "FR-DEBT-014"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["spendable", "q5", "credit-cards"]
@@ -29,7 +30,7 @@ expected_result:
   - "cardsWithoutPaymentCount es 1"
   - "el monto del disponible es el mismo que con la tarjeta sin saldo adeudado"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-REPORTING-SPENDABLE-017 — Q5 avisa una tarjeta con saldo adeudado sin pago programado sin cambiar el disponible

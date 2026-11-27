@@ -582,6 +582,7 @@ export class CommitmentsQueries
             status: o.status as 'SCHEDULED' | 'DUE' | 'OVERDUE',
             requiresApproval: needsApproval(o.status, v.mode),
             expected: { ...o.expected, currency: o.currency },
+            expectedBasis: o.expectedBasis,
             projected: projected === null ? null : money(projected, o.currency),
             accountId: v.accountId,
             toAccountId: v.toAccountId,

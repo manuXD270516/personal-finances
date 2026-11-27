@@ -97,6 +97,16 @@ describe('UpcomingPaymentsAssembler: lista (reporting/cash-flow-calendar)', () =
     expect(total(items)).toBe('2980.00');
   });
 
+  it('[TC-REPORTING-UPCOMING-023] [TC-REPORTING-UPCOMING-024] [TC-REPORTING-UPCOMING-025] el ítem copia el origen del esperado de la ocurrencia', () => {
+    const items = assemble([
+      occ('Cuotas', '2026-11-05', { amountType: 'ESTIMATED', expectedBasis: 'INSTALLMENTS' }),
+      occ('Ciclo abierto', '2026-11-06', { amountType: 'ESTIMATED', expectedBasis: 'OPEN_CYCLE' }),
+      occ('Estado', '2026-11-07', { expectedBasis: 'STATEMENT' }),
+      occ('Sin origen', '2026-11-08', { expectedBasis: null }),
+    ]);
+    expect(items.map((i) => i.expectedBasis)).toEqual(['INSTALLMENTS', 'OPEN_CYCLE', 'STATEMENT', undefined]);
+  });
+
   it('[TC-REPORTING-UPCOMING-003] los ingresos pendientes no suman ni se listan', () => {
     const items = assemble(
       [occ('Internet', '2026-10-22', { amount: bob('199.00') })],

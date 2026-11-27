@@ -368,6 +368,8 @@ export interface UpcomingPaymentDto {
   readonly status: 'SCHEDULED' | 'DUE' | 'OVERDUE';
   readonly requiresApproval: boolean;
   readonly expected: ExpectedAmountDto;
+  /** Origen del esperado de un pago administrado (p. ej. cuotas de tarjeta), o `null`. */
+  readonly expectedBasis: ExpectedBasisDto | null;
   /** Monto proyectado (máximo en `MIN_MAX`); `null` si es `VARIABLE`. */
   readonly projected: MoneyDto | null;
   readonly accountId: string;
@@ -558,7 +560,15 @@ export interface ManagedExpectationDto {
   readonly type: 'FIXED' | 'ESTIMATED' | 'NONE';
   /** Obligatorio con `FIXED` y `ESTIMATED` (> 0, a la escala de la moneda). */
   readonly amount?: string;
+  /**
+   * Origen del esperado (openspec fix-phase-4-debt-followups): estado de cuenta emitido, ciclo abierto o cuotas
+   * programadas. Sin él la ocurrencia queda sin origen; solo lo fija el administrador.
+   */
+  readonly basis?: ExpectedBasisDto;
 }
+
+/** Origen del monto esperado de un pago administrado (aditivo). */
+export type ExpectedBasisDto = 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS';
 
 /** Ocurrencia de una definición administrada vista por su administrador. */
 export interface ManagedOccurrenceDto {
@@ -572,6 +582,8 @@ export interface ManagedOccurrenceDto {
   readonly transactionId: string | null;
   /** El usuario editó el monto a mano (el administrador no lo pisa hasta que él mismo lo restablezca). */
   readonly editedByUser: boolean;
+  /** Origen del esperado informado por el administrador, o `null`. */
+  readonly expectedBasis: ExpectedBasisDto | null;
   readonly skipReason: string | null;
 }
 

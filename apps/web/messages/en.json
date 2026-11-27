@@ -1109,7 +1109,8 @@
       "customFields": "Custom fields",
       "reconciliation": "Reconciliation",
       "statementRef": "Statement of {date} for {balance}",
-      "source": "Origin"
+      "source": "Origin",
+      "editDescriptive": "Edit description and notes"
     },
     "history": {
       "title": "History (lifecycle)",
@@ -1220,6 +1221,16 @@
       "voided": "Entry voided",
       "undoReason": "Undone from the recording notice",
       "recordAndDetail": "Record and go to details"
+    },
+    "managedEdit": {
+      "title": "Edit description and notes",
+      "loanManaged": "This entry is managed by the loan: only the description and notes can be edited.",
+      "cardManaged": "Managed by the card: the amount, account, date, currency and categories are not edited here.",
+      "cardManagedNamed": "Managed by the card {name}: the amount, account, date, currency and categories are not edited here.",
+      "account": "Account",
+      "currency": "Currency",
+      "viewCard": "View the card",
+      "categories": "Categories"
     }
   },
   "Fx": {
@@ -3705,6 +3716,7 @@
     "cardPayment": {
       "label": "Card payment · {name}",
       "estimated": "Estimated: adjusted when the statement is issued",
+      "installments": "installments",
       "viewCard": "View the card"
     }
   },

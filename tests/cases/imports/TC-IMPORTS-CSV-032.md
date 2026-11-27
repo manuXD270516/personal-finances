@@ -5,16 +5,17 @@ spec: imports/import-pipeline
 related_specs: []
 requirement: "Filas de muestra al retomar una importación esperando mapeo"
 scenario: "Archivo con más de 20 filas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: []
 invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["imports","csv","mapping"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "sampleRows tiene 20 elementos: las filas de datos 1 a 20 en el orden del archivo"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-IMPORTS-CSV-032 — La muestra al retomar se limita a 20 filas

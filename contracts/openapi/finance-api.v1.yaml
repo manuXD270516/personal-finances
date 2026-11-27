@@ -10222,7 +10222,9 @@ paths:
       description: |
         While the import is `APPROVED` or `PERSISTING` the client polls this operation (with `If-None-Match`: 304 when
         nothing changed). `progress` reports the batches done; `counters` the rows by outcome; `errors` the rows that a
-        rejected batch left out (a code, the count and the first 100 file lines).
+        rejected batch left out (a code, the count and the first 100 file lines). While the import is
+        `AWAITING_MAPPING` the response also carries `sampleRows` and, when the account has a previous import,
+        `suggestedMapping`, so the mapping step can be resumed.
       x-openspec-capability: imports/import-pipeline
       x-required-role: VIEWER
       parameters:
@@ -21846,6 +21848,12 @@ components:
           type: string
           enum: [FIXED, ESTIMATED, MIN_MAX, VARIABLE, ACTUAL]
           description: '`ACTUAL` is the real amount of a pending transaction.'
+        expectedBasis:
+          type: string
+          description: >-
+            Origin of the expected amount of a card payment: issued statement, open cycle or scheduled installments of a
+            later cycle. Absent on the other payments. Open set; clients must handle unknown values.
+          x-extensible-enum: [STATEMENT, OPEN_CYCLE, INSTALLMENTS]
         amount:
           oneOf:
             - $ref: '#/components/schemas/Money'
@@ -25140,6 +25148,22 @@ components:
             - $ref: '#/components/schemas/ImportPdfInfo'
             - type: 'null'
           description: What the reader reports about a PDF statement (`format = PDF`); `null` for the other formats. Structure and counts only, never text of the statement.
+        sampleRows:
+          type: array
+          maxItems: 20
+          items:
+            type: array
+            items: { type: string }
+          description: >-
+            Up to 20 records after the first one. Present only on `getImport` while the import is `AWAITING_MAPPING`
+            (and on creation). Untrusted text, always escaped by the UI.
+        suggestedMapping:
+          oneOf:
+            - $ref: '#/components/schemas/ImportMapping'
+            - type: 'null'
+          description: >-
+            Mapping of the last import of the account when it fits this file. Present only on `getImport` while the
+            import is `AWAITING_MAPPING` and the account has a previous import (and on creation).
     ImportCreated:
       description: The import just created, with the first rows of the file to build the mapping.
       allOf:

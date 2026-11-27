@@ -32,7 +32,8 @@
     "version",
     "created_at",
     "schedule_key",
-    "shares_transaction"
+    "shares_transaction",
+    "expected_basis"
   ],
   "properties": {
     "id": {
@@ -167,6 +168,12 @@
     },
     "shares_transaction": {
       "type": "boolean"
+    },
+    "expected_basis": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "x-pfos-table": "commitments.recurring_occurrence",
