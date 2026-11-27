@@ -46,11 +46,11 @@ export default defineConfig({
     // `chromium` (un solo stack, workers: 1). Sin dependencia de `alerts`: no espera la cadena de notificaciones.
     {
       name: 'webkit',
-      testMatch: /(app-shell|a11y|transactions|auth|content-security-policy).spec.ts$/,
+      testMatch: /(app-shell|a11y|transactions|auth|content-security-policy)\.spec\.ts$/,
       dependencies: ['chromium'],
       // Corre sobre el stack ya cargado por toda la suite de Chromium (colas con miles de trabajos pendientes, ver `alerts`)
-      // y con un motor más lento por pantalla: el doble de tiempo por test (medido: 2 tests de `transactions` pasaban de 90 s).
-      timeout: 180_000,
+      // y con un motor más lento por pantalla: cinco minutos por test (en Windows, sobre el stack cargado, el test largo de `transactions` pasó de 180 s; en Linux CI WebKit completo tarda 3,4 min).
+      timeout: 300_000,
       use: { ...devices['Desktop Safari'], browserName: 'webkit' },
     },
   ],
