@@ -4,7 +4,7 @@
 #   pnpm stack:up                       # modo A: perfil deps (apps en el host con `pnpm dev`)
 #   pnpm stack:up -- --profile core     # modo B: producto completo en contenedores (mismas imágenes que prod)
 #
-# Perfiles: deps | core | seed | observability | ml | valkey. Los servicios de `deps` declaran también `core`.
+# Perfiles: deps | core | seed | observability | ml | tls | valkey. Los servicios de `deps` declaran también `core`.
 # Contrato de configuración (docs/19 §0.3): un solo `.env` en la raíz con los valores del modo A; en modo B cada
 # servicio de app hereda ese `.env` y aquí solo se sobrescriben las DIRECCIONES (nombres de servicio y puertos
 # canónicos de la red Compose). Puertos de host: `${PF_BIND_ADDR}:${PF_<SVC>_PORT}` (defaults "2 + canónico").
@@ -334,6 +334,55 @@ services:
     deploy:
       resources:
         limits: { cpus: '1', memory: 512m }
+
+  # ─────────────────── tls-proxy (solo E2E, perfil `tls`) ───────────────────
+  # change add-e2e-https (D516): HTTPS para la web, Keycloak y la subida de archivos del stack de E2E, con la misma
+  # imagen y digest de Caddy que producción (`compose.prod.yaml`: Renovate los actualiza juntos). Autoridad interna
+  # efímera (`local_certs`): `/data` y `/config` en tmpfs, así que la CA y los certificados mueren con el contenedor;
+  # nada se versiona. Cada sitio escucha en el mismo puerto que publica, para que `Host` y redirects coincidan.
+  # Sin HSTS (no debe quedar en el navegador del desarrollador). El stack de desarrollo por omisión no lo levanta.
+  tls-proxy:
+    profiles: [tls]
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    environment:
+      PF_WEB_TLS_PORT: ${PF_WEB_TLS_PORT:-23443}
+      PF_KEYCLOAK_TLS_PORT: ${PF_KEYCLOAK_TLS_PORT:-28443}
+      PF_OBJECT_STORAGE_TLS_PORT: ${PF_OBJECT_STORAGE_TLS_PORT:-29443}
+    volumes:
+      - ./caddy/Caddyfile.e2e:/etc/caddy/Caddyfile:ro
+    ports:
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_WEB_TLS_PORT:-23443}:${PF_WEB_TLS_PORT:-23443}'
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_KEYCLOAK_TLS_PORT:-28443}:${PF_KEYCLOAK_TLS_PORT:-28443}'
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_OBJECT_STORAGE_TLS_PORT:-29443}:${PF_OBJECT_STORAGE_TLS_PORT:-29443}'
+    read_only: true
+    tmpfs:
+      - '/tmp:size=16m'
+      - '/data:size=32m'
+      - '/config:size=8m'
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+      finance-web: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+      object-storage: { condition: service_healthy }
+    healthcheck:
+      # La imagen es Alpine: `wget` de BusyBox; la autoridad es efímera, así que no se valida la cadena aquí.
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-check-certificate -q -O /dev/null https://localhost:$${PF_WEB_TLS_PORT}/api/health/ready',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+      start_interval: 1s
+    stop_grace_period: 10s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 128m }
 
   # ───────────────────────────── seed ─────────────────────────────
   # One-shot: `pnpm db:seed -- --profile=minimal` → `docker compose --profile core run --rm seed seed --profile=…`.
