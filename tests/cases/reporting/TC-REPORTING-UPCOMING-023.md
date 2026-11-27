@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: ["debt/credit-cards","reporting/dashboard"]
 requirement: "Cuotas de tarjeta futuras en los próximos pagos"
 scenario: "Cuota en la tarjeta Q8 del Home"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-017","FR-REPORTING-016"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - packages/contexts/reporting/src/domain/upcoming-payments.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["upcoming-payments","installments","q8"]
@@ -26,10 +29,10 @@ input: {}
 steps:
   - "se consultan los próximos 30 días y se abre el Home"
 expected_result:
-  - "el ítem del 2026-12-15 \"Pago de tarjeta · Visa Oro\" lleva 333.33 BOB, amountType ESTIMATED y expectedBasis INSTALLMENTS"
+  - "el ítem de un ciclo posterior al abierto (p. ej. 2027-01-15, 333.34 BOB) \"Pago de tarjeta · Visa Oro\" lleva amountType ESTIMATED y expectedBasis INSTALLMENTS"
   - "la tarjeta Q8 muestra ese pago marcado como estimado con la indicación \"cuotas\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-REPORTING-UPCOMING-023 — La cuota de la laptop se rotula cuotas en la tarjeta Q8 del Home
@@ -44,7 +47,7 @@ Verifica el scenario "Cuota en la tarjeta Q8 del Home" del requirement "Cuotas d
 Dado Workspace en BOB con TZ America/La_Paz, tarjeta "Visa Oro BOB" con vencimiento el día 15 y el plan "Laptop" de 1000.00 BOB en 3 cuotas
 Y Hoy 2026-11-20 con FixedClock; el paso diario de tarjetas ya fijó el esperado del pago del 2026-12-15
 Cuando se consultan los próximos 30 días y se abre el Home
-Entonces el ítem del 2026-12-15 "Pago de tarjeta · Visa Oro" lleva 333.33 BOB, amountType ESTIMATED y expectedBasis INSTALLMENTS
+Entonces el ítem de un ciclo posterior al abierto (p. ej. 2027-01-15, 333.34 BOB) "Pago de tarjeta · Visa Oro" lleva amountType ESTIMATED y expectedBasis INSTALLMENTS
 Y la tarjeta Q8 muestra ese pago marcado como estimado con la indicación "cuotas"
 ```
 

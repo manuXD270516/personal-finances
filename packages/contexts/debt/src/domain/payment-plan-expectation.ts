@@ -15,8 +15,11 @@ import { applyMinimumPayment } from './minimum-payment-rule.js';
  *    `NONE` si da 0.
  *  - Ciclo POSTERIOR: `ESTIMATED` con la suma de las cuotas programadas que se facturan en él, o `NONE` si no hay.
  */
+/** Origen del esperado (openspec fix-phase-4-debt-followups): estado emitido, ciclo abierto o cuotas programadas. */
+export type ExpectationBasis = 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS';
+
 export type PlanExpectation =
-  | { readonly type: 'FIXED' | 'ESTIMATED'; readonly amount: Money }
+  | { readonly type: 'FIXED' | 'ESTIMATED'; readonly amount: Money; readonly basis?: ExpectationBasis }
   | { readonly type: 'NONE' }
   | { readonly type: 'SKIP'; readonly reason: 'NOTHING_BILLED' | 'STATEMENT_PAID' };
 
@@ -26,7 +29,7 @@ export function expectationForIssued(input: {
 }): PlanExpectation {
   const { standing } = input;
   const remaining = input.policy === 'MINIMUM' ? standing.remainingMinimum : standing.remainingNoInterest;
-  if (remaining.isPositive()) return { type: 'FIXED', amount: remaining };
+  if (remaining.isPositive()) return { type: 'FIXED', amount: remaining, basis: 'STATEMENT' };
   return {
     type: 'SKIP',
     reason: standing.noInterestPayment.isPositive() ? 'STATEMENT_PAID' : 'NOTHING_BILLED',
@@ -46,7 +49,7 @@ export function expectationForOpen(input: {
   const raw = input.presentedBalance.subtract(input.dueIssuedRemaining).subtract(input.unbilledAfter);
   if (!raw.isPositive()) return { type: 'NONE' };
   const amount = input.policy === 'MINIMUM' ? applyMinimumPayment(input.minimumRule, raw) : raw;
-  return amount.isPositive() ? { type: 'ESTIMATED', amount } : { type: 'NONE' };
+  return amount.isPositive() ? { type: 'ESTIMATED', amount, basis: 'OPEN_CYCLE' } : { type: 'NONE' };
 }
 
 export function expectationForFuture(input: {
@@ -58,18 +61,20 @@ export function expectationForFuture(input: {
   const total = input.installmentsTotal;
   if (!total.isPositive()) return { type: 'NONE' };
   const amount = input.policy === 'MINIMUM' ? applyMinimumPayment(input.minimumRule, total) : total;
-  return amount.isPositive() ? { type: 'ESTIMATED', amount } : { type: 'NONE' };
+  return amount.isPositive() ? { type: 'ESTIMATED', amount, basis: 'INSTALLMENTS' } : { type: 'NONE' };
 }
 
 /** `true` si la expectativa deseada ya es la que tiene la ocurrencia (no hay que escribir ni publicar nada). */
 export function sameExpectation(
   wanted: PlanExpectation,
-  current: { readonly type: string; readonly amount: string | null },
+  current: { readonly type: string; readonly amount: string | null; readonly basis?: string | null },
   scale: number,
 ): boolean {
   if (wanted.type === 'SKIP') return false;
-  if (wanted.type === 'NONE') return current.type === 'VARIABLE' && current.amount === null;
+  if (wanted.type === 'NONE')
+    return current.type === 'VARIABLE' && current.amount === null && (current.basis ?? null) === null;
   return (
+    (current.basis ?? null) === (wanted.basis ?? null) &&
     current.type === wanted.type &&
     current.amount !== null &&
     Money.parse(current.amount, { code: wanted.amount.currency.code, scale }).equals(wanted.amount)

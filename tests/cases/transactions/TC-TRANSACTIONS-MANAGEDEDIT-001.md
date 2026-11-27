@@ -5,16 +5,18 @@ spec: transactions/transaction-recording
 related_specs: ["debt/loans"]
 requirement: "Edición descriptiva de transacciones administradas desde la pantalla"
 scenario: "Nota en un pago de préstamo desde la pantalla"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-002","FR-DEBT-007","FR-TRANSACTIONS-009"]
 nfr: []
 invariants: ["INV-021"]
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/transactions/transactions.test.tsx
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["loans","managed-transactions","ui"]
@@ -31,7 +33,7 @@ expected_result:
   - "la nota queda registrada con la versión siguiente de la transacción"
   - "el asiento del pago y el saldo de \"Banco BOB\" no cambian"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-TRANSACTIONS-MANAGEDEDIT-001 — Nota en un pago de préstamo desde la pantalla sin campos financieros

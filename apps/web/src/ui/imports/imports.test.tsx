@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { esContext, textOf } from '../test-support';
 import { FileInfo } from './FileInfo';
-import { EMPTY_MAPPING_FORM, type MappingForm } from './logic';
+import { EMPTY_MAPPING_FORM, initialMappingOf, resumedCreated, type MappingForm } from './logic';
 import { MappingStep } from './MappingStep';
 import { PreviewTable } from './PreviewTable';
 import {
@@ -18,12 +18,30 @@ import { AlreadyImportedWarning, ProgressPanel, ResultStep } from './ResultPanel
 import { StepIndicator } from './StepIndicator';
 import { ImportsTable } from './ImportsList';
 import { UploadStep } from './UploadStep';
-import type { ImportJob, ImportPreviewRow, ImportPreviewSummary, ImportRowDecision } from './types';
+import type {
+  ImportJob,
+  ImportJobDetail,
+  ImportMapping,
+  ImportPreviewRow,
+  ImportPreviewSummary,
+  ImportRowDecision,
+} from './types';
 import { problemMessage } from '../../errors/error-messages';
 
 const f = esContext('Imports');
 const bob = (amount: string) => ({ amount, currency: 'BOB' });
 const noop = () => undefined;
+const SUGGESTED: ImportMapping = {
+  hasHeader: true,
+  skipRows: 0,
+  columns: {
+    date: { index: 0 },
+    description: { index: 1 },
+    amount: { mode: 'SIGNED', index: 2, signConvention: 'NEGATIVE_IS_OUTFLOW' },
+  },
+  dateFormat: 'dd/MM/yyyy',
+  decimalSeparator: ',',
+};
 
 function job(over: Partial<ImportJob> = {}): ImportJob {
   return {
@@ -283,6 +301,26 @@ describe('Asistente Importar CSV: mapeo (TC-IMPORTS-CSV-006, -007, -008)', () =>
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('=HYPERLINK(&quot;http://x&quot;,&quot;clic&quot;)');
     expect(html).not.toMatch(/<a [^>]*HYPERLINK/);
+  });
+
+  it('[TC-IMPORTS-CSV-031] [TC-IMPORTS-CSV-034] al retomar con la respuesta de getImport muestra las filas escapadas, precarga el mapeo y no avisa', () => {
+    const rows = [['01/10/2026', '<b>CAFÉ</b>', '-18,00']];
+    const detail = {
+      ...job(),
+      status: 'AWAITING_MAPPING',
+      header: ['Fecha', 'Descripción', 'Monto'],
+      sampleRows: rows,
+      suggestedMapping: SUGGESTED,
+    } as ImportJobDetail;
+    const resumed = resumedCreated(detail);
+    expect(resumed?.sampleRows).toEqual(rows);
+    expect(initialMappingOf(resumed!).dateIndex).toBe('0');
+    const html = renderMapping({ header: detail.header, sampleRows: resumed?.sampleRows });
+    expect(html).not.toContain('data-testid="mapping-no-sample"');
+    expect(html).toContain('&lt;b&gt;CAFÉ&lt;/b&gt;');
+    // sin muestra en la respuesta (otro estado o API anterior) se conserva el aviso
+    expect(resumedCreated({ ...detail, sampleRows: undefined })).toBeUndefined();
+    expect(resumedCreated({ ...detail, status: 'AWAITING_REVIEW' })).toBeUndefined();
   });
 
   it('retomar sin muestra lo avisa y VIEWER no ve el botón de aplicar', () => {

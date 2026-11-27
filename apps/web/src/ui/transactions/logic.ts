@@ -128,6 +128,14 @@ export function availableActions(tx: Transaction) {
   };
 }
 
+/** La transacción la administra otro contexto (préstamo o tarjeta): solo admite la edición descriptiva. */
+export const isManagedTransaction = (tx: Pick<Transaction, 'kind' | 'debtRole'>): boolean =>
+  isLoanManagedKind(tx.kind) || tx.debtRole === 'CARD_CHARGE';
+
+/** «Editar descripción y notas» (fix-phase-4-debt-followups): roles con edición y transacción no anulada. */
+export const managedEditOffered = (tx: Transaction, canEdit: boolean): boolean =>
+  canEdit && isManagedTransaction(tx) && tx.status !== 'VOIDED';
+
 /** Un evento del ciclo de vida de la transacción presentado como transición de estado. */
 export interface TimelineItem {
   readonly id: string;

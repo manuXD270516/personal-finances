@@ -321,3 +321,7 @@ Todo change declara su impacto en tests (ver [16-testing-strategy.md §11](./16-
 ## Nota as-built: `add-budget-overrun-risk` (Phase 9, 2026-11-26)
 
 - Matriz: `TC-REPORTING-INSIGHT-001..019` y `TC-NOTIFICATIONS-BUDGETRISK-001..005`. Dominio (`budget-overrun-projector.test.ts`, con PBT y timeout explícito) y aplicación (`budget-risk.queries.test.ts`, `report-summary.budget-risk.test.ts`) en `@pf/reporting`; aviso, preferencias y textos es/en/pt en `@pf/notifications` (`budget-risk-notifications.test.ts`); paso de avisos en el job (`reporting-jobs.test.ts`); UI en `apps/web` (`budget-risk.test.tsx`); API contra PostgreSQL real y el worker (`budget-risk.int.test.ts`), arranque del worker con la plantilla del host (`event-throughput.int.test.ts`, TC-015) y E2E (`budget-overrun-risk.spec.ts`). `TC-REPORTING-INSIGHT-017` corre además en el nightly (`budget-risk.perf.ts`).
+
+## Nota as-built: `fix-phase-4-debt-followups` (Phase 9, 2026-11-26)
+
+- Matriz: `TC-TRANSACTIONS-MANAGEDEDIT-001..004`, `TC-REPORTING-UPCOMING-023..025`, `TC-REPORTING-SPENDABLE-016..018` y `TC-IMPORTS-CSV-031..035`; `TC-DEBT-CARD-033` modificado (origen `INSTALLMENTS` y rótulo «cuotas»). Dominio (`payment-plan-expectation`, `recurring-occurrence`, `upcoming-payments`), aplicación (`imports.service`, `spendable.queries`, `card-payment.service`), API (`credit-cards.api`, `imports.api`) y UI (`transactions`, `cards`, `imports`) citan sus TC-id. `TC-TRANSACTIONS-MANAGEDEDIT-001` y `TC-IMPORTS-CSV-031` tienen además E2E.

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { countsAsCommittedOutflow } from './committed-calculator.js';
 import { assertKindAvailable } from './definition-version.js';
 import { candidates } from './occurrence-generator.js';
+import { RecurringOccurrence } from './recurring-occurrence.js';
 import { BANK, SAVINGS, d, definition, version, type TemplateOverrides } from './test-fixtures.js';
 
 const CARD = '0190a000-0000-7000-8000-0000000acc09';
@@ -140,5 +141,53 @@ describe('CARD_PAYMENT en el dominio (add-credit-cards)', () => {
     expect(
       candidates(def, { from: d('2027-01-01'), to: d('2027-05-31') }).map((c) => c.occurrenceDate.toString()),
     ).toEqual(['2027-01-31', '2027-02-28', '2027-03-31', '2027-04-30', '2027-05-31']);
+  });
+});
+
+describe('origen del esperado de una ocurrencia (fix-phase-4-debt-followups)', () => {
+  const spec = (amount: string) => ({ type: 'ESTIMATED' as const, amount, min: null, max: null });
+  const fresh = () =>
+    RecurringOccurrence.generate({
+      id: 'o1',
+      workspaceId: 'w',
+      definitionId: 'd',
+      occurrenceDate: '2026-12-15',
+      dueDate: '2026-12-15',
+      definitionVersionNo: 1,
+      expected: { type: 'VARIABLE', amount: null, min: null, max: null },
+      currency: 'BOB',
+      at: '2026-11-20T00:00:00.000Z',
+    });
+
+  it('[TC-DEBT-CARD-033] el administrador fija el origen; el usuario, un esperado sin origen, rewrite y unsettle lo limpian', () => {
+    const occ = fresh();
+    expect(occ.snapshot.expectedBasis).toBeNull();
+    occ.edit({ expected: spec('333.33') }, { byManager: true, basis: 'INSTALLMENTS' });
+    expect(occ.snapshot.expectedBasis).toBe('INSTALLMENTS');
+    // mismo monto, otro origen: cambia solo el origen
+    occ.edit({ expected: spec('333.33') }, { byManager: true, basis: 'OPEN_CYCLE' });
+    expect(occ.snapshot.expectedBasis).toBe('OPEN_CYCLE');
+    expect(occ.changedFields).toEqual(['expectedBasis']);
+    occ.edit({ expected: spec('333.33') }, { byManager: true });
+    expect(occ.snapshot.expectedBasis).toBeNull();
+    occ.edit({ expected: spec('333.33') }, { byManager: true, basis: 'STATEMENT' });
+    occ.edit({ expected: spec('400.00') });
+    expect(occ.snapshot).toMatchObject({ expectedBasis: null, amountOverridden: true });
+    occ.edit({ expected: spec('500.00') }, { byManager: true, basis: 'STATEMENT' });
+    occ.rewrite({
+      dueDate: '2026-12-15',
+      definitionVersionNo: 2,
+      expected: spec('1.00'),
+      currency: 'BOB',
+    });
+    expect(occ.snapshot.expectedBasis).toBeNull();
+  });
+
+  it('[TC-DEBT-CARD-033] unsettle limpia el origen', () => {
+    const occ = fresh();
+    occ.edit({ expected: spec('333.33') }, { byManager: true, basis: 'INSTALLMENTS' });
+    occ.settle({ transactionId: 't', at: '2026-12-15T00:00:00.000Z', by: null });
+    occ.unsettle({ today: d('2026-12-16'), leadDays: 0 });
+    expect(occ.snapshot.expectedBasis).toBeNull();
   });
 });

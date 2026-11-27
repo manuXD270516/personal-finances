@@ -5,16 +5,20 @@ spec: imports/import-pipeline
 related_specs: []
 requirement: "Filas de muestra al retomar una importación esperando mapeo"
 scenario: "Retomar el mapeo de un extracto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003","FR-IMPORTS-001"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - apps/web/src/ui/imports/imports.test.tsx
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - tests/e2e/specs/csv-import.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["imports","csv","mapping"]
@@ -30,7 +34,7 @@ expected_result:
   - "la respuesta trae el header \"Fecha\", \"Descripción\", \"Monto\" y sampleRows con las 4 filas, iguales a las de la creación"
   - "la pantalla de mapeo muestra las 4 filas escapadas y no muestra el aviso mapping-no-sample"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-IMPORTS-CSV-031 — Retomar el mapeo devuelve y muestra las 4 filas de muestra

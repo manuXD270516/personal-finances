@@ -387,6 +387,7 @@ interface OccurrenceRow {
   scale: number;
   amount_overridden: boolean;
   date_overridden: boolean;
+  expected_basis: OccurrenceState['expectedBasis'];
   status: OccurrenceStatus;
   cancel_reason: OccurrenceState['cancelReason'];
   transaction_id: string | null;
@@ -407,7 +408,7 @@ const OCCURRENCE_COLUMNS = sql`
   o.id, o.workspace_id, o.definition_id, o.occurrence_date::text AS occurrence_date, o.due_date::text AS due_date,
   o.definition_version_no, o.expected_type, o.expected_amount::text AS expected_amount,
   o.expected_min::text AS expected_min, o.expected_max::text AS expected_max, o.currency, c.scale,
-  o.amount_overridden, o.date_overridden, o.status, o.cancel_reason, o.transaction_id, o.resolution, o.matched_by,
+  o.amount_overridden, o.date_overridden, o.expected_basis, o.status, o.cancel_reason, o.transaction_id, o.resolution, o.matched_by,
   o.skip_reason,
   CASE WHEN o.resolved_at IS NULL THEN NULL
        ELSE to_char(o.resolved_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS resolved_at,
@@ -432,6 +433,7 @@ const toOccurrenceState = (r: OccurrenceRow): OccurrenceState => {
     currency: r.currency,
     amountOverridden: r.amount_overridden,
     dateOverridden: r.date_overridden,
+    expectedBasis: r.expected_basis ?? null,
     status: r.status,
     cancelReason: r.cancel_reason,
     transactionId: r.transaction_id,
@@ -505,6 +507,7 @@ export class PgOccurrenceRepository implements OccurrenceRepository {
           currency: s.currency,
           amount_overridden: s.amountOverridden,
           date_overridden: s.dateOverridden,
+          expected_basis: s.expectedBasis,
           status: s.status,
           cancel_reason: s.cancelReason,
           transaction_id: s.transactionId,
@@ -561,7 +564,7 @@ export class PgOccurrenceRepository implements OccurrenceRepository {
                expected_type = ${s.expected.type}, expected_amount = ${s.expected.amount}::numeric,
                expected_min = ${s.expected.min}::numeric, expected_max = ${s.expected.max}::numeric,
                currency = ${s.currency}, amount_overridden = ${s.amountOverridden},
-               date_overridden = ${s.dateOverridden}, status = ${s.status}, cancel_reason = ${s.cancelReason},
+               date_overridden = ${s.dateOverridden}, expected_basis = ${s.expectedBasis}, status = ${s.status}, cancel_reason = ${s.cancelReason},
                transaction_id = ${s.transactionId}::uuid, resolution = ${s.resolution}, matched_by = ${s.matchedBy},
                skip_reason = ${s.skipReason}, resolved_at = ${s.resolvedAt}::timestamptz,
                resolved_by = ${s.resolvedBy}::uuid, last_auto_create_error = ${s.lastAutoCreateError},

@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: []
 requirement: "Filas de muestra al retomar una importación esperando mapeo"
 scenario: "Importación ya mapeada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["imports","csv"]
@@ -29,7 +31,7 @@ expected_result:
   - "la respuesta no incluye sampleRows"
   - "el resto de la respuesta es igual a la de antes del change (ImportJob)"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-IMPORTS-CSV-033 — Una importación ya mapeada no devuelve filas de muestra

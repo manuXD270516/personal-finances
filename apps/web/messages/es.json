@@ -1116,7 +1116,8 @@
       "customFields": "Campos personalizados",
       "reconciliation": "Conciliación",
       "statementRef": "Extracto del {date} por {balance}",
-      "source": "Origen"
+      "source": "Origen",
+      "editDescriptive": "Editar descripción y notas"
     },
     "history": {
       "title": "Historial (ciclo de vida)",
@@ -1227,6 +1228,16 @@
       "voided": "Registro anulado",
       "undoReason": "Deshecho desde el aviso de registro",
       "recordAndDetail": "Registrar e ir al detalle"
+    },
+    "managedEdit": {
+      "title": "Editar descripción y notas",
+      "loanManaged": "Este movimiento lo administra el préstamo: solo se pueden editar la descripción y las notas.",
+      "cardManaged": "Lo administra la tarjeta: el monto, la cuenta, la fecha, la moneda y las categorías no se editan aquí.",
+      "cardManagedNamed": "Lo administra la tarjeta {name}: el monto, la cuenta, la fecha, la moneda y las categorías no se editan aquí.",
+      "account": "Cuenta",
+      "currency": "Moneda",
+      "viewCard": "Ver la tarjeta",
+      "categories": "Categorías"
     }
   },
   "Fx": {
@@ -3730,6 +3741,7 @@
     "cardPayment": {
       "label": "Pago de tarjeta · {name}",
       "estimated": "Estimado: se ajusta al emitirse el estado de cuenta",
+      "installments": "cuotas",
       "viewCard": "Ver la tarjeta"
     }
   },

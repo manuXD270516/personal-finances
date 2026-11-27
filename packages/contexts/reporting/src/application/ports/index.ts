@@ -254,6 +254,8 @@ export interface UpcomingOccurrenceRow {
     readonly max: string | null;
     readonly currency: string;
   };
+  /** Origen del esperado de un pago administrado (cuotas de tarjeta, etc.); `null` si no lo informa. */
+  readonly expectedBasis?: 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS' | null;
   /** Monto proyectado (máximo en `MIN_MAX`); `null` si es `VARIABLE`. */
   readonly projected: MoneyRow | null;
   readonly accountId: string;

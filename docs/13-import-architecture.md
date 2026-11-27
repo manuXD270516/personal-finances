@@ -107,6 +107,8 @@ stateDiagram-v2
 
 > **Phase 3 (`add-basic-csv-import`):** el subconjunto implementado usa `AWAITING_MAPPING → AWAITING_REVIEW` (el mapeo se puede reenviar) `→ APPROVED → PERSISTING → COMPLETED | PARTIALLY_FAILED → COMPLETED_WITH_ERRORS`, más `CANCELLED` desde `AWAITING_*` (usuario o expiración a los 30 días). `AWAITING_MAPPING` es el estado nuevo que Phase 6 reutiliza cuando ningún perfil coincide (asistente de mapeo, §5.1); las fallas de subida son síncronas y no crean job (sin `PARSE_FAILED`). El mapeo y la clasificación se calculan de forma síncrona en la petición (≤ 5 000 filas) y no hay máquina `ImportJob` en `audit/lifecycle-timeline` (docs/35 D151): solo auditoría de creación, aprobación, reintento, aceptación de errores, cancelación y expiración.
 
+> **Retomar el mapeo (`fix-phase-4-debt-followups`, D492):** `getImport` en `AWAITING_MAPPING` devuelve `sampleRows` (hasta 20 registros posteriores al encabezado, leídos de `imports.staged_transaction.raw` por `row_number`) y `suggestedMapping` (el de la última importación de la cuenta, si lo hay), igual que al crear; en los demás estados no los lee y la UI conserva el aviso `mapping-no-sample` solo si la respuesta no trae la muestra.
+
 Reglas:
 
 - Transiciones de etapa técnica (`PARSING → … → AWAITING_REVIEW`) las ejecuta el **worker**; las de decisión (`APPROVED`, `CANCELLED`, `RevertImport`) las ejecuta un **usuario** con rol `OWNER` o `EDITOR`.
