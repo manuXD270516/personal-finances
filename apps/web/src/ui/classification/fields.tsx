@@ -13,12 +13,15 @@ export function IconGlyph({ icon }: { icon: string | null | undefined }) {
   );
 }
 
+/** Valor inicial del selector de color de una categoría: un dato del usuario, no un color del tema. */
+const DEFAULT_CATEGORY_COLOR = '#1565c0'; // color-data: dato, no tema
+
 const swatch = (color: string): CSSProperties => ({
   display: 'inline-block',
   width: '0.85rem',
   height: '0.85rem',
   borderRadius: '50%',
-  border: '1px solid #57606a',
+  border: '1px solid var(--pf-control-border)',
   background: color,
   verticalAlign: 'middle',
   marginRight: '0.25rem',
@@ -90,7 +93,7 @@ export function ColorField({
             {...p}
             type="color"
             name={name}
-            value={isHexColor(value) ? value : '#1565c0'}
+            value={isHexColor(value) ? value : DEFAULT_CATEGORY_COLOR}
             disabled={!value}
             onChange={(e) => onChange(e.target.value)}
             style={{ minWidth: '3rem', minHeight: '2rem' }}
@@ -102,7 +105,7 @@ export function ColorField({
           type="checkbox"
           name={`${name}-none`}
           checked={!value}
-          onChange={(e) => onChange(e.target.checked ? '' : '#1565c0')}
+          onChange={(e) => onChange(e.target.checked ? '' : DEFAULT_CATEGORY_COLOR)}
         />
         {t('noColor')}
       </label>

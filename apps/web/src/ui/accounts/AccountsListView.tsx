@@ -120,7 +120,7 @@ export function AccountsListView({
                   data-account-id={a.id}
                   data-status={a.status}
                   data-nature={a.classification}
-                  style={{ padding: '0.5rem 0', borderBottom: '1px solid #eaeef2' }}
+                  style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--pf-border)' }}
                 >
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'baseline' }}>
                     <a href={href(`/cuentas/${a.id}`)} data-testid="account-name">

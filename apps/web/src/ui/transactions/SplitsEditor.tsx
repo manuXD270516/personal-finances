@@ -58,7 +58,13 @@ export function SplitsEditor({
 
   return (
     <fieldset
-      style={{ border: '1px solid #d0d7de', padding: '0.5rem', display: 'grid', gap: '0.5rem', minWidth: 0 }}
+      style={{
+        border: '1px solid var(--pf-card-border)',
+        padding: '0.5rem',
+        display: 'grid',
+        gap: '0.5rem',
+        minWidth: 0,
+      }}
     >
       <legend>{t('splits.title')}</legend>
       {rows.map((r, i) => (
@@ -200,7 +206,7 @@ export function SplitsEditor({
           data-testid="split-remaining"
           data-balanced={summary.balanced ? 'true' : 'false'}
           aria-live="polite"
-          style={summary.balanced ? mutedStyle : { ...errorStyle, color: '#9a6700' }}
+          style={summary.balanced ? mutedStyle : { ...errorStyle, color: 'var(--pf-fin-warning)' }}
         >
           {summary.remaining === null
             ? t('splits.remainingUnknown')

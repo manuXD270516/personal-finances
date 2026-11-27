@@ -9,7 +9,7 @@ export const gridStyle: CSSProperties = {
 };
 
 export const cardStyle: CSSProperties = {
-  border: '1px solid #d0d7de',
+  border: '1px solid var(--pf-card-border)',
   borderRadius: '0.5rem',
   padding: '1rem',
   minWidth: 0,
@@ -18,13 +18,13 @@ export const cardStyle: CSSProperties = {
 
 export const amountStyle: CSSProperties = { fontSize: '1.5rem', fontWeight: 600, margin: '0.25rem 0' };
 
-export const mutedStyle: CSSProperties = { color: '#57606a', fontSize: '0.875rem' };
+export const mutedStyle: CSSProperties = { color: 'var(--pf-fg-muted)', fontSize: '0.875rem' };
 
 export const warningStyle: CSSProperties = {
-  borderLeft: '4px solid #bf8700',
-  background: '#fff8c5',
+  borderLeft: '4px solid var(--pf-warning-accent)',
+  background: 'var(--pf-warning-bg)',
   padding: '0.5rem',
-  color: '#3b2300',
+  color: 'var(--pf-warning-fg)',
 };
 
 export const listStyle: CSSProperties = { listStyle: 'none', padding: 0, margin: 0 };

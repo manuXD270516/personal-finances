@@ -35,7 +35,7 @@
   color: var(--pf-fg-muted);
 }
 .pf-upc-badge[data-tone='danger'] {
-  color: #b91c1c;
+  color: var(--pf-error);
   font-weight: 600;
 }
 .pf-upc-badge[data-tone='warn'] {
