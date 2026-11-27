@@ -11,8 +11,8 @@ import {
   mutedStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -67,7 +67,7 @@ export function DryRunTable({
   ruleNames: ReadonlyMap<string, string>;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('run.region')}>
+    <TableRegion label={f.t('run.region')}>
       <table style={tableStyle} data-testid="dry-run-table">
         <caption className="pf-sr-only">{f.t('run.caption')}</caption>
         <thead>
@@ -140,7 +140,7 @@ export function DryRunTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

@@ -1,4 +1,4 @@
-import { cardStyle, cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cardStyle, cellStyle, mutedStyle, numCellStyle, tableStyle, TableRegion } from '../common/ui';
 import { formatDecimal } from '../AuditHistory';
 import type { FormatContext } from '../dashboard/types';
 import { formatLocalDate } from '../dashboard/format';
@@ -34,7 +34,7 @@ export function CoverageView({ catalog, f }: { catalog: InstitutionCatalogData; 
       </p>
 
       <h3 style={{ margin: 0, fontSize: '0.9375rem' }}>{f.t('coverage.byCategory')}</h3>
-      <div style={tableWrapStyle} role="region" tabIndex={0} aria-label={f.t('coverage.tableLabel')}>
+      <TableRegion label={f.t('coverage.tableLabel')}>
         <table style={tableStyle}>
           <thead>
             <tr>
@@ -63,7 +63,7 @@ export function CoverageView({ catalog, f }: { catalog: InstitutionCatalogData; 
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
 
       <div style={{ display: 'grid', gap: 'var(--pf-space-3)' }}>
         {c.byDimension.map((d) => (

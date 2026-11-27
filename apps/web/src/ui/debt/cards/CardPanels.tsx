@@ -15,8 +15,8 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../../common/workspace';
 import { formatMoney, formatSignedMoney } from '../../dashboard/format';
@@ -88,7 +88,7 @@ export function FiguresTable({ statement, f }: { statement: CardStatement; f: Fo
   const changed = new Set(changedFigures(statement));
   const rows = FIGURE_KEYS.filter((k) => ALWAYS.includes(k) || !isZeroAmount(current[k].amount));
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('statements.figuresRegion')}>
+    <TableRegion label={f.t('statements.figuresRegion')}>
       <table style={tableStyle} data-testid="statement-figures">
         <caption className="pf-sr-only">
           {f.t('statements.figuresCaption', {
@@ -148,7 +148,7 @@ export function FiguresTable({ statement, f }: { statement: CardStatement; f: Fo
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -831,7 +831,7 @@ export function PlanPanel({ ctx, card, accounts, onChanged }: PanelProps & { acc
 /** Tabla de cuotas de un plan: número, cierre, vencimiento, capital, interés proyectado y total. */
 export function InstallmentsTable({ plan, f }: { plan: CardInstallmentPlan; f: FormatContext }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('installments.region')}>
+    <TableRegion label={f.t('installments.region')} tall>
       <table style={tableStyle} data-testid="installments-table">
         <caption className="pf-sr-only">
           {f.t('installments.caption', { count: plan.installmentCount })}
@@ -873,7 +873,7 @@ export function InstallmentsTable({ plan, f }: { plan: CardInstallmentPlan; f: F
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -1183,7 +1183,7 @@ export function FutureChargesTable({
   f: FormatContext;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('future.region')}>
+    <TableRegion label={f.t('future.region')}>
       <table style={tableStyle} data-testid="future-table">
         <caption className="pf-sr-only">{f.t('future.caption')}</caption>
         <thead>
@@ -1227,7 +1227,7 @@ export function FutureChargesTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

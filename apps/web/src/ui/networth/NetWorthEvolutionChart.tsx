@@ -1,3 +1,4 @@
+import { TableRegion } from '../common/ui';
 import { formatDecimal } from '../AuditHistory';
 import { formatMoney, formatSignedDecimal } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
@@ -256,7 +257,7 @@ export function NetWorthTable({
   const currency = history.reportingCurrency;
   const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } as const;
   return (
-    <div className={hidden ? 'pf-home-sr' : 'pf-nw-table-wrap'}>
+    <TableRegion label={f.t('table.caption', { currency })} srOnly={hidden}>
       <table data-testid="net-worth-table" className="pf-nw-table">
         <caption>{f.t('table.caption', { currency })}</caption>
         <thead>
@@ -306,7 +307,7 @@ export function NetWorthTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

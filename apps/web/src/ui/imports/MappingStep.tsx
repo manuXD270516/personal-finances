@@ -12,7 +12,7 @@ import {
   mutedStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import {
   DATE_FORMAT_EXAMPLE,
@@ -140,7 +140,7 @@ export function MappingStep({
             {f.t('mapping.noSample')}
           </p>
         ) : null}
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('mapping.sampleRegion')}>
+        <TableRegion label={f.t('mapping.sampleRegion')}>
           <table style={tableStyle} data-testid="mapping-sample">
             <caption className="pf-sr-only">{f.t('mapping.sampleCaption')}</caption>
             <thead>
@@ -174,7 +174,7 @@ export function MappingStep({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       </section>
 
       <form

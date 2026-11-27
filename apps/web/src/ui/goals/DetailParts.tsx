@@ -6,8 +6,8 @@ import {
   mutedStyle,
   numCellStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { formatMoney, formatSignedMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
@@ -135,7 +135,7 @@ export function LinkedAccountsTable({
       {goal.linkedAccounts.length === 0 ? (
         <p style={mutedStyle}>{f.t('accounts.none')}</p>
       ) : (
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('accounts.region')}>
+        <TableRegion label={f.t('accounts.region')}>
           <table style={tableStyle}>
             <caption className="pf-sr-only">{f.t('accounts.caption')}</caption>
             <thead>
@@ -176,7 +176,7 @@ export function LinkedAccountsTable({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       )}
     </section>
   );
@@ -349,7 +349,7 @@ export function MovementsTable({
     );
   const reversed = reversedIds(movements);
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('movements.region')}>
+    <TableRegion label={f.t('movements.region')} tall>
       <table style={tableStyle} data-testid="goal-movements">
         <caption className="pf-sr-only">{f.t('movements.caption')}</caption>
         <thead>
@@ -420,6 +420,6 @@ export function MovementsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

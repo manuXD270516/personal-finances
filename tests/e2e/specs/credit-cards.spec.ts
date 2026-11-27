@@ -170,7 +170,7 @@ test.describe('Tarjetas de crédito (debt/credit-cards)', () => {
     await expect(page.getByTestId('open-cycle')).toHaveAttribute('data-currency', 'BOB');
     await expect(page.getByTestId('detail-balance')).toHaveText('1.200,00 BOB');
     await expect(page.getByTestId('utilization-text')).toContainText('8,00 %');
-    await expect(page.getByTestId('utilization-bar')).toHaveAttribute('role', 'progressbar');
+    await expect(page.getByTestId('utilization-bar')).toHaveRole('meter');
     expect(await seriousViolations(page)).toEqual([]);
     await page.getByRole('tab', { name: 'Estados de cuenta' }).click();
     const issued = page.locator('[data-testid="statement"][data-status="ISSUED"]');

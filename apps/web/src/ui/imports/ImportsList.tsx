@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { cellStyle, mutedStyle, pageStyle, rowStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, pageStyle, rowStyle, tableStyle, TableRegion } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatInstant } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
@@ -31,7 +31,7 @@ export function ImportsTable({
   timeZone: string;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('list.region')}>
+    <TableRegion label={f.t('list.region')}>
       <table style={tableStyle} data-testid="imports-table">
         <caption className="pf-sr-only">{f.t('list.caption')}</caption>
         <thead>
@@ -79,7 +79,7 @@ export function ImportsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

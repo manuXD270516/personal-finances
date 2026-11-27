@@ -15,8 +15,8 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -409,7 +409,7 @@ function EntriesTable(p: AuditLogViewProps & { entries: readonly AuditEntry[] })
     timeZone: f.timeZone,
   });
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={f.t('table.caption')} tall>
       <table style={tableStyle} data-testid="audit-entries">
         <caption style={{ textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}>
           {f.t('table.caption')}
@@ -489,7 +489,7 @@ function EntriesTable(p: AuditLogViewProps & { entries: readonly AuditEntry[] })
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -522,33 +522,35 @@ export function EntryDetail(p: AuditLogViewProps & { entry: AuditEntry }) {
         </dd>
       </dl>
       {e.changes.length > 0 ? (
-        <table style={tableStyle}>
-          <caption style={{ textAlign: 'left' }}>{f.t('detail.changes')}</caption>
-          <thead>
-            <tr>
-              <th scope="col" style={cellStyle}>
-                {f.t('detail.field')}
-              </th>
-              <th scope="col" style={cellStyle}>
-                {f.t('detail.before')}
-              </th>
-              <th scope="col" style={cellStyle}>
-                {f.t('detail.after')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {e.changes.map((c) => (
-              <tr key={c.field} data-field={c.field}>
-                <th scope="row" style={cellStyle}>
-                  {fieldLabel(c.field, f, h)}
+        <TableRegion label={f.t('detail.changes')}>
+          <table style={tableStyle}>
+            <caption style={{ textAlign: 'left' }}>{f.t('detail.changes')}</caption>
+            <thead>
+              <tr>
+                <th scope="col" style={cellStyle}>
+                  {f.t('detail.field')}
                 </th>
-                <td style={cellStyle}>{formatValue(c.before, f.locale, f.t('detail.none'))}</td>
-                <td style={cellStyle}>{formatValue(c.after, f.locale, f.t('detail.none'))}</td>
+                <th scope="col" style={cellStyle}>
+                  {f.t('detail.before')}
+                </th>
+                <th scope="col" style={cellStyle}>
+                  {f.t('detail.after')}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {e.changes.map((c) => (
+                <tr key={c.field} data-field={c.field}>
+                  <th scope="row" style={cellStyle}>
+                    {fieldLabel(c.field, f, h)}
+                  </th>
+                  <td style={cellStyle}>{formatValue(c.before, f.locale, f.t('detail.none'))}</td>
+                  <td style={cellStyle}>{formatValue(c.after, f.locale, f.t('detail.none'))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableRegion>
       ) : (
         <p style={mutedStyle}>{f.t('detail.noChanges')}</p>
       )}
