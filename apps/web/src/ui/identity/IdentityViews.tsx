@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { THEME_PREFERENCES } from '../common/theme';
 import { Field, formStyle, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
 import type { Membership } from '../session-context';
 import {
@@ -325,6 +326,31 @@ export function PreferencesView(p: PreferencesViewProps) {
         </Field>
         <TimeZoneSuggestions id="me-timezones" />
       </div>
+      <fieldset
+        data-testid="theme-group"
+        aria-describedby="theme-hint"
+        style={{ display: 'grid', gap: '0.25rem', minWidth: 0 }}
+      >
+        <legend>{t('theme.legend')}</legend>
+        <p id="theme-hint" style={{ margin: 0 }}>
+          {t('theme.hint')}
+        </p>
+        {THEME_PREFERENCES.map((value) => (
+          <label
+            key={value}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minHeight: '2rem' }}
+          >
+            <input
+              type="radio"
+              name="theme"
+              value={value}
+              checked={form.theme === value}
+              onChange={() => p.onChange({ theme: value })}
+            />
+            {t(`theme.${value}`)}
+          </label>
+        ))}
+      </fieldset>
       <div style={rowStyle}>
         <button type="submit" disabled={p.busy} aria-busy={p.busy || undefined}>
           {p.busy ? t('saving') : t('save')}

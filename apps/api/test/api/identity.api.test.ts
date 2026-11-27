@@ -356,6 +356,8 @@ describe('[TC-IDENTITY-AUTH-008] el nombre visible y las preferencias se actuali
     // Cada request vuelve a ejecutar la provisión con el nombre del IdP: no debe pisar el elegido por el usuario.
     const again = await call('GET', '/api/v1/me', { token: u.token });
     expect(again.body).toMatchObject({ displayName: 'Ana Demo', version: v + 2 });
+    // `Me.preferences` (contrato) viaja en la lectura: la web toma de ahí el tema (add-dark-theme, TC-PLATFORM-THEME-004).
+    expect(again.body['preferences']).toEqual({ theme: 'dark' });
     const app = await connect(deps.databaseUrl);
     try {
       const prefs = await inTx(app, { userId: u.id, workspaceId: null }, () =>

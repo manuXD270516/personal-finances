@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+  - apps/web/src/ui/identity/identity.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "preferences"]
@@ -28,7 +30,7 @@ expected_result:
   - "hay un único PATCH /me y no incluye cambios de preferences.theme"
   - "preferences.theme sigue en \"light\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-008 — Guardar otras preferencias no vuelve a escribir el tema

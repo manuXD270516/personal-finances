@@ -12,9 +12,11 @@ invariants: []
 priority: low
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+  - apps/web/src/ui/common/theme.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "viewport"]
@@ -28,7 +30,7 @@ expected_result:
   - "<meta name=\"color-scheme\" content=\"dark\">"
   - "un único <meta name=\"theme-color\"> con el valor del fondo oscuro"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-019 — Con «Oscuro» el documento declara el esquema y el color de barra oscuros

@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "preferences"]
@@ -30,7 +31,7 @@ expected_result:
   - "preferences.theme = \"system\" en /me"
   - "la cookie pfos_theme ya no existe"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-005 — Volver a «Sistema» quita el tema propio y sigue al sistema

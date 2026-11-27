@@ -1,4 +1,5 @@
 import { parseAmount, scaleFor, type AmountError } from '../common/money';
+import type { ThemePreference } from '../common/theme';
 
 /**
  * Lógica pura de las pantallas de identidad (add-workspace-identity 8.4): configuración del workspace
@@ -166,6 +167,16 @@ export interface PreferencesValues {
   readonly displayName: string;
   readonly locale: string;
   readonly timezone: string;
+  /** Tema de la interfaz (`preferences.theme` del perfil; ausente = «sistema», D501). */
+  readonly theme: ThemePreference;
+}
+
+/** Cuerpo del `PATCH /me` de las preferencias: `preferences.theme` solo viaja si el tema cambió. */
+export interface PreferencesPatch {
+  readonly displayName?: string;
+  readonly locale?: string;
+  readonly timezone?: string;
+  readonly preferences?: { readonly theme: ThemePreference };
 }
 
 export type PreferencesField = keyof PreferencesValues;
@@ -176,7 +187,7 @@ export function buildPreferencesPatch(
   original: PreferencesValues,
   form: PreferencesValues,
 ):
-  | { readonly ok: true; readonly patch: Partial<PreferencesValues> }
+  | { readonly ok: true; readonly patch: PreferencesPatch }
   | { readonly ok: false; readonly errors: Partial<Record<PreferencesField, PreferencesError>> } {
   const errors: Partial<Record<PreferencesField, PreferencesError>> = {};
   const displayName = form.displayName.trim();
@@ -185,10 +196,12 @@ export function buildPreferencesPatch(
   const timezone = form.timezone.trim();
   if (!isValidTimeZone(timezone)) errors.timezone = 'timezoneInvalid';
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  const patch: { -readonly [K in keyof PreferencesValues]?: string } = {};
+  const patch: { -readonly [K in keyof PreferencesPatch]?: PreferencesPatch[K] } = {};
   if (displayName !== original.displayName) patch.displayName = displayName;
   if (form.locale !== original.locale) patch.locale = form.locale;
   if (timezone !== original.timezone) patch.timezone = timezone;
+  // Cada PATCH sube la versión del perfil y genera auditoría: el tema se escribe solo si cambió.
+  if (form.theme !== original.theme) patch.preferences = { theme: form.theme };
   return { ok: true, patch };
 }
 

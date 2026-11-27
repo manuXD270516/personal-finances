@@ -115,7 +115,7 @@ export function LifecycleExportActions({
   const linkStyle = {
     display: 'inline-block',
     padding: '0.375rem 0.75rem',
-    border: '1px solid #8c959f',
+    border: '1px solid var(--pf-control-border)',
     borderRadius: 6,
     textDecoration: 'none',
     color: 'inherit',

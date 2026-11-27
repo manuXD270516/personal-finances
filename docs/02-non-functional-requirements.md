@@ -188,7 +188,7 @@ Detalle en [18-observability.md](./18-observability.md) y ADR-0020.
 |----|---------------|--------------------|--------------|------|------|
 | NFR-USAB-101 | Conformidad **WCAG 2.2 nivel AA** en todas las pantallas. | 0 violaciones `serious`/`critical` de axe-core en flujos E2E; auditoría manual por fase. | `@axe-core/playwright` en CI + checklist manual. | 1 | Must |
 | NFR-USAB-102 | Navegación completa por teclado, foco visible (2.4.11/2.4.13), sin trampas de foco. | 100 % de flujos críticos operables solo con teclado. | E2E keyboard-only. | 1 | Must |
-| NFR-USAB-103 | Contraste ≥ 4.5:1 texto, ≥ 3:1 componentes UI y gráficos; en modo claro y oscuro. | Tokens de diseño validados. | Validador de tokens (doc 28) + axe. | 1 | Must |
+| NFR-USAB-103 | Contraste ≥ 4.5:1 texto, ≥ 3:1 componentes UI y gráficos; en modo claro y oscuro. | Tokens de diseño validados. | Validador de tokens (`apps/web/src/ui/common/contrast.test.ts`, TC-PLATFORM-THEME-014) + axe en claro y en oscuro (`a11y.spec.ts`, TC-PLATFORM-THEME-015). | 1 | Must |
 | NFR-USAB-104 | El color nunca es el único medio para comunicar estado (ingreso/gasto, sobre/bajo presupuesto, behind/ahead). | Iconos/texto acompañan al color. | Revisión UX. | 1 | Must |
 | NFR-USAB-105 | Gráficos (ECharts) con alternativa textual/tabla accesible y `aria` descriptivo. | 100 % de gráficos con tabla alternativa. | Revisión + axe. | 1 | Must |
 | NFR-USAB-106 | Tamaño mínimo de objetivos táctiles 24×24 px (2.5.8). | 0 violaciones. | axe + revisión. | 1 | Must |

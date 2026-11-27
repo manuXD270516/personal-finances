@@ -120,6 +120,13 @@
       "displayNameRequired": "Informe um nome de exibição.",
       "displayNameTooLong": "O nome admite até 100 caracteres.",
       "timezoneInvalid": "Não é um fuso horário IANA válido (por exemplo America/La_Paz)."
+    },
+    "theme": {
+      "legend": "Tema",
+      "hint": "“Sistema” segue o modo claro ou escuro do seu dispositivo.",
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Escuro"
     }
   },
   "Auth": {

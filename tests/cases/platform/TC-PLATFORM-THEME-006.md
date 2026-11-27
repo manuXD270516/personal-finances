@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "shell"]
@@ -27,7 +28,7 @@ steps:
 expected_result:
   - "la barra superior no contiene ningún control con nombre de tema (es, en y pt)"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-006 — La barra superior no ofrece ningún control de tema

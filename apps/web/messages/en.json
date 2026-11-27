@@ -120,6 +120,13 @@
       "displayNameRequired": "Enter a display name.",
       "displayNameTooLong": "The name allows up to 100 characters.",
       "timezoneInvalid": "This is not a valid IANA time zone (for example America/La_Paz)."
+    },
+    "theme": {
+      "legend": "Theme",
+      "hint": "“System” follows your device's light or dark mode.",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
     }
   },
   "Auth": {
