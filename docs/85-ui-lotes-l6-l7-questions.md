@@ -89,6 +89,8 @@ Al redactar los changes 82 a 84 quedaron seis puntos que D500–D516 no cubren. 
 
 **¿Bloquea?** Sí: los grupos 5 a 7 del change 84 (etapa 2) y el grupo 6 del change 83 (M-29). La etapa 1 del 84 y el resto del 83 no esperan.
 
+**Resultado de la etapa 1 (2026-11-27, change 84, tarea 4.1).** El perfil de teléfono modesto («Fast 4G» y CPU ×4) **no supera 2.5 s** en ninguno de los cuatro destinos. Medianas de tres corridas completas (Chromium local, contenido propio / LCP): Inicio → Transacciones 1 663 / 1 421 ms, Inicio → Presupuestos 1 386 / 1 397 ms, Inicio → Reportes 1 388 / 1 613 ms y lista → detalle de gasto 1 718 / 1 745 ms; en escritorio 127–187 ms de contenido y 152–200 ms de LCP. El mayor valor aislado fue 2 392 / 2 424 ms (detalle de gasto, una corrida con el PC compartido con otro agente), también por debajo de 2.5 s, pero con poco margen (≈ 100 ms). Con la opción (B) el criterio de la etapa 2 no se cumple, así que corresponde **no migrar** (retirar los 5 requirements de la etapa 2 y habilitar M-29 en el 83, pregunta 6); falta la confirmación del owner. Límites de la medición: emulación, no un teléfono real; caché de HTTP caliente; sin latencia de red real hacia el servidor (el stack es local; la emulación añade 150 ms y el ancho de banda de «Fast 4G» a los recursos).
+
 ### 6. M-29 si se mantiene la navegación por documento
 
 **Contexto.** M-29 es una regla de CSS, `@view-transition { navigation: auto }`, que anima el paso entre documentos. Es Limited (en navegadores sin soporte no hace nada), sin script ni cambio de CSP, y de esfuerzo S. D511 la sacó del lote L7 hasta resolver el 84, porque con navegación del cliente queda inerte. El change 83 la incluye como requirement condicionado.
