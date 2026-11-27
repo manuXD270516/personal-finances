@@ -5,17 +5,18 @@ spec: classification/categories
 related_specs: ["security/access-control"]
 requirement: "Fusionar categorías"
 scenario: "VIEWER no fusiona"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-IDENTITY-006"]
 nfr: []
 invariants: []
 priority: medium
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","roles"]
 error_code: "INSUFFICIENT_ROLE"
@@ -28,7 +29,7 @@ expected_result:
   - "responde 403 INSUFFICIENT_ROLE"
   - "nada cambia"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-006 — Un VIEWER no puede fusionar categorías

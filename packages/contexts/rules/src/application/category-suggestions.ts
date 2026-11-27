@@ -151,23 +151,33 @@ export class CategorySuggestionService {
     workspaceId: string,
     items: readonly ClassificationEvidenceDto[],
   ): Promise<SuggestionEvidence[]> {
-    const categoryIds = [...new Set(items.flatMap((i) => (i.categoryId === null ? [] : [i.categoryId])))];
+    const rawIds = [...new Set(items.flatMap((i) => (i.categoryId === null ? [] : [i.categoryId])))];
+    // D496 (add-category-and-counterparty-merge): la evidencia de una categoría fusionada cuenta como la de su destino
+    // vigente, incluidas las porciones que conservaron la origen por estar en periodos cerrados; nunca se propone una
+    // categoría fusionada (la destino es la que resulta activa).
+    const merged = this.deps.categoryMerge
+      ? await this.deps.categoryMerge.resolve({ workspaceId, categoryIds: rawIds })
+      : new Map<string, string>();
+    const resolve = (id: string): string => merged.get(id) ?? id;
+    const categoryIds = [...new Set(rawIds.map(resolve))];
     const catalog = await this.deps.catalog.load({
       workspaceId,
       actions: categoryIds.map((categoryId) => ({ type: 'SET_CATEGORY' as const, categoryId })),
     });
-    return items.flatMap((i) =>
-      i.categoryId !== null && catalog.activeCategoryKind(i.categoryId) === categoryKindFor(i.kind)
+    return items.flatMap((i) => {
+      if (i.categoryId === null) return [];
+      const categoryId = resolve(i.categoryId);
+      return catalog.activeCategoryKind(categoryId) === categoryKindFor(i.kind)
         ? [
             {
               kind: i.kind,
               description: i.description,
               counterpartyId: i.counterpartyId,
-              categoryId: i.categoryId,
+              categoryId,
             },
           ]
-        : [],
-    );
+        : [];
+    });
   }
 
   private async loadIndex(

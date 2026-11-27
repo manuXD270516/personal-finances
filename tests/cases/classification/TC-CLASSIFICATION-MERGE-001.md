@@ -5,17 +5,23 @@ spec: classification/categories
 related_specs: ["reporting/financial-reports","ledger/journal-posting"]
 requirement: "Fusionar categorías"
 scenario: "Fusionar Super en Supermercado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-CLASSIFICATION-002","FR-AUDIT-001"]
 nfr: []
 invariants: ["INV-019","INV-021"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/src/identity/merge-participants.architecture.test.ts
+  - apps/api/test/api/category-merge.api.test.ts
+  - apps/web/src/ui/classification/merge.test.tsx
+  - packages/contexts/classification/src/application/merge.service.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+  - tests/e2e/specs/category-merge.spec.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories"]
 error_code: null
@@ -30,7 +36,7 @@ expected_result:
   - "\"Super\" queda ARCHIVED con mergedInto \"Supermercado\""
   - "el número de asientos y los saldos de las cuentas no cambian; hay un registro de auditoría con el operationId"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-001 — Fusionar Super en Supermercado suma 1560,50 en noviembre sin tocar el ledger

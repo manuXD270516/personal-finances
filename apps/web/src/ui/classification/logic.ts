@@ -1,4 +1,5 @@
-import type { Category, CategoryGroup } from '../common/types';
+import type { Category, CategoryGroup, Counterparty } from '../common/types';
+import type { MergeCount, MergePreview, MergeTargetGroup } from './types';
 
 /**
  * Lógica pura de la pantalla de clasificación (add-classification 8.1/8.2): árbol grupo → categoría → subcategoría
@@ -128,3 +129,64 @@ export function parseAliases(
   if (aliases.length > 20) return { ok: false, error: 'ALIAS_MAX_COUNT' };
   return { ok: true, aliases };
 }
+
+// ── Fusión de categorías y contrapartes (add-category-and-counterparty-merge, tareas 6.1 a 6.3) ──────────────────
+
+/**
+ * Destinos compatibles para fusionar `source` en otra categoría: mismo tipo de movimiento, activa, no fusionada y
+ * distinta de la origen. Se puede elegir el padre de una subcategoría; si la origen tiene subcategorías activas, una
+ * subcategoría no sirve de destino (excedería la profundidad). Agrupadas por grupo en el orden persistente.
+ */
+export function categoryMergeTargets(
+  groups: readonly CategoryGroup[],
+  categories: readonly Category[],
+  source: Category,
+): MergeTargetGroup[] {
+  const hasActiveChildren = categories.some((c) => c.parentId === source.id && !c.archivedAt);
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const eligible = (c: Category) =>
+    c.id !== source.id &&
+    c.kind === source.kind &&
+    !c.archivedAt &&
+    !c.mergedInto &&
+    !(hasActiveChildren && c.parentId);
+  return [...groups]
+    .sort(byOrder)
+    .map((g) => ({
+      label: g.name,
+      options: categories
+        .filter((c) => c.groupId === g.id && eligible(c))
+        .sort((a, b) => {
+          const pa = a.parentId ? (byId.get(a.parentId)?.name ?? '') : a.name;
+          const pb = b.parentId ? (byId.get(b.parentId)?.name ?? '') : b.name;
+          return pa.localeCompare(pb) || Number(!!a.parentId) - Number(!!b.parentId) || byOrder(a, b);
+        })
+        .map((c) => ({
+          id: c.id,
+          label: c.parentId ? `${byId.get(c.parentId)?.name ?? '…'} › ${c.name}` : c.name,
+        })),
+    }))
+    .filter((g) => g.options.length > 0);
+}
+
+/** Destinos compatibles para fusionar una contraparte: activa, no fusionada y distinta de la origen. */
+export function counterpartyMergeTargets(
+  counterparties: readonly Counterparty[],
+  source: Counterparty,
+): MergeTargetGroup['options'] {
+  return counterparties
+    .filter((c) => c.id !== source.id && !c.archivedAt && !c.mergedInto)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((c) => ({ id: c.id, label: c.name }));
+}
+
+/** Conteos para mostrar: sin los que valen 0, en el orden en que los informa la API. Las claves nuevas se toleran. */
+export const visibleCounts = (counts: readonly MergeCount[]): MergeCount[] =>
+  counts.filter((c) => c.count > 0);
+
+/**
+ * La fusión se puede confirmar solo con una vista previa cargada sin conflictos y con la casilla de «no se puede
+ * deshacer» marcada.
+ */
+export const canConfirmMerge = (preview: MergePreview | null | undefined, acknowledged: boolean): boolean =>
+  !!preview && preview.conflicts.length === 0 && acknowledged;

@@ -5,17 +5,19 @@ spec: classification/categories
 related_specs: ["planning/budgets","planning/budget-templates","commitments/recurrence-engine","rules/rule-engine"]
 requirement: "Referencias a la categoría fusionada en otros contextos"
 scenario: "Plan, plantilla, compromiso y regla"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-PLANNING-008","FR-COMMITMENTS-001","FR-RULES-001"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/rules/src/application/classification-merge.participant.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","budgets","rules","commitments"]
 error_code: null
@@ -31,7 +33,7 @@ expected_result:
   - "\"Mercado semanal\" es de \"Supermercado\" con sus ocurrencias de 150.00 BOB sin cambios"
   - "\"HIPERMAXI\" tiene una versión nueva con SET_CATEGORY \"Supermercado\" y la anterior queda en su historial"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-016 — Plan, plantilla, compromiso y regla pasan a la destino en la misma operación

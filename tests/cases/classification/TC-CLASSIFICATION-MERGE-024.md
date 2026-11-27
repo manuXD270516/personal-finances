@@ -5,17 +5,18 @@ spec: classification/counterparties
 related_specs: ["planning/month-closing"]
 requirement: "Fusionar contrapartes"
 scenario: "Gasto en un periodo cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-013","FR-PLANNING-005"]
 nfr: []
 invariants: ["INV-019"]
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","counterparties","closed-periods"]
 error_code: null
@@ -29,7 +30,7 @@ expected_result:
   - "el gasto de 60.00 BOB de octubre conserva \"HIPERMAXI S.A.\", mostrada como archivada y fusionada en \"Hipermaxi\""
   - "los 4 gastos de noviembre tienen \"Hipermaxi\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-024 — El gasto de un periodo cerrado conserva la contraparte origen

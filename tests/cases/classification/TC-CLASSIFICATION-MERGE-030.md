@@ -5,17 +5,18 @@ spec: classification/categories
 related_specs: ["classification/auto-classification"]
 requirement: "Continuidad de la historia de una categoría fusionada en los análisis"
 scenario: "Sugerencia con la evidencia de la origen"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007", "FR-CLASSIFICATION-014"]
 nfr: []
 invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge", "categories", "suggestions"]
 error_code: null
@@ -29,7 +30,7 @@ expected_result:
   - "la sugerencia de categoría es \"Supermercado\""
   - "ninguna sugerencia propone \"Super\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-030 — La sugerencia de categoría propone la destino y nunca la origen fusionada

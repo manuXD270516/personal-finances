@@ -7,7 +7,7 @@ import type {
   LifecyclePort,
   LifecycleQuery,
 } from '@pf/audit/contracts';
-import type { CategoryCatalogQuery } from '@pf/classification/contracts';
+import type { CategoryCatalogQuery, ClassificationMergeParticipant } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import type {
@@ -91,6 +91,7 @@ import {
   sha256Hex,
 } from '../infrastructure/pg-closing.js';
 import { PgBudgetTemplateRepository } from '../infrastructure/pg-templates.js';
+import { PgPlanningMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 import {
   PgFinancialPeriodRepository,
   PgPlanningUnitOfWork,
@@ -692,3 +693,11 @@ export function closeSnapshotRestoreHook(ctx: {
 export const financialPeriodExistenceQuery: FinancialPeriodExistenceQuery = {
   existing: pgExistingIds('planning.financial_period'),
 };
+
+/**
+ * Participante de PLANNING en la fusión de categorías (add-category-and-counterparty-merge): líneas de planes no
+ * cerrados y versión nueva de las plantillas vigentes; corre en la unidad de trabajo de la fusión.
+ */
+export function createClassificationMergeParticipant(): ClassificationMergeParticipant {
+  return new PgPlanningMergeParticipant();
+}

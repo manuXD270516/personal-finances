@@ -1,4 +1,5 @@
 import type { AuditPort } from '@pf/audit/contracts';
+import type { CategoryMergeQuery } from '@pf/classification/contracts';
 import type {
   ClassificationCoverageQuery,
   ClassificationSubjectsQuery,
@@ -243,6 +244,8 @@ export interface RulesDeps {
   readonly coverage: Pick<ClassificationCoverageQuery, 'coverage' | 'ruleStats'>;
   readonly classifier: RuleClassificationCommand;
   readonly audit: AuditPort;
+  /** D496: lee la evidencia de una categoría fusionada como la de su destino (add-category-and-counterparty-merge). */
+  readonly categoryMerge?: CategoryMergeQuery;
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly settings: RulesSettings;

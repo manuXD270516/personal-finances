@@ -76,7 +76,7 @@ const AUDIT_FIELDS = [
   'version',
 ] as const;
 
-function diff(before: Snap | null, after: Snap): AuditChangeInput[] {
+export function diff(before: Snap | null, after: Snap): AuditChangeInput[] {
   return AUDIT_FIELDS.filter(
     (f) => JSON.stringify(before?.[f] ?? null) !== JSON.stringify(after[f] ?? null),
   ).map((f) => ({ field: f, before: before?.[f] ?? null, after: after[f] ?? null }));

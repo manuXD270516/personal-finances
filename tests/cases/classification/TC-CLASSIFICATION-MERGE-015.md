@@ -5,17 +5,18 @@ spec: classification/categories
 related_specs: ["planning/month-closing"]
 requirement: "Fusión de categorías y periodos cerrados"
 scenario: "Periodo reabierto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007"]
 nfr: []
 invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","closed-periods"]
 error_code: null
@@ -27,7 +28,7 @@ steps:
 expected_result:
   - "el gasto de 100.00 BOB de octubre pasa a \"Supermercado\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-015 — Un periodo reabierto se reasigna como abierto

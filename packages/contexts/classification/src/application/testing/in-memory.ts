@@ -1,11 +1,14 @@
 import type { AuditEntry, LifecycleDto, LifecycleStepInput } from '@pf/audit/contracts';
+import type { ClassificationMergeParticipant, ClosedDateRange } from '../../contracts/merge.js';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import { Category, CategoryGroup } from '../../domain/category.js';
 import { Counterparty } from '../../domain/counterparty.js';
 import { CustomFieldDefinition, type CustomFieldUsage } from '../../domain/custom-field.js';
 import { Tag } from '../../domain/tag.js';
 import type {
+  CategoriesMergedEvent,
   CategoryArchivedEvent,
+  CounterpartiesMergedEvent,
   CustomFieldDefinitionChangedEvent,
   ClassificationDeps,
   DefaultCatalog,
@@ -84,6 +87,10 @@ export class InMemoryClassification {
   readonly usage = new Map<string, CustomFieldUsage>();
   readonly events: CategoryArchivedEvent[] = [];
   readonly customFieldEvents: CustomFieldDefinitionChangedEvent[] = [];
+  readonly mergeEvents: (CategoriesMergedEvent | CounterpartiesMergedEvent)[] = [];
+  /** Participantes de la fusión y periodos cerrados que ve CLASSIFICATION (los tests los fijan). */
+  readonly participants: ClassificationMergeParticipant[] = [];
+  closedRanges: readonly ClosedDateRange[] = [];
   readonly audits: AuditEntry[] = [];
   /** Pasos del recorrido escritos con `LifecyclePort` (con la acción de su registro de auditoría). */
   readonly steps: (LifecycleStepInput & { readonly action: string; readonly aggregateId: string })[] = [];
@@ -109,6 +116,7 @@ export class InMemoryClassification {
           const saved = repos.map((r) => new Map(r.rows as Map<string, unknown>));
           const ev = this.events.length;
           const cfEv = this.customFieldEvents.length;
+          const mgEv = this.mergeEvents.length;
           const au = this.audits.length;
           const st = this.steps.length;
           this.depth += 1;
@@ -122,6 +130,7 @@ export class InMemoryClassification {
             });
             this.events.length = ev;
             this.customFieldEvents.length = cfEv;
+            this.mergeEvents.length = mgEv;
             this.audits.length = au;
             this.steps.length = st;
             throw err;
@@ -142,7 +151,12 @@ export class InMemoryClassification {
       outbox: {
         append: async (e) => {
           if (e.eventType === 'classification.CustomFieldDefinitionChanged') this.customFieldEvents.push(e);
-          else this.events.push(e);
+          else if (
+            e.eventType === 'classification.CategoriesMerged' ||
+            e.eventType === 'classification.CounterpartiesMerged'
+          ) {
+            this.mergeEvents.push(e);
+          } else this.events.push(e);
         },
       },
       audit: {
@@ -179,6 +193,8 @@ export class InMemoryClassification {
         lastCategoryUsed: async ({ counterpartyId, kind }) =>
           this.lastUsed.get(`${counterpartyId}:${kind}`) ?? null,
       },
+      closedPeriods: { closedRanges: async () => this.closedRanges },
+      mergeParticipants: this.participants,
       catalogs: { get: (v) => this.catalogs.find((c) => c.version === v) ?? null },
       ids: { next: () => this.nextId() },
       clock: this.clock,

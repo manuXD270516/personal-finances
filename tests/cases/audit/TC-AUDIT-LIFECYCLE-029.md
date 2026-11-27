@@ -5,17 +5,19 @@ spec: audit/lifecycle-timeline
 related_specs: ["classification/counterparties"]
 requirement: "Fusión en el recorrido de categorías y contrapartes"
 scenario: "Fusión de contraparte rechazada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-AUDIT-009","FR-CLASSIFICATION-013"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/classification/src/application/merge.service.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["lifecycle","merge","counterparties"]
 error_code: "COUNTERPARTY_ARCHIVED"
@@ -29,7 +31,7 @@ expected_result:
   - "la fusión responde 409 COUNTERPARTY_ARCHIVED"
   - "ninguno de los dos recorridos tiene transiciones ni anotaciones nuevas"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-AUDIT-LIFECYCLE-029 — Una fusión de contraparte rechazada no deja rastro en los recorridos

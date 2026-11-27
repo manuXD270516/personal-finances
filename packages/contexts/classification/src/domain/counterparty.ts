@@ -5,7 +5,7 @@ import {
   type ClassificationTransition,
   type ClassificationTransitionRecord,
 } from './classification-lifecycle.js';
-import { invalidTransition, validation } from './errors.js';
+import { counterpartyMerged, invalidTransition, validation } from './errors.js';
 import { normalizeText } from './normalized-text.js';
 
 export type CounterpartyKind =
@@ -80,6 +80,9 @@ export interface CounterpartySnapshot {
   readonly notes: string | null;
   readonly website: string | null;
   readonly archivedAt: string | null;
+  /** Fusión (add-category-and-counterparty-merge): contraparte destino en la que se fusionó esta; `null` si no. */
+  readonly mergedIntoId?: string | null;
+  readonly mergedAt?: string | null;
   readonly version: number;
 }
 
@@ -191,12 +194,27 @@ export class Counterparty {
   get isArchived(): boolean {
     return this.s.archivedAt !== null;
   }
+  /** Contraparte destino de la fusión (`null` si no se fusionó). */
+  get mergedIntoId(): string | null {
+    return this.s.mergedIntoId ?? null;
+  }
+  get mergedAt(): string | null {
+    return this.s.mergedAt ?? null;
+  }
+  get isMerged(): boolean {
+    return this.mergedIntoId !== null;
+  }
   get version(): number {
     return this.s.version;
   }
 
   snapshot(): CounterpartySnapshot {
-    return { ...this.s, aliases: [...this.s.aliases] };
+    return {
+      ...this.s,
+      aliases: [...this.s.aliases],
+      mergedIntoId: this.mergedIntoId,
+      mergedAt: this.mergedAt,
+    };
   }
 
   update(patch: CounterpartyPatch): boolean {
@@ -224,8 +242,32 @@ export class Counterparty {
 
   unarchive(): void {
     if (!this.isArchived) throw invalidTransition('counterparty is not archived');
+    if (this.isMerged) throw counterpartyMerged(this.mergedIntoId);
     this.mark('UNARCHIVE');
     this.s = { ...this.s, archivedAt: null, version: this.s.version + 1 };
+  }
+
+  /**
+   * Fusiona esta contraparte (origen) en `targetId` (add-category-and-counterparty-merge, D52 v2): queda archivada de
+   * forma permanente, sin alias (pasan a la destino) y marcada «fusionada en» la destino. Si ya estaba archivada
+   * conserva su `archivedAt`. Las reglas de validez y el cálculo de alias y categoría por defecto: `CounterpartyMergePolicy`.
+   */
+  merge(targetId: string, at: string): void {
+    if (this.isMerged) throw counterpartyMerged(this.mergedIntoId);
+    this.mark('MERGE');
+    this.s = {
+      ...this.s,
+      aliases: [],
+      archivedAt: this.s.archivedAt ?? at,
+      mergedIntoId: targetId,
+      mergedAt: at,
+      version: this.s.version + 1,
+    };
+  }
+
+  /** Reemplaza alias y categoría por defecto de la destino de una fusión (anotación, sin transición). */
+  absorb(input: { readonly aliases: readonly string[]; readonly defaultCategoryId: string | null }): boolean {
+    return this.update({ aliases: input.aliases, defaultCategoryId: input.defaultCategoryId });
   }
 }
 

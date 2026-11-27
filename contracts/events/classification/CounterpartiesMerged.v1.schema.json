@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/classification/CounterpartiesMerged.v1.schema.json",
+  "title": "classification.CounterpartiesMerged.v1",
+  "description": "Una contraparte se fusionó en otra (openspec add-category-and-counterparty-merge, D480): la origen queda archivada y marcada «fusionada en» la destino, y toda referencia viva pasó a la destino en la misma unidad de trabajo. El agregado es la origen (se fusiona una sola vez; la destino viaja en el payload) y la idempotencia natural es (origen, aggregateVersion). Una origen por operación. Productor: CLASSIFICATION. Sin consumidores en este change (D249). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "classification.CounterpartiesMerged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Counterparty"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceCounterpartyId",
+        "targetCounterpartyId",
+        "movedAliases",
+        "counts",
+        "operationId",
+        "mergedAt"
+      ],
+      "properties": {
+        "sourceCounterpartyId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "targetCounterpartyId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "movedAliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "counts": {
+          "description": "Referencias reasignadas (y las que se conservaron por estar en periodos cerrados) por tipo; enum abierto de claves.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "count"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$",
+                "examples": [
+                  "SPLITS_OPEN",
+                  "SPLITS_CLOSED_KEPT",
+                  "TRANSACTIONS_OPEN",
+                  "TRANSACTIONS_CLOSED_KEPT",
+                  "BUDGET_LINES",
+                  "TEMPLATES",
+                  "RECURRING_DEFINITIONS",
+                  "SUBSCRIPTIONS",
+                  "RULES",
+                  "DEFAULT_CATEGORY_COUNTERPARTIES",
+                  "ESSENTIALS",
+                  "LOANS",
+                  "CONVERSIONS",
+                  "IMPORT_ROWS",
+                  "SUBCATEGORIES_MOVED",
+                  "ALIASES_MOVED"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "operationId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "mergedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000108",
+      "eventType": "classification.CounterpartiesMerged",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-27T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Counterparty",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000cc001",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "sourceCounterpartyId": "01928c4e-0000-7000-8000-0000000cc001",
+        "targetCounterpartyId": "01928c4e-0000-7000-8000-0000000cc002",
+        "movedAliases": [
+          "hipermaxi sa"
+        ],
+        "counts": [
+          {
+            "key": "TRANSACTIONS_OPEN",
+            "count": 3
+          }
+        ],
+        "operationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+        "mergedAt": "2026-11-27T14:03:22.120Z"
+      }
+    }
+  ]
+}

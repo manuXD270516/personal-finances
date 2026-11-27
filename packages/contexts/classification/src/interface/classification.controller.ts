@@ -23,6 +23,7 @@ import {
 } from '@pf/platform/nest';
 import type { ClassificationQueries } from '../application/classification.queries.js';
 import type { ClassificationService } from '../application/classification.service.js';
+import type { ClassificationMergeService } from '../application/merge.service.js';
 import type { CustomFieldsQueries } from '../application/custom-fields.queries.js';
 import type { CustomFieldsService } from '../application/custom-fields.service.js';
 import type { LocaleResolver } from '../application/ports/index.js';
@@ -31,12 +32,14 @@ import { isCounterpartyKind, type Counterparty } from '../domain/counterparty.js
 import type { CustomFieldDefinition, CustomFieldOptionInput } from '../domain/custom-field.js';
 import { isCustomFieldTarget } from '../domain/custom-field-value.js';
 import { NameTakenError } from '../domain/errors.js';
+import { isDomainError } from '@pf/shared-kernel';
 import { isCategoryKind, systemCategoryName } from '../domain/system-categories.js';
 import type { Tag } from '../domain/tag.js';
 
 export const CLASSIFICATION_SERVICE = Symbol('CLASSIFICATION_SERVICE');
 export const CLASSIFICATION_QUERIES = Symbol('CLASSIFICATION_QUERIES');
 export const CLASSIFICATION_LOCALES = Symbol('CLASSIFICATION_LOCALES');
+export const CLASSIFICATION_MERGE_SERVICE = Symbol('CLASSIFICATION_MERGE_SERVICE');
 export const CUSTOM_FIELDS_SERVICE = Symbol('CUSTOM_FIELDS_SERVICE');
 export const CUSTOM_FIELDS_QUERIES = Symbol('CUSTOM_FIELDS_QUERIES');
 
@@ -89,8 +92,12 @@ export function groupDto(g: CategoryGroup) {
   };
 }
 
+/** `{id, name}` de la destino de una fusión (`null` si no se fusionó); `names` trae los nombres ya resueltos. */
+const mergedInto = (id: string | null, names?: ReadonlyMap<string, string>) =>
+  id === null ? null : { id, name: names?.get(id) ?? '' };
+
 /** Las categorías de sistema se nombran en el locale del usuario (design §6, TC-CLASSIFICATION-SYSTEM-003). */
-export function categoryDto(c: Category, locale: string) {
+export function categoryDto(c: Category, locale: string, names?: ReadonlyMap<string, string>) {
   return {
     id: c.id,
     groupId: c.groupId,
@@ -103,6 +110,7 @@ export function categoryDto(c: Category, locale: string) {
     icon: c.icon,
     sortOrder: c.sortOrder,
     archivedAt: c.archivedAt,
+    mergedInto: mergedInto(c.mergedIntoId, names),
     version: c.version,
   };
 }
@@ -127,7 +135,7 @@ export function customFieldDto(f: CustomFieldDefinition) {
   };
 }
 
-export function counterpartyDto(c: Counterparty) {
+export function counterpartyDto(c: Counterparty, names?: ReadonlyMap<string, string>) {
   return {
     id: c.id,
     name: c.name,
@@ -138,6 +146,7 @@ export function counterpartyDto(c: Counterparty) {
     website: c.website,
     notes: c.notes,
     archivedAt: c.archivedAt,
+    mergedInto: mergedInto(c.mergedIntoId, names),
     version: c.version,
   };
 }
@@ -156,8 +165,51 @@ export class ClassificationController {
     @Inject(CLASSIFICATION_LOCALES) private readonly locales: LocaleResolver,
     @Inject(CUSTOM_FIELDS_SERVICE) private readonly customFields: CustomFieldsService,
     @Inject(CUSTOM_FIELDS_QUERIES) private readonly customFieldQueries: CustomFieldsQueries,
+    @Inject(CLASSIFICATION_MERGE_SERVICE) private readonly merge: ClassificationMergeService,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
   ) {}
+
+  /** Nombres de las destinos de fusión de `rows` (categorías o contrapartes), para `mergedInto`. */
+  private async mergedNames(
+    user: string,
+    ws: string,
+    kind: 'CATEGORY' | 'COUNTERPARTY',
+    locale: string,
+    rows: readonly { readonly mergedIntoId: string | null }[],
+  ): Promise<ReadonlyMap<string, string>> {
+    const ids = [...new Set(rows.flatMap((r) => (r.mergedIntoId === null ? [] : [r.mergedIntoId])))];
+    if (ids.length === 0) return new Map();
+    if (kind === 'COUNTERPARTY') {
+      const found = await this.queries.counterpartiesByIds(user, ws, ids);
+      return new Map(found.map((c) => [c.id, c.name]));
+    }
+    const found = await this.queries.categoriesByIds(user, ws, ids);
+    return new Map(
+      found.map((c) => [c.id, c.systemCode ? systemCategoryName(c.systemCode, locale) : c.name]),
+    );
+  }
+
+  /**
+   * Errores de la fusión con sus datos para el cliente (design § Contratos): `CLASSIFICATION_MERGE_CONFLICT` publica
+   * `conflicts`; `CATEGORY_MERGED` y `COUNTERPARTY_MERGED` publican `mergedInto` con `{id, name}` de la destino.
+   */
+  private async mergeProblems<T>(user: string, ws: string, locale: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await mapped(fn);
+    } catch (err) {
+      if (!isDomainError(err)) throw err;
+      if (err.code === 'CLASSIFICATION_MERGE_CONFLICT') {
+        throw new ApiProblem(err.code, err.message, { extensions: { conflicts: err.details['conflicts'] } });
+      }
+      if (err.code === 'CATEGORY_MERGED' || err.code === 'COUNTERPARTY_MERGED') {
+        const id = typeof err.details['mergedInto'] === 'string' ? err.details['mergedInto'] : null;
+        const kind = err.code === 'CATEGORY_MERGED' ? 'CATEGORY' : 'COUNTERPARTY';
+        const names = await this.mergedNames(user, ws, kind, locale, [{ mergedIntoId: id }]);
+        throw new ApiProblem(err.code, err.message, { extensions: { mergedInto: mergedInto(id, names) } });
+      }
+      throw err;
+    }
+  }
 
   private page<T extends { id: string }, D>(
     resource: string,
@@ -299,7 +351,8 @@ export class ClassificationController {
       ...(typeof query['groupId'] === 'string' ? { groupId: query['groupId'] } : {}),
     });
     const locale = await this.locales.localeOf(user);
-    return this.page('categories', ws, query, rows, (c) => categoryDto(c, locale));
+    const names = await this.mergedNames(user, ws, 'CATEGORY', locale, rows);
+    return this.page('categories', ws, query, rows, (c) => categoryDto(c, locale, names));
   }
 
   @Post(`${WS}/categories`)
@@ -355,7 +408,9 @@ export class ClassificationController {
     @Param('categoryId') id: string,
   ) {
     const user = userId(req);
-    return categoryDto(await this.queries.getCategory(user, ws, id), await this.locales.localeOf(user));
+    const c = await this.queries.getCategory(user, ws, id);
+    const locale = await this.locales.localeOf(user);
+    return categoryDto(c, locale, await this.mergedNames(user, ws, 'CATEGORY', locale, [c]));
   }
 
   /**
@@ -416,8 +471,57 @@ export class ClassificationController {
     @ExpectedVersion() v: number,
   ) {
     const user = userId(req);
-    const c = await mapped(() => this.service.unarchiveCategory(user, ws, id, v));
-    return categoryDto(c, await this.locales.localeOf(user));
+    const locale = await this.locales.localeOf(user);
+    const c = await this.mergeProblems(user, ws, locale, () =>
+      this.service.unarchiveCategory(user, ws, id, v),
+    );
+    return categoryDto(c, locale);
+  }
+
+  /** `GET W/categories/{id}/merge-preview?targetId=` (`previewCategoryMerge`, VIEWER+): solo lectura. */
+  @Get(`${WS}/categories/:categoryId/merge-preview`)
+  async previewCategoryMerge(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('categoryId') id: string,
+    @ValidatedQuery() query: Json,
+  ) {
+    const user = userId(req);
+    const locale = await this.locales.localeOf(user);
+    const p = await this.mergeProblems(user, ws, locale, () =>
+      this.merge.previewCategoryMerge(user, ws, id, String(query['targetId'])),
+    );
+    const names = await this.mergedNames(user, ws, 'CATEGORY', locale, [p.source, p.target]);
+    return {
+      source: categoryDto(p.source, locale, names),
+      target: categoryDto(p.target, locale, names),
+      counts: p.counts,
+      conflicts: p.conflicts,
+    };
+  }
+
+  /** `POST W/categories/{id}/merge` (`mergeCategory`, EDITOR; `If-Match`, `Idempotency-Key`, costly). */
+  @Post(`${WS}/categories/:categoryId/merge`)
+  @HttpCode(200)
+  async mergeCategory(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('categoryId') id: string,
+    @ExpectedVersion() v: number,
+    @Body() body: Json,
+  ) {
+    const user = userId(req);
+    const locale = await this.locales.localeOf(user);
+    const r = await this.mergeProblems(user, ws, locale, () =>
+      this.merge.mergeCategory(user, ws, id, v, String(body['targetCategoryId'])),
+    );
+    const names = await this.mergedNames(user, ws, 'CATEGORY', locale, [r.source, r.target]);
+    return {
+      source: categoryDto(r.source, locale, names),
+      target: categoryDto(r.target, locale, names),
+      counts: r.counts,
+      operationId: r.operationId,
+    };
   }
 
   @Delete(`${WS}/categories/:categoryId`)
@@ -598,7 +702,8 @@ export class ClassificationController {
       ...(kind ? { kind } : {}),
     });
     if (query['sort'] === '-name') rows = rows.reverse();
-    return this.page('counterparties', ws, query, rows, counterpartyDto);
+    const names = await this.mergedNames(userId(req), ws, 'COUNTERPARTY', 'es', rows);
+    return this.page('counterparties', ws, query, rows, (c) => counterpartyDto(c, names));
   }
 
   @Post(`${WS}/counterparties`)
@@ -640,7 +745,9 @@ export class ClassificationController {
     @Param('workspaceId') ws: string,
     @Param('counterpartyId') id: string,
   ) {
-    return counterpartyDto(await this.queries.getCounterparty(userId(req), ws, id));
+    const user = userId(req);
+    const c = await this.queries.getCounterparty(user, ws, id);
+    return counterpartyDto(c, await this.mergedNames(user, ws, 'COUNTERPARTY', 'es', [c]));
   }
 
   /**
@@ -696,7 +803,54 @@ export class ClassificationController {
     @Param('counterpartyId') id: string,
     @ExpectedVersion() v: number,
   ) {
-    return counterpartyDto(await mapped(() => this.service.unarchiveCounterparty(userId(req), ws, id, v)));
+    const user = userId(req);
+    return counterpartyDto(
+      await this.mergeProblems(user, ws, 'es', () => this.service.unarchiveCounterparty(user, ws, id, v)),
+    );
+  }
+
+  /** `GET W/counterparties/{id}/merge-preview?targetId=` (`previewCounterpartyMerge`, VIEWER+): solo lectura. */
+  @Get(`${WS}/counterparties/:counterpartyId/merge-preview`)
+  async previewCounterpartyMerge(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('counterpartyId') id: string,
+    @ValidatedQuery() query: Json,
+  ) {
+    const user = userId(req);
+    const p = await this.mergeProblems(user, ws, 'es', () =>
+      this.merge.previewCounterpartyMerge(user, ws, id, String(query['targetId'])),
+    );
+    const names = await this.mergedNames(user, ws, 'COUNTERPARTY', 'es', [p.source, p.target]);
+    return {
+      source: counterpartyDto(p.source, names),
+      target: counterpartyDto(p.target, names),
+      counts: p.counts,
+      conflicts: p.conflicts,
+    };
+  }
+
+  /** `POST W/counterparties/{id}/merge` (`mergeCounterparty`, EDITOR; `If-Match`, `Idempotency-Key`, costly). */
+  @Post(`${WS}/counterparties/:counterpartyId/merge`)
+  @HttpCode(200)
+  async mergeCounterparty(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('counterpartyId') id: string,
+    @ExpectedVersion() v: number,
+    @Body() body: Json,
+  ) {
+    const user = userId(req);
+    const r = await this.mergeProblems(user, ws, 'es', () =>
+      this.merge.mergeCounterparty(user, ws, id, v, String(body['targetCounterpartyId'])),
+    );
+    const names = await this.mergedNames(user, ws, 'COUNTERPARTY', 'es', [r.source, r.target]);
+    return {
+      source: counterpartyDto(r.source, names),
+      target: counterpartyDto(r.target, names),
+      counts: r.counts,
+      operationId: r.operationId,
+    };
   }
 
   @Get(`${WS}/counterparties/:counterpartyId/category-suggestion`)

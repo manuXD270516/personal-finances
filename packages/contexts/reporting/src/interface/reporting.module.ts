@@ -1,6 +1,10 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
-import type { CategoryCatalogQuery, CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import type {
+  CategoryCatalogQuery,
+  ClassificationMergeParticipant,
+  CounterpartyCatalogQuery,
+} from '@pf/classification/contracts';
 import type { FxQuoteSideRatesPort, FxValuationPort } from '@pf/fx/contracts';
 import type {
   AccountBalanceHistoryQuery,
@@ -489,5 +493,11 @@ export {
   type LedgerTrialPort,
   type ReconciliationReports,
 } from '../application/reports-reconciliation.js';
+import { PgReportingMergeParticipant } from '../infrastructure/pg-classification-merge.js';
 export { describeMismatch, type ReconciliationMismatch } from '../domain/index.js';
 export type { DrillDownParams } from '../application/financial-reports.exports.js';
+
+/** Participante de REPORTING en la fusión de categorías (add-category-and-counterparty-merge): categorías esenciales del disponible. */
+export function createClassificationMergeParticipant(): ClassificationMergeParticipant {
+  return new PgReportingMergeParticipant();
+}

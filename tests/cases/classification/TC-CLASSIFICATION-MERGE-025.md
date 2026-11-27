@@ -5,17 +5,20 @@ spec: classification/counterparties
 related_specs: []
 requirement: "Vista previa de la fusión de contrapartes"
 scenario: "Vista previa de HIPERMAXI S.A."
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-013"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - apps/web/src/ui/classification/merge.test.tsx
+  - packages/contexts/classification/src/application/merge.service.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","counterparties","preview"]
 error_code: null
@@ -29,7 +32,7 @@ expected_result:
   - "counts: TRANSACTIONS_OPEN 4, TRANSACTIONS_CLOSED_KEPT 1, SUBSCRIPTIONS 1, RULES 1, ALIASES_MOVED 1; conflicts vacío"
   - "nada cambia"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-025 — Vista previa de la fusión de HIPERMAXI S.A. sin cambios

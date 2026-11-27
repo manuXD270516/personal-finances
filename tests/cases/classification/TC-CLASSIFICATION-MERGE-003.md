@@ -5,17 +5,19 @@ spec: classification/categories
 related_specs: []
 requirement: "Fusionar categorías"
 scenario: "Origen de sistema"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-CLASSIFICATION-003"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","system-categories"]
 error_code: "SYSTEM_CATEGORY_IMMUTABLE"
@@ -28,7 +30,7 @@ expected_result:
   - "se rechaza con SYSTEM_CATEGORY_IMMUTABLE"
   - "\"Comisiones\" sigue ACTIVE"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-003 — Una categoría de sistema no puede ser origen de una fusión

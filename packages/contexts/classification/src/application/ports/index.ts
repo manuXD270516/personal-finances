@@ -1,5 +1,11 @@
 import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { Clock } from '@pf/shared-kernel';
+import type {
+  CategoriesMergedV1,
+  ClassificationMergeParticipant,
+  ClosedDateRange,
+  CounterpartiesMergedV1,
+} from '../../contracts/merge.js';
 import type { Category, CategoryGroup } from '../../domain/category.js';
 import type { Counterparty } from '../../domain/counterparty.js';
 import type { CustomFieldDefinition, CustomFieldUsage } from '../../domain/custom-field.js';
@@ -87,9 +93,53 @@ export interface CustomFieldDefinitionChangedEvent {
   };
 }
 
+/**
+ * `classification.CategoriesMerged.v1` y `classification.CounterpartiesMerged.v1` (add-category-and-counterparty-
+ * merge): agregado = la origen (se fusiona una sola vez; la destino viaja en el payload). Sin consumidores en este change (D249).
+ */
+export interface CategoriesMergedEvent {
+  readonly eventId: string;
+  readonly eventType: 'classification.CategoriesMerged';
+  readonly eventVersion: 1;
+  readonly aggregateType: 'Category';
+  readonly aggregateId: string;
+  readonly aggregateVersion: number;
+  readonly workspaceId: string;
+  readonly occurredAt: string;
+  readonly actor: { readonly type: 'USER'; readonly id: string };
+  readonly payload: CategoriesMergedV1;
+}
+
+export interface CounterpartiesMergedEvent {
+  readonly eventId: string;
+  readonly eventType: 'classification.CounterpartiesMerged';
+  readonly eventVersion: 1;
+  readonly aggregateType: 'Counterparty';
+  readonly aggregateId: string;
+  readonly aggregateVersion: number;
+  readonly workspaceId: string;
+  readonly occurredAt: string;
+  readonly actor: { readonly type: 'USER'; readonly id: string };
+  readonly payload: CounterpartiesMergedV1;
+}
+
 /** Outbox transaccional (`platform.outbox`): misma transacción que el archivado (design §11). */
 export interface OutboxPort {
-  append(event: CategoryArchivedEvent | CustomFieldDefinitionChangedEvent): Promise<void>;
+  append(
+    event:
+      | CategoryArchivedEvent
+      | CustomFieldDefinitionChangedEvent
+      | CategoriesMergedEvent
+      | CounterpartiesMergedEvent,
+  ): Promise<void>;
+}
+
+/**
+ * Periodos cerrados del workspace como rangos de fechas de negocio (D494). El composition root lo implementa con
+ * `PeriodQuery` de PLANNING (`CLOSED`; `REOPENED` cuenta como no cerrado): CLASSIFICATION no depende de PLANNING.
+ */
+export interface ClosedPeriodRangesPort {
+  closedRanges(workspaceId: string): Promise<readonly ClosedDateRange[]>;
 }
 
 /**
@@ -153,6 +203,9 @@ export interface ClassificationDeps {
   /** Consulta `GetLifecycle` de AUDIT (el contexto dueño verifica el agregado y aporta su estado). */
   readonly lifecycleQuery: LifecycleQuery;
   readonly lastCategoryUsed: LastCategoryUsedQueryPort;
+  /** Fusión (add-category-and-counterparty-merge): periodos cerrados y participantes, en orden fijo. */
+  readonly closedPeriods: ClosedPeriodRangesPort;
+  readonly mergeParticipants: readonly ClassificationMergeParticipant[];
   readonly catalogs: DefaultCatalogSource;
   readonly ids: IdGenerator;
   readonly clock: Clock;

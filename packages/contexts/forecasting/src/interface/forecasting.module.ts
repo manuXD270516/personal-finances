@@ -1,3 +1,4 @@
+import type { CategoryMergeQuery } from '@pf/classification/contracts';
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import { runWithRequestContext } from '@pf/platform/api';
@@ -117,6 +118,8 @@ export interface ForecastingRuntimeOptions {
   /** Ocurrencias, proyección y cuotas de los costos conocidos (COMMITMENTS y DEBT). */
   readonly known: KnownSourcesPort;
   readonly categories: CategoriesPort;
+  /** D496: la historia de una categoría fusionada cuenta como la de su destino (add-category-and-counterparty-merge). */
+  readonly categoryMerge?: CategoryMergeQuery;
   /** Cuentas líquidas por moneda (add-predicted-cash-flow-band); sin él no hay serie del gasto variable líquido. */
   readonly liquidAccounts?: LiquidAccountsPort;
   readonly rates: RatesPort;
@@ -162,6 +165,7 @@ export function createForecastingRuntime(options: ForecastingRuntimeOptions): Fo
     flows: options.flows,
     known: options.known,
     categories: options.categories,
+    ...(options.categoryMerge ? { categoryMerge: options.categoryMerge } : {}),
     ...(options.liquidAccounts ? { liquidAccounts: options.liquidAccounts } : {}),
     rates: options.rates,
     service: options.service,
@@ -182,6 +186,7 @@ export function createForecastingRuntime(options: ForecastingRuntimeOptions): Fo
     workspaces: options.workspaces,
     settingsOf: options.settingsOf,
     categories: options.categories,
+    ...(options.categoryMerge ? { categoryMerge: options.categoryMerge } : {}),
     rates: options.rates,
     expenses: anomalyOptions?.expenses ?? NO_ANOMALY_PORTS.expenses,
     resolved: anomalyOptions?.resolved ?? NO_ANOMALY_PORTS.resolved,

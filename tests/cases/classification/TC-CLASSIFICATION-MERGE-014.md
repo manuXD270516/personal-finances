@@ -5,17 +5,18 @@ spec: classification/categories
 related_specs: ["planning/month-closing","reporting/financial-reports"]
 requirement: "Fusión de categorías y periodos cerrados"
 scenario: "Octubre cerrado y noviembre abierto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-PLANNING-005"]
 nfr: []
 invariants: ["INV-019"]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","closed-periods"]
 error_code: null
@@ -30,7 +31,7 @@ expected_result:
   - "el gasto de octubre sigue en \"Super\"; el reporte de octubre muestra \"Super\" = 100.00 BOB, archivada y fusionada en \"Supermercado\", igual que el snapshot"
   - "los gastos de noviembre están en \"Supermercado\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-014 — Octubre cerrado conserva Super y noviembre pasa a Supermercado

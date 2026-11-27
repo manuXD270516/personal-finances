@@ -283,10 +283,13 @@ const CLASSIFICATION_LAYOUT: Readonly<Record<Orientation, LayoutSpec>> = {
   horizontal: {
     start: { x: 20, y: 150 },
     nodes: { ACTIVE: { x: 130, y: 150 }, ARCHIVED: { x: 380, y: 150 } },
+    // Máquina versión 2: `MERGE` (Activa → Archivada) va por fuera del par archivar/desarchivar para no superponerse.
+    bends: { [edgeId('MERGE', 'ACTIVE', 'ARCHIVED')]: -56 },
   },
   vertical: {
     start: { x: 170, y: 20 },
     nodes: { ACTIVE: { x: 170, y: 100 }, ARCHIVED: { x: 170, y: 260 } },
+    bends: { [edgeId('MERGE', 'ACTIVE', 'ARCHIVED')]: -56 },
   },
 };
 

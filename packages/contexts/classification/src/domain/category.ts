@@ -6,7 +6,7 @@ import {
   type ClassificationTransition,
   type ClassificationTransitionRecord,
 } from './classification-lifecycle.js';
-import { invalidTransition, validation } from './errors.js';
+import { categoryMerged, invalidTransition, validation } from './errors.js';
 import { normalizeText } from './normalized-text.js';
 import { SystemCategoryPolicy, type CategoryKind, type SystemCode } from './system-categories.js';
 
@@ -124,6 +124,9 @@ export interface CategorySnapshot {
   readonly color: string | null;
   readonly sortOrder: number;
   readonly archivedAt: string | null;
+  /** Fusión (add-category-and-counterparty-merge): categoría destino en la que se fusionó esta; `null` si no. */
+  readonly mergedIntoId?: string | null;
+  readonly mergedAt?: string | null;
   readonly version: number;
 }
 
@@ -254,12 +257,22 @@ export class Category {
   get isArchived(): boolean {
     return this.s.archivedAt !== null;
   }
+  /** Categoría destino de la fusión (`null` si no se fusionó). */
+  get mergedIntoId(): string | null {
+    return this.s.mergedIntoId ?? null;
+  }
+  get mergedAt(): string | null {
+    return this.s.mergedAt ?? null;
+  }
+  get isMerged(): boolean {
+    return this.mergedIntoId !== null;
+  }
   get version(): number {
     return this.s.version;
   }
 
   snapshot(): CategorySnapshot {
-    return { ...this.s };
+    return { ...this.s, mergedIntoId: this.mergedIntoId, mergedAt: this.mergedAt };
   }
 
   /** Renombrar/icono/color/orden. Una categoría de sistema no se renombra (`SYSTEM_CATEGORY_IMMUTABLE`). */
@@ -322,9 +335,28 @@ export class Category {
     this.s = { ...this.s, archivedAt: at, version: this.s.version + 1 };
   }
 
-  /** Padre o grupo archivados ⇒ `CATEGORY_ARCHIVED`. */
+  /**
+   * Fusiona esta categoría (origen) en `targetId` (add-category-and-counterparty-merge, D52 v2): queda archivada de
+   * forma permanente y marcada «fusionada en» la destino. Si ya estaba archivada conserva su `archivedAt` (D497). Las
+   * reglas de validez (tipo, destino activa, subcategorías) las aplica `CategoryMergePolicy`; aquí solo el estado.
+   */
+  merge(targetId: string, at: string): void {
+    if (this.isSystem) throw SystemCategoryPolicy.immutable('system categories cannot be merged');
+    if (this.isMerged) throw categoryMerged(this.mergedIntoId);
+    this.mark('MERGE');
+    this.s = {
+      ...this.s,
+      archivedAt: this.s.archivedAt ?? at,
+      mergedIntoId: targetId,
+      mergedAt: at,
+      version: this.s.version + 1,
+    };
+  }
+
+  /** Padre o grupo archivados ⇒ `CATEGORY_ARCHIVED`; una categoría fusionada ⇒ `CATEGORY_MERGED`. */
   unarchive(group: CategoryGroup, parent: Category | null): void {
     if (!this.isArchived) throw invalidTransition('category is not archived');
+    if (this.isMerged) throw categoryMerged(this.mergedIntoId);
     if (group.isArchived) throw archivedError('category group');
     if (parent?.isArchived) throw archivedError('parent category');
     this.mark('UNARCHIVE');

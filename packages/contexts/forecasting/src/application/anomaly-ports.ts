@@ -1,4 +1,5 @@
 import type { AuditPort } from '@pf/audit/contracts';
+import type { CategoryMergeQuery } from '@pf/classification/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type {
   AnomalyReasonKind,
@@ -158,6 +159,8 @@ export interface AnomalyDeps {
   readonly workspaces: WorkspaceDirectory;
   readonly settingsOf: WorkspaceSettingsPort;
   readonly categories: CategoriesPort;
+  /** D496: la historia de una categoría fusionada cuenta como la de su destino (add-category-and-counterparty-merge). */
+  readonly categoryMerge?: CategoryMergeQuery;
   readonly rates: RatesPort;
   readonly expenses: ExpenseLinesPort;
   readonly resolved: ResolvedTransactionsPort;

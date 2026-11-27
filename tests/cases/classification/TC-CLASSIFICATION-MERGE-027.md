@@ -5,17 +5,20 @@ spec: classification/counterparties
 related_specs: []
 requirement: "Una contraparte fusionada no se desarchiva ni se vuelve a fusionar"
 scenario: "Desarchivar una contraparte fusionada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-013"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/classification/src/application/merge.service.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","counterparties"]
 error_code: "COUNTERPARTY_MERGED"
@@ -28,7 +31,7 @@ expected_result:
   - "responde 409 COUNTERPARTY_MERGED indicando \"Hipermaxi\""
   - "\"HIPERMAXI S.A.\" sigue ARCHIVED"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-027 — Desarchivar una contraparte fusionada se rechaza con COUNTERPARTY_MERGED

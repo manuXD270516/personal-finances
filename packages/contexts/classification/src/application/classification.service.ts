@@ -60,7 +60,7 @@ export interface CatalogResult {
 }
 
 /** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
-const preconditionFailed = (currentVersion?: number) =>
+export const preconditionFailed = (currentVersion?: number) =>
   new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
     ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
   });
@@ -68,10 +68,10 @@ const preconditionFailed = (currentVersion?: number) =>
 const lostRace = async (current: Promise<{ readonly version: number } | null>) =>
   preconditionFailed((await current)?.version);
 
-type Snap = Readonly<Record<string, unknown>>;
+export type Snap = Readonly<Record<string, unknown>>;
 
 /** Diff campo a campo entre dos snapshots (la allow-list de AUDIT filtra lo no permitido). */
-function diff(before: Snap | null, after: Snap, fields: readonly string[]): AuditChangeInput[] {
+export function diff(before: Snap | null, after: Snap, fields: readonly string[]): AuditChangeInput[] {
   return fields
     .filter((f) => JSON.stringify(before?.[f] ?? null) !== JSON.stringify(after[f] ?? null))
     .map((f) => ({ field: f, before: before?.[f] ?? null, after: after[f] ?? null }));
@@ -79,17 +79,17 @@ function diff(before: Snap | null, after: Snap, fields: readonly string[]): Audi
 
 const status = (archivedAt: string | null) => (archivedAt === null ? 'ACTIVE' : 'ARCHIVED');
 const groupView = (g: CategoryGroup): Snap => ({ ...g.snapshot(), status: status(g.archivedAt) });
-const categoryView = (c: Category): Snap => ({ ...c.snapshot(), status: status(c.archivedAt) });
+export const categoryView = (c: Category): Snap => ({ ...c.snapshot(), status: status(c.archivedAt) });
 const tagView = (t: Tag): Snap => ({ ...t.snapshot(), status: status(t.archivedAt) });
 /** Los alias se auditan como texto (AUDIT solo admite valores escalares o dinero). */
-const counterpartyView = (c: Counterparty): Snap => ({
+export const counterpartyView = (c: Counterparty): Snap => ({
   ...c.snapshot(),
   aliases: c.aliases.join(', '),
   status: status(c.archivedAt),
 });
 
 const GROUP_FIELDS = ['name', 'kind', 'sortOrder', 'status'] as const;
-const CATEGORY_FIELDS = [
+export const CATEGORY_FIELDS = [
   'name',
   'groupId',
   'parentId',
@@ -98,10 +98,11 @@ const CATEGORY_FIELDS = [
   'icon',
   'color',
   'sortOrder',
+  'mergedIntoId',
   'status',
 ] as const;
 const TAG_FIELDS = ['name', 'color', 'status'] as const;
-const COUNTERPARTY_FIELDS = [
+export const COUNTERPARTY_FIELDS = [
   'name',
   'kind',
   'icon',
@@ -109,6 +110,7 @@ const COUNTERPARTY_FIELDS = [
   'aliases',
   'notes',
   'website',
+  'mergedIntoId',
   'status',
 ] as const;
 
@@ -972,7 +974,7 @@ export class ClassificationService {
 }
 
 /** Paso `TRANSITION` desde el registro validado por la máquina (sin registro ⇒ error de programación). */
-function transitionStep(
+export function transitionStep(
   t: ClassificationTransitionRecord | null,
   machine: ClassificationLifecycleMachine,
 ): LifecycleStepInput & { readonly kind: 'TRANSITION' } {

@@ -226,6 +226,7 @@ export const CLASSIFICATION_AUDIT_POLICY = {
     icon: 'plain',
     color: 'plain',
     sortOrder: 'plain',
+    mergedIntoId: 'plain',
     status: 'plain',
   },
   Tag: { name: 'plain', color: 'plain', status: 'plain' },
@@ -235,7 +236,31 @@ export const CLASSIFICATION_AUDIT_POLICY = {
     icon: 'plain',
     defaultCategoryId: 'plain',
     aliases: 'plain',
+    mergedIntoId: 'plain',
     status: 'plain',
+  },
+  // add-category-and-counterparty-merge: un registro por contexto participante, con los conteos de la operación.
+  ClassificationMerge: {
+    kind: 'plain',
+    sourceId: 'plain',
+    targetId: 'plain',
+    context: 'plain',
+    SPLITS_OPEN: 'plain',
+    SPLITS_CLOSED_KEPT: 'plain',
+    TRANSACTIONS_OPEN: 'plain',
+    TRANSACTIONS_CLOSED_KEPT: 'plain',
+    BUDGET_LINES: 'plain',
+    TEMPLATES: 'plain',
+    RECURRING_DEFINITIONS: 'plain',
+    SUBSCRIPTIONS: 'plain',
+    RULES: 'plain',
+    DEFAULT_CATEGORY_COUNTERPARTIES: 'plain',
+    ESSENTIALS: 'plain',
+    LOANS: 'plain',
+    CONVERSIONS: 'plain',
+    IMPORT_ROWS: 'plain',
+    SUBCATEGORIES_MOVED: 'plain',
+    ALIASES_MOVED: 'plain',
   },
   CustomFieldDefinition: {
     key: 'plain',
@@ -255,4 +280,5 @@ export const CLASSIFICATION_AUDIT_POLICY = {
   },
 } as const satisfies AuditFieldPoliciesDto;
 
+export * from './merge.js';
 export * from './portability.js';

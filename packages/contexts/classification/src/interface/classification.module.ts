@@ -5,11 +5,13 @@ import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { ClassificationQueries } from '../application/classification.queries.js';
 import { ClassificationService } from '../application/classification.service.js';
+import { ClassificationMergeService } from '../application/merge.service.js';
 import { CustomFieldsQueries } from '../application/custom-fields.queries.js';
 import { CustomFieldsService } from '../application/custom-fields.service.js';
 import type { LifecycleMachineDto } from '@pf/audit/contracts';
 import type {
   AuditPort,
+  ClosedPeriodRangesPort,
   LastCategoryUsedQueryPort,
   LifecyclePort,
   LifecycleQuery,
@@ -18,15 +20,19 @@ import type {
 } from '../application/ports/index.js';
 import type {
   CategoryCatalogQuery,
+  CategoryMergeQuery,
   ClassificationLookup,
+  ClassificationMergeParticipant,
   ClassificationValidator,
   CounterpartyCatalogQuery,
   WorkspaceCatalogProvisioner,
 } from '../contracts/index.js';
 import { CATEGORY_LIFECYCLE, COUNTERPARTY_LIFECYCLE } from '../domain/classification-lifecycle.js';
 import { pgClassificationDeps } from '../infrastructure/pg-classification.js';
+import { PgCategoryMergeQuery } from '../infrastructure/pg-merge.js';
 import {
   CLASSIFICATION_LOCALES,
+  CLASSIFICATION_MERGE_SERVICE,
   CLASSIFICATION_QUERIES,
   CLASSIFICATION_SERVICE,
   ClassificationController,
@@ -46,6 +52,9 @@ export interface ClassificationRuntimeOptions {
   readonly locales: LocaleResolver;
   /** Adapter hacia Transactions; por defecto, stub sin historial (hasta add-transaction-recording). */
   readonly lastCategoryUsed?: LastCategoryUsedQueryPort;
+  /** Fusión (add-category-and-counterparty-merge): periodos cerrados (PLANNING) y participantes, en orden fijo. */
+  readonly closedPeriods?: ClosedPeriodRangesPort;
+  readonly mergeParticipants?: readonly ClassificationMergeParticipant[];
 }
 
 export interface ClassificationRuntime {
@@ -53,6 +62,10 @@ export interface ClassificationRuntime {
   readonly queries: ClassificationQueries;
   readonly customFields: CustomFieldsService;
   readonly customFieldQueries: CustomFieldsQueries;
+  /** Fusión de categorías y contrapartes (vista previa y comando). */
+  readonly merge: ClassificationMergeService;
+  /** `CategoryMergeQuery.resolve` (D496) para FORECAST y RULES. */
+  readonly categoryMerge: CategoryMergeQuery;
   readonly locales: LocaleResolver;
   /** Gancho síncrono de `CreateWorkspace` (design §6). */
   readonly provisioner: WorkspaceCatalogProvisioner;
@@ -157,6 +170,8 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
     lifecycle: options.lifecycle,
     lifecycleQuery: options.lifecycleQuery,
     ...(options.lastCategoryUsed ? { lastCategoryUsed: options.lastCategoryUsed } : {}),
+    ...(options.closedPeriods ? { closedPeriods: options.closedPeriods } : {}),
+    ...(options.mergeParticipants ? { mergeParticipants: options.mergeParticipants } : {}),
   });
   const service = new ClassificationService(deps);
   const queries = new ClassificationQueries(deps);
@@ -167,6 +182,8 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
     queries,
     customFields,
     customFieldQueries,
+    merge: new ClassificationMergeService(deps),
+    categoryMerge: new PgCategoryMergeQuery(options.pool, ambientUserId),
     locales: options.locales,
     provisioner: { onWorkspaceCreated: (input) => service.onWorkspaceCreated(input) },
     validator: {
@@ -204,6 +221,7 @@ export class ClassificationModule {
         { provide: CLASSIFICATION_QUERIES, useValue: options.runtime.queries },
         { provide: CUSTOM_FIELDS_SERVICE, useValue: options.runtime.customFields },
         { provide: CUSTOM_FIELDS_QUERIES, useValue: options.runtime.customFieldQueries },
+        { provide: CLASSIFICATION_MERGE_SERVICE, useValue: options.runtime.merge },
         { provide: CLASSIFICATION_LOCALES, useValue: options.runtime.locales },
       ],
     };
@@ -217,4 +235,4 @@ export class ClassificationModule {
 export const CATEGORY_LIFECYCLE_MACHINE: LifecycleMachineDto = CATEGORY_LIFECYCLE.definition;
 export const COUNTERPARTY_LIFECYCLE_MACHINE: LifecycleMachineDto = COUNTERPARTY_LIFECYCLE.definition;
 
-export type { AuditPort, LifecyclePort, LifecycleQuery, LocaleResolver, OutboxPort };
+export type { AuditPort, ClosedPeriodRangesPort, LifecyclePort, LifecycleQuery, LocaleResolver, OutboxPort };

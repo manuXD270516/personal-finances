@@ -5,17 +5,20 @@ spec: classification/categories
 related_specs: []
 requirement: "Fusión de una categoría con subcategorías"
 scenario: "Subcategorías que pasan a la destino"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-CLASSIFICATION-007","FR-CLASSIFICATION-001"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/category-merge.api.test.ts
+  - packages/contexts/classification/src/application/merge.service.test.ts
+  - packages/contexts/classification/src/domain/merge-policy.test.ts
+status: automated
+regression_suite: true
 phase: 9
 tags: ["merge","categories","hierarchy"]
 error_code: null
@@ -28,7 +31,7 @@ expected_result:
   - "\"Luz\" y \"Agua\" son subcategorías de \"Servicios básicos\""
   - "el gasto de 180.00 BOB sigue en \"Luz\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-CLASSIFICATION-MERGE-010 — Las subcategorías de la origen pasan a la destino de primer nivel
