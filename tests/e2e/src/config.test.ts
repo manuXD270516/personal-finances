@@ -46,7 +46,7 @@ describe('proxy TLS del stack de E2E (add-e2e-https)', () => {
     expect(dev).toBeDefined();
     expect(dev).toBe(image('deploy/compose/compose.prod.yaml'));
     const caddyfile = readFileSync(resolve(ROOT, 'deploy/compose/caddy/Caddyfile.e2e'), 'utf8').replace(
-      /^[ 	]*#.*$/gm,
+      /^\s*#.*$/gm,
       '',
     );
     expect(caddyfile).toContain('local_certs');
