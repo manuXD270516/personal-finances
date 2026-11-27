@@ -5,16 +5,17 @@ spec: transactions/transaction-recording
 related_specs: ["debt/credit-cards"]
 requirement: "Edición descriptiva de transacciones administradas desde la pantalla"
 scenario: "Cargo de tarjeta con campos financieros de solo lectura"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013","FR-TRANSACTIONS-009"]
 nfr: []
 invariants: ["INV-021"]
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/transactions/transactions.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["credit-cards","card-charges","managed-transactions","ui"]
@@ -31,7 +32,7 @@ expected_result:
   - "la petición enviada solo lleva los campos descriptivos"
   - "la nota queda registrada y el cargo sigue en 4.80 BOB"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-TRANSACTIONS-MANAGEDEDIT-002 — Cargo de tarjeta con campos financieros de solo lectura y nota guardada

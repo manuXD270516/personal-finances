@@ -477,6 +477,11 @@ export interface UpcomingPaymentItemDto {
   readonly status: UpcomingItemStatusDto;
   readonly daysOverdue?: number;
   readonly amountType: UpcomingAmountTypeDto;
+  /**
+   * Origen del monto esperado de un pago de tarjeta (estado de cuenta emitido, ciclo abierto o cuotas programadas de
+   * un ciclo posterior); ausente en los demás pagos (openspec fix-phase-4-debt-followups).
+   */
+  readonly expectedBasis?: 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS';
   /** `null` en `VARIABLE` y en `MIN_MAX` (ver `range`). */
   readonly amount: MoneyDto | null;
   readonly range?: { readonly min: MoneyDto; readonly max: MoneyDto };

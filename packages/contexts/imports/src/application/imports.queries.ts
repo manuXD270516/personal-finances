@@ -4,7 +4,17 @@ import { Money, currency as makeCurrency } from '@pf/shared-kernel';
 import type { ImportStatus } from '../domain/index.js';
 import type { ImportsDeps, PreviewFilter } from './ports/index.js';
 import { buildPreviewSummary, toRowView } from './preview.js';
-import { toJobView, type ImportJobView, type PreviewCandidateView, type PreviewView } from './views.js';
+import { parseMapping } from '../domain/index.js';
+import {
+  toJobView,
+  type ImportJobDetailView,
+  type ImportJobView,
+  type PreviewCandidateView,
+  type PreviewView,
+} from './views.js';
+
+/** Registros de muestra que devuelve `getImport` en `AWAITING_MAPPING` (los mismos que al crear). */
+const SAMPLE_ROWS = 20;
 
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `import ${id} not found`);
 
@@ -45,13 +55,27 @@ export class ImportsQueries {
   }
 
   /** Detalle del job; en revisión con saldo final del extracto, incluye la diferencia contra el saldo resultante. */
-  get(workspaceId: string, id: string): Promise<ImportJobView> {
+  get(workspaceId: string, id: string): Promise<ImportJobDetailView> {
     return this.deps.uow.run(workspaceId, async () => {
       const { deps } = this;
       const job = await deps.jobs.findById(workspaceId, id);
       if (!job) throw notFound(id);
       const account = await deps.accounts.getAccount(workspaceId, job.state.accountId);
       const view = toJobView(job.state, account?.currency ?? '');
+      if (job.state.status === 'AWAITING_MAPPING') {
+        // Al retomar el mapeo: muestra del staging y mapeo sugerido de la última importación de la cuenta (D492).
+        const sampleRows = await deps.staging.sampleRaw(workspaceId, id, SAMPLE_ROWS);
+        let suggestedMapping: ReturnType<typeof parseMapping> | undefined;
+        const last = await deps.jobs.lastMapping(workspaceId, job.state.accountId);
+        if (last) {
+          try {
+            suggestedMapping = parseMapping(last, job.state.columnCount);
+          } catch {
+            suggestedMapping = undefined;
+          }
+        }
+        return { ...view, sampleRows, ...(suggestedMapping ? { suggestedMapping } : {}) };
+      }
       const closing = job.state.statement?.closingBalance ?? null;
       if (account && closing !== null && job.state.status === 'AWAITING_REVIEW') {
         const summary = await buildPreviewSummary(deps, {

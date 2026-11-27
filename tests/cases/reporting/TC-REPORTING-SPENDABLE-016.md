@@ -5,16 +5,17 @@ spec: reporting/dashboard
 related_specs: ["planning/financial-periods"]
 requirement: "Disponible sin un periodo financiero que cubra hoy"
 scenario: "Workspace nuevo sin periodos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024"]
 nfr: ["NFR-USAB-004"]
 invariants: ["INV-020"]
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["spendable","q5","periods"]
@@ -30,7 +31,7 @@ expected_result:
   - "el periodo es {id: null, label: \"2026-10\", start: \"2026-10-01\", end: \"2026-10-31\"}"
   - "la segunda vista tiene estado NO_PLAN y la UI ofrece crear el presupuesto, sin mostrar 0.00"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-REPORTING-SPENDABLE-016 — Sin periodo financiero que cubra hoy Q5 usa el mes calendario sin plan

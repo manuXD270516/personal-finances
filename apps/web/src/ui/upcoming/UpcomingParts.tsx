@@ -49,6 +49,12 @@ export function ItemName({
           <br />
           <span className="pf-home-muted" data-testid="card-payment-estimated">
             {f.t('cardPayment.estimated')}
+            {item.expectedBasis === 'INSTALLMENTS' ? (
+              <>
+                {' · '}
+                <span data-testid="card-payment-installments">{f.t('cardPayment.installments')}</span>
+              </>
+            ) : null}
           </span>
         </>
       ) : null}

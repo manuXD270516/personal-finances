@@ -5,16 +5,17 @@ spec: transactions/transaction-recording
 related_specs: ["debt/loans"]
 requirement: "Edición descriptiva de transacciones administradas desde la pantalla"
 scenario: "Pago de préstamo anulado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-007","FR-TRANSACTIONS-009"]
 nfr: []
 invariants: []
 priority: low
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/transactions/transactions.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["loans","managed-transactions","ui"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "no se le ofrece editar la descripción ni las notas"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-TRANSACTIONS-MANAGEDEDIT-004 — Pago de préstamo anulado sin edición descriptiva

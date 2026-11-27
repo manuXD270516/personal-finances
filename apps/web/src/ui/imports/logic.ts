@@ -11,6 +11,7 @@ import {
   type ImportCreated,
   type ImportDateFormat,
   type ImportJob,
+  type ImportJobDetail,
   type ImportJobStatus,
   type ImportMapping,
   type ImportPreviewCandidate,
@@ -294,6 +295,15 @@ export function columnNames(
 ): readonly (string | undefined)[] {
   const skip = /^\d+$/.test(skipRows) ? Number(skipRows) : 0;
   return header.map((name) => (hasHeader && skip === 0 && name.trim() !== '' ? name : undefined));
+}
+
+/**
+ * Al retomar una importación en `AWAITING_MAPPING`: la respuesta de `getImport` trae la muestra y el mapeo sugerido y se
+ * trata como la de la creación; sin muestra (otro estado o una API anterior) se conserva el aviso `mapping-no-sample`.
+ */
+export function resumedCreated(detail: ImportJobDetail): ImportCreated | undefined {
+  if (detail.status !== 'AWAITING_MAPPING' || detail.sampleRows === undefined) return undefined;
+  return { ...detail, sampleRows: detail.sampleRows, suggestedMapping: detail.suggestedMapping ?? null };
 }
 
 /** Registros que se muestran en la muestra: el primero del archivo y hasta 20 más (`sampleRows`). */

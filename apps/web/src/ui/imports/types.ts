@@ -240,6 +240,12 @@ export interface ImportJob {
   readonly pdf?: ImportPdfInfo | null;
 }
 
+/** `getImport`: en `AWAITING_MAPPING` suma la muestra y el mapeo sugerido para retomar el paso (D492). */
+export interface ImportJobDetail extends ImportJob {
+  readonly sampleRows?: readonly (readonly string[])[];
+  readonly suggestedMapping?: ImportMapping | null;
+}
+
 export interface ImportCreated extends ImportJob {
   readonly sampleRows: readonly (readonly string[])[];
   readonly suggestedMapping: ImportMapping | null;

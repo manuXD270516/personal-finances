@@ -654,6 +654,13 @@ class MemoryStaging implements StagingRepository {
     }
   }
 
+  async sampleRaw(_ws: string, jobId: string, limit: number) {
+    return this.rowsOf(jobId)
+      .sort((a, b) => a.rowNumber - b.rowNumber)
+      .slice(1, 1 + limit)
+      .map((s) => s.raw);
+  }
+
   async loadForMapping(_ws: string, jobId: string) {
     return this.rowsOf(jobId)
       .sort((a, b) => a.rowNumber - b.rowNumber)
