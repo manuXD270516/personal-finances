@@ -4,7 +4,7 @@
 # `archive_command` se ejecuta DENTRO del contenedor de PostgreSQL, por eso pgBackRest tiene que vivir en la
 # misma imagen (no sirve un sidecar). Misma base que el stack local (deploy/compose/compose.yaml), fijada por
 # versión y digest; pgBackRest sale del repositorio PGDG que la imagen oficial ya trae configurado.
-ARG POSTGRES_IMAGE=postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+ARG POSTGRES_IMAGE=postgres:18.7-trixie@sha256:eb63372c1e05c755f55fa30cbd07aecc443676fc6c0fa90b9002d01537841e1a
 
 FROM ${POSTGRES_IMAGE} AS runtime
 # gosu (binario Go de la imagen oficial) solo se usa al arrancar como root; aquí se arranca como `postgres`, así
