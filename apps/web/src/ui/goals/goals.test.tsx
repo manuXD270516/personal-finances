@@ -75,8 +75,10 @@ describe('listado de metas', () => {
     expect(html.match(/data-testid="goal-row"/g)).toHaveLength(3);
     expect(textOf(html)).toContain('33,33 %');
     expect(textOf(html)).toContain('5.000,00 de 15.000,00 BOB');
-    expect(html).toMatch(/role="progressbar"[^>]*aria-label="Progreso de la meta Fondo de emergencia"/);
-    expect(html).toMatch(/aria-valuenow="33"/);
+    // [TC-PLATFORM-TABLES-015] el avance es una medida <meter>, no un progreso.
+    expect(html).toMatch(/<meter[^>]*aria-label="Progreso de la meta Fondo de emergencia"/);
+    expect(html).toMatch(/<meter[^>]*value="33"/);
+    expect(html).not.toContain('role="progressbar"');
     expect(html).toMatch(/aria-valuetext="33,33 % · 5\.000,00 de 15\.000,00 BOB"/);
     // Accesibilidad estructural: leyenda, encabezados de columna y de fila.
     expect(html).toContain('<caption');
@@ -146,7 +148,7 @@ describe('listado de metas', () => {
       />,
     );
     expect(textOf(done)).toContain('104,17 %');
-    expect(done).toMatch(/aria-valuenow="100"/);
+    expect(done).toMatch(/<meter[^>]*value="100"/);
     expect(textOf(done)).toContain('Alcanzada el 01/12/2026');
     expect(textOf(done)).toContain('Alcanzada');
   });
@@ -651,7 +653,7 @@ describe('Home: tarjeta Q9 y aportes a metas', () => {
     const first = html.match(/<li class="pf-home-card" data-testid="home-goal"[\s\S]*?<\/li>/)?.[0] ?? '';
     expect(textOf(first)).toContain('Fondo de emergencia');
     expect(textOf(first)).toContain('33,33 %');
-    expect(first).toMatch(/role="progressbar"[^>]*aria-valuenow="33"/);
+    expect(first).toMatch(/<meter[^>]*value="33"/);
     expect(first).toMatch(/data-testid="home-goal-status"[^>]*><span aria-hidden="true">▼<\/span> Atrasada/);
     expect(textOf(first)).toContain('Requerido: 1.666,67 BOB por mes');
     expect(textOf(first)).toContain('Fecha esperada: 31/07/2027');

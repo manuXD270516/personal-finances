@@ -11,8 +11,8 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { formatDecimal } from '../AuditHistory';
 import { formatSignedDecimal } from '../dashboard/format';
@@ -166,7 +166,7 @@ export function MappingForm({
           )}
         </Field>
       </div>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('compare.sampleRegion')}>
+      <TableRegion label={f.t('compare.sampleRegion')}>
         <table style={tableStyle} data-testid="reference-sample">
           <caption className="pf-sr-only">{f.t('compare.sampleCaption')}</caption>
           <thead>
@@ -190,7 +190,7 @@ export function MappingForm({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       <fieldset style={{ ...cardStyle, margin: 0 }} disabled={busy}>
         <legend>{f.t('compare.mapping')}</legend>
         <p style={{ ...mutedStyle, margin: 0 }}>{f.t('compare.mappingHint')}</p>
@@ -262,7 +262,7 @@ export function ManualRows({
       }}
     >
       <p style={{ ...mutedStyle, margin: 0 }}>{f.t('compare.manualHint')}</p>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('compare.manualRegion')}>
+      <TableRegion label={f.t('compare.manualRegion')}>
         <table style={tableStyle}>
           <caption className="pf-sr-only">{f.t('compare.manualCaption')}</caption>
           <thead>
@@ -327,7 +327,7 @@ export function ManualRows({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       <div style={rowStyle}>
         <button type="button" onClick={onAdd} disabled={busy || rows.length >= 600} data-testid="manual-add">
           {f.t('compare.manualAdd')}
@@ -472,39 +472,43 @@ function RowDetail({ row, f }: { row: ComparedRow; f: FormatContext }) {
         {f.t('compare.table.detail')}
         <span className="pf-sr-only"> {row.n}</span>
       </summary>
-      <table style={{ ...tableStyle, fontSize: '0.875rem' }}>
-        <caption className="pf-sr-only">{f.t('compare.table.detailCaption', { n: row.n })}</caption>
-        <thead>
-          <tr>
-            <th scope="col" style={cellStyle}>
-              {f.t('installments.component')}
-            </th>
-            <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
-              {f.t('compare.table.system')}
-            </th>
-            <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
-              {f.t('compare.table.bank')}
-            </th>
-            <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
-              {f.t('compare.table.diff')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {COMPARED.map((c) => (
-            <tr key={c} data-component={c}>
-              <th scope="row" style={cellStyle}>
-                {f.t(`compare.components.${c}`)}
+      <TableRegion label={f.t('compare.table.detailCaption', { n: row.n })}>
+        <table style={{ ...tableStyle, fontSize: '0.875rem' }}>
+          <caption className="pf-sr-only">{f.t('compare.table.detailCaption', { n: row.n })}</caption>
+          <thead>
+            <tr>
+              <th scope="col" style={cellStyle}>
+                {f.t('installments.component')}
               </th>
-              <td style={numCellStyle}>{row.system ? formatDecimal(row.system[c], f.locale) : '—'}</td>
-              <td style={numCellStyle}>{row.reference ? formatDecimal(row.reference[c], f.locale) : '—'}</td>
-              <td style={{ ...numCellStyle, ...(isDifferent(row.differences?.[c]) ? diffStyle : {}) }}>
-                {row.differences ? formatSignedDecimal(row.differences[c], f.locale) : '—'}
-              </td>
+              <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
+                {f.t('compare.table.system')}
+              </th>
+              <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
+                {f.t('compare.table.bank')}
+              </th>
+              <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
+                {f.t('compare.table.diff')}
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {COMPARED.map((c) => (
+              <tr key={c} data-component={c}>
+                <th scope="row" style={cellStyle}>
+                  {f.t(`compare.components.${c}`)}
+                </th>
+                <td style={numCellStyle}>{row.system ? formatDecimal(row.system[c], f.locale) : '—'}</td>
+                <td style={numCellStyle}>
+                  {row.reference ? formatDecimal(row.reference[c], f.locale) : '—'}
+                </td>
+                <td style={{ ...numCellStyle, ...(isDifferent(row.differences?.[c]) ? diffStyle : {}) }}>
+                  {row.differences ? formatSignedDecimal(row.differences[c], f.locale) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableRegion>
     </details>
   );
 }
@@ -527,7 +531,7 @@ export function ComparisonTable({ f, comparison }: { f: FormatContext; compariso
         />
         {f.t('compare.table.onlyDiff')}
       </label>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('compare.table.region')}>
+      <TableRegion label={f.t('compare.table.region')}>
         <table style={tableStyle} data-testid="comparison-table">
           <caption className="pf-sr-only">{f.t('compare.table.caption')}</caption>
           <thead>
@@ -594,7 +598,7 @@ export function ComparisonTable({ f, comparison }: { f: FormatContext; compariso
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </section>
   );
 }

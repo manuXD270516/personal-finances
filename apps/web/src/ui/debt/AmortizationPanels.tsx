@@ -14,7 +14,7 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import { formatMoney } from '../dashboard/format';
@@ -295,12 +295,7 @@ export function PrepaymentPanel({
               {f.t('prepayment.paysOff')}
             </p>
           ) : (
-            <div
-              style={tableWrapStyle}
-              tabIndex={0}
-              role="region"
-              aria-label={f.t('prepayment.previewTitle')}
-            >
+            <TableRegion label={f.t('prepayment.previewTitle')}>
               <table style={tableStyle}>
                 <caption className="pf-sr-only">{f.t('prepayment.previewCaption')}</caption>
                 <thead>
@@ -343,7 +338,7 @@ export function PrepaymentPanel({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableRegion>
           )}
         </section>
       ) : null}
@@ -487,7 +482,7 @@ export function RateChangePanel({
           aria-label={f.t('rateChange.previewTitle')}
         >
           <h3 style={{ fontSize: '1rem' }}>{f.t('rateChange.previewTitle')}</h3>
-          <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('rateChange.previewTitle')}>
+          <TableRegion label={f.t('rateChange.previewTitle')}>
             <table style={tableStyle}>
               <caption className="pf-sr-only">{f.t('rateChange.previewCaption')}</caption>
               <thead>
@@ -523,7 +518,7 @@ export function RateChangePanel({
                 </tr>
               </tbody>
             </table>
-          </div>
+          </TableRegion>
         </section>
       ) : null}
       <Feedback
@@ -662,7 +657,7 @@ export function CustomSchedulePanel({
         ) : (
           <p style={{ ...mutedStyle, margin: 0 }}>{f.t('custom.noReference')}</p>
         )}
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('custom.gridLabel')}>
+        <TableRegion label={f.t('custom.gridLabel')}>
           <table style={tableStyle} data-testid="custom-grid">
             <caption className="pf-sr-only">{f.t('custom.gridLabel')}</caption>
             <thead>
@@ -725,7 +720,7 @@ export function CustomSchedulePanel({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
         <div style={rowStyle}>
           <button
             type="button"
@@ -787,7 +782,7 @@ export function VersionsSection({
       <h2 id="loan-versions-title" style={{ fontSize: '1.125rem' }}>
         {f.t('versions.title')}
       </h2>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('versions.title')}>
+      <TableRegion label={f.t('versions.title')}>
         <table style={tableStyle}>
           <caption className="pf-sr-only">{f.t('versions.caption')}</caption>
           <thead>
@@ -846,7 +841,7 @@ export function VersionsSection({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       {rates.length > 1 ? (
         <>
           <h3 style={{ fontSize: '1rem' }}>{f.t('versions.ratesTitle')}</h3>

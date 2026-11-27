@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../bff/finance-api-client';
 import { ProblemMessage } from '../errors/ProblemMessage';
 import { useSession } from './session-context';
+import { TableRegion } from './common/ui';
 
 /** `AuditLogEntry` del contrato (`listAuditLog`). */
 export interface AuditLogEntry {
@@ -113,25 +114,27 @@ export function AuditHistoryView({
               </p>
               {e.reason ? <p>{t('reason', { reason: e.reason })}</p> : null}
               {e.changes.length > 0 ? (
-                <table>
-                  <caption>{t('changesCaption')}</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">{t('field')}</th>
-                      <th scope="col">{t('before')}</th>
-                      <th scope="col">{t('after')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {e.changes.map((c) => (
-                      <tr key={c.field} data-field={c.field}>
-                        <th scope="row">{label('fields', c.field)}</th>
-                        <td>{formatValue(c.before, locale, t('none'))}</td>
-                        <td>{formatValue(c.after, locale, t('none'))}</td>
+                <TableRegion label={t('changesCaption')}>
+                  <table>
+                    <caption>{t('changesCaption')}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">{t('field')}</th>
+                        <th scope="col">{t('before')}</th>
+                        <th scope="col">{t('after')}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {e.changes.map((c) => (
+                        <tr key={c.field} data-field={c.field}>
+                          <th scope="row">{label('fields', c.field)}</th>
+                          <td>{formatValue(c.before, locale, t('none'))}</td>
+                          <td>{formatValue(c.after, locale, t('none'))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableRegion>
               ) : null}
             </li>
           ))}

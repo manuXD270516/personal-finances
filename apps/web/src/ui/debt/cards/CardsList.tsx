@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../../bff/finance-api-client';
 import { ProblemMessage } from '../../../errors/ProblemMessage';
-import { cardStyle, cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle } from '../../common/ui';
+import { cardStyle, cellStyle, mutedStyle, numCellStyle, tableStyle, TableRegion } from '../../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../../common/workspace';
 import { formatMoney } from '../../dashboard/format';
 import type { FormatContext } from '../../dashboard/types';
@@ -67,12 +67,7 @@ export function CardSummary({
           />
         </div>
       ) : null}
-      <div
-        style={tableWrapStyle}
-        tabIndex={0}
-        role="region"
-        aria-label={f.t('list.region', { name: card.name })}
-      >
+      <TableRegion label={f.t('list.region', { name: card.name })}>
         <table style={tableStyle} data-testid="card-accounts">
           <caption className="pf-sr-only">{f.t('list.caption', { name: card.name })}</caption>
           <thead>
@@ -161,7 +156,7 @@ export function CardSummary({
             })}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </article>
   );
 }

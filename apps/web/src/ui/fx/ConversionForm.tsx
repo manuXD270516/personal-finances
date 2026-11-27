@@ -428,13 +428,13 @@ function ConversionForm({
           </Field>
         </div>
         {errors['amounts'] ? (
-          <p role="alert" style={{ color: '#cf222e', margin: 0 }}>
+          <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>
             {errors['amounts']}
           </p>
         ) : null}
         <fieldset
           style={{
-            border: '1px solid #d0d7de',
+            border: '1px solid var(--pf-card-border)',
             padding: '0.5rem',
             display: 'grid',
             gap: '0.5rem',

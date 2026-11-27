@@ -5,6 +5,7 @@ import { ActionHint } from '../dashboard/QuestionWidgets';
 import type { FormatContext } from '../dashboard/types';
 import { horizonView, isShort, nearPeriodEnd, subtracted } from './logic';
 import type { Spendable, SpendableCurrencyTerms, SpendableEssentialWarning, SpendableSummary } from './types';
+import { TableRegion } from '../common/ui';
 
 export interface SpendableLinks {
   /** Vista de detalle del disponible. */
@@ -348,7 +349,7 @@ function EssentialsSection({
         </p>
       ) : null}
       {items.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
+        <TableRegion label={t('spendable.essentials.caption')}>
           <table
             data-testid="spendable-essential-items"
             style={{ width: '100%', borderCollapse: 'collapse' }}
@@ -389,7 +390,7 @@ function EssentialsSection({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       ) : null}
       {warnings.length > 0 ? (
         <ul className="pf-home-list" data-testid="spendable-essential-warnings">

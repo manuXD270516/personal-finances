@@ -2,7 +2,7 @@
 
 import { problemMessage } from '../../errors/error-messages';
 import type { Transaction } from '../common/types';
-import { cardStyle, mutedStyle } from '../common/ui';
+import { cardStyle, mutedStyle, TableRegion } from '../common/ui';
 import { useFormat, type WorkspaceContext } from '../common/workspace';
 import { formatDecimal } from '../AuditHistory';
 import type { FormatContext } from '../dashboard/types';
@@ -37,25 +37,27 @@ export function LoanTransactionView({
         {managedMessage}
       </p>
       {tx.loanPaymentBreakdown ? (
-        <table style={{ borderCollapse: 'collapse' }} data-testid="tx-loan-breakdown">
-          <caption className="pf-sr-only">{f.t('transaction.breakdownCaption')}</caption>
-          <tbody>
-            {COMPONENT_KEYS.map((k) => (
-              <tr key={k}>
-                <th
-                  scope="row"
-                  style={{ textAlign: 'left', paddingRight: 'var(--pf-space-4)', fontWeight: 400 }}
-                >
-                  {f.t(`components.${k}`)}
-                </th>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} data-component={k}>
-                  {formatDecimal(tx.loanPaymentBreakdown![k].amount, f.locale)}{' '}
-                  {tx.loanPaymentBreakdown![k].currency}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableRegion label={f.t('transaction.breakdownCaption')}>
+          <table style={{ borderCollapse: 'collapse' }} data-testid="tx-loan-breakdown">
+            <caption className="pf-sr-only">{f.t('transaction.breakdownCaption')}</caption>
+            <tbody>
+              {COMPONENT_KEYS.map((k) => (
+                <tr key={k}>
+                  <th
+                    scope="row"
+                    style={{ textAlign: 'left', paddingRight: 'var(--pf-space-4)', fontWeight: 400 }}
+                  >
+                    {f.t(`components.${k}`)}
+                  </th>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} data-component={k}>
+                    {formatDecimal(tx.loanPaymentBreakdown![k].amount, f.locale)}{' '}
+                    {tx.loanPaymentBreakdown![k].currency}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableRegion>
       ) : null}
     </section>
   );

@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "csp", "security"]
@@ -28,7 +29,7 @@ expected_result:
   - "0 eventos securitypolicyviolation"
   - "ningún <script> ni <style> en línea sin nonce en el HTML crudo"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-010 — El tema oscuro no produce violaciones de la CSP

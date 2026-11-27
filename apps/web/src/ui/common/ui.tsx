@@ -50,19 +50,97 @@ export const errorStyle: CSSProperties = {
   fontSize: 'var(--pf-text-sm)',
   margin: 0,
 };
-export const tableWrapStyle: CSSProperties = {
-  // Contenedor de posicionamiento: el `<caption>` accesible (`pf-sr-only`, absoluto) no debe ensanchar la página.
-  position: 'relative',
-  overflowX: 'auto',
-  maxWidth: '100%',
-  background: 'var(--pf-surface-raised)',
-  border: '1px solid var(--pf-border)',
-  borderRadius: 'var(--pf-radius-md)',
+/**
+ * Región de una tabla de datos (refine-data-tables, M-16): nombre accesible, foco con el teclado (`tabIndex={0}`
+ * siempre, porque axe exige el foco solo si hay desbordamiento y medirlo cuesta un `ResizeObserver` por tabla) y
+ * desplazamiento propio. Con `tall` (tablas de mucho volumen) suma un alto máximo y la cabecera fija: un
+ * `overflow-x: auto` sin alto no fija nada. Los estilos viven en `.pf-table-wrap` de `app/globals.css`.
+ * El nombre es el título de la tabla: `label` con el mismo texto del `<caption>`, o `labelledBy` con su `id`.
+ */
+export type TableRegionProps = {
+  readonly tall?: boolean;
+  /** Solo para lectores de pantalla (la tabla es la alternativa accesible de un gráfico): sin foco ni borde. */
+  readonly srOnly?: boolean;
+  readonly testId?: string;
+  readonly children: ReactNode;
+} & (
+  | { readonly label: string; readonly labelledBy?: undefined }
+  | { readonly labelledBy: string; readonly label?: undefined }
+);
+export function TableRegion({ label, labelledBy, tall, srOnly, testId, children }: TableRegionProps) {
+  // Un envoltorio recortado no puede recibir el foco de forma visible: conserva la tabla para los lectores de pantalla.
+  if (srOnly) {
+    return (
+      <div className="pf-home-sr" {...(testId ? { 'data-testid': testId } : {})}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div
+      role="region"
+      tabIndex={0}
+      {...(label !== undefined ? { 'aria-label': label } : { 'aria-labelledby': labelledBy })}
+      className={tall ? 'pf-table-wrap pf-table-wrap--tall' : 'pf-table-wrap'}
+      {...(testId ? { 'data-testid': testId } : {})}
+    >
+      {children}
+    </div>
+  );
+}
+/**
+ * Medida de 0 a 100 (utilización de una tarjeta, avance de una meta): `<meter>` nativo con nombre, valor y texto
+ * (refine-data-tables, M-10). No es el progreso de un proceso (eso es `<progress>`). `low`, `high` y `optimum`
+ * dicen al navegador qué zona es buena; el color visible lo fija `color` y solo refuerza: el texto y el icono
+ * del contexto dicen lo mismo.
+ */
+export function Meter({
+  value,
+  label,
+  valueText,
+  color,
+  low,
+  high,
+  optimum,
+  testId,
+}: {
+  value: number;
+  label: string;
+  valueText: string;
+  color: string;
+  low?: number;
+  high?: number;
+  optimum?: number;
+  testId?: string;
+}) {
+  return (
+    <meter
+      className="pf-meter"
+      min={0}
+      max={100}
+      value={value}
+      {...(low !== undefined ? { low } : {})}
+      {...(high !== undefined ? { high } : {})}
+      {...(optimum !== undefined ? { optimum } : {})}
+      aria-label={label}
+      aria-valuetext={valueText}
+      style={{ '--pf-meter-fill': color } as CSSProperties}
+      {...(testId ? { 'data-testid': testId } : {})}
+    >
+      {valueText}
+    </meter>
+  );
+}
+// Modelo de bordes `separate`: con `collapse` el borde de una celda fija se pierde al desplazar en Chromium.
+export const tableStyle: CSSProperties = {
+  width: '100%',
+  borderCollapse: 'separate',
+  borderSpacing: 0,
+  fontSize: '0.9375rem',
 };
-export const tableStyle: CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9375rem' };
 export const cellStyle: CSSProperties = {
   padding: 'var(--pf-space-2) var(--pf-space-3)',
-  borderBottom: '1px solid var(--pf-border)',
+  borderBlockEnd: '1px solid var(--pf-border)',
   textAlign: 'left',
   verticalAlign: 'top',
 };

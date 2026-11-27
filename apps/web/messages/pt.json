@@ -120,6 +120,13 @@
       "displayNameRequired": "Informe um nome de exibição.",
       "displayNameTooLong": "O nome admite até 100 caracteres.",
       "timezoneInvalid": "Não é um fuso horário IANA válido (por exemplo America/La_Paz)."
+    },
+    "theme": {
+      "legend": "Tema",
+      "hint": "“Sistema” segue o modo claro ou escuro do seu dispositivo.",
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Escuro"
     }
   },
   "Auth": {
@@ -2267,7 +2274,16 @@
     "suggest": {
       "open": "Sugerir a partir do histórico"
     },
-    "historyRegion": "Histórico de alterações do plano"
+    "historyRegion": "Histórico de alterações do plano",
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "do menor para o maior",
+      "descending": "do maior para o menor",
+      "textAscending": "de A a Z",
+      "textDescending": "de Z a A",
+      "dateAscending": "da mais antiga para a mais recente",
+      "dateDescending": "da mais recente para a mais antiga"
+    }
   },
   "Templates": {
     "title": "Templates de orçamento",
@@ -3468,6 +3484,15 @@
       "statementSave": "Salvar valor do extrato",
       "statementSaved": "O valor do extrato foi salvo.",
       "truncated": "Mostrando as primeiras {limit} cobranças."
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "do menor para o maior",
+      "descending": "do maior para o menor",
+      "textAscending": "de A a Z",
+      "textDescending": "de Z a A",
+      "dateAscending": "da mais antiga para a mais recente",
+      "dateDescending": "da mais recente para a mais antiga"
     }
   },
   "AuditLog": {
@@ -6815,6 +6840,15 @@
         "TAG": "uma etiqueta",
         "COUNTERPARTY": "uma contraparte"
       }
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "do menor para o maior",
+      "descending": "do maior para o menor",
+      "textAscending": "de A a Z",
+      "textDescending": "de Z a A",
+      "dateAscending": "da mais antiga para a mais recente",
+      "dateDescending": "da mais recente para a mais antiga"
     }
   },
   "ImportConnections": {

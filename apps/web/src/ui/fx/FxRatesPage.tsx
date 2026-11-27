@@ -21,7 +21,7 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { Tabs } from '../common/Tabs';
@@ -403,7 +403,7 @@ function RatePairSection({
           )}
         </Field>
       </div>
-      <div style={tableWrapStyle}>
+      <TableRegion labelledBy={id}>
         <table style={tableStyle}>
           <thead>
             <tr>
@@ -509,7 +509,7 @@ function RatePairSection({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       {correcting ? (
         <form
           style={{ ...rowStyle, marginTop: '0.5rem' }}

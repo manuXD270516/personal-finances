@@ -12,9 +12,10 @@ invariants: []
 priority: low
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "print"]
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - "el fondo calculado de body es claro y el texto oscuro"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-021 — La impresión sale en claro aunque el tema sea oscuro

@@ -120,6 +120,13 @@
       "displayNameRequired": "Ingresa un nombre visible.",
       "displayNameTooLong": "El nombre admite hasta 100 caracteres.",
       "timezoneInvalid": "No es una zona horaria IANA válida (por ejemplo America/La_Paz)."
+    },
+    "theme": {
+      "legend": "Tema",
+      "hint": "«Sistema» sigue el modo claro u oscuro de tu dispositivo.",
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Oscuro"
     }
   },
   "Auth": {
@@ -2267,7 +2274,16 @@
     "suggest": {
       "open": "Sugerir desde el historial"
     },
-    "historyRegion": "Historial de cambios del plan"
+    "historyRegion": "Historial de cambios del plan",
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "de menor a mayor",
+      "descending": "de mayor a menor",
+      "textAscending": "de la A a la Z",
+      "textDescending": "de la Z a la A",
+      "dateAscending": "de la más antigua a la más reciente",
+      "dateDescending": "de la más reciente a la más antigua"
+    }
   },
   "Templates": {
     "title": "Templates de presupuesto",
@@ -3468,6 +3484,15 @@
       "statementSave": "Guardar monto del extracto",
       "statementSaved": "Se guardó el monto del extracto.",
       "truncated": "Se muestran los primeros {limit} cargos."
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "de menor a mayor",
+      "descending": "de mayor a menor",
+      "textAscending": "de la A a la Z",
+      "textDescending": "de la Z a la A",
+      "dateAscending": "de la más antigua a la más reciente",
+      "dateDescending": "de la más reciente a la más antigua"
     }
   },
   "AuditLog": {
@@ -6815,6 +6840,15 @@
         "TAG": "una etiqueta",
         "COUNTERPARTY": "una contraparte"
       }
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "de menor a mayor",
+      "descending": "de mayor a menor",
+      "textAscending": "de la A a la Z",
+      "textDescending": "de la Z a la A",
+      "dateAscending": "de la más antigua a la más reciente",
+      "dateDescending": "de la más reciente a la más antigua"
     }
   },
   "ImportConnections": {

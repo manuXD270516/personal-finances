@@ -140,9 +140,9 @@ export function LifecycleReport({
             data-order={row.order ?? ''}
             data-derived={String(row.derived)}
             style={{
-              borderLeft: `3px solid ${row.kind === 'TRANSITION' ? '#0969da' : '#d0d7de'}`,
+              borderLeft: `3px solid ${row.kind === 'TRANSITION' ? 'var(--pf-chart-on)' : 'var(--pf-card-border)'}`,
               paddingLeft: '0.75rem',
-              ...(row.kind === 'ANNOTATION' ? { color: '#57606a' } : {}),
+              ...(row.kind === 'ANNOTATION' ? { color: 'var(--pf-fg-muted)' } : {}),
             }}
           >
             <p style={{ margin: 0 }}>

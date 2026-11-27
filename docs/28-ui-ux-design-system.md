@@ -253,7 +253,7 @@ Pasos: 1 Archivo → 2 Mapeo de columnas (solo si no hay perfil; vista previa de
 
 ## 5. Design tokens
 
-Definidos como CSS variables propias `--pf-*` en `app/globals.css` (D506), con valores light (el tema oscuro es del lote L3). Los nombres son **semánticos**; los valores concretos se ajustan en implementación verificando contraste.
+Definidos como CSS variables propias `--pf-*` en `app/globals.css` (D506), con valores claros y oscuros (as-built de `add-dark-theme`, §9). Los nombres son **semánticos**; los valores concretos se ajustan en implementación verificando contraste.
 
 ### 5.1 Color base
 
@@ -378,10 +378,17 @@ Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrec
 
 ## 9. Dark mode
 
-- Tema `system` (default), `light`, `dark`; persistido por usuario.
-- Tokens con valores dark propios (no inversión automática); semánticos financieros reajustados para contraste ≥ 4.5:1 en texto sobre `--surface` oscuro.
-- Gráficos con tema dark dedicado; patrones decal visibles en ambos.
-- Imágenes/adjuntos con fondo neutro; no se invierte el color de documentos.
+As-built de `add-dark-theme` (lote L3 de [docs/78](78-propuesta-mejora-ui-ux-modern-web.md); D500 y D501 de [docs/79](79-ui-ux-modern-web-decisions.md)):
+
+- **Qué sigue qué.** El tema sigue al sistema (`prefers-color-scheme`). La preferencia propia (`system` | `light` | `dark`) se elige en **Mis preferencias** y vive en `preferences.theme` de `/me` (sin cambio de contrato; ausencia = `system`). **No hay interruptor de tema en la barra superior** (D501). `PATCH /me` solo incluye `preferences.theme` si el valor cambió: cada `PATCH` sube la versión del perfil y genera auditoría.
+- **Tokens.** Los claros viven en `:root` de `app/globals.css`; los oscuros, en dos bloques de valores idénticos (`@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) }` y `:root[data-theme='dark']`), no con `light-dark()` (Newly, D500). `:root` declara `color-scheme: light dark`, y `[data-theme]` lo fija a un esquema. Valores propios (no inversión automática): los de § 5.1 más los que fijó el test de contraste (`--pf-surface-sunken` `#202a3a`, `--pf-border-strong` `#475569`, `--pf-primary-hover` `#93c5fd`, `--pf-primary-soft` `#172a4d`, `--pf-fin-expense` `#e2e8f0`, `--pf-fin-transfer` y `--pf-fin-neutral` `#94a3b8`, `--pf-warning-*`). Sombras casi nulas: la elevación se expresa con la diferencia de superficie.
+- **Tokens nuevos.** `--pf-track`, `--pf-card-border`, `--pf-warning-accent`, `--pf-fin-expense-soft` (el gasto atenuado del Home, que conserva su `#334155` claro hasta que el owner responda la pregunta 1 de [docs/82](82-ui-lotes-l3-l5-questions.md)) y los del diagrama de recorrido (`--pf-chart-on`, `--pf-chart-on-strong`, `--pf-chart-on-fg`, `--pf-chart-off`, `--pf-chart-visited`, aplicados con clases `.pf-lc-*`). El bloque de 13 tokens de `.pf-home` se eliminó.
+- **Sin colores literales fuera de la hoja de tokens.** `src/ui/common/colors.test.ts` falla ante cualquier hexadecimal, `rgb()` o `hsl()` fuera de `app/globals.css` (excepción marcada: el color inicial de una categoría, que es un dato del usuario).
+- **Primera pintura sin destello y sin scripts en línea** (la CSP por nonce no cambia). Una cookie espejo `pfos_theme` (`light` | `dark`; sin cookie = sistema; sin `HttpOnly`; `Path=/; SameSite=Lax; Max-Age=31536000`; `Secure` en HTTPS) la escribe el cliente al guardar, el BFF en el callback de login (lee `preferences.theme` del mismo `GET /me` del aprovisionamiento) y `SessionProvider` al reconciliar si otro dispositivo cambió el tema (un solo documento con destello). El layout raíz la lee con `cookies()` y pone `<html data-theme>`; `generateViewport` emite `color-scheme` y `theme-color` (uno por esquema con «Sistema», uno solo con tema propio). Los valores de `theme-color` salen de `THEME_COLOR` (`src/ui/common/theme.ts`), que `contrast.test.ts` compara con `--pf-bg`.
+- **Contraste medido.** `src/ui/common/contrast.test.ts` mide los pares de texto, controles, foco y gráficos en los dos esquemas (≥ 4.5:1 texto, ≥ 3:1 controles, foco y series) y exige que los dos bloques oscuros coincidan; `a11y.spec.ts` repasa las pantallas principales en oscuro con axe.
+- **Impresión** siempre en claro (`@media print` con los tokens claros).
+- Gráficos y diagramas usan solo tokens; patrones y texto acompañan al color en ambos temas. Imágenes y adjuntos con fondo neutro; no se invierte el color de documentos.
+- Fuera de alcance: el tema del inicio de sesión de Keycloak (pregunta 3 de docs/82) y las barras de desplazamiento personalizadas.
 
 ## 10. Accesibilidad — WCAG 2.2 AA
 
@@ -407,7 +414,7 @@ Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrec
 
 - Breakpoints de la hoja propia: `640 · 768 · 1024` px. Diseño base para 360–414 px.
 - Mobile prioriza: quick add, saldo disponible, próximos pagos, lista de transacciones con swipe (categorizar / anular con confirmación).
-- Tablas → listas de tarjetas en móvil; reportes muestran KPI + gráfico simplificado + "ver tabla".
+- Tablas: se desplazan a lo ancho dentro de su región con nombre y foco (`TableRegion`), sin vista apilada (as-built de refine-data-tables: `display: block` en `table`/`tr`/`td` quita los roles de tabla); cabecera fija en las tablas largas (alto máximo propio), columna de identificación fija en la vista previa del import y el cronograma, orden por columna en las tablas comparativas y medidas con `<meter>`. Reportes muestran KPI + gráfico simplificado + "ver tabla".
 - Quick add como **sheet** inferior con teclado numérico (`inputmode="decimal"`), monto autoenfocado.
 - PWA (instalable, ícono, splash) como Could en Phase 2+; offline queue futuro.
 

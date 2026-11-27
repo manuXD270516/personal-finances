@@ -98,12 +98,35 @@ describe('lógica de configuración del workspace (FR-IDENTITY-005)', () => {
 });
 
 describe('lógica de preferencias personales (FR-IDENTITY-003)', () => {
-  const me = { displayName: 'Owner Demo', locale: 'es-BO', timezone: 'America/La_Paz' };
+  const me = {
+    displayName: 'Owner Demo',
+    locale: 'es-BO',
+    timezone: 'America/La_Paz',
+    theme: 'system',
+  } as const;
 
   it('locale en-US y zona America/Sao_Paulo (escenario "Actualización de locale y zona horaria")', () => {
     expect(buildPreferencesPatch(me, { ...me, locale: 'en-US', timezone: 'America/Sao_Paulo' })).toEqual({
       ok: true,
       patch: { locale: 'en-US', timezone: 'America/Sao_Paulo' },
+    });
+  });
+
+  it('[TC-PLATFORM-THEME-008] guardar solo la zona horaria no escribe el tema (cada PATCH sube la versión y audita)', () => {
+    const light = { ...me, theme: 'light' } as const;
+    const built = buildPreferencesPatch(light, { ...light, timezone: 'America/Sao_Paulo' });
+    expect(built).toEqual({ ok: true, patch: { timezone: 'America/Sao_Paulo' } });
+    expect(buildPreferencesPatch(light, light)).toEqual({ ok: true, patch: {} });
+  });
+
+  it('[TC-PLATFORM-THEME-004] cambiar el tema lo manda dentro de preferences y solo eso', () => {
+    expect(buildPreferencesPatch(me, { ...me, theme: 'dark' })).toEqual({
+      ok: true,
+      patch: { preferences: { theme: 'dark' } },
+    });
+    expect(buildPreferencesPatch({ ...me, theme: 'dark' }, { ...me, theme: 'system' })).toEqual({
+      ok: true,
+      patch: { preferences: { theme: 'system' } },
     });
   });
 
@@ -216,12 +239,19 @@ describe('WorkspaceSettingsView', () => {
   });
 });
 
+/** Radios del grupo de tema en el marcado estático (el orden de los atributos lo decide React). */
+const themeRadios = (html: string) =>
+  [...html.matchAll(/<input\b[^>]*name="theme"[^>]*>/g)].map((m) => ({
+    value: /value="(\w+)"/.exec(m[0])?.[1],
+    checked: /\bchecked\b/.test(m[0]),
+  }));
+
 describe('PreferencesView', () => {
   const props = {
     t: prefs,
     localeName,
     uiLocale: 'es',
-    form: { displayName: 'Owner Demo', locale: 'es-BO', timezone: 'America/La_Paz' },
+    form: { displayName: 'Owner Demo', locale: 'es-BO', timezone: 'America/La_Paz', theme: 'system' },
     errors: {},
     busy: false,
     notice: undefined,
@@ -237,6 +267,28 @@ describe('PreferencesView', () => {
     expect(html).toContain('<option value="en-US">English (United States)</option>');
     expect(html).toContain('<option value="pt-BR">Português (Brasil)</option>');
     expect(textOf(html)).toContain('La pantalla cambia de idioma al guardar.');
+  });
+
+  it('[TC-PLATFORM-THEME-004] el tema es un grupo de 3 radios con leyenda y «Sistema» por omisión', () => {
+    const html = renderToStaticMarkup(<PreferencesView {...props} />);
+    expect(html).toMatch(/<fieldset[^>]*data-testid="theme-group"[^>]*><legend>Tema<\/legend>/);
+    const radios = themeRadios(html);
+    expect(radios.map((r) => r.value)).toEqual(['system', 'light', 'dark']);
+    expect(radios.filter((r) => r.checked).map((r) => r.value)).toEqual(['system']);
+    expect(textOf(html)).toContain('Sistema');
+    expect(textOf(html)).toContain('Claro');
+    expect(textOf(html)).toContain('Oscuro');
+  });
+
+  it('[TC-PLATFORM-THEME-007] con «Claro» elegido, el radio marcado es «light»', () => {
+    const html = renderToStaticMarkup(
+      <PreferencesView {...props} form={{ ...props.form, theme: 'light' }} />,
+    );
+    expect(
+      themeRadios(html)
+        .filter((r) => r.checked)
+        .map((r) => r.value),
+    ).toEqual(['light']);
   });
 
   it('un locale fuera de la lista sugerida se conserva como opción', () => {

@@ -17,7 +17,7 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -736,7 +736,7 @@ function VersionsTable({
   return (
     <section aria-labelledby="versions-title" style={{ display: 'grid', gap: 'var(--pf-space-2)' }}>
       <h2 id="versions-title">{f.t('detail.versions')}</h2>
-      <div style={tableWrapStyle}>
+      <TableRegion label={f.t('detail.versionsCaption')}>
         <table style={tableStyle} data-testid="versions-table">
           <caption className="pf-sr-only">{f.t('detail.versionsCaption')}</caption>
           <thead>
@@ -777,7 +777,7 @@ function VersionsTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </section>
   );
 }

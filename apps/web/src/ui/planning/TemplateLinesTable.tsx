@@ -1,5 +1,5 @@
 import { formatDecimal } from '../AuditHistory';
-import { cellStyle, mutedStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, tableStyle, TableRegion } from '../common/ui';
 import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { targetName, type TargetNames } from './BudgetLinesTable';
@@ -62,7 +62,7 @@ export function TemplateLinesTable({
   }
   const editable = Boolean(onEdit || onRemove);
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={caption}>
       <table style={tableStyle} data-testid="template-lines">
         <caption style={{ textAlign: 'left' }}>{caption}</caption>
         <thead>
@@ -137,6 +137,6 @@ export function TemplateLinesTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

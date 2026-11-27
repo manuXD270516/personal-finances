@@ -272,7 +272,10 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
     // Hoja estática (la CSP no admite <style> en línea sin nonce; [TC-SECURITY-CSP-006]).
     expect(html).not.toContain('<style');
     const css = readFileSync(new URL('./home.css', import.meta.url), 'utf8');
-    expect(css).toMatch(/--pf-fin-warning:\s*#b45309/i);
+    // Los tokens viven en la hoja global; `.pf-home` ya no los redeclara (add-dark-theme, [TC-PLATFORM-THEME-018]).
+    expect(css).not.toMatch(/--pf-fin-warning\s*:/);
+    const globals = readFileSync(new URL('../../../app/globals.css', import.meta.url), 'utf8');
+    expect(globals).toMatch(/--pf-fin-warning:\s*#b45309/i);
     expect(css).toMatch(/@media \(min-width:\s*768px\)/);
     expect(css).toContain('prefers-reduced-motion');
   });

@@ -1,12 +1,23 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   FinanceApiError,
   createFinanceApiClient,
   type ApiProblemBody,
   type FinanceApiClient,
 } from '../bff/finance-api-client';
+import { themeCookieValue, themeFromMeBody } from './common/theme';
+import { applyThemePreference, readThemeCookie } from './common/theme-client';
 
 export type Role = 'OWNER' | 'EDITOR' | 'VIEWER';
 
@@ -27,6 +38,8 @@ export interface Me {
   readonly memberships: readonly Membership[];
   /** Funciones habilitadas por entorno (p. ej. carga de datos de demostración). */
   readonly features?: { readonly demoData?: boolean };
+  /** Preferencias libres de la interfaz (`preferences.theme`: `system` | `light` | `dark`). */
+  readonly preferences?: Readonly<Record<string, unknown>>;
   readonly version: number;
 }
 
@@ -73,6 +86,7 @@ async function readSession(): Promise<SessionInfo | null> {
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({ status: 'loading' });
+  const themeReconciled = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +100,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         headers: () => ({ 'x-csrf-token': info.csrfToken }),
       });
       const me = (await api.get<Me>('/me')).data!;
+      // Reconciliación del tema (decisión 6): si otro dispositivo lo cambió, la cookie espejo queda atrás; se corrige
+      // una sola vez por documento (el único caso con un destello) y el siguiente HTML ya sale con el tema correcto.
+      if (!themeReconciled.current) {
+        themeReconciled.current = true;
+        const profileTheme = themeFromMeBody(me);
+        if (themeCookieValue(profileTheme) !== readThemeCookie()) applyThemePreference(profileTheme);
+      }
       const active =
         me.memberships.find((m) => m.workspaceId === info.activeWorkspaceId) ?? me.memberships[0];
       setState({ status: 'ready', csrfToken: info.csrfToken, me, api, active });

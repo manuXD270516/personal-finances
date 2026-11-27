@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "dark-mode"]
@@ -30,7 +31,7 @@ expected_result:
   - "color-scheme calculado de html incluye dark (controles nativos en oscuro)"
   - "captura a 360 px y a 1280 px adjuntada al informe"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-001 — Sin preferencia guardada, Inicio sigue al sistema en oscuro

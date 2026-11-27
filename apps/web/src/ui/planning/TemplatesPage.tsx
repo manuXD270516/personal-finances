@@ -16,7 +16,7 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatInstant } from '../dashboard/format';
@@ -71,7 +71,7 @@ function DiffTable({
 }) {
   if (rows.length === 0) return <p style={mutedStyle}>{f.t('compare.none')}</p>;
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={title}>
       <table style={tableStyle} data-testid="version-diff">
         <caption style={{ textAlign: 'left' }}>{title}</caption>
         <thead>
@@ -105,7 +105,7 @@ function DiffTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -365,7 +365,7 @@ function Templates({ ctx }: { ctx: WorkspaceContext }) {
               {f.t('empty')}
             </p>
           ) : (
-            <div style={tableWrapStyle}>
+            <TableRegion label={f.t('list.caption')}>
               <table style={tableStyle} data-testid="templates-list">
                 <caption style={{ textAlign: 'left' }}>{f.t('list.caption')}</caption>
                 <thead>
@@ -416,7 +416,7 @@ function Templates({ ctx }: { ctx: WorkspaceContext }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableRegion>
           )}
 
           {canWrite ? (
@@ -671,7 +671,7 @@ function Templates({ ctx }: { ctx: WorkspaceContext }) {
                 />
               ) : null}
 
-              <div style={tableWrapStyle}>
+              <TableRegion label={f.t('versions.caption')}>
                 <table style={tableStyle} data-testid="template-versions">
                   <caption style={{ textAlign: 'left' }}>{f.t('versions.caption')}</caption>
                   <thead>
@@ -709,7 +709,7 @@ function Templates({ ctx }: { ctx: WorkspaceContext }) {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableRegion>
 
               {detail.versions.length > 1 ? (
                 <div style={{ ...cardStyle, display: 'grid', gap: 'var(--pf-space-2)' }}>
