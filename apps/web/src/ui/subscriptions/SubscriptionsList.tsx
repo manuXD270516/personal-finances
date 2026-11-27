@@ -1,4 +1,4 @@
-import { cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, numCellStyle, tableStyle, TableRegion } from '../common/ui';
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { MoneyText, SubscriptionStatusBadge, cycleSummary } from './Badges';
@@ -25,7 +25,7 @@ export function SubscriptionsList({
       </p>
     );
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={f.t('list.caption')}>
       <table style={tableStyle} data-testid="subscriptions-table">
         <caption className="pf-sr-only">{f.t('list.caption')}</caption>
         <thead>
@@ -105,6 +105,6 @@ export function SubscriptionsList({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

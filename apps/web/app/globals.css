@@ -397,7 +397,9 @@ body {
 
 /* Tablas: cabecera sutil, filas separadas, montos tabulares (docs/28 §5.3). */
 :where(table) {
-  border-collapse: collapse;
+  /* `separate`: con `collapse` el borde de una celda fija se pierde al desplazar (refine-data-tables, decisión 3). */
+  border-collapse: separate;
+  border-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 :where(th) {
@@ -413,6 +415,178 @@ body {
   text-align: left;
   font-weight: 600;
   padding-bottom: var(--pf-space-2);
+}
+
+/* ---------- Regiones de tabla (refine-data-tables, M-16/M-17) ---------- */
+
+/* Región con nombre y foco (`TableRegion`): desplaza a lo ancho dentro de sí misma, nunca la página. */
+.pf-table-wrap {
+  /* Contenedor de posicionamiento: el `<caption>` accesible (`pf-sr-only`, absoluto) no debe ensanchar la página. */
+  position: relative;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  background: var(--pf-surface-raised);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-md);
+}
+/* Tablas de mucho volumen: alto máximo propio; solo así `position: sticky` fija la cabecera. */
+.pf-table-wrap--tall {
+  max-block-size: min(32rem, 70dvh);
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+}
+.pf-table-wrap--tall > table > thead > tr > th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  /* Opaco: las filas no se ven a través de la cabecera. */
+  background: var(--pf-surface);
+}
+/* Columna de identificación fija (fecha o número de cuota): la primera celda de cada fila es `th scope="row"`. */
+.pf-table--idcol > tbody > tr > th[scope='row'] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--pf-surface-raised);
+  color: var(--pf-fg);
+  font-weight: 500;
+  font-size: inherit;
+  white-space: nowrap;
+}
+.pf-table--idcol > thead > tr > th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  /* Por encima de la columna fija y de la cabecera fija. */
+  z-index: 2;
+}
+
+/* Pista de que hay más columnas a la derecha (mejora progresiva): un degradado en el borde final que se retira al
+   llegar al último. La máscara solo cambia la opacidad, no mueve nada: vale también con movimiento reducido. Sin
+   soporte de `animation-timeline` no hay pista y queda la barra de desplazamiento, que no se oculta. */
+@property --pf-fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+/* La animación está ligada al desplazamiento del usuario y solo cambia la opacidad de la máscara: no mueve nada, así
+   que corre con cualquier preferencia de movimiento (la consulta cubre ambas y la declara ante styles.test.ts). */
+@media (prefers-reduced-motion: no-preference), (prefers-reduced-motion: reduce) {
+  @supports (animation-timeline: scroll()) {
+    .pf-table-wrap {
+      --pf-fade-size: 2.5rem;
+      --pf-fade-dir: right;
+      --pf-fade-end-pos: 100%;
+      mask:
+        linear-gradient(black, black) no-clip subtract,
+        linear-gradient(to var(--pf-fade-dir), transparent, black) var(--pf-fade-end-pos) 0 /
+          var(--pf-fade-end) 100% no-repeat no-clip;
+      animation: pf-hide-fade-end linear both;
+      animation-timeline: scroll(self inline);
+      animation-range: calc(100% - var(--pf-fade-size)) 100%;
+    }
+    .pf-table-wrap:dir(rtl) {
+      --pf-fade-dir: left;
+      --pf-fade-end-pos: 0;
+    }
+    @keyframes pf-hide-fade-end {
+      from {
+        --pf-fade-end: var(--pf-fade-size);
+      }
+    }
+  }
+}
+
+/* Detalle de un préstamo (refine-data-tables, 5.8): una columna que puede encogerse (`minmax(0, 1fr)`) y tarjetas con
+   `min-inline-size: 0`; con la columna `auto` el cronograma ancho ensanchaba todas las tarjetas y la página. */
+.pf-loan-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--pf-space-4);
+}
+.pf-loan-detail > * {
+  min-inline-size: 0;
+}
+.pf-loan-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-2) var(--pf-space-6);
+  margin: 0;
+}
+.pf-loan-figures--tight {
+  gap: var(--pf-space-1) var(--pf-space-4);
+}
+.pf-loan-figures > div {
+  min-inline-size: 0;
+}
+.pf-loan-figures dd {
+  overflow-wrap: anywhere;
+}
+
+/* Medidas (`Meter`): utilización de una tarjeta y avance de una meta. El relleno toma `--pf-meter-fill`. */
+.pf-meter {
+  appearance: none;
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 6rem;
+  block-size: 0.625rem;
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius-full);
+  background: var(--pf-surface-sunken);
+  overflow: hidden;
+}
+.pf-meter::-webkit-meter-bar {
+  block-size: 100%;
+  border: 0;
+  background: var(--pf-surface-sunken);
+}
+.pf-meter::-webkit-meter-optimum-value {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+.pf-meter::-webkit-meter-suboptimum-value {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+.pf-meter::-webkit-meter-even-less-good-value {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+.pf-meter::-moz-meter-bar {
+  background: var(--pf-meter-fill, var(--pf-primary));
+}
+
+/* Cabecera clicable de las tablas con orden por columna (`SortableHeader`). */
+.pf-table th:has(> .pf-sort-btn) {
+  padding: 0;
+}
+.pf-sort-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-space-1);
+  inline-size: 100%;
+  min-block-size: 2.75rem;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  justify-content: inherit;
+  cursor: pointer;
+}
+:where(.pf-sort-btn:hover:not(:disabled)) {
+  background: var(--pf-surface-sunken);
+}
+.pf-sort-icon {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  flex: none;
+  opacity: 0.35;
+}
+th[aria-sort] .pf-sort-icon {
+  opacity: 1;
+}
+th[aria-sort='descending'] .pf-sort-icon {
+  transform: rotate(180deg);
 }
 
 :where(hr) {
@@ -1149,4 +1323,36 @@ html {
 }
 .pf-lc-node-text--off {
   fill: var(--pf-fg-muted);
+}
+
+/* Impresión de tablas (refine-data-tables): completas, sin alto máximo ni desplazamiento propio, con la cabecera
+   repetida en cada página. La barra inferior y la lateral no se imprimen. */
+@media print {
+  .pf-table-wrap,
+  .pf-table-wrap--tall {
+    max-block-size: none;
+    overflow: visible;
+    mask: none;
+    animation: none;
+  }
+  .pf-table-wrap--tall > table > thead > tr > th,
+  .pf-table--idcol > tbody > tr > th[scope='row'],
+  .pf-table--idcol > thead > tr > th:first-child {
+    position: static;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  .pf-sort-icon {
+    display: none;
+  }
+  /* Navegación del marco: no se imprime (sin la barra inferior, que llega con el change 80). */
+  .pf-topbar,
+  .pf-sidenav,
+  .pf-skip {
+    display: none;
+  }
 }

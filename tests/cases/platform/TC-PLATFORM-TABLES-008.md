@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/data-tables.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["tables", "mobile", "a11y"]
@@ -51,3 +52,4 @@ Entonces el árbol de accesibilidad tiene table con columnheader y row
 ## Notas
 
 - Change `refine-data-tables` (lote L5, docs/78; decisiones en docs/79). Lo implementa el agente `frontend` (D512). Datos ficticios; ningún dato real del owner.
+- Nota de implementación: a la fecha, Transacciones es una lista (`ul`), no una tabla. La verificación E2E de esta semántica se hace sobre el cronograma de un préstamo a 360 px (`data-tables.spec.ts`); convertir la lista de Transacciones a tabla queda como pregunta al owner.

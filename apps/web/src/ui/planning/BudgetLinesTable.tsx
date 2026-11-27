@@ -1,4 +1,6 @@
-import { cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle, warningStyle } from '../common/ui';
+import { SortableHeader, SortStatus, useTableSort } from '../common/SortableHeader';
+import { sortRows, type SortKind } from '../common/sort';
+import { cellStyle, mutedStyle, numCellStyle, tableStyle, warningStyle, TableRegion } from '../common/ui';
 import { formatMoney, formatSignedMoney } from '../dashboard/format';
 import { formatDecimal } from '../AuditHistory';
 import type { FormatContext } from '../dashboard/types';
@@ -21,6 +23,14 @@ export interface TargetNames {
   readonly GROUP: ReadonlyMap<string, string>;
   readonly TAG: ReadonlyMap<string, string>;
 }
+
+type LineSortKey = 'target' | 'planned' | 'actual' | 'remaining';
+const LINE_SORT_KINDS: Readonly<Record<LineSortKey, SortKind>> = {
+  target: 'text',
+  planned: 'decimal',
+  actual: 'decimal',
+  remaining: 'decimal',
+};
 
 export const targetName = (names: TargetNames, kind: BudgetTargetKind, id: string): string =>
   names[kind].get(id) ?? id;
@@ -134,6 +144,7 @@ export function BudgetLinesTable({
   /** Formato del namespace `BudgetRisk` (textos del indicador). */
   riskFormat?: FormatContext | undefined;
 }) {
+  const sorter = useTableSort<LineSortKey>(f);
   const withRisk = risk !== undefined && riskFormat !== undefined;
   if (budget.lines.length === 0) {
     return (
@@ -143,210 +154,236 @@ export function BudgetLinesTable({
     );
   }
   const editable = canEdit && budget.periodStatus !== 'CLOSED';
+  const lines = sorter.sort
+    ? sortRows(
+        budget.lines,
+        (line) => {
+          switch (sorter.sort?.key) {
+            case 'planned':
+              return line.progress.effectivePlanned.amount;
+            case 'actual':
+              return line.progress.actual.amount;
+            case 'remaining':
+              return line.progress.remaining.amount;
+            default:
+              return targetName(names, line.target.kind, line.target.id);
+          }
+        },
+        sorter.sort.direction,
+        LINE_SORT_KINDS[sorter.sort.key],
+      )
+    : budget.lines;
+  const header = (key: LineSortKey, label: string, align: 'left' | 'right') => (
+    <SortableHeader
+      label={label}
+      align={align}
+      direction={sorter.directionOf(key)}
+      onSort={() => sorter.toggle(key, label, LINE_SORT_KINDS[key])}
+    />
+  );
   // `position: relative`: el texto solo-lectores (absoluto) queda recortado por el scroll de la tabla, no por la página.
   return (
-    <div style={{ ...tableWrapStyle, position: 'relative' }}>
-      <table style={tableStyle} data-testid="budget-lines-table">
-        <caption style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}>
-          {f.t('lines.caption')}
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col" style={cellStyle}>
-              {f.t('lines.columns.target')}
-            </th>
-            <th scope="col" style={numCellStyle}>
-              {f.t('lines.columns.planned')}
-            </th>
-            <th scope="col" style={numCellStyle}>
-              {f.t('lines.columns.actual')}
-            </th>
-            <th scope="col" style={numCellStyle}>
-              {f.t('lines.columns.remaining')}
-            </th>
-            <th scope="col" style={cellStyle}>
-              {f.t('lines.columns.usage')}
-            </th>
-            <th scope="col" style={numCellStyle}>
-              {f.t('lines.columns.projection')}
-            </th>
-            <th scope="col" style={cellStyle}>
-              {f.t('lines.columns.status')}
-            </th>
-            {withRisk ? (
+    <>
+      <TableRegion label={f.t('lines.caption')}>
+        <table style={tableStyle} data-testid="budget-lines-table">
+          <caption
+            style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}
+          >
+            {f.t('lines.caption')}
+          </caption>
+          <thead>
+            <tr>
+              {header('target', f.t('lines.columns.target'), 'left')}
+              {header('planned', f.t('lines.columns.planned'), 'right')}
+              {header('actual', f.t('lines.columns.actual'), 'right')}
+              {header('remaining', f.t('lines.columns.remaining'), 'right')}
               <th scope="col" style={cellStyle}>
-                {riskFormat.t('column')}
+                {f.t('lines.columns.usage')}
               </th>
-            ) : null}
-            <th scope="col" style={cellStyle}>
-              {f.t('lines.columns.thresholds')}
-            </th>
-            {editable ? (
+              <th scope="col" style={numCellStyle}>
+                {f.t('lines.columns.projection')}
+              </th>
               <th scope="col" style={cellStyle}>
-                {f.t('lines.columns.actions')}
+                {f.t('lines.columns.status')}
               </th>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {budget.lines.map((line) => {
-            const p = line.progress;
-            const name = targetName(names, line.target.kind, line.target.id);
-            const bar = barValue(p.utilization);
-            return (
-              <tr
-                key={line.id}
-                data-line-id={line.id}
-                data-target-id={line.target.id}
-                data-kind={line.kind}
-                aria-current={editingId === line.id || highlightedId === line.id ? 'true' : undefined}
-                data-highlighted={highlightedId === line.id ? 'true' : undefined}
-                style={
-                  highlightedId === line.id
-                    ? {
-                        background: 'var(--pf-primary-soft)',
-                        outline: '2px solid var(--pf-primary)',
-                        outlineOffset: '-2px',
-                      }
-                    : undefined
-                }
-              >
-                <th scope="row" style={{ ...cellStyle, fontWeight: 600 }}>
-                  {name}
-                  {highlightedId === line.id ? (
-                    <small
-                      data-testid="line-highlight-note"
-                      style={{ color: 'var(--pf-primary)', fontWeight: 600 }}
-                    >
-                      {' '}
-                      {f.t('lineFromNotification')}
-                    </small>
-                  ) : null}
-                  <br />
-                  <small style={{ ...mutedStyle, fontWeight: 400 }}>
-                    {f.t(`targetKind.${line.target.kind}`)} · {f.t(`kind.${line.kind}`)}
-                    {line.nature === 'INCOME' ? ` · ${f.t('lines.income')}` : ''}
-                  </small>
-                  {line.historyBasis ? (
-                    <>
-                      <br />
-                      <HistoryBasisNote basis={line.historyBasis} f={f} />
-                    </>
-                  ) : null}
+              {withRisk ? (
+                <th scope="col" style={cellStyle}>
+                  {riskFormat.t('column')}
                 </th>
-                <td style={numCellStyle} data-testid="line-planned">
-                  <Plan line={line} f={f} />
-                </td>
-                <td style={numCellStyle} data-testid="line-actual">
-                  {formatMoney(p.actual, f.locale)}
-                  {!p.actualComplete ? (
-                    <>
-                      <br />
-                      <small data-testid="line-incomplete" style={{ color: 'var(--pf-fin-warning)' }}>
-                        <span aria-hidden="true">⚠</span>{' '}
-                        {f.t('lines.incomplete', {
-                          amounts: p.unconverted.map((m) => formatMoney(m, f.locale)).join(', '),
-                        })}
+              ) : null}
+              <th scope="col" style={cellStyle}>
+                {f.t('lines.columns.thresholds')}
+              </th>
+              {editable ? (
+                <th scope="col" style={cellStyle}>
+                  {f.t('lines.columns.actions')}
+                </th>
+              ) : null}
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line) => {
+              const p = line.progress;
+              const name = targetName(names, line.target.kind, line.target.id);
+              const bar = barValue(p.utilization);
+              return (
+                <tr
+                  key={line.id}
+                  data-line-id={line.id}
+                  data-target-id={line.target.id}
+                  data-kind={line.kind}
+                  aria-current={editingId === line.id || highlightedId === line.id ? 'true' : undefined}
+                  data-highlighted={highlightedId === line.id ? 'true' : undefined}
+                  style={
+                    highlightedId === line.id
+                      ? {
+                          background: 'var(--pf-primary-soft)',
+                          outline: '2px solid var(--pf-primary)',
+                          outlineOffset: '-2px',
+                        }
+                      : undefined
+                  }
+                >
+                  <th scope="row" style={{ ...cellStyle, fontWeight: 600 }}>
+                    {name}
+                    {highlightedId === line.id ? (
+                      <small
+                        data-testid="line-highlight-note"
+                        style={{ color: 'var(--pf-primary)', fontWeight: 600 }}
+                      >
+                        {' '}
+                        {f.t('lineFromNotification')}
                       </small>
-                    </>
-                  ) : null}
-                </td>
-                <td style={numCellStyle} data-testid="line-remaining">
-                  {line.nature === 'INCOME' ? (
-                    <>
-                      {formatSignedMoney(p.difference, f.locale)}
-                      <br />
-                      <small style={mutedStyle}>{f.t('lines.difference')}</small>
-                    </>
-                  ) : (
-                    formatMoney(p.remaining, f.locale)
-                  )}
-                </td>
-                <td style={cellStyle} data-testid="line-usage">
-                  {p.utilization === null ? (
-                    <span>—</span>
-                  ) : (
-                    <>
-                      <progress
-                        max={100}
-                        value={bar ?? 0}
-                        aria-label={f.t('lines.usageLabel', { name })}
-                        style={{ width: '6rem', maxWidth: '100%' }}
-                      />
-                      <br />
-                      <small>{f.t('lines.usage', { percent: formatDecimal(p.utilization, f.locale) })}</small>
-                    </>
-                  )}
-                </td>
-                <td style={numCellStyle} data-testid="line-projection">
-                  <Projection line={line} f={f} />
-                </td>
-                <td style={cellStyle}>
-                  <BudgetStatusBadge status={p.status} f={f} />
-                </td>
-                {withRisk ? (
-                  <td style={cellStyle} data-testid="line-risk-cell">
-                    <BudgetRiskCell risk={risk.get(line.id)} f={riskFormat} />
+                    ) : null}
+                    <br />
+                    <small style={{ ...mutedStyle, fontWeight: 400 }}>
+                      {f.t(`targetKind.${line.target.kind}`)} · {f.t(`kind.${line.kind}`)}
+                      {line.nature === 'INCOME' ? ` · ${f.t('lines.income')}` : ''}
+                    </small>
+                    {line.historyBasis ? (
+                      <>
+                        <br />
+                        <HistoryBasisNote basis={line.historyBasis} f={f} />
+                      </>
+                    ) : null}
+                  </th>
+                  <td style={numCellStyle} data-testid="line-planned">
+                    <Plan line={line} f={f} />
                   </td>
-                ) : null}
-                <td style={cellStyle} data-testid="line-thresholds">
-                  {line.thresholds.length === 0 ? (
-                    <span aria-label={f.t('lines.noThresholds')}>—</span>
-                  ) : (
-                    <ul
-                      style={{
-                        listStyle: 'none',
-                        margin: 0,
-                        padding: 0,
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '0.25rem',
-                      }}
-                    >
-                      {line.thresholds.map((th) => {
-                        const crossed = p.crossedThresholds.includes(th);
-                        return (
-                          <li key={th} data-crossed={crossed ? 'true' : 'false'}>
-                            <small>
-                              {crossed ? <span aria-hidden="true">✓ </span> : null}
-                              {th} %
-                              {crossed ? <span className="pf-sr-only"> {f.t('lines.crossed')}</span> : null}
-                            </small>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </td>
-                {editable ? (
+                  <td style={numCellStyle} data-testid="line-actual">
+                    {formatMoney(p.actual, f.locale)}
+                    {!p.actualComplete ? (
+                      <>
+                        <br />
+                        <small data-testid="line-incomplete" style={{ color: 'var(--pf-fin-warning)' }}>
+                          <span aria-hidden="true">⚠</span>{' '}
+                          {f.t('lines.incomplete', {
+                            amounts: p.unconverted.map((m) => formatMoney(m, f.locale)).join(', '),
+                          })}
+                        </small>
+                      </>
+                    ) : null}
+                  </td>
+                  <td style={numCellStyle} data-testid="line-remaining">
+                    {line.nature === 'INCOME' ? (
+                      <>
+                        {formatSignedMoney(p.difference, f.locale)}
+                        <br />
+                        <small style={mutedStyle}>{f.t('lines.difference')}</small>
+                      </>
+                    ) : (
+                      formatMoney(p.remaining, f.locale)
+                    )}
+                  </td>
+                  <td style={cellStyle} data-testid="line-usage">
+                    {p.utilization === null ? (
+                      <span>—</span>
+                    ) : (
+                      <>
+                        <progress
+                          max={100}
+                          value={bar ?? 0}
+                          aria-label={f.t('lines.usageLabel', { name })}
+                          style={{ width: '6rem', maxWidth: '100%' }}
+                        />
+                        <br />
+                        <small>
+                          {f.t('lines.usage', { percent: formatDecimal(p.utilization, f.locale) })}
+                        </small>
+                      </>
+                    )}
+                  </td>
+                  <td style={numCellStyle} data-testid="line-projection">
+                    <Projection line={line} f={f} />
+                  </td>
                   <td style={cellStyle}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--pf-space-2)' }}>
-                      <button
-                        type="button"
-                        onClick={() => onEdit?.(line)}
-                        disabled={busyId === line.id}
-                        aria-label={f.t('lines.editLabel', { name })}
-                      >
-                        {f.t('lines.edit')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRemove?.(line)}
-                        disabled={busyId === line.id}
-                        aria-label={f.t('lines.removeLabel', { name })}
-                      >
-                        {f.t('lines.remove')}
-                      </button>
-                    </div>
+                    <BudgetStatusBadge status={p.status} f={f} />
                   </td>
-                ) : null}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {withRisk ? <BudgetRiskLegend lines={[...risk.values()]} f={riskFormat} /> : null}
-    </div>
+                  {withRisk ? (
+                    <td style={cellStyle} data-testid="line-risk-cell">
+                      <BudgetRiskCell risk={risk.get(line.id)} f={riskFormat} />
+                    </td>
+                  ) : null}
+                  <td style={cellStyle} data-testid="line-thresholds">
+                    {line.thresholds.length === 0 ? (
+                      <span aria-label={f.t('lines.noThresholds')}>—</span>
+                    ) : (
+                      <ul
+                        style={{
+                          listStyle: 'none',
+                          margin: 0,
+                          padding: 0,
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        {line.thresholds.map((th) => {
+                          const crossed = p.crossedThresholds.includes(th);
+                          return (
+                            <li key={th} data-crossed={crossed ? 'true' : 'false'}>
+                              <small>
+                                {crossed ? <span aria-hidden="true">✓ </span> : null}
+                                {th} %
+                                {crossed ? <span className="pf-sr-only"> {f.t('lines.crossed')}</span> : null}
+                              </small>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </td>
+                  {editable ? (
+                    <td style={cellStyle}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--pf-space-2)' }}>
+                        <button
+                          type="button"
+                          onClick={() => onEdit?.(line)}
+                          disabled={busyId === line.id}
+                          aria-label={f.t('lines.editLabel', { name })}
+                        >
+                          {f.t('lines.edit')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onRemove?.(line)}
+                          disabled={busyId === line.id}
+                          aria-label={f.t('lines.removeLabel', { name })}
+                        >
+                          {f.t('lines.remove')}
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {withRisk ? <BudgetRiskLegend lines={[...risk.values()]} f={riskFormat} /> : null}
+      </TableRegion>
+      <SortStatus message={sorter.message} />
+    </>
   );
 }
 

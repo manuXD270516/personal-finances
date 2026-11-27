@@ -8,7 +8,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test:e2e": "playwright test",
-    "browsers": "playwright install chromium"
+    "browsers": "playwright install chromium",
+    "test": "vitest run src"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
@@ -17,6 +18,7 @@
     "@types/pg": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

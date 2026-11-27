@@ -9,9 +9,11 @@ import {
   mutedStyle,
   numCellStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
+import { SortableHeader, SortStatus, useTableSort } from '../common/SortableHeader';
+import { sortRows, type SortKind } from '../common/sort';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import { RateSourceBadge } from '../dashboard/RateSourceBadge';
 import { formatInstant, formatMoney } from '../dashboard/format';
@@ -41,6 +43,13 @@ function BaseAmount({ amounts, f }: { amounts: SubscriptionCostAmounts; f: Forma
   );
 }
 
+type CostSortKey = 'name' | 'monthly' | 'annual';
+const COST_SORT_KINDS: Readonly<Record<CostSortKey, SortKind>> = {
+  name: 'text',
+  monthly: 'decimal',
+  annual: 'decimal',
+};
+
 function ItemsTable({
   items,
   f,
@@ -54,56 +63,80 @@ function ItemsTable({
   caption: string;
   testId: string;
 }) {
+  const sorter = useTableSort<CostSortKey>(f);
+  // Orden por el monto en la moneda base; lo que no tiene tasa (sin convertir) queda al final.
+  const rows = sorter.sort
+    ? sortRows(
+        items,
+        (item) => {
+          switch (sorter.sort?.key) {
+            case 'monthly':
+              return item.monthly.base?.amount;
+            case 'annual':
+              return item.annual.base?.amount;
+            default:
+              return item.name;
+          }
+        },
+        sorter.sort.direction,
+        COST_SORT_KINDS[sorter.sort.key],
+      )
+    : items;
+  const header = (key: CostSortKey, label: string, align: 'left' | 'right') => (
+    <SortableHeader
+      label={label}
+      align={align}
+      direction={sorter.directionOf(key)}
+      onSort={() => sorter.toggle(key, label, COST_SORT_KINDS[key])}
+    />
+  );
   return (
-    <div style={tableWrapStyle}>
-      <table style={tableStyle} data-testid={testId}>
-        <caption className="pf-sr-only">{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col" style={cellStyle}>
-              {f.t('columns.name')}
-            </th>
-            <th scope="col" style={cellStyle}>
-              {f.t('columns.status')}
-            </th>
-            <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
-              {f.t('cost.monthly')}
-            </th>
-            <th scope="col" style={{ ...cellStyle, textAlign: 'right' }}>
-              {f.t('cost.annual')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr
-              key={item.subscriptionId}
-              data-testid="cost-row"
-              data-subscription-id={item.subscriptionId}
-              data-complete={item.complete}
-            >
-              <td style={cellStyle}>
-                <a href={href(subscriptionPath(item.subscriptionId))}>{item.name}</a>
-                {!item.complete ? (
-                  <div style={mutedStyle} data-testid="cost-row-incomplete">
-                    <span aria-hidden="true">⚠</span> {f.t('cost.incomplete')}
-                  </div>
-                ) : null}
-              </td>
-              <td style={cellStyle}>
-                <SubscriptionStatusBadge status={item.status} f={f} />
-              </td>
-              <td style={numCellStyle} data-testid="cost-monthly">
-                <BaseAmount amounts={item.monthly} f={f} />
-              </td>
-              <td style={numCellStyle} data-testid="cost-annual">
-                <BaseAmount amounts={item.annual} f={f} />
-              </td>
+    <>
+      <TableRegion label={caption}>
+        <table style={tableStyle} data-testid={testId}>
+          <caption className="pf-sr-only">{caption}</caption>
+          <thead>
+            <tr>
+              {header('name', f.t('columns.name'), 'left')}
+              <th scope="col" style={cellStyle}>
+                {f.t('columns.status')}
+              </th>
+              {header('monthly', f.t('cost.monthly'), 'right')}
+              {header('annual', f.t('cost.annual'), 'right')}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((item) => (
+              <tr
+                key={item.subscriptionId}
+                data-testid="cost-row"
+                data-subscription-id={item.subscriptionId}
+                data-complete={item.complete}
+              >
+                <td style={cellStyle}>
+                  <a href={href(subscriptionPath(item.subscriptionId))}>{item.name}</a>
+                  {!item.complete ? (
+                    <div style={mutedStyle} data-testid="cost-row-incomplete">
+                      <span aria-hidden="true">⚠</span> {f.t('cost.incomplete')}
+                    </div>
+                  ) : null}
+                </td>
+                <td style={cellStyle}>
+                  <SubscriptionStatusBadge status={item.status} f={f} />
+                </td>
+                <td style={numCellStyle} data-testid="cost-monthly">
+                  <BaseAmount amounts={item.monthly} f={f} />
+                </td>
+                <td style={numCellStyle} data-testid="cost-annual">
+                  <BaseAmount amounts={item.annual} f={f} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableRegion>
+      <SortStatus message={sorter.message} />
+    </>
   );
 }
 

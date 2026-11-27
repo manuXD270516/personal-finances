@@ -9,8 +9,8 @@ import {
   numCellStyle,
   pageStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../../common/workspace';
 import { formatMoney } from '../../dashboard/format';
@@ -29,7 +29,7 @@ function Totals({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
       <h3 id="debt-totals-title" style={{ margin: 0 }}>
         {t('panel.totals.title')}
       </h3>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={t('panel.totals.caption')}>
+      <TableRegion label={t('panel.totals.caption')}>
         <table style={tableStyle} data-testid="debt-totals-table">
           <caption className="pf-sr-only">{t('panel.totals.caption')}</caption>
           <thead>
@@ -53,7 +53,7 @@ function Totals({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       <p style={{ margin: 0 }} data-testid="debt-consolidated">
         {t('panel.totals.consolidated', {
           currency: summary.baseCurrency,
@@ -85,7 +85,7 @@ function Debts({
       <h3 id="debt-list-title" style={{ margin: 0 }}>
         {t('panel.debts.title')}
       </h3>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={t('panel.debts.region')}>
+      <TableRegion label={t('panel.debts.region')}>
         <table style={tableStyle} data-testid="debt-debts-table">
           <caption className="pf-sr-only">{t('panel.debts.caption')}</caption>
           <thead>
@@ -145,7 +145,7 @@ function Debts({
             )}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </section>
   );
 }
@@ -189,7 +189,7 @@ function Interest({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
         <p data-testid="debt-interest-none">{t('panel.interest.none')}</p>
       ) : (
         <>
-          <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={t('panel.interest.caption')}>
+          <TableRegion label={t('panel.interest.caption')}>
             <table style={tableStyle} data-testid="debt-interest-table">
               <caption className="pf-sr-only">{t('panel.interest.caption')}</caption>
               <thead>
@@ -213,7 +213,7 @@ function Interest({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
           <p style={{ margin: 0 }} data-testid="debt-interest-consolidated">
             {t('panel.interest.consolidated', {
               currency: summary.baseCurrency,
@@ -228,12 +228,7 @@ function Interest({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
               })}
             </p>
           ) : null}
-          <div
-            style={tableWrapStyle}
-            tabIndex={0}
-            role="region"
-            aria-label={t('panel.interest.attributionRegion')}
-          >
+          <TableRegion label={t('panel.interest.attributionRegion')}>
             <table style={tableStyle} data-testid="debt-attribution-table">
               <caption className="pf-sr-only">{t('panel.interest.attributionCaption')}</caption>
               <thead>
@@ -259,7 +254,7 @@ function Interest({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
                   ))}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
           {!interest.attributionConsistent ? (
             <p role="status" style={warningStyle} data-testid="debt-attribution-inconsistent">
               <span aria-hidden="true">⚠</span> {t('panel.interest.inconsistent')}
@@ -309,7 +304,7 @@ function Dues({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
           {t('panel.dues.none')}
         </p>
       ) : (
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={t('panel.dues.region')}>
+        <TableRegion label={t('panel.dues.region')}>
           <table style={tableStyle} data-testid="debt-dues-table">
             <caption className="pf-sr-only">{t('panel.dues.caption')}</caption>
             <thead>
@@ -356,7 +351,7 @@ function Dues({ summary, f }: { summary: DebtSummary; f: FormatContext }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       )}
     </section>
   );

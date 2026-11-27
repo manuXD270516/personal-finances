@@ -13,8 +13,8 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import {
   excludedAmounts,
@@ -181,7 +181,7 @@ function Results({ f, analysis }: { f: FormatContext; analysis: ConversionCostAn
           {f.t('incomplete')}
         </p>
       ) : null}
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('tableRegion')}>
+      <TableRegion label={f.t('tableRegion')}>
         <table style={tableStyle} data-testid="costs-table">
           <caption
             style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}
@@ -317,7 +317,7 @@ function Results({ f, analysis }: { f: FormatContext; analysis: ConversionCostAn
             </tr>
           </tfoot>
         </table>
-      </div>
+      </TableRegion>
       <aside style={cardStyle}>
         <p style={{ margin: 0, ...mutedStyle }}>{f.t('method')}</p>
       </aside>

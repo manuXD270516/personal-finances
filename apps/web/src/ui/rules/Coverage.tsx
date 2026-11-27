@@ -12,7 +12,7 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -49,7 +49,7 @@ export function CoverageView({
         </p>
         <p style={mutedStyle}>{f.t('coverage.total', { count: coverage.count })}</p>
       </div>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('coverage.originRegion')}>
+      <TableRegion label={f.t('coverage.originRegion')}>
         <table style={tableStyle} data-testid="coverage-origins">
           <caption className="pf-sr-only">{f.t('coverage.originCaption')}</caption>
           <thead>
@@ -73,9 +73,9 @@ export function CoverageView({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       {coverage.byRule.length > 0 ? (
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('coverage.ruleRegion')}>
+        <TableRegion label={f.t('coverage.ruleRegion')}>
           <table style={tableStyle} data-testid="coverage-rules">
             <caption className="pf-sr-only">{f.t('coverage.ruleCaption')}</caption>
             <thead>
@@ -100,7 +100,7 @@ export function CoverageView({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       ) : null}
     </div>
   );

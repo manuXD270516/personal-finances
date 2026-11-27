@@ -16,8 +16,8 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { Tabs } from '../common/Tabs';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
@@ -430,7 +430,7 @@ function Detail({
                     <h2 id="tx-splits-title" style={{ fontSize: '1rem', marginTop: 0 }}>
                       {t('splits.title')}
                     </h2>
-                    <div style={tableWrapStyle}>
+                    <TableRegion labelledBy="tx-splits-title">
                       <table style={tableStyle}>
                         <thead>
                           <tr>
@@ -481,7 +481,7 @@ function Detail({
                           ))}
                         </tbody>
                       </table>
-                    </div>
+                    </TableRegion>
                   </section>
                 ) : null}
                 {tx.conversion ? (

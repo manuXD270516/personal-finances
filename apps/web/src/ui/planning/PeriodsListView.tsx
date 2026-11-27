@@ -1,5 +1,5 @@
 import type { FormatContext } from '../dashboard/types';
-import { badgeStyle, cellStyle, mutedStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { badgeStyle, cellStyle, mutedStyle, tableStyle, TableRegion } from '../common/ui';
 import {
   canActivate,
   containsDate,
@@ -77,7 +77,7 @@ export function PeriodsListView({
     );
   }
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={f.t('caption')}>
       <table style={tableStyle} data-testid="periods-table">
         <caption style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}>
           {f.t('caption')}
@@ -166,6 +166,6 @@ export function PeriodsListView({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

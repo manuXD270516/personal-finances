@@ -13,7 +13,7 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import { formatDecimal } from '../AuditHistory';
@@ -84,7 +84,7 @@ export function ExplanationView({
           : f.t('explanation.method.SAME_PERIOD_LAST_YEAR')}{' '}
         <small style={mutedStyle}>{f.t('explanation.todayCategories')}</small>
       </p>
-      <div style={tableWrapStyle}>
+      <TableRegion label={f.t('explanation.periodsCaption', { name: line.targetName })}>
         <table style={tableStyle}>
           <caption style={{ ...mutedStyle, textAlign: 'left' }}>
             {f.t('explanation.periodsCaption', { name: line.targetName })}
@@ -157,7 +157,7 @@ export function ExplanationView({
             })}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       <ul style={{ margin: 0, paddingLeft: 'var(--pf-space-4)' }}>
         <li>{f.t('explanation.used', { used: explanation.usedCount, min: explanation.minValid })}</li>
         <li>
@@ -238,7 +238,7 @@ export function SuggestionsTable({
     );
   }
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={f.t('table.caption')}>
       <table style={tableStyle} data-testid="suggestions-table">
         <caption style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}>
           {f.t('table.caption')}
@@ -372,7 +372,7 @@ export function SuggestionsTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

@@ -6,8 +6,8 @@ import {
   mutedStyle,
   numCellStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { formatInstant, formatMoney, formatSignedMoney } from '../dashboard/format';
 import type { FormatContext, Money } from '../dashboard/types';
@@ -239,7 +239,7 @@ function FlowsTable({ snapshot: s, f }: { snapshot: CloseSnapshot; f: FormatCont
   return (
     <section aria-labelledby="report-flows-title" style={{ ...stackStyle, gap: 'var(--pf-space-2)' }}>
       <h2 id="report-flows-title">{f.t('report.flows.title')}</h2>
-      <div style={tableWrapStyle}>
+      <TableRegion label={f.t('report.flows.caption')}>
         <table style={tableStyle} data-testid="report-flows">
           <caption
             style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}
@@ -275,7 +275,7 @@ function FlowsTable({ snapshot: s, f }: { snapshot: CloseSnapshot; f: FormatCont
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </section>
   );
 }
@@ -295,7 +295,7 @@ function BalancesTable({
       {s.balances.length === 0 ? (
         <p style={mutedStyle}>{f.t('report.balances.empty')}</p>
       ) : (
-        <div style={tableWrapStyle}>
+        <TableRegion label={f.t('report.balances.caption')}>
           <table style={tableStyle} data-testid="report-balances">
             <caption
               style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}
@@ -351,7 +351,7 @@ function BalancesTable({
               })}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       )}
     </section>
   );
@@ -368,7 +368,7 @@ function BudgetSection({ snapshot: s, f }: { snapshot: CloseSnapshot; f: FormatC
         </p>
       ) : (
         <>
-          <div style={tableWrapStyle}>
+          <TableRegion label={f.t('report.budget.caption')}>
             <table style={tableStyle} data-testid="report-budget">
               <caption
                 style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}
@@ -422,7 +422,7 @@ function BudgetSection({ snapshot: s, f }: { snapshot: CloseSnapshot; f: FormatC
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </TableRegion>
         </>
       )}
     </section>
@@ -493,7 +493,7 @@ export function CloseDiffView({
           </dd>
         </div>
       </dl>
-      <div style={tableWrapStyle}>
+      <TableRegion label={f.t('diff.balancesCaption')}>
         <table style={tableStyle} data-testid="diff-balances">
           <caption
             style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}
@@ -529,7 +529,7 @@ export function CloseDiffView({
             )}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </div>
   );
 }
