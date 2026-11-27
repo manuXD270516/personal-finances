@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { compose, composeContext, serviceStates } from '../../../scripts/stack/src/lib/compose.js';
 import { interpolateEnv, parseEnvLines } from '../../../scripts/stack/src/lib/dotenv.js';
 import { renderEnv } from '../../../scripts/stack/src/lib/env-template.js';
+import { portsFor, resolvePortPrefix } from './ports.js';
 
 /**
  * Stack desechable de la suite E2E: proyecto Compose `pfos-e2e` (nunca `pfos` ni contenedores ajenos), `.env`
@@ -26,10 +27,14 @@ function e2eProject(): string {
   return name;
 }
 
-/** Primer dígito de los puertos publicados (`4` ⇒ 4xxxx); `PF_E2E_PORT_PREFIX=5` evita choques entre corridas paralelas. */
-const PORT_PREFIX = /^[35]$/.test(process.env['PF_E2E_PORT_PREFIX'] ?? '')
-  ? process.env['PF_E2E_PORT_PREFIX']!
-  : '4';
+/** Primer dígito de los puertos publicados (`4` ⇒ 4xxxx); `PF_E2E_PORT_PREFIX=3` evita choques entre corridas paralelas. Solo 3 o 4: otro valor falla antes de tocar Docker. */
+const PORT_PREFIX = resolvePortPrefix(process.env['PF_E2E_PORT_PREFIX']);
+
+/** Perfiles de Compose del stack E2E: producto completo, pronósticos reales y proxy TLS (change add-e2e-https). */
+export const E2E_PROFILES = ['core', 'ml', 'tls'] as const;
+
+/** Raíz de la autoridad interna del proxy TLS dentro del contenedor (Caddy, `/data` en tmpfs). */
+const TLS_ROOT_IN_CONTAINER = '/data/caddy/pki/authorities/local/root.crt';
 
 /** Puerto del servidor de providers simulados en el host (`2<prefijo>090`, fuera del rango efímero de Linux 32768–60999 para no chocar con conexiones salientes del runner; `PF_E2E_FX_SIM_PORT` lo cambia). */
 export const FX_SIM_PORT = Number.parseInt(process.env['PF_E2E_FX_SIM_PORT'] ?? `2${PORT_PREFIX}090`, 10);
@@ -41,11 +46,7 @@ export function createEnvFile(): string {
   const dir = mkdtempSync(join(tmpdir(), 'pfos-e2e-'));
   const file = join(dir, '.env');
   const example = readFileSync(join(ROOT, '.env.example'), 'utf8');
-  const ports = new Map<string, string>();
-  for (const line of parseEnvLines(example)) {
-    if (line.key && /^PF_[A-Z0-9_]+_PORT$/.test(line.key))
-      ports.set(line.key, `${PORT_PREFIX}${line.value!.slice(1)}`);
-  }
+  const ports = portsFor(example, PORT_PREFIX);
   // CI reutiliza las imágenes del job `image` (FINANCE_*_IMAGE en el entorno del proceso).
   // Sin red en E2E: los providers de tasas de mercado apuntan a providers SIMULADOS por el harness
   // (`src/fx-sim.ts`, servidor HTTP local en el host; add-market-rate-providers 7.2), nunca a la red real. El cron
@@ -71,6 +72,13 @@ export function createEnvFile(): string {
     // Reintentos acortados (add-ml-forecasting-service 8.6): con el servicio caído la corrida termina `FAILED` en el
     // primer intento en vez de esperar la espera creciente de 5 min (el valor por omisión son 5 intentos).
     ['FORECASTING_MAX_ATTEMPTS', '1'],
+    // HTTPS delante de la web, Keycloak y la subida de archivos (change add-e2e-https, D516): la cookie `__Host-` con
+    // `Secure` solo viaja en WebKit sobre https. `APP_PUBLIC_URL`, el redirect URI del realm, `OIDC_ISSUER_URL` y
+    // `KC_HOSTNAME` salen de estas por interpolación; la cookie y sus atributos no cambian.
+    ['WEB_PUBLIC_URL', 'https://localhost:${PF_WEB_TLS_PORT}'],
+    ['OIDC_PUBLIC_BASE_URL', 'https://localhost:${PF_KEYCLOAK_TLS_PORT}'],
+    ['OBJECT_STORAGE_PUBLIC_ENDPOINT', 'https://localhost:${PF_OBJECT_STORAGE_TLS_PORT}'],
+    ['OBJECT_STORAGE_CORS_ORIGINS', 'https://localhost:${PF_WEB_TLS_PORT}'],
   ]);
   const extra = new Map([
     ['FX_PROVIDER_PARALELO_BO_URL', simUrl],
@@ -129,6 +137,27 @@ export function removeEnvFile(file: string): void {
 const ML_SERVICE = 'ml-forecasting';
 
 /**
+ * Copia (con `exec cat`: `docker cp` no lee los `tmpfs`) la raíz de la autoridad efímera del proxy TLS a `<carpeta del .env desechable>/tls-root.crt` y fija
+ * `NODE_EXTRA_CA_CERTS` para que los workers de Playwright (que heredan `process.env`) confíen en ella desde Node
+ * (alta de usuarios en Keycloak, revocación de tokens). Nunca `NODE_TLS_REJECT_UNAUTHORIZED=0`. Se borra con la carpeta.
+ */
+export async function trustTlsAuthority(file: string): Promise<string> {
+  const target = join(resolve(file, '..'), 'tls-root.crt');
+  const env = processEnvFor(file);
+  const result = await compose(
+    [...E2E_PROFILES],
+    ['exec', '-T', 'tls-proxy', 'cat', TLS_ROOT_IN_CONTAINER],
+    { mode: 'capture', env },
+    composeContext(env),
+  );
+  if (result.code !== 0 || !result.stdout.includes('BEGIN CERTIFICATE'))
+    throw new Error(`no se pudo leer la raíz de la autoridad del proxy TLS: ${result.stderr}`);
+  writeFileSync(target, result.stdout);
+  process.env['NODE_EXTRA_CA_CERTS'] = target;
+  return target;
+}
+
+/**
  * Detiene o arranca el servicio `ml-forecasting` del stack E2E (siempre con `-p <proyecto E2E>`; nunca otro proyecto).
  * `start` espera a que quede healthy. Sirve para las pruebas de degradación (add-ml-forecasting-service 8.6).
  */
@@ -140,7 +169,7 @@ export async function setMlService(action: 'stop' | 'start'): Promise<void> {
     action === 'stop'
       ? ['stop', ML_SERVICE]
       : ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '120', ML_SERVICE];
-  const result = await compose(['core', 'ml'], args, { mode: 'capture', env: processEnvFor(file) }, ctx);
+  const result = await compose([...E2E_PROFILES], args, { mode: 'capture', env: processEnvFor(file) }, ctx);
   if (result.code !== 0)
     throw new Error(`docker compose ${action} ${ML_SERVICE} terminó con ${result.code}: ${result.stderr}`);
 }
@@ -167,7 +196,7 @@ export async function dumpServiceLogs(dir: string, file = process.env[ENV_FILE_V
     const states = await serviceStates(ctx);
     for (const { Service } of states) {
       const result = await compose(
-        ['core', 'ml'],
+        [...E2E_PROFILES],
         ['logs', '--no-color', '--timestamps', Service],
         { mode: 'capture', env },
         ctx,

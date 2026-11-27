@@ -3,12 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "E2E con Playwright (Chromium) contra el stack Compose desechable `pfos-e2e` con Keycloak real (docs/16 §5).",
+  "description": "E2E con Playwright (Chromium y WebKit por https) contra el stack Compose desechable `pfos-e2e` con Keycloak real (docs/16 §5).",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
     "lint": "eslint .",
     "test:e2e": "playwright test",
-    "browsers": "playwright install chromium"
+    "browsers": "playwright install chromium webkit"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
@@ -17,6 +18,7 @@
     "@types/pg": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

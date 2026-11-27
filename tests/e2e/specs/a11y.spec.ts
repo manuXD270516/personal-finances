@@ -91,7 +91,10 @@ async function seriousViolations(page: Page) {
 test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
   test('sin violaciones serias ni críticas en Home, cuentas, transacciones, transferencias, FX, instituciones y clasificación', async ({
     browser,
+    browserName,
   }) => {
+    // WebKit recorre las ~20 pantallas con axe a otro ritmo que Chromium (≈ 6 s por página sobre https): triple tiempo.
+    test.slow(browserName === 'webkit', 'WebKit tarda más por pantalla con axe');
     const { context, page, W } = await newFinanceUser(browser, 'a11y');
     const bank = await openAccount(page, W, 'Banco a11y', 'BANK', 'BOB', '1000.00');
     await openAccount(page, W, 'Ahorro USD a11y', 'SAVINGS', 'USD', '100.00');

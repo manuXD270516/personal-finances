@@ -208,8 +208,12 @@ Para cada nivel: **alcance · herramientas · ubicación · mock vs real · pres
 ### 5.12 E2E (Playwright contra compose)
 
 - **Alcance:** recorridos críticos de usuario sobre el stack completo (`core` + seed `minimal`): login vía Keycloak dev realm, crear cuenta, registrar gasto, transferencia, conversión USDT→BOB, ver saldo y net worth. Pocos tests, alto valor.
-- **Herramientas:** Playwright (Chromium en PR; Firefox/WebKit nightly).
+- **Herramientas:** Playwright (Chromium en PR, más un subconjunto de 5 specs en WebKit dentro del mismo job `e2e`: `app-shell`, `a11y`, `transactions`, `auth` y `content-security-policy`; Firefox fuera de E2E).
 - **Ubicación:** `tests/e2e/`.
+- **Esquema `https` (change `add-e2e-https`, D516):** toda la suite corre por `https`, igual que producción, **sin tocar la cookie de sesión** (`__Host-`, `Secure`): WebKit no la envía sobre `http://localhost`. El perfil `tls` de `deploy/compose/compose.yaml` agrega el servicio `tls-proxy` (la imagen y el digest de Caddy de producción, `deploy/compose/caddy/Caddyfile.e2e`) delante de la web, Keycloak y la subida de archivos, en los puertos `PF_WEB_TLS_PORT`, `PF_KEYCLOAK_TLS_PORT` y `PF_OBJECT_STORAGE_TLS_PORT` (23443, 28443 y 29443; con el prefijo de la corrida, 3 o 4). La autoridad es la interna de Caddy, con `/data` en `tmpfs`: nace y muere con el stack, sin archivos versionados ni HSTS. El harness fija las URL públicas `https://localhost:<puerto TLS>` en el `.env` desechable; los navegadores usan `ignoreHTTPSErrors` y los tests de Node (`fetch` a Keycloak) `NODE_EXTRA_CA_CERTS` con la raíz copiada del proxy (nunca `NODE_TLS_REJECT_UNAUTHORIZED=0`). El prefijo de puertos acepta solo `3` o `4` (el `5` choca con otro stack): otro valor falla antes de tocar Docker.
+- **Abrir el stack de E2E a mano:** con `PF_E2E_KEEP_STACK=1` el stack queda arriba; el navegador mostrará el aviso del certificado de prueba (autoridad interna de Caddy): aceptarlo solo para esa pestaña. Los puertos `http` de cada servicio siguen publicados en loopback para diagnóstico.
+- **WebKit en Windows:** ver la nota de la tarea 1.2 de `openspec/changes/add-e2e-https/tasks.md` (si falla sobre https en Windows, el proyecto `webkit` corre solo en CI).
+- **Duración:** el job `e2e` escribe en su resumen la duración por proyecto (`tests/e2e/src/duration-summary.ts`); si pasa de 35 minutos se reduce el subconjunto de WebKit (límite del job: 40).
 - **Mock vs real:** nada mockeado salvo proveedores externos de tasas (Phase 5) — se usa un stub HTTP.
 - **Velocidad:** < 8 min la suite smoke E2E.
 - **CI:** gate posterior (cuando exista UI funcional): smoke E2E en PR, suite completa nightly.

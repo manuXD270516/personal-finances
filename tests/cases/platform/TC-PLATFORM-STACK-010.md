@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: security
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/tls.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["tls", "secrets", "stack"]
@@ -31,7 +32,7 @@ expected_result:
   - "al bajarlo no queda ningún volumen ni archivo de la autoridad"
   - "el repositorio no contiene claves privadas ni certificados de la autoridad y .gitleaks.toml no suma excepciones"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-STACK-010 — La autoridad de prueba del E2E es efímera y no deja secretos en el repositorio

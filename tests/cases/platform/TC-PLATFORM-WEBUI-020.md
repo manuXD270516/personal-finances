@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/auth.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["e2e","webkit","session"]
@@ -31,7 +32,7 @@ expected_result:
   - "la cookie __Host-pfos_sid es Secure, HttpOnly y con Path=/"
   - "ningún atributo difiere del de producción"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-WEBUI-020 — La sesión persiste en WebKit con la cookie de producción sin atributos relajados

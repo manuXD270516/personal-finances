@@ -108,7 +108,7 @@ describe('stack local en contenedores (pfos-test)', () => {
     for (const app of [...APPS, 'migrate', 'otel-lgtm', 'valkey']) expect(all).not.toContain(app);
   });
 
-  it('[TC-PLATFORM-STACK-001] [TC-PLATFORM-MLSERVICE-001] pnpm stack:up -- --profile core deja todo healthy, migrate en 0 y las apps como non-root, sin el servicio de pronósticos', async () => {
+  it('[TC-PLATFORM-STACK-001] [TC-PLATFORM-STACK-013] [TC-PLATFORM-MLSERVICE-001] pnpm stack:up -- --profile core deja todo healthy, migrate en 0 y las apps como non-root, sin el servicio de pronósticos', async () => {
     const up = await pnpm('stack:up', ['--profile', 'core'], processEnv);
     expect(up.code, up.stderr + up.stdout).toBe(0);
     timings['core_up_on_top_of_deps'] = up.ms;
@@ -126,6 +126,9 @@ describe('stack local en contenedores (pfos-test)', () => {
     });
     expect((await http(`${api}/health/live`)).status).toBe(200);
     expect((await http(`${web}/api/health/ready`)).status).toBe(200);
+    // Sin el perfil `tls` (add-e2e-https) no existe el proxy TLS: el stack de desarrollo sigue por http.
+    expect((await serviceStates(ctx)).map((x) => x.Service)).not.toContain('tls-proxy');
+    expect(env['WEB_PUBLIC_URL']).toMatch(/^http:[/][/]/);
 
     for (const svc of APPS) {
       const name = (await stateOf(ctx, svc))!.Name;
