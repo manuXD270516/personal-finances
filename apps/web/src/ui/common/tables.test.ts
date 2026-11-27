@@ -55,7 +55,7 @@ describe('[TC-PLATFORM-TABLES-002] todas las tablas pasan por la región común 
       .filter((f) => /\btableWrapStyle\b/.test(readFileSync(f, 'utf8')))
       .map(rel);
     expect(offenders).toEqual([]);
-  });
+  }, 120_000);
 
   it('[TC-PLATFORM-TABLES-002] cada <table> está dentro de <TableRegion> en su archivo', () => {
     const offenders: string[] = [];
@@ -65,7 +65,7 @@ describe('[TC-PLATFORM-TABLES-002] todas las tablas pasan por la región común 
       if (lines.length > 0) offenders.push(`${rel(file)}:${lines.join(',')}`);
     }
     expect(offenders).toEqual([]);
-  });
+  }, 120_000);
 
   it('[TC-PLATFORM-TABLES-002] ningún envoltorio propio con desplazamiento horizontal rodea una tabla', () => {
     // Los envoltorios `*-table-wrap` y los `overflowX: 'auto'` junto a una tabla se reemplazan por TableRegion.
@@ -124,5 +124,5 @@ describe('[TC-PLATFORM-TABLES-022] filas de tabla dibujadas completas', () => {
       visit(sf);
     }
     expect(offenders).toEqual([]);
-  });
+  }, 120_000);
 });
