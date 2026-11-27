@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/a11y.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "a11y", "axe"]
@@ -30,7 +31,7 @@ expected_result:
   - "axe no informa violaciones serious ni critical (incluida color-contrast)"
   - "capturas a 360 px y a 1280 px adjuntadas"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-015 — axe en oscuro no informa violaciones serias ni críticas en las pantallas principales

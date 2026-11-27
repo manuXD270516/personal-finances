@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "sync"]
@@ -30,7 +31,7 @@ expected_result:
   - "Inicio pasa a oscuro tras leer /me y la cookie pasa a dark"
   - "el HTML crudo de Transacciones ya tiene data-theme=\"dark\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-011 — El tema cambiado en otro dispositivo se adopta al leer el perfil

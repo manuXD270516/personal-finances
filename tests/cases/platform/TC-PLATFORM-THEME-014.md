@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/common/contrast.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "contrast", "tokens"]
@@ -28,7 +29,7 @@ expected_result:
   - "texto ≥ 4.5:1, texto grande ≥ 3:1, bordes de control, foco y series de gráficos ≥ 3:1 en los dos esquemas"
   - "los dos bloques oscuros (media y data-theme) declaran los mismos valores"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-014 — Todos los pares de colores del tema alcanzan su contraste en claro y en oscuro

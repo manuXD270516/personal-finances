@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "dashboard"]
@@ -31,7 +32,7 @@ expected_result:
   - "los montos y las barras usan los colores del tema oscuro"
   - "captura a 360 px y a 1280 px adjuntada"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-016 — El Home en oscuro no tiene tarjetas con colores fijos claros
