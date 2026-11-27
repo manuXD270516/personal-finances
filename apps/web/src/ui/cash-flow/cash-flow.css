@@ -328,7 +328,7 @@
   display: grid;
   gap: var(--pf-space-2);
 }
-@media (max-width: 480px) {
+@media (max-width: 30em) {
   .pf-cf-choice {
     margin-right: var(--pf-space-2);
   }

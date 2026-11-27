@@ -89,12 +89,15 @@ export function createFinanceApiClient(options: FinanceApiClientOptions) {
   async function send<T>(
     method: string,
     path: string,
-    init: { body?: unknown; headers: Record<string, string> },
+    init: { body?: unknown; headers: Record<string, string>; background?: boolean },
   ) {
     const res = await doFetch(`${options.baseUrl}${path}`, {
       method,
       headers: { accept: 'application/json', ...(options.headers?.() ?? {}), ...init.headers },
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      // Consulta de fondo (contadores): `priority: 'low'` es Newly 2024-10-29; sin soporte el navegador la ignora y no
+      // hace falta detectarla (D500, M-31). Las que pide el usuario y los comandos nunca la llevan.
+      ...(init.background ? { priority: 'low' } : {}),
     });
     const text = res.status === 304 ? '' : await res.text();
     const json = text ? (JSON.parse(text) as unknown) : undefined;
@@ -108,10 +111,14 @@ export function createFinanceApiClient(options: FinanceApiClientOptions) {
     (status === 409 && problem?.code === 'IDEMPOTENCY_REQUEST_IN_PROGRESS');
 
   return {
-    /** Lectura; con `etag` envía `If-None-Match` y un 304 devuelve `data: undefined`. */
-    async get<T>(path: string, opts: { etag?: string } = {}): Promise<ApiResult<T>> {
+    /**
+     * Lectura; con `etag` envía `If-None-Match` y un 304 devuelve `data: undefined`. Con `background: true` la
+     * petición sale con `priority: 'low'` (solo para lo que no responde a una acción del usuario: contadores).
+     */
+    async get<T>(path: string, opts: { etag?: string; background?: boolean } = {}): Promise<ApiResult<T>> {
       const { res, json } = await send<T>('GET', path, {
         headers: opts.etag ? { 'if-none-match': opts.etag } : {},
+        ...(opts.background ? { background: true } : {}),
       });
       if (!res.ok && res.status !== 304)
         throw new FinanceApiError(res.status, (json ?? {}) as ApiProblemBody);

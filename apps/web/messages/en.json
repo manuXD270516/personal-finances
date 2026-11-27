@@ -854,7 +854,8 @@
       "resolved": "Resolved: {resolved} · pending: {pending} · {pct}",
       "notEligibleApart": "Not eligible, reported apart:",
       "tableLabel": "Census coverage by category"
-    }
+    },
+    "infoTip": "More information about “{subject}”"
   },
   "Transactions": {
     "backToList": "← Back to transactions",
@@ -1238,7 +1239,8 @@
       "currency": "Currency",
       "viewCard": "View the card",
       "categories": "Categories"
-    }
+    },
+    "infoTip": "More information about “{subject}”"
   },
   "Fx": {
     "backToRates": "← Back to rates",
@@ -1481,7 +1483,8 @@
           "REASON_MAX": "The reason allows up to 500 characters."
         }
       }
-    }
+    },
+    "infoTip": "More information about “{subject}”"
   },
   "Classification": {
     "title": "Classification",
@@ -1808,7 +1811,8 @@
       "csv": "Export CSV",
       "pdf": "Export PDF"
     },
-    "auditLink": "View this item in the audit log"
+    "auditLink": "View this item in the audit log",
+    "infoTip": "More information about “{subject}”"
   },
   "Demo": {
     "title": "Demo data",
@@ -7543,6 +7547,7 @@
       "title": "Unusual expense",
       "intro": "This amount is away from what is usual. It changes neither the transaction nor any figure.",
       "open": "View unusual expenses"
-    }
+    },
+    "infoTip": "More information about “{subject}”"
   }
 }

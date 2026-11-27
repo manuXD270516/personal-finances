@@ -332,7 +332,7 @@ export function PreferencesView(p: PreferencesViewProps) {
         style={{ display: 'grid', gap: '0.25rem', minWidth: 0 }}
       >
         <legend>{t('theme.legend')}</legend>
-        <p id="theme-hint" style={{ margin: 0 }}>
+        <p id="theme-hint" className="pf-help" style={{ margin: 0 }}>
           {t('theme.hint')}
         </p>
         {THEME_PREFERENCES.map((value) => (

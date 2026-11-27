@@ -7,6 +7,7 @@ import { problemMessage } from '../../errors/error-messages';
 import { RowSuggestion } from '../category-suggestions/RowSuggestion';
 import { acceptSuggestionsPath, type SuggestionKind } from '../category-suggestions/logic';
 import { useCatalogs } from '../transactions/catalogs';
+import { useSwapTransition } from '../common/motion';
 import { ConfirmDialog, mutedStyle } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -105,6 +106,7 @@ export function ReviewStep({
   const [approving, setApproving] = useState(false);
   const [serverPending, setServerPending] = useState<number | undefined>();
   const [reload, setReload] = useState(0);
+  const swap = useSwapTransition('import-preview');
 
   useEffect(() => {
     let cancelled = false;
@@ -113,10 +115,13 @@ export function ReviewStep({
       .get<ImportPreview>(previewPath(base, job.id, filterQuery(filter)))
       .then((r) => {
         if (cancelled || !r.data) return;
-        setRows(r.data.rows);
-        setNextCursor(r.data.nextCursor);
-        setSummary(r.data.summary);
-        setProblem(undefined);
+        const preview = r.data;
+        swap(() => {
+          setRows(preview.rows);
+          setNextCursor(preview.nextCursor);
+          setSummary(preview.summary);
+          setProblem(undefined);
+        });
       })
       .catch((err: unknown) => {
         if (!cancelled) setProblem(problemOf(err));
@@ -128,7 +133,7 @@ export function ReviewStep({
       cancelled = true;
     };
     // La versión del import cambia con cada decisión y la lista NO se recarga por eso (se actualiza la fila).
-  }, [api, base, job.id, filter, reload]);
+  }, [api, base, job.id, filter, reload, swap]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor) return;

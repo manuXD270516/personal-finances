@@ -12,9 +12,11 @@ invariants: []
 priority: low
 type: e2e
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/src/inp.test.ts
+  - tests/e2e/specs/inp.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["inp", "performance"]

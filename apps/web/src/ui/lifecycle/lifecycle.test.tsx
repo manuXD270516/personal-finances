@@ -148,7 +148,7 @@ describe('recorrido: reporte visual y línea de tiempo (add-lifecycle-timeline 6
     // Bajo 768 px se muestra la orientación vertical: la regla vive en una hoja estática, no en un <style> en línea (CSP).
     expect(html).not.toContain('<style');
     expect(readFileSync(new URL('./lifecycle.css', import.meta.url), 'utf8')).toContain(
-      '@media (max-width: 767.98px)',
+      '@media (width < 48em)',
     );
   });
 

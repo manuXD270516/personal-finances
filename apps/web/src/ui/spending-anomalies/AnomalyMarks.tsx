@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { FormatContext } from '../dashboard/types';
+import { InfoTip } from '../common/InfoTip';
 import { badgeStyle, cardStyle, mutedStyle } from '../common/ui';
 import { useFormat, type WorkspaceContext } from '../common/workspace';
 import type { NameResolver } from '../transactions/TransactionTimeline';
@@ -58,20 +59,24 @@ export function AnomalyBadge({
 }) {
   const reasons = reasonsText(anomaly, f, names).join('; ');
   return (
-    <a
-      href={href(SPENDING_ANOMALIES_PATH)}
-      data-testid="tx-anomaly-mark"
-      title={f.t('mark.hint', { reasons })}
-      style={{
-        ...badgeStyle,
-        borderColor: 'var(--pf-warning-border)',
-        background: 'var(--pf-warning-bg)',
-        color: 'var(--pf-warning-fg)',
-        textDecoration: 'none',
-      }}
-    >
-      {f.t('mark.label')}
-    </a>
+    <>
+      <a
+        href={href(SPENDING_ANOMALIES_PATH)}
+        data-testid="tx-anomaly-mark"
+        style={{
+          ...badgeStyle,
+          borderColor: 'var(--pf-warning-border)',
+          background: 'var(--pf-warning-bg)',
+          color: 'var(--pf-warning-fg)',
+          textDecoration: 'none',
+        }}
+      >
+        {f.t('mark.label')}
+      </a>
+      <InfoTip label={f.t('infoTip', { subject: f.t('mark.label') })}>
+        {f.t('mark.hint', { reasons })}
+      </InfoTip>
+    </>
   );
 }
 

@@ -318,9 +318,12 @@ describe('Indicador y marca de conciliada sin extracto (docs/33 D111)', () => {
       systemFlags: ['RECONCILED_WITHOUT_STATEMENT'],
     });
     const verified = tx('v', { status: 'RECONCILED', reconciliationMode: 'STATEMENT', systemFlags: [] });
-    expect(textOf(renderToStaticMarkup(<WithoutStatementBadge tx={flagged} f={txf} />))).toBe(
-      'Conciliada sin extracto — pendiente de revisión',
-    );
+    const badge = renderToStaticMarkup(<WithoutStatementBadge tx={flagged} f={txf} />);
+    expect(textOf(badge)).toContain('Conciliada sin extracto — pendiente de revisión');
+    // La explicación ya no vive en `title`: va en un botón de información con popover (M-09, TC-PLATFORM-PERCEIVED-011).
+    expect(badge).not.toContain('title=');
+    expect(badge).toMatch(/popover="auto"/);
+    expect(badge).toContain('queda pendiente de revisión hasta que una conciliación posterior la coteje');
     expect(renderToStaticMarkup(<WithoutStatementBadge tx={verified} f={txf} />)).toBe('');
     expect(renderToStaticMarkup(<WithoutStatementBadge tx={tx('c')} f={txf} />)).toBe('');
     const list = renderToStaticMarkup(

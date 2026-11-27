@@ -234,7 +234,10 @@ describe('marca en la transacción', () => {
     );
     expect(html).toContain('data-testid="tx-anomaly-mark"');
     expect(html).toContain('href="/es/gastos-atipicos"');
-    expect(textOf(html)).toBe('Atípico');
+    expect(textOf(html)).toContain('Atípico');
+    // El motivo va en un botón de información con popover, no en `title` (M-09, TC-PLATFORM-PERCEIVED-011).
+    expect(html).not.toContain('title=');
+    expect(html).toMatch(/popover="auto"/);
     expect(html).toContain('3,8 veces la mediana');
   });
 });

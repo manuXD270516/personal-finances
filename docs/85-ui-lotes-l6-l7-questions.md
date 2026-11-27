@@ -100,3 +100,29 @@ Al redactar los changes 82 a 84 quedaron seis puntos que D500–D516 no cubren. 
 **Recomendación: (A).** Da continuidad visual sin costo ni riesgo en los navegadores que no la soportan. Con la pregunta 5 en (C), o en (B) con migración, el requirement se retira del 83.
 
 **¿Bloquea?** No (depende de la 5).
+
+## L7: preguntas surgidas al implementar `refine-perceived-performance` (2026-11-27)
+
+### 7. Formato de los montos en la tabla alternativa de los gráficos
+
+**Contexto.** El scenario «Valor exacto de un punto del gráfico» (y TC-PLATFORM-PERCEIVED-014) espera «Bs 1.234,56», pero las tablas de los reportes muestran el monto con el código ISO («1.234,56 BOB»), como manda [docs/28](28-ui-ux-design-system.md) § 8.2 para tablas y reportes (el símbolo «Bs» queda para listas y KPIs de la moneda base). La implementación conserva el código y la prueba verifica «1.234,56 BOB» (el valor exacto está en la tabla).
+
+**Opciones.**
+- **(A)** Mantener el código ISO en los reportes y corregir el texto del scenario y de TC-PLATFORM-PERCEIVED-014 antes de archivar.
+- **(B)** Mostrar «Bs» en las tablas de reportes de una sola moneda (cambia muchas pruebas de reportes y contradice docs/28 § 8.2).
+
+**Recomendación: (A).** El valor exacto ya está en la tabla; solo el texto del scenario es impreciso.
+
+**¿Bloquea?** No. Hay que resolverla antes de archivar el 83.
+
+### 8. Respuesta con la CPU ×4 de «abrir fila» y «filtrar» (dato de la opción A de la pregunta 4)
+
+**Contexto.** La columna con el procesador ralentizado ×4 (mediana de 3 corridas locales, 2 000 filas, transiciones activas) dio: abrir fila 736 ms (1112 / 688 / 736), filtrar 640 ms (856 / 640 / 528), aprobar 144 ms y edición masiva 136 ms. Las dos primeras pasan del aviso de 500 ms; en escritorio ninguna pasa de 200 ms (abrir fila 128, filtrar 96, aprobar 32, edición masiva 32). La medición de INP solo cubre el cuadro de la interacción: no incluye lo que tarda la lista en actualizarse cuando la respuesta del servidor llega después.
+
+**Opciones.**
+- **(A)** No hacer nada hasta tener datos de un teléfono real.
+- **(B)** Un change chico que ceda el hilo (`scheduler.yield()` con respaldo `setTimeout`) o memorice la fila en «abrir fila» y «filtrar», con objetivo ≤ 500 ms con la CPU ×4.
+
+**Recomendación: (B).** Con datos en la mano, el costo es bajo y el riesgo es medible con la misma suite `inp`.
+
+**¿Bloquea?** No.

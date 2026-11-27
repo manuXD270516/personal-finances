@@ -197,7 +197,7 @@ export function Field({
         ...(describedBy ? { 'aria-describedby': describedBy } : {}),
       })}
       {hint ? (
-        <small id={hintId} style={mutedStyle}>
+        <small id={hintId} className="pf-help" style={mutedStyle}>
           {hint}
         </small>
       ) : null}

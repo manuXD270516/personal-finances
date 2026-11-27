@@ -170,6 +170,8 @@ Funciones que esta propuesta quiere usar y su estado según las guías:
 | M-28 | [`ui-behaviors/same-document-transitions`][g-samedoc], [`ui-behaviors/group-element-transitions`][g-group] | Brecha | Cambios de filtro o de pestaña reemplazan el contenido de golpe. | Al filtrar la vista previa del import se pierde la referencia visual de qué cambió. | `document.startViewTransition()` detectando soporte (Newly 2025-10-14), solo con `no-preference`. | Could | M |
 | M-29 | [`ui-behaviors/cross-document-transitions`][g-crossdoc] | Brecha | La navegación es por documento completo (§ 3.2) y no tiene transición. | Cada cambio de sección "parpadea" en blanco. | `@view-transition { navigation: auto; }` en CSS, dentro de `no-preference` (Limited: en navegadores sin soporte no pasa nada). Validado por `frontend` (§ 11.1 punto 6): la regla queda inerte si se migra a `next/link`, que mejora más la velocidad percibida pero es un change aparte (P12); decidir P12 antes de construirla. | Could | S |
 
+**Estado (2026-11-27, change 83 `refine-perceived-performance`).** M-28 implementado (pestañas, filtros de Transacciones, Reportes y Presupuestos y vista previa del import; sin vistas excluidas, medianas locales de INP con transiciones: abrir fila 128 ms, filtrar 96 ms, aprobar 32 ms, edición masiva 32 ms). **M-29 sin construir:** espera la pregunta 5 de [docs/85](85-ui-lotes-l6-l7-questions.md) (D511).
+
 ### 5.7 Rendimiento percibido
 
 | ID | Guía | Estado | Brecha (archivo:línea) | Impacto para el usuario | Mejora | Prio | Esf. |
@@ -177,6 +179,8 @@ Funciones que esta propuesta quiere usar y su estado según las guías:
 | M-30 | [`performance/identify-inp-causes`][g-inp], [`performance/break-up-long-tasks`][g-longtasks], [`performance/performance`][g-perf] | Sin medir | No hay medición de INP en la web; los flujos con más trabajo en el cliente son la vista previa del import, la edición masiva, el simulador de deudas y los reportes. | Supuesto: respuestas lentas en extractos grandes o teléfonos modestos. | Medir INP con `PerformanceObserver` (event timing, Newly 2025-12-12) en la suite e2e y en desarrollo, sin servicios de terceros. Donde haya tareas > 50 ms, ceder el hilo (`scheduler.yield()` con respaldo `setTimeout`) o mover cálculo al servidor. | Should | M |
 | M-31 | [`performance/deprioritize-background-fetches`][g-bgfetch], [`performance/detect-initial-visibility-state`][g-visibility] | Brecha | Sondeos que siguen con la pestaña oculta: `imports/ImportWizard.tsx:161-181`, `forecasts/ForecastsPage.tsx:21-22`, `DemoDataPanel.tsx:21`. | Gasto de batería y datos móviles en segundo plano. | Pausar con `visibilitychange` y reanudar al volver; `priority: 'low'` en las consultas de fondo (Newly; se ignora si no hay soporte). | Could | S |
 | M-32 | [`performance/improve-next-page-load-performance`][g-speculation] | No adoptar | — | — | Speculation rules es Limited, requiere un `<script>` en línea (nonce) y prerenderizar páginas autenticadas con efectos es riesgoso. Se registra y se descarta por ahora. | — | — |
+
+**Estado (2026-11-27, change 83).** M-31 implementado: los cinco sondeos usan `createVisiblePoller` y los contadores piden `priority: 'low'`. Con la CPU ×4 la mediana de INP de tres corridas locales es 736 ms al abrir una fila y 640 ms al filtrar (por encima del aviso de 500 ms), 144 ms al aprobar y 136 ms en la edición masiva; sirve de dato para la pregunta 4 de docs/85 (opción B).
 
 ### 5.8 Instalación (PWA)
 

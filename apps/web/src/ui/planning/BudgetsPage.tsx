@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { AuditHistory } from '../AuditHistory';
+import { useSwapTransition } from '../common/motion';
 import { scaleFor } from '../common/money';
 import { todayIn } from '../common/dates';
 import { cardStyle, ConfirmDialog, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
@@ -133,12 +134,13 @@ function Budgets({
   }, [highlight, lineId]);
   const period = periods?.find((p) => p.id === periodId);
 
+  const swap = useSwapTransition('budgets-period');
   const loadBudget = useCallback(() => {
     if (!periodId) return;
     setBudget(undefined);
     ctx.api
       .get<Budget>(`${ctx.base}/periods/${periodId}/budget`)
-      .then((r) => setBudget(r.data ?? null))
+      .then((r) => swap(() => setBudget(r.data ?? null)))
       .catch((err: unknown) => {
         if (err instanceof FinanceApiError && err.status === 404) setBudget(null);
         else {
@@ -146,7 +148,7 @@ function Budgets({
           setBudget(null);
         }
       });
-  }, [ctx, periodId]);
+  }, [ctx, periodId, swap]);
   useEffect(loadBudget, [loadBudget]);
 
   // Riesgo de exceder cada línea (add-budget-overrun-risk): solo del periodo en curso y como lectura aparte, que se

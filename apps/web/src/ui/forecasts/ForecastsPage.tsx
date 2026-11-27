@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { createVisiblePoller } from '../common/polling';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { ForecastsView } from './ForecastsView';
 import {
@@ -20,6 +21,44 @@ import type { ForecastKnownItems, LatestForecast } from './types';
 
 const POLL_MS = 2500;
 const POLL_MAX = 48;
+
+type RunOutcome = 'done' | 'failed' | 'timeout';
+
+/** Espera el fin de una corrida consultándola con `createVisiblePoller`; `stop` deja que el componente la cancele. */
+function waitForRun(
+  api: WorkspaceContext['api'],
+  base: string,
+  id: string,
+  stop: { current: (() => void) | undefined },
+): Promise<RunOutcome> {
+  return new Promise<RunOutcome>((resolve, reject) => {
+    let attempts = 0;
+    const finish = (outcome: RunOutcome) => {
+      poller.stop();
+      stop.current = undefined;
+      resolve(outcome);
+    };
+    const poller = createVisiblePoller({
+      intervalMs: POLL_MS,
+      run: async () => {
+        attempts += 1;
+        try {
+          const r = await api.get<{ status: string }>(`${base}/forecasts/${id}`);
+          const status = r.data?.status;
+          if (status === 'COMPLETED' || status === 'INSUFFICIENT_DATA') return finish('done');
+          if (status === 'FAILED' || status === 'SUPERSEDED') return finish('failed');
+          if (attempts >= POLL_MAX) finish('timeout');
+        } catch (err) {
+          poller.stop();
+          stop.current = undefined;
+          reject(err);
+        }
+      },
+    });
+    stop.current = () => poller.stop();
+    poller.start();
+  });
+}
 
 const nextPeriod = (period: string): string => {
   const [y, m] = period.split('-').map(Number) as [number, number];
@@ -41,6 +80,9 @@ function Forecasts({ ctx }: { ctx: WorkspaceContext }) {
   const [run, setRun] = useState<'idle' | 'requesting' | 'pending' | 'failed'>('idle');
   const [reload, setReload] = useState(0);
   const polling = useRef(false);
+  const stopPoll = useRef<(() => void) | undefined>(undefined);
+  // Al salir de la pantalla se corta el sondeo de la corrida (antes seguía consultando sin pantalla).
+  useEffect(() => () => stopPoll.current?.(), []);
   const { horizon } = selection;
 
   useEffect(() => {
@@ -116,22 +158,14 @@ function Forecasts({ ctx }: { ctx: WorkspaceContext }) {
       const started = await ctx.api.command<{ id: string }>('POST', `${ctx.base}/forecasts`, undefined);
       const id = started.data?.id;
       setRun('pending');
-      for (let i = 0; id && i < POLL_MAX; i += 1) {
-        await new Promise((r) => setTimeout(r, POLL_MS));
-        const r = await ctx.api.get<{ status: string }>(`${ctx.base}/forecasts/${id}`);
-        const status = r.data?.status;
-        if (status === 'COMPLETED' || status === 'INSUFFICIENT_DATA') {
-          setRun('idle');
-          setReload((n) => n + 1);
-          return;
-        }
-        if (status === 'FAILED' || status === 'SUPERSEDED') {
-          setRun('failed');
-          return;
-        }
+      // Sondeo en pausa con la pestaña oculta (M-31): cada consulta cuenta como un intento de POLL_MAX; al volver a la
+      // pestaña consulta enseguida.
+      const outcome = id ? await waitForRun(ctx.api, ctx.base, id, stopPoll) : 'timeout';
+      if (outcome === 'failed') setRun('failed');
+      else {
+        setRun('idle');
+        setReload((n) => n + 1);
       }
-      setRun('idle');
-      setReload((n) => n + 1);
     } catch (err) {
       setProblem(problemOf(err));
       setRun('idle');

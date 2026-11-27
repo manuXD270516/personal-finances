@@ -14,8 +14,8 @@ const TONES: Record<'danger' | 'warn' | 'ok' | 'neutral', CSSProperties> = {
 
 /**
  * Indicador de riesgo de una línea del plan del periodo en curso (add-budget-overrun-risk): nivel con TEXTO + ICONO (el
- * color solo refuerza) y, bajo él, la proyección (y la alta si existe), la fecha estimada y la base del cálculo. Es un
- * texto visible (además del `title`) para que lo lean también los lectores de pantalla. No toca la columna de proyección
+ * color solo refuerza) y, bajo él, la proyección (y la alta si existe), la fecha estimada y la base del cálculo. Todo es
+ * texto visible (sin `title`) para que lo lean también los lectores de pantalla y el teléfono. No toca la columna de proyección
  * lineal del plan. Presentacional; `f` es el namespace `BudgetRisk`.
  */
 export function BudgetRiskCell({ risk, f }: { risk: BudgetLineRisk | undefined; f: FormatContext }) {
@@ -23,21 +23,8 @@ export function BudgetRiskCell({ risk, f }: { risk: BudgetLineRisk | undefined; 
   const p = levelPresentation(risk.level);
   const d = riskDetails(risk, f);
   const unavailable = risk.level === 'NOT_AVAILABLE';
-  const title = [
-    d.projected ? f.t('detail.projected', { amount: d.projected }) : '',
-    d.projectedHigh ? f.t('detail.projectedHigh', { amount: d.projectedHigh }) : '',
-    d.date ? f.t('detail.date', { date: d.date }) : '',
-    d.basis ?? '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
   return (
-    <span
-      data-testid="line-risk"
-      data-level={risk.level}
-      data-basis={risk.basis ?? undefined}
-      title={title || undefined}
-    >
+    <span data-testid="line-risk" data-level={risk.level} data-basis={risk.basis ?? undefined}>
       <span style={{ ...badgeStyle, ...TONES[p.tone] }} data-testid="line-risk-level">
         <span aria-hidden="true">{p.icon}</span> {f.t(`level.${risk.level}`)}
       </span>

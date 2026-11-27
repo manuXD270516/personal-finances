@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { useSwapTransition } from '../common/motion';
 import { mutedStyle, pageStyle } from '../common/ui';
 import { problemOf, listAll, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { todayIn } from '../common/dates';
@@ -118,6 +119,7 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
   );
   const [draft, setDraft] = useState<ReportFilters>(applied);
   const [data, setData] = useState<unknown>();
+  const swap = useSwapTransition('reports-filter');
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [accounts, setAccounts] = useState<readonly { id: string; name: string }[]>([]);
   const [cell, setCell] = useState<DrillCell | undefined>();
@@ -146,12 +148,12 @@ function Report({ ctx, slug }: { ctx: WorkspaceContext; slug: ReportSlug }) {
     setProblem(undefined);
     ctx.api
       .get<unknown>(reportApiPath(ctx.base, slug, applied, defaults))
-      .then((r) => !cancelled && setData(r.data))
+      .then((r) => !cancelled && swap(() => setData(r.data)))
       .catch((err: unknown) => !cancelled && setProblem(problemOf(err)));
     return () => {
       cancelled = true;
     };
-  }, [ctx.api, ctx.base, slug, applied, defaults, ready]);
+  }, [ctx.api, ctx.base, slug, applied, defaults, ready, swap]);
 
   const apply = useCallback(() => {
     setApplied(draft);

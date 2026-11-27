@@ -617,10 +617,11 @@ function Detail({
                     {pending !== 'reconcile' ? (
                       <Field label={t('detail.confirm.reason')}>
                         {(p) => (
-                          <input
+                          <textarea
                             {...p}
                             name="reason"
                             required
+                            rows={3}
                             maxLength={500}
                             style={inputStyle}
                             value={reason}

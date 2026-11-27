@@ -193,6 +193,48 @@
 }
 
 /* La impresión sale siempre en claro, aunque el tema sea oscuro (decisión 10). */
+/* Transiciones en el mismo documento (change refine-perceived-performance, M-28; NFR-USAB-107): fundido de 200 ms por
+   defecto, sin `view-transition-name` por elemento y solo cuando el usuario no pidió movimiento reducido. Sin soporte de
+   View Transitions (Newly 2025-10-14) estas reglas no se usan: `withViewTransition` actualiza el DOM sin animación. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-group(*) {
+    animation-duration: 200ms;
+  }
+}
+
+/* Explicación accesible (`InfoTip`, M-09; popover nativo, Newly 2025-01-27). NADA aquí oculta el contenido fuera de
+   `:popover-open`: la hoja del navegador ya lo oculta cuando entiende `popover`; sin soporte el texto queda visible junto
+   al botón (D500). Objetivo táctil de al menos 24 x 24 px (NFR-USAB-106). */
+.pf-infotip {
+  display: inline;
+}
+.pf-infotip-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.5rem;
+  min-block-size: 1.5rem;
+  padding: 0;
+  margin-inline: var(--pf-space-1);
+  border-radius: var(--pf-radius-full);
+  font-size: var(--pf-text-xs);
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+.pf-infotip-body:popover-open {
+  max-inline-size: min(24rem, calc(100vw - 2rem));
+  padding: var(--pf-space-3) var(--pf-space-4);
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-surface-raised);
+  color: var(--pf-fg);
+  box-shadow: var(--pf-shadow-overlay);
+  font-size: var(--pf-text-sm);
+  font-weight: 400;
+  text-align: start;
+}
+
 @media print {
   :root,
   :root:not([data-theme='light']),
@@ -284,6 +326,23 @@ body {
 :where(p) {
   margin: 0;
 }
+
+/* Legibilidad (change refine-perceived-performance, M-23): títulos con líneas equilibradas (Newly 2024-05-13) y párrafos sin
+   palabra huérfana en la última línea (`pretty`, Limited: sin soporte no cambia nada). Mejora progresiva (D500), sin polyfill. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p,
+li {
+  text-wrap: pretty;
+}
+/* Textos de ayuda de los campos: no pasan de unos 70 caracteres por línea. `small` es en línea, por eso `display: block`. */
+.pf-help {
+  display: block;
+  max-inline-size: 70ch;
+}
 :where(small) {
   font-size: var(--pf-text-sm);
 }
@@ -327,6 +386,16 @@ body {
 }
 :where(textarea) {
   min-height: 5rem;
+}
+/* Campos que crecen con su contenido (change refine-perceived-performance, M-05; `field-sizing` es Newly 2026-06-16). Solo
+   con soporte: sin él, la regla de arriba (alto mínimo de 5rem y desplazamiento) no cambia. El ancho no se toca (evita saltos
+   horizontales); a partir de 12 líneas el campo se desplaza por dentro. */
+@supports (field-sizing: content) {
+  textarea {
+    field-sizing: content;
+    min-block-size: 3lh;
+    max-block-size: 12lh;
+  }
 }
 :where(input, select, textarea):disabled {
   background: var(--pf-surface-sunken);
@@ -742,7 +811,6 @@ th[aria-sort='descending'] .pf-sort-icon {
 .pf-ws-role {
   font-size: var(--pf-text-xs);
   color: var(--pf-fg-muted);
-  white-space: nowrap;
 }
 
 /* Menú de usuario (disclosure). */
@@ -971,14 +1039,14 @@ html {
   display: none;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 40em) {
   .pf-hide-sm {
     display: inline;
   }
 }
 
 /* Bajo `lg 1024` el rótulo del selector de workspace queda solo para lectores de pantalla (el `<label>` se conserva). */
-@media (max-width: 1023.98px) {
+@media (width < 64em) {
   .pf-ws-label {
     position: absolute;
     width: 1px;
@@ -992,7 +1060,7 @@ html {
   }
 }
 
-@media (max-width: 639.98px) {
+@media (width < 40em) {
   .pf-topbar {
     flex-wrap: wrap;
     /* Con el acceso «＋ Registrar» la fila de 360 px queda justa: menos separación horizontal para que el menú de usuario no baje. */
@@ -1011,7 +1079,7 @@ html {
   }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48em) {
   .pf-shell {
     grid-template-columns: var(--pf-sidebar-w) minmax(0, 1fr);
     grid-template-rows: auto 1fr;
@@ -1245,7 +1313,7 @@ html {
   white-space: nowrap;
   border: 0;
 }
-@media (min-width: 640px) {
+@media (min-width: 40em) {
   .pf-quick-add-label {
     position: static;
     width: auto;

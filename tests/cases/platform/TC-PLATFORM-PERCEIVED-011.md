@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/common/InfoTip.test.tsx
+  - apps/web/src/ui/common/perceived-css.test.ts
+  - tests/e2e/specs/perceived-performance.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["toggletip", "keyboard", "a11y"]
