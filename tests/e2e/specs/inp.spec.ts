@@ -14,7 +14,7 @@ const ROWS = Number(process.env['PF_INP_ROWS'] ?? 2000);
 test('[TC-PLATFORM-TABLES-017] INP de abrir fila, filtrar, aprobar y edición masiva con 2 000 filas', async ({
   browser,
 }, testInfo) => {
-  test.setTimeout(900_000);
+  test.setTimeout(Number(process.env['PF_INP_TIMEOUT'] ?? 900_000));
   const { page, W } = await newFinanceUser(browser, 'inp');
   await installInpObserver(page);
   const bank = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '500000.00');
@@ -31,9 +31,14 @@ test('[TC-PLATFORM-TABLES-017] INP de abrir fila, filtrar, aprobar y edición ma
       description: r.description,
     });
   }
+  const started = Date.now();
   await importSyntheticCsv(page, bank, testInfo.outputPath('extracto-sintetico.csv'), ROWS);
+  console.log(`[inp] importación hasta la vista previa: ${Math.round((Date.now() - started) / 1000)}s`);
   await loadAllPreviewRows(page);
   const rows: InpRow[] = [];
+  const t0 = Date.now();
+  const step = (name: string) => console.log(`[inp] ${name} +${Math.round((Date.now() - t0) / 1000)}s`);
+  step('vista previa cargada, filas en el DOM: ' + String(await page.getByTestId('import-row').count()));
   const probable = page.locator('[data-testid="import-row"][data-classification="DUPLICATE_PROBABLE"]');
 
   // 1) Abrir una fila: decidir un posible duplicado (reescribe la tabla con todas las filas cargadas).
@@ -46,6 +51,7 @@ test('[TC-PLATFORM-TABLES-017] INP de abrir fila, filtrar, aprobar y edición ma
     await expect(probable.nth(i)).toHaveAttribute('data-decision', /.+/);
   }
 
+  step('fila decidida');
   // 2) Filtrar: solo las filas nuevas.
   await resetInp(page);
   await page.getByTestId('import-filter-NEW').click();
@@ -53,6 +59,7 @@ test('[TC-PLATFORM-TABLES-017] INP de abrir fila, filtrar, aprobar y edición ma
   await page.getByTestId('import-row').first().waitFor();
   rows.push({ flow: 'filtrar', ms: await readInp(page) });
 
+  step('filtrado');
   // 3) Aprobar (abrir el resumen y confirmar).
   await resetInp(page);
   await page.getByTestId('import-approve').click();
@@ -60,6 +67,7 @@ test('[TC-PLATFORM-TABLES-017] INP de abrir fila, filtrar, aprobar y edición ma
   await page.getByTestId('import-approve-confirm').getByRole('button').last().click();
   rows.push({ flow: 'aprobar', ms: await readInp(page) });
 
+  step('aprobado');
   // 4) Edición masiva de transacciones sobre todo lo filtrado.
   await expect
     .poll(
@@ -72,7 +80,6 @@ test('[TC-PLATFORM-TABLES-017] INP de abrir fila, filtrar, aprobar y edición ma
   await page.getByTestId('transaction-row').first().waitFor();
   await resetInp(page);
   await page.getByTestId('bulk-select-filtered').click();
-  await page.getByRole('button', { name: 'Recategorizar', exact: true }).click();
   const panel = page.getByTestId('bulk-edit-panel');
   await panel.getByLabel('Categoría nueva').selectOption({ index: 1 });
   await panel.getByTestId('bulk-preview').click();

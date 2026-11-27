@@ -14,7 +14,7 @@ PFOS muestra casi todo en tablas, y en el teléfono y en las tablas largas se vu
 - **Orden por columna (M-18, Could):** en reportes, presupuesto contra real y costo de suscripciones; montos por su valor Decimal, `aria-sort` solo en la columna activa, un anuncio.
 - **Medidas y procesos (M-10, Could):** `<meter>` para la utilización de tarjeta y el avance de metas; `<progress>` para el procesamiento del import.
 - **Medición de INP (M-30):** `PerformanceObserver` desde Playwright, sin dependencias, en cuatro flujos con un extracto sintético de 2 000 filas. Informativa: no hace fallar la suite.
-- **Vista previa por páginas (M-19, condicionada):** `content-visibility` no actúa sobre `tr`/`tbody` (§ 11.1 punto 8), así que no se usa en filas. Si la medición confirma el problema (INP > 200 ms al abrir o filtrar con 2 000 filas), la vista previa pasa de «Cargar más» acumulativo a páginas de 200 filas. Si no lo confirma, el grupo se omite y la decisión vuelve al owner (pregunta 7 de [docs/82](../../../docs/82-ui-lotes-l3-l5-questions.md)).
+- **Vista previa por páginas (M-19, retirada):** la medición con 2 000 filas no superó 200 ms en la mediana de 3 corridas (abrir fila 200 ms, filtrar 136 ms), así que no se pagina y el requirement se retiró (docs/82, pregunta 7: recomendación aplicada). `content-visibility` no actúa sobre `tr`/`tbody` (§ 11.1 punto 8) y no se usa en filas.
 - **Detalle de préstamo a 360 px:** se corrige el desbordamiento horizontal de ~250 px de la sección «Detalle» (`loan-balances`, `debt/LoanDetail.tsx`) que encontró el change 77.
 - **Fuera de alcance:** vista apilada, ventaneo con IntersectionObserver, `content-visibility` en otros bloques (L7), estados de carga con `aria-busy` (deuda transversal), orden en el servidor, transiciones de filtro (M-28, L7) y convertir la medición de INP en gate (docs/78 § 11.1 punto 9: después de 2-3 semanas de datos).
 
@@ -25,11 +25,11 @@ PFOS muestra casi todo en tablas, y en el teléfono y en las tablas largas se vu
 Ninguna. `platform/web-interface` la crea el change 77.
 
 ### Modified Capabilities
-- `platform/web-interface`: 12 ADDED (1 Must, 7 Should, 4 Could): región con nombre y foco, cabecera fija, columna de identificación fija, impresión, semántica en pantallas angostas, pista de desplazamiento, orden por columna, medidas y procesos, medición de INP, vista previa por páginas, filas sin contención y detalle de préstamo sin desbordamiento.
+- `platform/web-interface`: 11 ADDED (1 Must, 6 Should, 4 Could): región con nombre y foco, cabecera fija, columna de identificación fija, impresión, semántica en pantallas angostas, pista de desplazamiento, orden por columna, medidas y procesos, medición de INP, vista previa por páginas, filas sin contención y detalle de préstamo sin desbordamiento.
 
 ## Impact
 
-**Specs impactadas:** `platform/web-interface` (12 ADDED). Lee sin modificar: `imports/import-pipeline` (vista previa, decisiones por fila y paginación por cursor del servicio), `reporting/financial-reports`, `planning/budgets`, `debt/credit-cards`, `goals/savings-goals` y `commitments/subscriptions` (las tablas y medidas que se ajustan), más el cronograma de préstamos del change activo `add-loans`.
+**Specs impactadas:** `platform/web-interface` (11 ADDED). Lee sin modificar: `imports/import-pipeline` (vista previa, decisiones por fila y paginación por cursor del servicio), `reporting/financial-reports`, `planning/budgets`, `debt/credit-cards`, `goals/savings-goals` y `commitments/subscriptions` (las tablas y medidas que se ajustan), más el cronograma de préstamos del change activo `add-loans`.
 
 **Componentes/contextos impactados:** solo `apps/web` (capa interface): `src/ui/common/ui.tsx` (`TableRegion`, `tableStyle` y `cellStyle`), los ≈ 47 archivos que usan `tableWrapStyle`, `src/ui/imports/ReviewStep.tsx` y `PreviewTable.tsx` (cabecera, columna fija y páginas), `src/ui/imports/ProcessingPanel.tsx` (`<progress>`), `src/ui/debt/cards/parts.tsx` y `src/ui/goals/parts.tsx` más `dashboard/GoalsCard.tsx` (`<meter>`), las tablas comparativas de `reports`, `planning` y `subscriptions` (orden), `app/globals.css`, `messages/{es,en,pt}.json` y `tests/e2e` (spec de tablas y spec de INP). Ningún contexto de dominio.
 
@@ -41,7 +41,7 @@ Ninguna. `platform/web-interface` la crea el change 77.
 
 **Migraciones requeridas:** ninguna.
 
-**Test cases:** AÑADIDOS — TC-PLATFORM-TABLES-001..023 (23). MODIFICADOS — ninguno. DEPRECADOS — ninguno (TC-PLATFORM-TABLES-019..021 se deprecan solo si la medición no confirma la paginación y el owner decide no paginar).
+**Test cases:** AÑADIDOS — TC-PLATFORM-TABLES-001..023 (23). MODIFICADOS — ninguno. DEPRECADOS — TC-PLATFORM-TABLES-019..021 (la medición no confirma la paginación).
 
 **Impacto de regresión:** todas las tablas de la UI cambian de envoltorio y de modelo de bordes. Los tests unitarios que buscan `role="progressbar"` (`debt/cards/cards.test.tsx`, `goals/goals.test.tsx`) se actualizan a `meter`. Los specs E2E de import que usan «Cargar más» (`import-load-more`) cambian si se pagina. La suite completa y `a11y.spec.ts` corren en verde antes de fusionar.
 

@@ -124,7 +124,7 @@ test.describe('Tablas de datos (platform/web-interface)', () => {
     await page.emulateMedia({ media: 'print' });
     expect(await region.evaluate((el) => getComputedStyle(el).maxBlockSize)).toBe('none');
     expect(await region.evaluate((el) => getComputedStyle(el).overflowY)).toBe('visible');
-    expect(await table.locator('thead').evaluate((el) => getComputedStyle(el).display)).toBe(
+    expect(await table.locator(':scope > thead').evaluate((el) => getComputedStyle(el).display)).toBe(
       'table-header-group',
     );
     expect(await page.getByTestId('installment-row').count()).toBe(36);
@@ -231,19 +231,19 @@ test.describe('Tablas de datos (platform/web-interface)', () => {
         .getByTestId('cat-row')
         .evaluateAll((rows) => rows.map((r) => r.querySelector('td')?.textContent ?? ''));
 
-    // 011-012: Monto de mayor a menor, solo ese th declara aria-sort y el anuncio es único.
-    await view.getByRole('button', { name: 'Monto' }).click();
+    // 011-012: Gasto (el monto de la categoría) de mayor a menor, solo ese th declara aria-sort y el anuncio es único.
+    await view.getByRole('button', { name: 'Gasto', exact: true }).click();
     const order = await names();
     expect(order[0]).toContain(cats[0]!.name);
     expect(order[1]).toContain(cats[1]!.name);
     expect(order[2]).toContain(cats[2]!.name);
     await expect(view.locator('th[aria-sort]')).toHaveCount(1);
-    await expect(view.locator('th[aria-sort="descending"]')).toContainText('Monto');
-    await expect(page.getByTestId('sort-status')).toHaveText('Ordenado por Monto, de mayor a menor');
+    await expect(view.locator('th[aria-sort="descending"]')).toContainText('Gasto');
+    await expect(page.getByTestId('sort-status')).toHaveText('Ordenado por Gasto, de mayor a menor');
     await expect(page.getByRole('status').filter({ hasText: 'Ordenado por' })).toHaveCount(1);
 
     // 013: con el teclado, Tab hasta el botón Categoría y Enter; el foco sigue en el botón.
-    const button = view.getByRole('button', { name: 'Categoría' });
+    const button = view.getByRole('button', { name: 'Categoría', exact: true });
     await button.focus();
     await page.keyboard.press('Enter');
     await expect(view.locator('th[aria-sort="ascending"]')).toContainText('Categoría');

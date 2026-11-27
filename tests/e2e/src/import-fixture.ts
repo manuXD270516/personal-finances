@@ -57,6 +57,7 @@ export async function importSyntheticCsv(
 
 /** Carga todas las filas de la vista previa (con «Cargar más» si existe); sirve igual con o sin páginas. */
 export async function loadAllPreviewRows(page: Page): Promise<void> {
+  await page.getByTestId('import-row').first().waitFor();
   const more = page.getByTestId('import-load-more');
   while (await more.isVisible().catch(() => false)) {
     const before = await page.getByTestId('import-row').count();
