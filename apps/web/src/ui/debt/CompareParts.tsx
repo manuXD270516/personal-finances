@@ -292,7 +292,6 @@ export function ManualRows({
                           col: f.t(`compare.manualCols.${c}`),
                         })}
                         aria-invalid={error ? true : undefined}
-                        title={error ? f.t(`errors.${error}`) : undefined}
                         style={{
                           ...inputStyle,
                           width: c === 'dueDate' ? '9.5rem' : c === 'n' ? '4rem' : '7rem',

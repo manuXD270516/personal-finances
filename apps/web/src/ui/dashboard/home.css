@@ -270,12 +270,12 @@
     opacity: 0.55;
   }
 }
-@media (min-width: 768px) {
+@media (min-width: 48em) {
   .pf-home-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-@media (min-width: 1024px) {
+@media (min-width: 64em) {
   .pf-home-month {
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     align-items: start;

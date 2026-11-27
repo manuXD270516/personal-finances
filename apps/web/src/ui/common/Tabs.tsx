@@ -1,5 +1,6 @@
 'use client';
 
+import { withViewTransition } from './motion';
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 
 /** Pestaña destino de una tecla (patrón WAI-ARIA tabs con activación automática); `null` si la tecla no navega. */
@@ -52,11 +53,18 @@ export function Tabs({
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const active = Math.min(selected, tabs.length - 1);
 
+  // Cambio de pestaña con transición breve (M-28): sin soporte o con movimiento reducido cambia al instante. El foco no se
+  // mueve: ya está en la pestaña usada.
+  const select = (index: number) => {
+    if (index === active) return;
+    withViewTransition(() => setSelected(index), { view: 'tabs' });
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const next = tabTarget(e.key, index, tabs.length);
     if (next === null) return;
     e.preventDefault();
-    setSelected(next);
+    select(next);
     const target = refs.current[next];
     target?.focus();
     // La fila se desplaza en horizontal: la pestaña enfocada debe quedar a la vista (p. ej. Fin a 360 px).
@@ -79,7 +87,7 @@ export function Tabs({
             tabIndex={i === active ? 0 : -1}
             data-tab={tab.id}
             className="pf-tab"
-            onClick={() => setSelected(i)}
+            onClick={() => select(i)}
             onKeyDown={(e) => onKeyDown(e, i)}
           >
             {tab.label}

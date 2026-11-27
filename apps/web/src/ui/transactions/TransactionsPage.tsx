@@ -15,6 +15,7 @@ import {
   type TransactionStatus,
 } from '../common/types';
 import { auditHref } from '../audit/logic';
+import { useSwapTransition } from '../common/motion';
 import { Field, inputStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
@@ -111,6 +112,7 @@ function Register({
   const [shownQuery, setShownQuery] = useState<string | undefined>();
   // Solo la última petición escribe la lista: una respuesta tardía de filtros anteriores se descarta.
   const latest = useRef(0);
+  const swap = useSwapTransition('transactions-filter');
   const customDef = customFields.definitions.find(
     (d) => d.key === filters.customField.key && d.target === 'TRANSACTION' && !d.archivedAt,
   );
@@ -131,16 +133,21 @@ function Register({
         .then((r) => {
           if (seq !== latest.current) return;
           const data = r.data?.data ?? [];
-          setItems((prev) => (append ? [...(prev ?? []), ...data] : data));
-          setCursor(r.data?.page.hasMore ? r.data.page.nextCursor : null);
-          setShownQuery(shown);
-          setProblem(undefined);
+          const apply = () => {
+            setItems((prev) => (append ? [...(prev ?? []), ...data] : data));
+            setCursor(r.data?.page.hasMore ? r.data.page.nextCursor : null);
+            setShownQuery(shown);
+            setProblem(undefined);
+          };
+          // Un filtro nuevo cambia la lista con una transición breve (M-28); «Cargar más» y la primera carga, no.
+          if (append) apply();
+          else swap(apply);
         })
         .catch((err: unknown) => {
           if (seq === latest.current) setProblem(problemOf(err));
         });
     },
-    [ctx.api, ctx.base, ctx.formatLocale, filters, customDef],
+    [ctx.api, ctx.base, ctx.formatLocale, filters, customDef, swap],
   );
 
   useEffect(() => {

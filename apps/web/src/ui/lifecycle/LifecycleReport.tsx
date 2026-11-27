@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { formatInstant, formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
+import { InfoTip } from '../common/InfoTip';
 import { badgeStyle, cardStyle, mutedStyle, warningStyle } from '../common/ui';
 import './lifecycle.css';
 import { LifecycleDiagram } from './LifecycleDiagram';
@@ -159,9 +160,12 @@ export function LifecycleReport({
               {row.derived ? (
                 <>
                   {' '}
-                  <span style={badgeStyle} data-testid="lifecycle-derived" title={t('timeline.derivedHint')}>
+                  <span style={badgeStyle} data-testid="lifecycle-derived">
                     {t('timeline.derived')}
                   </span>
+                  <InfoTip label={t('infoTip', { subject: t('timeline.derived') })}>
+                    {t('timeline.derivedHint')}
+                  </InfoTip>
                 </>
               ) : null}
             </p>

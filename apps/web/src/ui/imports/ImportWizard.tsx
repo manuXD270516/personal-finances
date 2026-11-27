@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemMessage } from '../../errors/error-messages';
+import { createVisiblePoller } from '../common/polling';
 import { ConfirmDialog, mutedStyle, pageStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { BFF_API, useSession } from '../session-context';
@@ -165,30 +166,37 @@ export function ImportWizard({
     headingRef.current?.focus();
   }, [viewStep]);
 
-  // Persistencia en segundo plano: consulta cada POLL_MS con If-None-Match (304 = sin cambios).
+  // Persistencia en segundo plano: consulta cada POLL_MS con If-None-Match (304 = sin cambios), en pausa con la pestaña
+  // oculta y con una consulta inmediata al volver (M-31, `createVisiblePoller`).
   useEffect(() => {
     if (!job || !isPolling(job.status)) return;
     let cancelled = false;
-    const timer = setTimeout(() => {
-      ctx.api
-        .get<ImportJob>(importPath(ctx.base, job.id), etag.current ? { etag: etag.current } : {})
-        .then((r) => {
+    const poller = createVisiblePoller({
+      intervalMs: POLL_MS,
+      run: async () => {
+        try {
+          const r = await ctx.api.get<ImportJob>(
+            importPath(ctx.base, job.id),
+            etag.current ? { etag: etag.current } : {},
+          );
           if (cancelled) return;
           if (r.etag) etag.current = r.etag;
           if (r.data) setJob(r.data);
           else setTick((n) => n + 1);
-        })
-        .catch((err: unknown) => {
+        } catch (err: unknown) {
           if (cancelled) return;
           setProblem(problemOf(err));
           // Un fallo transitorio no corta el seguimiento; uno definitivo (no existe, sin permiso) sí.
           if (!(err instanceof FinanceApiError) || err.status >= 500 || err.status === 429)
             setTick((n) => n + 1);
-        });
-    }, POLL_MS);
+          return false;
+        }
+      },
+    });
+    poller.start();
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      poller.stop();
     };
   }, [ctx.api, ctx.base, job, tick]);
 

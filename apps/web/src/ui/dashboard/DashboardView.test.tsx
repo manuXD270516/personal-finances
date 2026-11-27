@@ -276,7 +276,7 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
     expect(css).not.toMatch(/--pf-fin-warning\s*:/);
     const globals = readFileSync(new URL('../../../app/globals.css', import.meta.url), 'utf8');
     expect(globals).toMatch(/--pf-fin-warning:\s*#b45309/i);
-    expect(css).toMatch(/@media \(min-width:\s*768px\)/);
+    expect(css).toMatch(/@media \(min-width:\s*48em\)/);
     expect(css).toContain('prefers-reduced-motion');
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INP_TARGET_MS, INP_WARNING_MS, inpReport, inpStatus } from './inp.js';
+import { INP_TARGET_MS, INP_WARNING_MS, inpReport, inpStatus, median } from './inp.js';
 
 describe('informe de INP (informativo)', () => {
   it('[TC-PLATFORM-TABLES-018] incluye el INP de los cuatro flujos con el objetivo y el aviso', () => {
@@ -39,5 +39,39 @@ describe('informe de INP (informativo)', () => {
       { flow: 'infinito', ms: Number.POSITIVE_INFINITY },
     ]);
     expect(weird.rows.map((r) => r.ms)).toEqual([0, 0, 0]);
+  });
+
+  it('[TC-PLATFORM-PERCEIVED-005] el informe muestra cada flujo con su valor en ms y su estado frente a 200 y 500 ms, sin lanzar', () => {
+    const report = inpReport([
+      { flow: 'abrir fila', ms: 200 },
+      { flow: 'filtrar', ms: 700 },
+    ]);
+    expect(report.text).toContain('200 ms');
+    expect(report.text).toContain('objetivo 200, aviso 500');
+    expect(report.text).toContain('dentro del objetivo');
+    expect(report.text).toContain('por encima del aviso');
+  });
+
+  it('[TC-PLATFORM-PERCEIVED-022] con procesador lento el informe muestra el valor de escritorio y el de CPU ×4 por flujo', () => {
+    const report = inpReport([
+      { flow: 'abrir fila', ms: 200, slowMs: 640 },
+      { flow: 'filtrar', ms: 136, slowMs: 310 },
+      { flow: 'aprobar', ms: 72 },
+    ]);
+    expect(report.rows[0]).toMatchObject({ ms: 200, slowMs: 640, slowStatus: 'above-warning' });
+    expect(report.rows[1]).toMatchObject({ slowMs: 310, slowStatus: 'above-target' });
+    expect(report.rows[2]?.slowMs).toBeUndefined();
+    expect(report.text).toContain('CPU ×4');
+    expect(report.text).toContain('640 ms');
+    expect(report.text).toContain('310 ms');
+    // Informativo: un valor lento enorme o raro tampoco hace fallar nada.
+    expect(() => inpReport([{ flow: 'x', ms: 1, slowMs: Number.NaN }])).not.toThrow();
+  });
+
+  it('[TC-PLATFORM-PERCEIVED-004] la mediana de tres corridas decide si una vista conserva la transición (≤ 200 ms)', () => {
+    expect(median([208, 200, 192])).toBe(200);
+    expect(median([120, 136, 144])).toBe(136);
+    expect(median([300, 100])).toBe(200);
+    expect(median([])).toBe(0);
   });
 });

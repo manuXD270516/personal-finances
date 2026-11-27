@@ -6,6 +6,7 @@ interface Call {
   url: string;
   headers: Record<string, string>;
   body: string | undefined;
+  priority: string | undefined;
 }
 
 /** `fetch` falso con una cola de respuestas (o errores de red). */
@@ -17,6 +18,7 @@ function fakeFetch(script: (Response | Error)[]) {
       url: String(url),
       headers: { ...(init?.headers as Record<string, string>) },
       body: init?.body as string | undefined,
+      priority: (init as { priority?: string } | undefined)?.priority,
     });
     const next = script.shift();
     if (!next) throw new Error('sin respuesta programada');
@@ -132,6 +134,22 @@ describe('cliente BFF → finance-api (Idempotency-Key, ETag/If-Match)', () => {
       currentVersion: 4,
     });
     expect(calls[3]?.headers['if-match']).toBe('"3"');
+  });
+
+  it('[TC-PLATFORM-PERCEIVED-009] una consulta de fondo (`background`) sale con priority: low y la del usuario no', async () => {
+    const { calls, fetch } = fakeFetch([json(200, { unread: 2 }), json(200, { data: [] })]);
+    const client = createFinanceApiClient({ baseUrl: 'http://api', fetch, delay: noDelay });
+    await client.get('/api/v1/workspaces/w1/notifications/unread-count', { background: true });
+    await client.get('/api/v1/workspaces/w1/transactions?q=supermercado');
+    expect(calls[0]?.priority).toBe('low');
+    expect(calls[1]?.priority).toBeUndefined();
+  });
+
+  it('[TC-PLATFORM-PERCEIVED-010] los comandos y las lecturas pedidas por el usuario nunca bajan su prioridad', async () => {
+    const { calls, fetch } = fakeFetch([json(201, { id: 'tx-1' })]);
+    const client = createFinanceApiClient({ baseUrl: 'http://api', fetch, delay: noDelay });
+    await client.command('POST', '/api/v1/workspaces/w1/transactions', expense);
+    expect(calls[0]?.priority).toBeUndefined();
   });
 
   it('uuidv7 codifica el instante en los primeros 48 bits y es ordenable', () => {

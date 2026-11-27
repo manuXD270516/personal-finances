@@ -2,7 +2,7 @@
 .pf-lifecycle-v {
   display: none;
 }
-@media (max-width: 767.98px) {
+@media (width < 48em) {
   .pf-lifecycle-h {
     display: none;
   }

@@ -42,7 +42,9 @@ export function RecurringNavCount() {
     const refresh = () => {
       if (document.hidden) return;
       api
-        .get<Page<RecurringOccurrence>>(`/workspaces/${workspaceId}/recurring/occurrences?${trayQuery()}`)
+        .get<Page<RecurringOccurrence>>(`/workspaces/${workspaceId}/recurring/occurrences?${trayQuery()}`, {
+          background: true,
+        })
         .then((r) => {
           if (!cancelled && r.data) setTray(trayCountOf(r.data));
         })

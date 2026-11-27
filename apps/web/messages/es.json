@@ -854,7 +854,8 @@
       "resolved": "Resueltas: {resolved} · pendientes: {pending} · {pct}",
       "notEligibleApart": "No elegibles, aparte:",
       "tableLabel": "Cobertura del censo por categoría"
-    }
+    },
+    "infoTip": "Más información sobre «{subject}»"
   },
   "Transactions": {
     "backToList": "← Volver a transacciones",
@@ -1238,7 +1239,8 @@
       "currency": "Moneda",
       "viewCard": "Ver la tarjeta",
       "categories": "Categorías"
-    }
+    },
+    "infoTip": "Más información sobre «{subject}»"
   },
   "Fx": {
     "backToRates": "← Volver a tasas",
@@ -1481,7 +1483,8 @@
           "REASON_MAX": "El motivo admite hasta 500 caracteres."
         }
       }
-    }
+    },
+    "infoTip": "Más información sobre «{subject}»"
   },
   "Classification": {
     "title": "Clasificación",
@@ -1755,7 +1758,8 @@
       "csv": "Exportar CSV",
       "pdf": "Exportar PDF"
     },
-    "auditLink": "Ver este elemento en la auditoría"
+    "auditLink": "Ver este elemento en la auditoría",
+    "infoTip": "Más información sobre «{subject}»"
   },
   "Demo": {
     "title": "Datos de demostración",
@@ -7490,6 +7494,7 @@
       "title": "Gasto atípico",
       "intro": "Este monto se aleja de lo habitual. No cambia la transacción ni ninguna cifra.",
       "open": "Ver los gastos atípicos"
-    }
+    },
+    "infoTip": "Más información sobre «{subject}»"
   }
 }

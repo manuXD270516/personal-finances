@@ -61,13 +61,29 @@ export type InpStatus = 'ok' | 'above-target' | 'above-warning';
 export interface InpRow {
   readonly flow: string;
   readonly ms: number;
+  /** Valor con el procesador ralentizado ×4 (`Emulation.setCPUThrottlingRate`), si se midió (change 83, pregunta 4). */
+  readonly slowMs?: number;
 }
 
 export interface InpReportRow extends InpRow {
   readonly status: InpStatus;
+  readonly slowStatus?: InpStatus;
   readonly target: number;
   readonly warning: number;
 }
+
+/** Mediana de una lista de mediciones (la de tres corridas locales del change 83); 0 si no hay ninguna. */
+export function median(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
+}
+
+/** Tasa de ralentización de la CPU de la columna «CPU ×4»: estima un teléfono modesto. */
+export const SLOW_CPU_RATE = 4;
+
+const clean = (value: number): number => (Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0);
 
 export const inpStatus = (ms: number): InpStatus =>
   ms > INP_WARNING_MS ? 'above-warning' : ms > INP_TARGET_MS ? 'above-target' : 'ok';
@@ -75,17 +91,28 @@ export const inpStatus = (ms: number): InpStatus =>
 /** Informe por flujo con el objetivo y el aviso. Función pura: nunca lanza, aunque reciba valores raros. */
 export function inpReport(rows: readonly InpRow[]): { rows: InpReportRow[]; text: string } {
   const out = rows.map((r): InpReportRow => {
-    const ms = Number.isFinite(r.ms) ? Math.max(0, Math.round(r.ms)) : 0;
-    return { flow: r.flow, ms, status: inpStatus(ms), target: INP_TARGET_MS, warning: INP_WARNING_MS };
+    const ms = clean(r.ms);
+    const slow = r.slowMs === undefined ? undefined : clean(r.slowMs);
+    return {
+      flow: r.flow,
+      ms,
+      status: inpStatus(ms),
+      ...(slow === undefined ? {} : { slowMs: slow, slowStatus: inpStatus(slow) }),
+      target: INP_TARGET_MS,
+      warning: INP_WARNING_MS,
+    };
   });
   const label: Record<InpStatus, string> = {
     ok: 'dentro del objetivo',
     'above-target': 'por encima del objetivo',
     'above-warning': 'por encima del aviso',
   };
-  const lines = out.map(
-    (r) =>
-      `${r.flow.padEnd(28)} ${String(r.ms).padStart(5)} ms  (objetivo ${r.target}, aviso ${r.warning})  ${label[r.status]}`,
-  );
+  const lines = out.map((r) => {
+    const base = `${r.flow.padEnd(28)} ${String(r.ms).padStart(5)} ms  (objetivo ${r.target}, aviso ${r.warning})  ${label[r.status]}`;
+    return r.slowMs === undefined || r.slowStatus === undefined
+      ? base
+      : `${base}
+${''.padEnd(28)} ${String(r.slowMs).padStart(5)} ms  CPU ×${SLOW_CPU_RATE}  ${label[r.slowStatus]}`;
+  });
   return { rows: out, text: ['INP por flujo (informativo)', ...lines].join('\n') };
 }
