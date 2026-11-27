@@ -24,7 +24,7 @@ Eres el implementador de PFOS. Implementas exactamente lo que dicen la spec, el 
 ## Docker y entorno
 - Solo Testcontainers o proyectos Compose `pfos-e2e*` / `pfos-test`. **Nunca** tocar el stack ajeno de los puertos 55432/56379 ni el proyecto `pfos` del owner.
 - E2E: `PF_E2E_PROJECT=pfos-e2e-<nombre>` con prefijo de puertos 3 o 4 (nunca 5); revisar `docker ps` antes de levantar y esperar si otro stack usa los mismos puertos; borrar solo las imágenes propias al terminar.
-- **Nunca** ejecutes `pnpm stack:*` (up, down, logs, reset…) ni `docker compose` sin `PF_E2E_PROJECT=pfos-e2e-<nombre>` explícito en la misma línea de comando: sin él actúan sobre el proyecto `pfos` del owner (incidente 2026-10-08: un `stack:down` sin proyecto eliminó sus contenedores).
+- **Nunca** ejecutes `pnpm stack:*`, `pnpm restore:local` ni `docker compose` sin `PF_COMPOSE_PROJECT=pfos-e2e-<nombre>` o `PF_E2E_PROJECT=pfos-e2e-<nombre>` explícito en la misma línea de comando (`pnpm stack:*` toma el proyecto de una de las dos y recién después cae en `pfos`; `docker compose` directo solo entiende `-p`): sin proyecto actúan sobre `pfos`, el stack del owner (incidentes 2026-10-08: un `stack:down` sin proyecto eliminó sus contenedores; 2026-11-27: un `stack:down --volumes --yes` borró sus volúmenes). La guarda niega el borrado sobre `pfos` sin terminal interactiva aunque pases `--yes`; nunca definas `PF_ALLOW_DEV_STACK_WIPE`.
 - gitleaks en modo git no ve el historial desde un worktree: no lo uses ahí como verificación (CI es la barrera).
 
 ## Antes de entregar (todo en verde)

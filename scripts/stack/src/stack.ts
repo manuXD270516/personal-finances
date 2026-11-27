@@ -5,10 +5,12 @@
 //   pnpm stack:restart [-- <servicio>…]
 //   pnpm stack:logs [-- <servicio>…] [--follow] [--tail=200]
 //   pnpm stack:reset -- --seed=minimal [--profile core] [--yes]   volúmenes limpios → migraciones → seed
+import { stdin } from 'node:process';
 import { listOption, option, parseArgs } from './lib/args.js';
 import { confirm, formatDuration, log, runMain, UsageError, warn } from './lib/cli.js';
 import { compose, composeContext, composeOrThrow, serviceStates } from './lib/compose.js';
 import { loadEnvFile } from './lib/dotenv.js';
+import { assertDestructiveAllowed } from './lib/paths.js';
 import { migrateInContainer, seedInContainer } from './lib/db.js';
 
 const ALL = ['*'];
@@ -93,11 +95,15 @@ async function up(args: ReturnType<typeof parseArgs>): Promise<number> {
 
 async function down(args: ReturnType<typeof parseArgs>): Promise<number> {
   const volumes = args.flags.has('volumes');
-  if (volumes)
+  if (volumes) {
+    assertDestructiveAllowed('stack:down --volumes', composeContext().project, {
+      isTTY: Boolean(stdin.isTTY),
+    });
     await confirm(
       'Esto borra los volúmenes del proyecto (base de datos y objetos locales)',
       args.flags.has('yes'),
     );
+  }
   await composeOrThrow(ALL, ['down', '--remove-orphans', ...(volumes ? ['--volumes'] : [])]);
   return 0;
 }
@@ -107,6 +113,7 @@ async function reset(args: ReturnType<typeof parseArgs>): Promise<number> {
   if (env['PFOS_ENV'] !== 'local' && env['PFOS_ENV'] !== 'ci') {
     throw new UsageError(`stack:reset solo se permite con PFOS_ENV=local|ci (actual: ${env['PFOS_ENV']})`);
   }
+  assertDestructiveAllowed('stack:reset', composeContext().project, { isTTY: Boolean(stdin.isTTY) });
   const seed = option(args, 'seed') ?? 'minimal';
   const profiles = profilesFrom(args, ['deps']);
   await confirm(

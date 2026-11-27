@@ -1,6 +1,9 @@
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import { CommandError } from './compose.js';
+import { UsageError } from './errors.js';
+
+export { UsageError };
 
 export const log = (msg: string): void => {
   process.stdout.write(`[pfos] ${msg}\n`);
@@ -8,17 +11,6 @@ export const log = (msg: string): void => {
 export const warn = (msg: string): void => {
   process.stderr.write(`[pfos] ${msg}\n`);
 };
-
-/** Error de uso / precondición: mensaje claro y código de salida explícito (sin stack). */
-export class UsageError extends Error {
-  constructor(
-    message: string,
-    readonly exitCode = 2,
-  ) {
-    super(message);
-    this.name = 'UsageError';
-  }
-}
 
 /** Confirmación de acciones destructivas: `--yes` obligatorio sin TTY (CI), SPIKE-08 §6.7. */
 export async function confirm(question: string, yes: boolean): Promise<void> {

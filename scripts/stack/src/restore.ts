@@ -14,6 +14,8 @@ import {
 import { confirm, formatDuration, log, runMain, UsageError } from './lib/cli.js';
 import { composeContext, composeOrThrow, serviceStates } from './lib/compose.js';
 import { loadEnvFile } from './lib/dotenv.js';
+import { assertDestructiveAllowed } from './lib/paths.js';
+import { stdin } from 'node:process';
 import { join } from 'node:path';
 
 const APP_SERVICES = ['finance-api', 'finance-worker', 'finance-web'];
@@ -25,6 +27,7 @@ runMain(async () => {
   if (env['PFOS_ENV'] !== 'local' && env['PFOS_ENV'] !== 'ci') {
     throw new UsageError(`restore:local solo se permite con PFOS_ENV=local|ci (actual: ${env['PFOS_ENV']})`);
   }
+  assertDestructiveAllowed('restore:local', ctx.project, { isTTY: Boolean(stdin.isTTY) });
   const id = resolveBackupId(args.positionals[0]);
   const manifest = readManifest(id);
   await verifyBackup(manifest);
