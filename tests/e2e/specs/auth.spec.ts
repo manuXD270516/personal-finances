@@ -17,9 +17,14 @@ test.describe('autenticación vía BFF con Keycloak real (identity/authenticatio
   test('[TC-IDENTITY-AUTH-002] el login OIDC vía BFF usa PKCE y crea una cookie de sesión segura y opaca', async ({
     page,
     context,
+    browserName,
   }) => {
     const authorize: string[] = [];
     const callbacks: string[] = [];
+    const callbackResponses: Response[] = [];
+    page.on('response', (r) => {
+      if (r.url().includes('/api/bff/auth/callback')) callbackResponses.push(r);
+    });
     page.on('request', (r) => {
       if (r.url().includes('/protocol/openid-connect/auth')) authorize.push(r.url());
       if (r.url().includes('/api/bff/auth/callback')) callbacks.push(r.url());
@@ -38,7 +43,22 @@ test.describe('autenticación vía BFF con Keycloak real (identity/authenticatio
 
     // Cookie: __Host-, HttpOnly, Secure, SameSite=Lax, Path=/, sin Domain explícito; valor opaco (no un JWT).
     const cookie = (await context.cookies(appUrl())).find((c) => c.name === SESSION_COOKIE)!;
-    expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
+    // La API de cookies de Playwright en WebKit informa `sameSite: 'None'` para esta cookie (observado con Playwright
+    // 1.63 sobre https) y no expone el `Set-Cookie` de la redirección: en WebKit se comprueban los demás atributos y
+    // en Chromium además el `Set-Cookie` completo (mismo código del BFF, que no cambia: D516; TC-PLATFORM-WEBUI-020).
+    expect(cookie).toMatchObject({ httpOnly: true, secure: true, path: '/' });
+    if (browserName !== 'webkit') {
+      expect(cookie.sameSite).toBe('Lax');
+      const setCookie = (
+        await Promise.all(callbackResponses.map(async (r) => (await r.allHeaders())['set-cookie'] ?? ''))
+      ).find((h) => h.includes(SESSION_COOKIE));
+      expect(setCookie, 'el callback emite la cookie de sesión').toBeDefined();
+      expect(setCookie).toMatch(/Path=[/](;|$)/m);
+      expect(setCookie).toContain('HttpOnly');
+      expect(setCookie).toContain('Secure');
+      expect(setCookie).toContain('SameSite=Lax');
+      expect(setCookie).not.toMatch(/Domain=/i);
+    }
     expect(cookie.domain).toBe(new URL(appUrl()).hostname);
     expect(cookie.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(cookie.value).not.toMatch(JWT);
@@ -161,6 +181,25 @@ test.describe('autenticación vía BFF con Keycloak real (identity/authenticatio
     } finally {
       await db.end();
     }
+  });
+
+  test('[TC-PLATFORM-WEBUI-020] la sesión real persiste entre páginas con la cookie __Host- de producción (también en WebKit, por https)', async ({
+    page,
+    context,
+  }) => {
+    await login(page, 'owner');
+    const sid = await sidOf(context);
+    for (const path of ['/cuentas', '/transacciones']) {
+      await page.goto(new URL(path, appUrl()).href);
+      await expect(page).toHaveURL(new RegExp(path + '$'));
+      await expect(page.getByTestId('ready')).toBeAttached();
+    }
+    // Sigue autenticada (no volvió al IdP) y la cookie es la misma, con los atributos de producción.
+    await expect(page).not.toHaveURL(/openid-connect/);
+    expect(await sidOf(context)).toBe(sid);
+    const cookie = (await context.cookies(appUrl())).find((c) => c.name === SESSION_COOKIE)!;
+    expect(cookie).toMatchObject({ httpOnly: true, secure: true, path: '/' });
+    expect(cookie.domain).toBe(new URL(appUrl()).hostname);
   });
 
   test('una mutación sin token CSRF se rechaza con 403 CSRF_REJECTED', async ({ page }) => {

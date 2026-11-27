@@ -120,7 +120,9 @@ Migración expand sin datos. Rollback: la columna queda sin uso; la UI vuelve a 
 
 ## Preguntas abiertas
 
-Ninguna. El owner adoptó el 2026-11-25 las cinco recomendaciones ([docs/77](../../../docs/77-phase-9-and-card-interest-decisions.md) § «Respuestas posteriores»):
+**Abierta (2026-11-26): tags en el formulario del cargo de tarjeta.** La implementación edita descripción, notas y contraparte; los tags no, porque viven en las porciones y reenviar porciones arriesga el rechazo `TRANSACTION_MANAGED_EXTERNALLY`. El requirement dice «tags editables». Se deja la desviación hasta que el owner decida: (a) aceptarla, o (b) permitir editar los tags de las porciones sin tocar categoría ni monto.
+
+Las cinco preguntas originales quedaron cerradas. El owner adoptó el 2026-11-25 las cinco recomendaciones ([docs/77](../../../docs/77-phase-9-and-card-interest-decisions.md) § «Respuestas posteriores»):
 
 | Pregunta | Decisión | Efecto en este change |
 |---|---|---|

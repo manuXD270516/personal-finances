@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "dark-mode"]
@@ -31,7 +32,7 @@ expected_result:
   - "no hubo navegación nueva"
   - "la búsqueda conserva \"super\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-002 — La página pasa a oscuro sin recargar cuando cambia el sistema

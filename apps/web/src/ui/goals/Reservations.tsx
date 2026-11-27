@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { cellStyle, mutedStyle, numCellStyle, pageStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, numCellStyle, pageStyle, tableStyle, TableRegion } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
@@ -26,7 +26,7 @@ export function ReservationsTable({
   href: (path: string) => string;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('reservations.region')}>
+    <TableRegion label={f.t('reservations.region')}>
       <table style={tableStyle} data-testid="reservations-table">
         <caption className="pf-sr-only">{f.t('reservations.caption')}</caption>
         <thead>
@@ -120,7 +120,7 @@ export function ReservationsTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

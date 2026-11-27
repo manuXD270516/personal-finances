@@ -5,16 +5,17 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Gastos atípicos para su categoría"
 scenario: "Gasto alto en una categoría dispersa"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: ["NFR-DATA-001"]
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/spending-anomaly-detector.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies", "calibration"]
@@ -29,7 +30,7 @@ expected_result:
   - "el gasto no se marca"
   - "la razón es 4.5 y el puntaje robusto 5.90, menor que 15"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-027 — Un gasto de 4.5 veces la mediana en una categoría dispersa no se marca con puntaje robusto menor que 15

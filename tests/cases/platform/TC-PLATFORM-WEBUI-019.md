@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/src/config.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["e2e","webkit","ci"]
@@ -29,7 +30,7 @@ expected_result:
   - "app-shell, a11y, transactions, auth y content-security-policy corren en webkit además de chromium"
   - "el job termina dentro de sus 40 minutos"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-WEBUI-019 — El job de E2E corre el subconjunto de specs también en WebKit

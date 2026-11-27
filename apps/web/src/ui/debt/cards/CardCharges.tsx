@@ -15,8 +15,8 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../../common/workspace';
 import { formatMoney } from '../../dashboard/format';
@@ -298,7 +298,7 @@ export function ChargesSection({
           {f.t('charges.empty')}
         </p>
       ) : (
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('charges.title')}>
+        <TableRegion label={f.t('charges.title')} tall>
           <table style={tableStyle} data-testid="charges-table">
             <caption className="pf-sr-only">
               {f.t('charges.caption', { closing: formatBusinessDate(statement.closingDate) })}
@@ -361,7 +361,7 @@ export function ChargesSection({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       )}
       {voiding ? (
         <ConfirmDialog

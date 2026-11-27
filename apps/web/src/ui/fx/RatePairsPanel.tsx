@@ -11,7 +11,7 @@ import {
   mutedStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatAge, formatInstant } from '../dashboard/format';
@@ -243,7 +243,7 @@ export function RatePairsView({
       {rows.length === 0 ? (
         <p style={mutedStyle}>{f.t('empty')}</p>
       ) : (
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('tableRegion')}>
+        <TableRegion label={f.t('tableRegion')}>
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -359,7 +359,7 @@ export function RatePairsView({
               })}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       )}
       {canEdit && mode === 'CUSTOM' ? (
         <fieldset style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} data-testid="rate-pair-add">

@@ -177,6 +177,12 @@ export function toJobView(s: ImportJobState, currency = ''): ImportJobView {
   };
 }
 
+/** Detalle de `getImport`: en `AWAITING_MAPPING` suma la muestra y el mapeo sugerido (fix-phase-4-debt-followups). */
+export interface ImportJobDetailView extends ImportJobView {
+  readonly sampleRows?: readonly (readonly string[])[];
+  readonly suggestedMapping?: CsvMapping;
+}
+
 export interface CreatedImportView extends ImportJobView {
   readonly sampleRows: readonly (readonly string[])[];
   readonly suggestedMapping: CsvMapping | null;

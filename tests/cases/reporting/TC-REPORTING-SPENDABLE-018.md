@@ -5,16 +5,17 @@ spec: reporting/dashboard
 related_specs: ["commitments/recurrence-engine", "debt/credit-cards"]
 requirement: "Aviso de tarjetas sin pago programado en el disponible"
 scenario: "Pago programado menor que el mínimo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016", "FR-COMMITMENTS-011", "FR-DEBT-014"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["spendable", "q5", "credit-cards"]
@@ -30,7 +31,7 @@ expected_result:
   - "cardsWithoutPaymentCount es 0"
   - "el comprometido incluye la transferencia de 200.00 BOB"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-REPORTING-SPENDABLE-018 — Un pago programado menor que el mínimo deja la tarjeta fuera del aviso de Q5

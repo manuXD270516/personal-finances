@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+  - apps/web/src/ui/identity/identity.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "preferences", "roles"]
@@ -29,7 +31,7 @@ expected_result:
   - "preferences.theme = \"light\" en su /me"
   - "la página se muestra en claro"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-007 — El VIEWER guarda su tema en el perfil

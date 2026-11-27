@@ -40,7 +40,7 @@ describe('PaymentPlanExpectation (add-credit-cards, decisión 7)', () => {
       dueIssuedRemaining: bob('0.00'),
       unbilledAfter: bob('0.00'),
     });
-    expect(e).toEqual({ type: 'ESTIMATED', amount: bob('1120.50') });
+    expect(e).toEqual({ type: 'ESTIMATED', amount: bob('1120.50'), basis: 'OPEN_CYCLE' });
   });
 
   it('el ciclo abierto descuenta lo que falta del emitido no vencido y las cuotas de ciclos posteriores', () => {
@@ -51,7 +51,7 @@ describe('PaymentPlanExpectation (add-credit-cards, decisión 7)', () => {
       dueIssuedRemaining: bob('1120.50'),
       unbilledAfter: bob('333.33'),
     });
-    expect(e).toEqual({ type: 'ESTIMATED', amount: bob('546.17') });
+    expect(e).toEqual({ type: 'ESTIMATED', amount: bob('546.17'), basis: 'OPEN_CYCLE' });
   });
 
   it('el ciclo abierto sin saldo que pagar queda sin monto (NONE)', () => {
@@ -74,7 +74,7 @@ describe('PaymentPlanExpectation (add-credit-cards, decisión 7)', () => {
       dueIssuedRemaining: bob('0.00'),
       unbilledAfter: bob('0.00'),
     });
-    expect(e).toEqual({ type: 'ESTIMATED', amount: bob('56.02') });
+    expect(e).toEqual({ type: 'ESTIMATED', amount: bob('56.02'), basis: 'OPEN_CYCLE' });
   });
 
   it('[TC-DEBT-CARD-017] estado emitido: FIXED 1120.50 BOB (NO_INTEREST) o 56.02 BOB (MINIMUM)', () => {
@@ -82,10 +82,12 @@ describe('PaymentPlanExpectation (add-credit-cards, decisión 7)', () => {
     expect(expectationForIssued({ policy: 'NO_INTEREST', standing })).toEqual({
       type: 'FIXED',
       amount: bob('1120.50'),
+      basis: 'STATEMENT',
     });
     expect(expectationForIssued({ policy: 'MINIMUM', standing })).toEqual({
       type: 'FIXED',
       amount: bob('56.02'),
+      basis: 'STATEMENT',
     });
   });
 
@@ -95,6 +97,7 @@ describe('PaymentPlanExpectation (add-credit-cards, decisión 7)', () => {
     ).toEqual({
       type: 'FIXED',
       amount: bob('620.50'),
+      basis: 'STATEMENT',
     });
     expect(
       expectationForIssued({ policy: 'NO_INTEREST', standing: standingOf('1120.50', '1120.50') }),
@@ -134,7 +137,7 @@ describe('PaymentPlanExpectation (add-credit-cards, decisión 7)', () => {
   it('[TC-DEBT-CARD-033] ciclos posteriores: ESTIMATED con la suma de las cuotas, o NONE sin cuotas', () => {
     expect(
       expectationForFuture({ policy: 'NO_INTEREST', minimumRule: rule, installmentsTotal: bob('333.33') }),
-    ).toEqual({ type: 'ESTIMATED', amount: bob('333.33') });
+    ).toEqual({ type: 'ESTIMATED', amount: bob('333.33'), basis: 'INSTALLMENTS' });
     expect(
       expectationForFuture({ policy: 'NO_INTEREST', minimumRule: rule, installmentsTotal: bob('0.00') }),
     ).toEqual({ type: 'NONE' });
@@ -147,5 +150,25 @@ describe('PaymentPlanExpectation (add-credit-cards, decisión 7)', () => {
     expect(sameExpectation(wanted, { type: 'FIXED', amount: '1120.40' }, 2)).toBe(false);
     expect(sameExpectation({ type: 'NONE' }, { type: 'VARIABLE', amount: null }, 2)).toBe(true);
     expect(sameExpectation({ type: 'NONE' }, { type: 'ESTIMATED', amount: '1.00' }, 2)).toBe(false);
+  });
+
+  it('[TC-DEBT-CARD-033] [TC-REPORTING-UPCOMING-024] [TC-REPORTING-UPCOMING-025] el origen sigue a cada ciclo y sameExpectation lo compara', () => {
+    const open = expectationForOpen({
+      policy: 'NO_INTEREST',
+      minimumRule: rule,
+      presentedBalance: bob('1120.50'),
+      dueIssuedRemaining: bob('0.00'),
+      unbilledAfter: bob('0.00'),
+    });
+    expect(open).toEqual({ type: 'ESTIMATED', amount: bob('1120.50'), basis: 'OPEN_CYCLE' });
+    const wanted = { type: 'ESTIMATED', amount: bob('333.33'), basis: 'INSTALLMENTS' } as const;
+    // Una ocurrencia sin origen (anterior al despliegue) se completa en el primer paso diario.
+    expect(sameExpectation(wanted, { type: 'ESTIMATED', amount: '333.33', basis: null }, 2)).toBe(false);
+    expect(sameExpectation(wanted, { type: 'ESTIMATED', amount: '333.33', basis: 'OPEN_CYCLE' }, 2)).toBe(
+      false,
+    );
+    expect(sameExpectation(wanted, { type: 'ESTIMATED', amount: '333.33', basis: 'INSTALLMENTS' }, 2)).toBe(
+      true,
+    );
   });
 });

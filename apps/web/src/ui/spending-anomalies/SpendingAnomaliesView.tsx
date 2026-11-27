@@ -14,6 +14,7 @@ import {
   type StatusFilter,
 } from './types';
 import './spending-anomalies.css';
+import { TableRegion } from '../common/ui';
 
 export interface SpendingAnomaliesViewProps {
   readonly page: Pick<SpendingAnomalyPage, 'featureStatus'>;
@@ -234,35 +235,37 @@ export function SpendingAnomaliesView(props: SpendingAnomaliesViewProps) {
           {filters.status === 'OPEN' && !filters.from && !filters.to ? f.t('empty') : f.t('emptyFiltered')}
         </p>
       ) : (
-        <table className="pf-sa-table" data-testid="anomalies-table">
-          <caption className="pf-sr-only">{f.t('table.caption')}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{f.t('table.date')}</th>
-              <th scope="col">{f.t('table.amount')}</th>
-              <th scope="col">{f.t('table.category')}</th>
-              <th scope="col">{f.t('table.counterparty')}</th>
-              <th scope="col">{f.t('table.reasons')}</th>
-              <th scope="col">{f.t('table.status')}</th>
-              {canDecide ? <th scope="col">{f.t('table.actions')}</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((a) => (
-              <AnomalyRow
-                key={a.id}
-                anomaly={a}
-                f={f}
-                names={names}
-                canDecide={canDecide}
-                busy={props.busyId === a.id}
-                onDismiss={props.onDismiss}
-                onRestore={props.onRestore}
-                href={props.href}
-              />
-            ))}
-          </tbody>
-        </table>
+        <TableRegion label={f.t('table.caption')}>
+          <table className="pf-sa-table" data-testid="anomalies-table">
+            <caption className="pf-sr-only">{f.t('table.caption')}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{f.t('table.date')}</th>
+                <th scope="col">{f.t('table.amount')}</th>
+                <th scope="col">{f.t('table.category')}</th>
+                <th scope="col">{f.t('table.counterparty')}</th>
+                <th scope="col">{f.t('table.reasons')}</th>
+                <th scope="col">{f.t('table.status')}</th>
+                {canDecide ? <th scope="col">{f.t('table.actions')}</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((a) => (
+                <AnomalyRow
+                  key={a.id}
+                  anomaly={a}
+                  f={f}
+                  names={names}
+                  canDecide={canDecide}
+                  busy={props.busyId === a.id}
+                  onDismiss={props.onDismiss}
+                  onRestore={props.onRestore}
+                  href={props.href}
+                />
+              ))}
+            </tbody>
+          </table>
+        </TableRegion>
       )}
       {props.hasMore ? (
         <button type="button" onClick={props.onMore} data-testid="anomalies-more">

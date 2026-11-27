@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { scaleFor, sumAmounts } from '../common/money';
-import { cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, numCellStyle, tableStyle, TableRegion } from '../common/ui';
 import { formatDecimal } from '../AuditHistory';
 import { formatMoney, formatSignedDecimal } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
@@ -86,7 +86,7 @@ export function SchedulePreviewTable({ f, preview }: { f: FormatContext; preview
           </p>
         ) : null}
       </div>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('preview.region')}>
+      <TableRegion label={f.t('preview.region')} tall>
         <table style={tableStyle} data-testid="schedule-preview-table">
           <caption className="pf-sr-only">{f.t('preview.caption')}</caption>
           <thead>
@@ -154,7 +154,7 @@ export function SchedulePreviewTable({ f, preview }: { f: FormatContext; preview
             </tr>
           </tfoot>
         </table>
-      </div>
+      </TableRegion>
     </div>
   );
 }
@@ -185,8 +185,8 @@ export function InstallmentsTable({
 }) {
   const { locale } = f;
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('installments.region')}>
-      <table style={tableStyle} data-testid="installments-table">
+    <TableRegion label={f.t('installments.region')} tall>
+      <table style={tableStyle} className="pf-table--idcol" data-testid="installments-table">
         <caption className="pf-sr-only">{f.t('installments.caption')}</caption>
         <thead>
           <tr>
@@ -307,7 +307,7 @@ export function InstallmentsTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -336,7 +336,7 @@ export function PaymentsTable({
       </p>
     );
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('payments.region')}>
+    <TableRegion label={f.t('payments.region')}>
       <table style={tableStyle} data-testid="payments-table">
         <caption className="pf-sr-only">{f.t('payments.caption')}</caption>
         <thead>
@@ -420,6 +420,6 @@ export function PaymentsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

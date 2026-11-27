@@ -101,3 +101,7 @@ Sin migraciones de datos ni de contratos. Vuelta atrás: revertir el PR. Se pued
 En [docs/82](../../../docs/82-ui-lotes-l3-l5-questions.md):
 
 7. Si la medición no confirma el problema, ¿se pagina igual la vista previa del import o se retira el requirement? No bloquea: el grupo 6 depende de la medición, no del owner, salvo en ese caso.
+
+## Resultado (2026-11-27)
+
+Medición local de INP con 2 000 filas cargadas con «Cargar más» (Chromium, 3 corridas): abrir fila 200 / 192 / 208 ms (mediana 200 ms) y filtrar 144 / 136 / 120 ms (mediana 136 ms), aprobar ~72 ms y edición masiva ~30 ms. Ninguna mediana supera 200 ms: **no se pagina** y el requirement «Vista previa del import por páginas» se retiró del delta (la decisión 11 queda como diseño descartado; TC-PLATFORM-TABLES-019..021 deprecados). Causa del desbordamiento de «Detalle» (decisión 13): columna `auto` de la rejilla de la pestaña, ensanchada por el cronograma; se corrigió con `minmax(0, 1fr)`. Las listas de Transacciones no son tablas, así que el escenario «Transacciones a 360 px» se verificó sobre el cronograma.

@@ -2,7 +2,7 @@
 # finance-api — una imagen, varios comandos (ADR-0011): api | worker | migrate | seed
 #   docker build -f docker/api.Dockerfile -t pfos/finance-api:local .
 # Base fijada por versión y digest (docs/20 §3, §15); Renovate la actualiza vía PR. Misma línea que .nvmrc (24).
-ARG NODE_IMAGE=node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+ARG NODE_IMAGE=node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
 
 ############################ base ############################
 FROM ${NODE_IMAGE} AS base

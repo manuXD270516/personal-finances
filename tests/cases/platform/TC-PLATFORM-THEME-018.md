@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/common/colors.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "tokens", "static"]
@@ -28,7 +29,7 @@ expected_result:
   - "solo app/globals.css define colores literales"
   - "el bloque de tokens de .pf-home ya no existe"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-018 — No quedan colores literales fuera de la hoja de tokens

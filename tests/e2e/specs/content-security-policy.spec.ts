@@ -294,6 +294,7 @@ test.describe('CSP de la web (security/access-control)', () => {
 
   test('[TC-SECURITY-CSP-004] un sitio ajeno no puede enmarcar la web: frame-ancestors none', async ({
     browser,
+    browserName,
   }) => {
     const context = await browser.newContext({ baseURL: appUrl() });
     const page = await context.newPage();
@@ -311,7 +312,13 @@ test.describe('CSP de la web (security/access-control)', () => {
         .frames()
         .filter((f) => f !== page.mainFrame())
         .map((f) => f.url());
-    await expect.poll(children).toEqual([expect.stringMatching(/^chrome-error:/)]);
+    // Chromium reemplaza el iframe por `chrome-error:`; WebKit conserva la URL del marco pero no renderiza nada, lo que
+    // comprueba el bucle de abajo (ni `main` ni `ready` dentro de ningún marco).
+    await expect
+      .poll(children)
+      .toEqual([
+        browserName === 'webkit' ? `${appUrl()}/auth/error` : expect.stringMatching(/^chrome-error:/),
+      ]);
     for (const frame of page.frames())
       await expect(frame.locator('[data-testid="ready"], main')).toHaveCount(0);
     const res = await context.request.get(`${appUrl()}/auth/error`);

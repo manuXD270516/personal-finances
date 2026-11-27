@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/stack/test/stack/stack.stack.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["stack", "tls", "regression"]
@@ -30,7 +31,7 @@ expected_result:
   - "no existe el contenedor tls-proxy"
   - "la web responde por http en su puerto de siempre"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-STACK-013 — Sin el perfil tls el stack de desarrollo sigue por http y no hay proxy

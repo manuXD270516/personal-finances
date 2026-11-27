@@ -73,8 +73,9 @@ describe('listado de tarjetas', () => {
     expect(text).toMatch(/Utilización 30,53 %/);
     expect(text).toMatch(/Cierra el día 25 · vence el día 15/);
     // La utilización también está en una barra con rol y nombre accesibles.
-    expect(html).toMatch(/role="progressbar"[^>]*aria-label="Utilización de Visa Oro en BOB"/);
-    expect(html).toMatch(/aria-valuenow="31"/);
+    expect(html).toMatch(/<meter[^>]*aria-label="Utilización de Visa Oro en BOB"/);
+    expect(html).toMatch(/<meter[^>]*value="31"/);
+    expect(html).not.toContain('role="progressbar"');
   });
 
   it('límite compartido: una utilización para toda la tarjeta y las filas por moneda remiten a ella', () => {
@@ -85,7 +86,7 @@ describe('listado de tarjetas', () => {
     );
     expect(html).toMatch(/aria-label="Utilización del límite compartido de Mastercard Platinum"/);
     expect(html.match(/data-testid="card-account-row"/g)).toHaveLength(2);
-    expect(html.match(/role="progressbar"/g)).toHaveLength(1);
+    expect(html.match(/<meter/g)).toHaveLength(1);
   });
 
   it('una tarjeta archivada lo dice en el título y el pago automático activo se marca con texto', () => {
@@ -127,7 +128,7 @@ describe('listado de tarjetas', () => {
       />,
     );
     expect(textOf(html)).toMatch(/falta la tasa de cambio de USD/);
-    expect(html).not.toContain('role="progressbar"');
+    expect(html).not.toContain('<meter');
   });
 
   it('el listado agrupa las tarjetas', () => {
@@ -137,7 +138,7 @@ describe('listado de tarjetas', () => {
 });
 
 describe('barra de utilización accesible (nunca solo color)', () => {
-  it('dice el porcentaje y el nivel con texto e icono decorativo, y la barra lleva nombre y valor', () => {
+  it('[TC-PLATFORM-TABLES-014] dice el porcentaje y el nivel con texto e icono decorativo, y la medida lleva nombre y valor', () => {
     const html = renderToStaticMarkup(
       <UtilizationMeter utilization={util({ utilization: '85.00' })} f={f} label="Utilización de Visa" />,
     );
@@ -145,9 +146,9 @@ describe('barra de utilización accesible (nunca solo color)', () => {
     expect(textOf(html)).toMatch(/Utilización 85,00 %/);
     expect(textOf(html)).toMatch(/Crítica/);
     expect(html).toMatch(/<span aria-hidden="true">⚠<\/span>/);
-    expect(html).toMatch(
-      /role="progressbar"[^>]*aria-valuemin="0"[^>]*aria-valuemax="100"[^>]*aria-valuenow="85"/,
-    );
+    // Medida (no progreso de un proceso): <meter> con su valor, umbrales y texto.
+    expect(html).toMatch(/<meter[^>]*min="0"[^>]*max="100"[^>]*value="85"[^>]*low="30"[^>]*high="80"/);
+    expect(html).not.toContain('role="progressbar"');
     expect(html).toMatch(/aria-valuetext="Utilización 85,00 % · Crítica"/);
   });
 
@@ -669,6 +670,19 @@ describe('Q8 y Pagos recurrentes: pago de tarjeta', () => {
     expect(html).toMatch(/data-testid="card-payment-item"[^>]*>Pago de tarjeta · Visa Oro</);
     expect(html).toContain('data-testid="card-payment-estimated"');
     expect(html).toContain('href="/es/debts/tarjetas/card-1"');
+  });
+
+  it('[TC-REPORTING-UPCOMING-023] [TC-REPORTING-UPCOMING-024] [TC-REPORTING-UPCOMING-025] la indicación «cuotas» solo aparece con el origen INSTALLMENTS', () => {
+    const render = (over: Partial<UpcomingPaymentItem>) =>
+      renderToStaticMarkup(<ItemName item={item(over)} f={fu} href={href} />);
+    const installments = render({ expectedBasis: 'INSTALLMENTS' });
+    expect(installments).toContain('data-testid="card-payment-installments"');
+    expect(textOf(installments)).toMatch(/Estimado.* · cuotas/);
+    expect(render({ expectedBasis: 'OPEN_CYCLE' })).not.toContain('card-payment-installments');
+    expect(render({ expectedBasis: 'STATEMENT', estimated: false, amountType: 'FIXED' })).not.toContain(
+      'card-payment-installments',
+    );
+    expect(render({})).not.toContain('card-payment-installments');
   });
 
   it('antes de cargar las tarjetas se reconoce por el prefijo y no hay enlace; un pago común no cambia', () => {

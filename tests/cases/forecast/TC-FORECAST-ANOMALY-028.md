@@ -5,16 +5,18 @@ spec: forecast/anomaly-detection
 related_specs: []
 requirement: "Gastos atípicos para su contraparte"
 scenario: "Contraparte con gastos de otra categoría"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FORECAST-010"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/forecasting/src/domain/spending-anomaly-detector.test.ts
+  - packages/contexts/forecasting/src/domain/expense-history-index.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["anomalies", "calibration", "counterparty"]
@@ -29,7 +31,7 @@ expected_result:
   - "no hay motivo COUNTERPARTY_OUTLIER"
   - "no hay motivo NEW_COUNTERPARTY_HIGH_AMOUNT"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-FORECAST-ANOMALY-028 — Una contraparte sin historia en la categoría del gasto no se evalúa por contraparte ni como nueva

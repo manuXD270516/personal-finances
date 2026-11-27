@@ -4,7 +4,7 @@
 # Un proceso, sin estado, sin acceso a la base de datos ni al almacenamiento de objetos. Base y `uv` fijados por versión
 # y digest (docs/20 §15); Renovate los actualiza vía PR. Dependencias solo desde `uv.lock` (ruedas manylinux, sin
 # compilar nada nativo en la imagen final).
-ARG PYTHON_IMAGE=python:3.14-slim-bookworm@sha256:3fe1a0b6c2d6b2ebb572906cdabeca75aeb558c0c17db5ffefbcf8094871c32b
+ARG PYTHON_IMAGE=python:3.15-slim-bookworm@sha256:96599df822d0e1c6bb700014a05c7f3c8cabc6e0f7ff3c4f9f69cee033b4b5d9
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.12.20@sha256:100047e74f30778ab704942321a09750d6158739573ff58bf3924085cc6cd2d8
 
 FROM ${UV_IMAGE} AS uv

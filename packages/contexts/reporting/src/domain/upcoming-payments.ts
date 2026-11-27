@@ -59,6 +59,7 @@ export const UpcomingWindow = {
   },
 } as const;
 
+export type ExpectedBasis = 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS';
 export type UpcomingAmountType = 'FIXED' | 'ESTIMATED' | 'MIN_MAX' | 'VARIABLE';
 export type UpcomingItemStatus = 'SCHEDULED' | 'DUE' | 'OVERDUE' | 'PENDING_APPROVAL' | 'PENDING';
 
@@ -71,6 +72,8 @@ export interface OccurrenceInput {
   readonly status: 'SCHEDULED' | 'DUE' | 'OVERDUE';
   readonly requiresApproval: boolean;
   readonly amountType: UpcomingAmountType;
+  /** Origen del esperado informado por el administrador (p. ej. `INSTALLMENTS` en una tarjeta). */
+  readonly expectedBasis?: ExpectedBasis | null;
   readonly amount: Money | null;
   readonly min: Money | null;
   readonly max: Money | null;
@@ -104,6 +107,8 @@ export interface UpcomingItem {
   readonly daysOverdue?: number;
   readonly requiresApproval: boolean;
   readonly amountType: UpcomingAmountType | 'ACTUAL';
+  /** Origen del esperado (solo ocurrencias administradas que lo informan). */
+  readonly expectedBasis?: ExpectedBasis;
   /** Monto a mostrar; `null` en `VARIABLE` y en `MIN_MAX` (se muestra el rango). */
   readonly amount: Money | null;
   readonly range?: { readonly min: Money; readonly max: Money };
@@ -137,6 +142,7 @@ function occurrenceItem(o: OccurrenceInput, today: LocalDate): UpcomingItem {
     ...(overdue ? { daysOverdue: overdueBy } : {}),
     requiresApproval: o.requiresApproval,
     amountType: o.amountType,
+    ...(o.expectedBasis ? { expectedBasis: o.expectedBasis } : {}),
   };
   switch (o.amountType) {
     case 'FIXED':

@@ -5,16 +5,19 @@ spec: imports/import-pipeline
 related_specs: []
 requirement: "Mapeo sugerido al retomar una importación"
 scenario: "Retomar con el mapeo de la importación anterior"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - apps/web/src/ui/imports/imports.test.tsx
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["imports", "csv", "mapping", "resume"]
@@ -29,7 +32,7 @@ expected_result:
   - "la respuesta trae suggestedMapping igual al mapeo de la importación anterior"
   - "la pantalla de mapeo lo muestra precargado al retomar"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-IMPORTS-CSV-034 — Al retomar una importación esperando mapeo vuelve el mapeo sugerido de la importación anterior

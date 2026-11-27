@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+  - apps/web/src/ui/common/theme.test.ts
+  - apps/web/test/integration/bff.int.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "bff", "auth"]
@@ -29,7 +32,7 @@ expected_result:
   - "el valor de la cookie es exactamente \"dark\", sin identificadores ni tokens"
   - "la primera página tras el login tiene data-theme=\"dark\" en el HTML crudo"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-012 — El callback de login deja la marca del tema guardado

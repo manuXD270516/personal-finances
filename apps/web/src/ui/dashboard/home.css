@@ -1,18 +1,6 @@
 /* Hoja del Home (docs/28 §5), compartida por las vistas con .pf-home. Hoja estática: la CSP no admite <style> sin nonce. */
+/* Los tokens viven en `app/globals.css` (add-dark-theme, decisión 3): este bloque ya no redeclara colores. */
 .pf-home {
-  --pf-bg: #ffffff;
-  --pf-surface: #f8fafc;
-  --pf-fg: #0f172a;
-  --pf-fg-muted: #475569;
-  --pf-border: #e2e8f0;
-  --pf-primary: #1d4ed8;
-  --pf-focus: #2563eb;
-  --pf-fin-income: #047857;
-  --pf-fin-expense: #334155;
-  --pf-fin-warning: #b45309;
-  --pf-fin-ok: #15803d;
-  --pf-fin-neutral: #64748b;
-  --pf-track: #e2e8f0;
   color: var(--pf-fg);
   display: grid;
   gap: 1.5rem;
@@ -136,7 +124,7 @@
   display: block;
   height: 100%;
   border-radius: 9999px;
-  background: var(--pf-fin-expense);
+  background: var(--pf-fin-expense-soft);
 }
 .pf-home-meter-fill[data-kind='income'] {
   background: var(--pf-fin-income);
@@ -237,10 +225,10 @@
   margin: 0;
 }
 .pf-home-warning {
-  border-left: 4px solid #bf8700;
-  background: #fff8c5;
+  border-left: 4px solid var(--pf-warning-accent);
+  background: var(--pf-warning-bg);
   padding: 0.5rem;
-  color: #3b2300;
+  color: var(--pf-warning-fg);
 }
 .pf-home-list {
   list-style: none;

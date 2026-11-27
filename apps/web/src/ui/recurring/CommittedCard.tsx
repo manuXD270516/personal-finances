@@ -11,8 +11,8 @@ import {
   mutedStyle,
   numCellStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import { formatMoney } from '../dashboard/format';
@@ -78,7 +78,7 @@ export function CommittedView({
         </p>
       ) : null}
       {committed.byCurrency.length > 0 ? (
-        <div style={tableWrapStyle}>
+        <TableRegion label={f.t('committed.byCurrency')}>
           <table style={tableStyle} data-testid="committed-by-currency">
             <caption className="pf-sr-only">{f.t('committed.byCurrency')}</caption>
             <thead>
@@ -112,7 +112,7 @@ export function CommittedView({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       ) : (
         <p style={mutedStyle}>{f.t('committed.none')}</p>
       )}
@@ -135,7 +135,7 @@ export function CommittedView({
       {committed.items.length > 0 ? (
         <details data-testid="committed-breakdown">
           <summary>{f.t('committed.breakdown', { count: committed.items.length })}</summary>
-          <div style={tableWrapStyle}>
+          <TableRegion label={f.t('committed.breakdownCaption')}>
             <table style={tableStyle}>
               <caption className="pf-sr-only">{f.t('committed.breakdownCaption')}</caption>
               <thead>
@@ -175,7 +175,7 @@ export function CommittedView({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
         </details>
       ) : null}
     </section>

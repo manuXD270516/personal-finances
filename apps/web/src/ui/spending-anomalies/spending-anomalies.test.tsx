@@ -80,7 +80,7 @@ describe('motivo por plantilla', () => {
     );
   });
 
-  it('[TC-FORECAST-ANOMALY-014] los motivos de contraparte y de contraparte nueva usan su plantilla', () => {
+  it('[TC-FORECAST-ANOMALY-030] los motivos de contraparte (con su categoría principal) y de contraparte nueva usan su plantilla', () => {
     const counterparty: SpendingAnomalyReason = {
       ...categoryReason,
       kind: 'COUNTERPARTY_OUTLIER',
@@ -90,8 +90,13 @@ describe('motivo por plantilla', () => {
       ratio: '3.2',
       sampleSize: 10,
     };
+    // Marca anterior al change 85 (sin categoría): plantilla sin categoría.
     expect(reasonText(counterparty, f, names)).toBe(
       '3,2 veces la mediana de tus gastos con "Pizzería Demo" (95,00 BOB en los últimos 12 meses, 10 gastos)',
+    );
+    // TC-FORECAST-ANOMALY-030: con la categoría principal.
+    expect(reasonText({ ...counterparty, categoryId: 'cat-1' }, f, names)).toBe(
+      '3,2 veces la mediana de "Pizzería Demo" en "Restaurantes" (95,00 BOB en los últimos 12 meses, 10 gastos)',
     );
     const fresh: SpendingAnomalyReason = {
       kind: 'NEW_COUNTERPARTY_HIGH_AMOUNT',
@@ -103,7 +108,7 @@ describe('motivo por plantilla', () => {
       sampleSize: 140,
     };
     expect(reasonText(fresh, f, { ...names, counterparty: () => 'Tienda Online Nueva' })).toBe(
-      'Contraparte nueva "Tienda Online Nueva", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil 95 de tus gastos (900,00 BOB, 140 gastos)',
+      'Contraparte nueva "Tienda Online Nueva", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil alto de tus gastos (900,00 BOB, 140 gastos)',
     );
   });
 

@@ -1,4 +1,5 @@
 import { formatDecimal } from '../AuditHistory';
+import { Meter } from '../common/ui';
 import {
   barWidth,
   GOAL_STATUS_PRESENTATION,
@@ -48,22 +49,13 @@ function GoalItem({
           · {detail}
         </span>
       </p>
-      <div
-        role="progressbar"
-        aria-label={t('goals.aria', { name: item.name })}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={barWidth(item.percent)}
-        aria-valuetext={`${percentText} · ${detail}`}
-        className="pf-home-meter"
-        data-testid="home-goal-bar"
-      >
-        <span
-          className="pf-home-meter-fill"
-          data-kind="goal"
-          style={{ width: `${barWidth(item.percent)}%` }}
-        />
-      </div>
+      <Meter
+        value={barWidth(item.percent)}
+        label={t('goals.aria', { name: item.name })}
+        valueText={`${percentText} · ${detail}`}
+        color="var(--pf-primary)"
+        testId="home-goal-bar"
+      />
       <p>
         <span className="pf-home-badge" data-tone={presentation.tone} data-testid="home-goal-status">
           <span aria-hidden="true">{presentation.icon}</span> {label}

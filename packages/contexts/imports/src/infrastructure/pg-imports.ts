@@ -459,6 +459,16 @@ export class PgStagingRepository implements StagingRepository {
     }
   }
 
+  async sampleRaw(workspaceId: string, jobId: string, limit: number) {
+    const { rows } = await sql<{ raw: string[] }>`
+      SELECT s.raw
+        FROM imports.staged_transaction s
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId}
+       ORDER BY s.row_number
+       OFFSET 1 LIMIT ${limit}`.execute(db());
+    return rows.map((r) => r.raw);
+  }
+
   async loadForMapping(workspaceId: string, jobId: string) {
     const { rows } = await sql<{
       id: string;

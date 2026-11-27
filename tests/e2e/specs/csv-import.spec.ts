@@ -219,6 +219,29 @@ test.describe('Importar CSV (imports/import-pipeline)', () => {
     await context.close();
   });
 
+  test('[TC-IMPORTS-CSV-031] retomar una importación esperando mapeo muestra las filas del archivo sin el aviso de muestra', async ({
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    const { context, page, W } = await newFinanceUser(browser, 'csvresume');
+    const bank = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '4000.00');
+    await go(page, `/imports/nueva?cuenta=${bank}`);
+    await page.getByTestId('import-legacy-toggle').click();
+    await page.getByTestId('import-legacy-file').setInputFiles(CSV);
+    await page.getByTestId('import-legacy-upload-submit').click();
+    await expect(page.getByTestId('import-wizard')).toHaveAttribute('data-step', '2');
+
+    // Se retoma desde la lista: la respuesta de getImport trae la muestra.
+    const listed = (await api(page, 'GET', `${W}/imports?accountId=${bank}`))['data'] as { id: string }[];
+    expect(listed).toHaveLength(1);
+    await go(page, `/imports/${listed[0]!.id}`);
+    await expect(page.getByTestId('import-wizard')).toHaveAttribute('data-step', '2');
+    await expect(page.getByTestId('mapping-sample')).toContainText('PAGO QR CAFÉ');
+    await expect(page.getByTestId('mapping-no-sample')).toHaveCount(0);
+    expect(await seriousViolations(page)).toEqual([]);
+    await context.close();
+  });
+
   test('[TC-IMPORTS-CSV-001] [TC-IMPORTS-CSV-003] [TC-IMPORTS-CSV-005] el archivo se valida antes de subir: vacío, extensión ajena y cuenta sin elegir', async ({
     browser,
   }) => {

@@ -924,7 +924,7 @@ describe('cuotas, utilización y calendario de cargos futuros (debt/credit-cards
     });
   });
 
-  it('[TC-DEBT-CARD-033] [TC-DEBT-CARD-024] la segunda cuota aparece en los próximos 60 días como estimado por cuotas y en el calendario de cargos futuros', async () => {
+  it('[TC-DEBT-CARD-033] [TC-DEBT-CARD-024] [TC-REPORTING-UPCOMING-023] la segunda cuota aparece en los próximos 60 días como estimado por cuotas y en el calendario de cargos futuros', async () => {
     setDay('2026-11-01');
     const upcoming = checked(
       'getUpcomingPayments',
@@ -936,6 +936,19 @@ describe('cuotas, utilización y calendario de cargos futuros (debt/credit-cards
     expect(second, JSON.stringify(items)).toBeDefined();
     expect(second.amount).toEqual(bob('333.33'));
     expect(second.amountType).toBe('ESTIMATED');
+    // El 2026-12-15 vence el ciclo que cierra el 2026-11-25: tras la emisión del 2026-10-25 ya es el ciclo abierto.
+    expect(second.expectedBasis).toBe('OPEN_CYCLE');
+    // La tercera cuota cae en un ciclo posterior al abierto: su origen son las cuotas programadas.
+    const later = checked(
+      'getUpcomingPayments',
+      200,
+      await get(s.owner, '/reports/upcoming-payments?days=90'),
+    );
+    const third = (later['items'] as any[]).find(
+      (i) => i.name === 'Pago de tarjeta · Visa Oro' && i.date === '2027-01-15',
+    );
+    expect(third, JSON.stringify(later['items'])).toBeDefined();
+    expect(third.expectedBasis).toBe('INSTALLMENTS');
     const charges = checked(
       'getCardFutureCharges',
       200,
@@ -1021,7 +1034,7 @@ describe('el pago de la tarjeta en el comprometido y en los próximos pagos (deb
     setDay('2026-11-01');
   }, 180_000);
 
-  it('[TC-DEBT-CARD-032] los próximos 30 días del 2026-11-01 listan "Pago de tarjeta · Visa Oro" por 1120.50 BOB', async () => {
+  it('[TC-DEBT-CARD-032] [TC-REPORTING-UPCOMING-025] los próximos 30 días del 2026-11-01 listan "Pago de tarjeta · Visa Oro" por 1120.50 BOB', async () => {
     const upcoming = checked(
       'getUpcomingPayments',
       200,
@@ -1030,7 +1043,12 @@ describe('el pago de la tarjeta en el comprometido y en los próximos pagos (deb
     const items = upcoming['items'] as any[];
     const pay = items.find((i) => i.name === 'Pago de tarjeta · Visa Oro');
     expect(pay, JSON.stringify(items)).toBeDefined();
-    expect(pay).toMatchObject({ date: '2026-11-15', amount: bob('1120.50'), amountType: 'FIXED' });
+    expect(pay).toMatchObject({
+      date: '2026-11-15',
+      amount: bob('1120.50'),
+      amountType: 'FIXED',
+      expectedBasis: 'STATEMENT',
+    });
   });
 
   it('[TC-DEBT-CARD-031] el comprometido de noviembre suma el pago de la tarjeta (1120.50) y el Internet (199.00): 1319.50 BOB', async () => {

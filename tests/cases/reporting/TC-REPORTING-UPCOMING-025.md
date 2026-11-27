@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: ["debt/credit-cards"]
 requirement: "Cuotas de tarjeta futuras en los próximos pagos"
 scenario: "Estado de cuenta emitido sin la indicación de cuotas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-017","FR-REPORTING-016"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - packages/contexts/debt/src/domain/payment-plan-expectation.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-payments.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["upcoming-payments","installments"]
@@ -30,7 +34,7 @@ expected_result:
   - "el esperado es FIXED 333.33 BOB con origen STATEMENT"
   - "el ítem de la lista no lleva la indicación \"cuotas\""
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-REPORTING-UPCOMING-025 — El pago de un estado emitido es exacto y sin la indicación cuotas

@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/dark-theme.spec.ts
+  - apps/web/src/ui/identity/identity.test.tsx
+status: automated
 regression_suite: false
 phase: 9
 tags: ["theme", "preferences", "audit"]
@@ -31,7 +33,7 @@ expected_result:
   - "el historial de auditoría tiene un cambio de preferencias del usuario"
   - "la cookie pfos_theme vale dark"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-THEME-004 — Elegir «Oscuro» en Preferencias aplica el tema sin recargar y queda auditado

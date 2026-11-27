@@ -1,5 +1,5 @@
 import { AxeBuilder } from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { api, bob, go, newFinanceUser, openAccount, todayLaPaz, userCategories } from '../src/finance.js';
 
 /**
@@ -91,7 +91,10 @@ async function seriousViolations(page: Page) {
 test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
   test('sin violaciones serias ni críticas en Home, cuentas, transacciones, transferencias, FX, instituciones y clasificación', async ({
     browser,
+    browserName,
   }) => {
+    // WebKit recorre las ~20 pantallas con axe a otro ritmo que Chromium (≈ 6 s por página sobre https): triple tiempo.
+    test.slow(browserName === 'webkit', 'WebKit tarda más por pantalla con axe');
     const { context, page, W } = await newFinanceUser(browser, 'a11y');
     const bank = await openAccount(page, W, 'Banco a11y', 'BANK', 'BOB', '1000.00');
     await openAccount(page, W, 'Ahorro USD a11y', 'SAVINGS', 'USD', '100.00');
@@ -218,6 +221,63 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
     await expect(page.getByTestId('transaction-row')).toHaveCount(1);
     const flaggedList = await seriousViolations(page);
     if (flaggedList.length > 0) found['Transacciones: filtro conciliadas sin extracto'] = flaggedList;
+    expect(found).toEqual({});
+    await context.close();
+  });
+
+  // add-dark-theme 7.5 (TC-PLATFORM-THEME-015): las mismas comprobaciones con el sistema en oscuro y capturas a 360 y 1280 px.
+  test('[TC-PLATFORM-THEME-015] axe en oscuro no informa violaciones serias ni críticas en las pantallas principales', async ({
+    browser,
+  }, testInfo: TestInfo) => {
+    const { context, page, W } = await newFinanceUser(browser, 'a11y-oscuro');
+    await page.emulateMedia({ colorScheme: 'dark' });
+    const bank = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '1000.00');
+    const [food] = await userCategories(page, W, 'EXPENSE');
+    const expense = await api(page, 'POST', `${W}/transactions`, {
+      kind: 'EXPENSE',
+      status: 'POSTED',
+      transactionDate: todayLaPaz(),
+      accountId: bank,
+      amount: bob('60.00'),
+      splits: [{ amount: bob('60.00'), categoryId: food!.id }],
+    });
+    const expenseId = String(expense['id']);
+
+    const found: Record<string, Awaited<ReturnType<typeof seriousViolations>>> = {};
+    const analyze = async (name: string, shot: string) => {
+      const violations = await seriousViolations(page);
+      if (violations.length > 0) found[name] = violations;
+      for (const width of [360, 1280]) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.screenshot({ path: testInfo.outputPath(`oscuro-${shot}-${width}.png`), fullPage: true });
+      }
+      await page.setViewportSize({ width: 1280, height: 720 });
+    };
+    const open = async (path: string) => {
+      await go(page, path);
+      await expect(page.locator('main, [role="main"]').first()).toBeVisible();
+    };
+
+    await open('/');
+    await expect(page.getByTestId('top-categories')).toHaveAttribute('data-comparison', 'ready');
+    await analyze('Inicio (/)', 'inicio');
+    await open('/transacciones');
+    await analyze('Transacciones', 'transacciones');
+    await open('/transacciones/nueva');
+    await analyze('Nueva transacción', 'alta');
+    await open(`/transacciones/${expenseId}`);
+    await analyze('Detalle de un gasto de 60.00 BOB', 'detalle');
+    await page.getByRole('tab', { name: 'Recorrido' }).click();
+    await expect(page.locator('[data-testid="lifecycle-diagram"]:visible')).toHaveCount(1);
+    await analyze('Recorrido del gasto', 'recorrido');
+    await open('/planificacion/presupuestos');
+    await analyze('Presupuestos', 'presupuestos');
+    await open('/reportes');
+    await analyze('Reportes: catálogo', 'reportes');
+    await open('/reportes/ingresos-gastos');
+    await analyze('Reportes: ingresos y gastos', 'reporte-ingresos-gastos');
+    await open('/preferencias');
+    await analyze('Mis preferencias', 'preferencias');
     expect(found).toEqual({});
     await context.close();
   });

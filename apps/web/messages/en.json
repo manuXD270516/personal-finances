@@ -120,6 +120,13 @@
       "displayNameRequired": "Enter a display name.",
       "displayNameTooLong": "The name allows up to 100 characters.",
       "timezoneInvalid": "This is not a valid IANA time zone (for example America/La_Paz)."
+    },
+    "theme": {
+      "legend": "Theme",
+      "hint": "“System” follows your device's light or dark mode.",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
     }
   },
   "Auth": {
@@ -1109,7 +1116,8 @@
       "customFields": "Custom fields",
       "reconciliation": "Reconciliation",
       "statementRef": "Statement of {date} for {balance}",
-      "source": "Origin"
+      "source": "Origin",
+      "editDescriptive": "Edit description and notes"
     },
     "history": {
       "title": "History (lifecycle)",
@@ -1220,6 +1228,16 @@
       "voided": "Entry voided",
       "undoReason": "Undone from the recording notice",
       "recordAndDetail": "Record and go to details"
+    },
+    "managedEdit": {
+      "title": "Edit description and notes",
+      "loanManaged": "This entry is managed by the loan: only the description and notes can be edited.",
+      "cardManaged": "Managed by the card: the amount, account, date, currency and categories are not edited here.",
+      "cardManagedNamed": "Managed by the card {name}: the amount, account, date, currency and categories are not edited here.",
+      "account": "Account",
+      "currency": "Currency",
+      "viewCard": "View the card",
+      "categories": "Categories"
     }
   },
   "Fx": {
@@ -2256,7 +2274,16 @@
     "suggest": {
       "open": "Suggest from history"
     },
-    "historyRegion": "Plan change history"
+    "historyRegion": "Plan change history",
+    "sort": {
+      "announce": "Sorted by {column}, {direction}",
+      "ascending": "lowest to highest",
+      "descending": "highest to lowest",
+      "textAscending": "A to Z",
+      "textDescending": "Z to A",
+      "dateAscending": "oldest to newest",
+      "dateDescending": "newest to oldest"
+    }
   },
   "Templates": {
     "title": "Budget templates",
@@ -3457,6 +3484,15 @@
       "statementSave": "Save statement amount",
       "statementSaved": "The statement amount was saved.",
       "truncated": "Showing the first {limit} charges."
+    },
+    "sort": {
+      "announce": "Sorted by {column}, {direction}",
+      "ascending": "lowest to highest",
+      "descending": "highest to lowest",
+      "textAscending": "A to Z",
+      "textDescending": "Z to A",
+      "dateAscending": "oldest to newest",
+      "dateDescending": "newest to oldest"
     }
   },
   "AuditLog": {
@@ -3705,6 +3741,7 @@
     "cardPayment": {
       "label": "Card payment · {name}",
       "estimated": "Estimated: adjusted when the statement is issued",
+      "installments": "installments",
       "viewCard": "View the card"
     }
   },
@@ -6803,6 +6840,15 @@
         "TAG": "tag",
         "COUNTERPARTY": "counterparty"
       }
+    },
+    "sort": {
+      "announce": "Sorted by {column}, {direction}",
+      "ascending": "lowest to highest",
+      "descending": "highest to lowest",
+      "textAscending": "A to Z",
+      "textDescending": "Z to A",
+      "dateAscending": "oldest to newest",
+      "dateDescending": "newest to oldest"
     }
   },
   "ImportConnections": {
@@ -7415,8 +7461,9 @@
     "reportingAmount": "Equivalent to {amount}",
     "reason": {
       "CATEGORY_OUTLIER": "{ratio} times the median of \"{name}\" ({reference} over the last 12 months, {count} expenses)",
-      "COUNTERPARTY_OUTLIER": "{ratio} times the median of your expenses with \"{name}\" ({reference} over the last 12 months, {count} expenses)",
-      "NEW_COUNTERPARTY_HIGH_AMOUNT": "New counterparty \"{name}\", with no expenses in the last 12 months, at or above the 95th percentile of your expenses ({reference}, {count} expenses)"
+      "COUNTERPARTY_OUTLIER": "{ratio} times the median of \"{name}\" in \"{category}\" ({reference} over the last 12 months, {count} expenses)",
+      "COUNTERPARTY_OUTLIER_LEGACY": "{ratio} times the median of your expenses with \"{name}\" ({reference} over the last 12 months, {count} expenses)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "New counterparty \"{name}\", with no expenses in the last 12 months, at or above the high percentile of your expenses ({reference}, {count} expenses)"
     },
     "dismiss": {
       "label": "Not unusual",

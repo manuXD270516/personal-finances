@@ -1,4 +1,4 @@
-import { cardStyle, cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cardStyle, cellStyle, mutedStyle, numCellStyle, tableStyle, TableRegion } from '../common/ui';
 import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import type { BudgetGoalContributions } from '../goals/types';
@@ -30,7 +30,7 @@ export function BudgetGoalContributionsView({
         {f.t('goalContributions.title')}
       </h2>
       <p style={{ ...mutedStyle, margin: 0 }}>{f.t('goalContributions.intro')}</p>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('goalContributions.region')}>
+      <TableRegion label={f.t('goalContributions.region')}>
         <table style={tableStyle}>
           <caption className="pf-sr-only">{f.t('goalContributions.caption')}</caption>
           <thead>
@@ -69,7 +69,7 @@ export function BudgetGoalContributionsView({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       <p style={{ margin: 0 }} data-testid="budget-goal-pending-total">
         <strong>{f.t('goalContributions.pendingTotal')}</strong>{' '}
         {pendingTotal.base

@@ -12,6 +12,7 @@ import {
   fromCommitment,
   type CardOf,
 } from './UpcomingParts';
+import { TableRegion } from '../common/ui';
 
 export interface UpcomingFullViewProps {
   readonly upcoming: UpcomingPayments;
@@ -103,7 +104,12 @@ function ItemsTable({
     );
   }
   return (
-    <div className="pf-upc-table-wrap">
+    <TableRegion
+      label={f.t('table.caption', {
+        from: formatLocalDate(upcoming.window.from, f.locale),
+        to: formatLocalDate(upcoming.window.to, f.locale),
+      })}
+    >
       <table className="pf-upc-table" data-testid="upcoming-table">
         <caption>
           {f.t('table.caption', {
@@ -158,7 +164,7 @@ function ItemsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 
@@ -170,7 +176,7 @@ function ProjectedBalances({ upcoming, f }: { upcoming: UpcomingPayments; f: For
       <p className="pf-home-muted pf-upc-projection" style={{ margin: 0 }}>
         {f.t('projected.note')}
       </p>
-      <div className="pf-upc-table-wrap">
+      <TableRegion label={f.t('projected.caption')}>
         <table className="pf-upc-table">
           <caption>{f.t('projected.caption')}</caption>
           <thead>
@@ -204,7 +210,7 @@ function ProjectedBalances({ upcoming, f }: { upcoming: UpcomingPayments; f: For
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
     </section>
   );
 }

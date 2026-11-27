@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/src/config.test.ts
+  - tests/e2e/src/duration-summary.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["ci", "e2e", "webkit"]
@@ -31,7 +33,7 @@ expected_result:
   - "el job termina dentro de sus 40 minutos"
   - "la lista de checks obligatorios de main es la misma que antes del change"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-PIPELINE-044 — WebKit corre dentro del job e2e, sin check obligatorio nuevo y con la duración publicada

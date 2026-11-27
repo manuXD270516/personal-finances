@@ -5,16 +5,17 @@ spec: imports/import-pipeline
 related_specs: []
 requirement: "Mapeo sugerido al retomar una importación"
 scenario: "Cuenta sin importaciones anteriores"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["imports", "csv", "mapping", "resume"]
@@ -29,7 +30,7 @@ expected_result:
   - "la respuesta no trae suggestedMapping"
   - "la pantalla de mapeo empieza vacía"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # TC-IMPORTS-CSV-035 — Sin importaciones anteriores de la cuenta la importación esperando mapeo no trae mapeo sugerido

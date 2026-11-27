@@ -129,7 +129,7 @@ export function TransactionsListView({
               gap: '0.25rem 0.75rem',
               alignItems: 'baseline',
               padding: '0.5rem 0',
-              borderBottom: '1px solid #eaeef2',
+              borderBottom: '1px solid var(--pf-border)',
               opacity: tx.status === 'VOIDED' ? 0.7 : 1,
             }}
           >

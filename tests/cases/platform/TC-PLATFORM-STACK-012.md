@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/src/ports.test.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["e2e", "stack", "ports"]
@@ -30,7 +31,7 @@ expected_result:
   - "con 5, la corrida falla con un mensaje que nombra PF_E2E_PORT_PREFIX y los valores 3 y 4"
   - "con 5, no se ejecuta ningún comando de Docker"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-STACK-012 — El harness de E2E rechaza un prefijo de puertos distinto de 3 o 4 antes de tocar Docker

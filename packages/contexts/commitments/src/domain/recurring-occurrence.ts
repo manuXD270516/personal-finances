@@ -9,6 +9,9 @@ import {
 } from './lifecycle.js';
 import type { CancelReason, MatchedBy, Resolution } from './types.js';
 
+/** Origen del esperado fijado por quien administra la definición (openspec fix-phase-4-debt-followups, decisión 2). */
+export type ExpectedBasis = 'STATEMENT' | 'OPEN_CYCLE' | 'INSTALLMENTS';
+
 /** Estado persistible de una ocurrencia (fechas `YYYY-MM-DD`, instantes RFC 3339 UTC). */
 export interface OccurrenceState {
   readonly id: string;
@@ -23,6 +26,8 @@ export interface OccurrenceState {
   readonly currency: string;
   readonly amountOverridden: boolean;
   readonly dateOverridden: boolean;
+  /** Origen del esperado informado por el administrador; `null` si no lo informó o dejó de ser el suyo. */
+  readonly expectedBasis: ExpectedBasis | null;
   readonly status: OccurrenceStatus;
   readonly cancelReason: CancelReason | null;
   readonly transactionId: string | null;
@@ -54,6 +59,8 @@ export interface OccurrenceEditOptions {
    * valor del administrador pasa a ser el vigente y la marca se limpia.
    */
   readonly byManager?: boolean;
+  /** Origen del esperado que fija el administrador; sin él (o en una edición del usuario) el origen queda en `null`. */
+  readonly basis?: ExpectedBasis | null;
 }
 
 /**
@@ -106,6 +113,7 @@ export class RecurringOccurrence {
         currency: input.currency,
         amountOverridden: false,
         dateOverridden: false,
+        expectedBasis: null,
         status: 'SCHEDULED',
         cancelReason: null,
         transactionId: null,
@@ -255,6 +263,7 @@ export class RecurringOccurrence {
       matchedBy: null,
       resolvedAt: null,
       resolvedBy: null,
+      expectedBasis: null,
       ...(input.expected ? { expected: input.expected, amountOverridden: input.overridden ?? false } : {}),
     });
     return released;
@@ -314,6 +323,12 @@ export class RecurringOccurrence {
       patch.amountOverridden = options.byManager !== true;
       fields.push('expected');
     }
+    // El origen es del administrador: una edición del usuario o un esperado sin origen lo dejan en `null`.
+    const wantedBasis = options.byManager === true ? (options.basis ?? null) : null;
+    if (changes.expected !== undefined && wantedBasis !== this.state.expectedBasis) {
+      patch.expectedBasis = wantedBasis;
+      if (fields.length === 0) fields.push('expectedBasis');
+    }
     if (changes.dueDate !== undefined && changes.dueDate !== this.state.dueDate) {
       LocalDate.parse(changes.dueDate);
       patch.dueDate = changes.dueDate;
@@ -347,6 +362,7 @@ export class RecurringOccurrence {
       currency: input.currency,
       amountOverridden: false,
       dateOverridden: false,
+      expectedBasis: null,
       lastAutoCreateError: null,
       lastAutoCreateOn: null,
     });

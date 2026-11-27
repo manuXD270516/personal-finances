@@ -69,7 +69,7 @@ export const DEFAULT_FORECASTING_SETTINGS: ForecastingSettings = {
   coherenceGapRatio: '0.05',
 };
 
-/** Ajustes por omisión de la detección de gastos atípicos (D473, D474): habilitada, 7 días, 3.5, 3.0, 8 y percentil 95. */
+/** Ajustes por omisión de la detección de gastos atípicos (D473, D474): habilitada, 7 días, 15, 3.0, 8 y percentil 99.5 (D513). */
 export const DEFAULT_ANOMALY_SETTINGS: AnomalySettings = {
   enabled: true,
   lookbackDays: 7,
@@ -346,6 +346,7 @@ export {
 } from '../contracts/index.js';
 export { MlForecastingServiceClient } from '../infrastructure/ml-service-client.js';
 export type { OutboxPort } from '../application/ports.js';
+export type { AnomalyThresholds } from '../domain/index.js';
 export { BacktestReport, collectBacktestReport } from './backtest-report-runner.js';
 export {
   MIN_PRECISION,
@@ -354,4 +355,5 @@ export {
   formatBacktestReport,
   type AnomalyBacktestReport,
   type AnomalyLabel,
+  type BacktestThresholds,
 } from '../application/backtest-spending-anomalies.js';

@@ -1,4 +1,4 @@
-import { cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, numCellStyle, tableStyle, TableRegion } from '../common/ui';
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { AmountText, DefinitionStatusBadge } from './Badges';
@@ -34,7 +34,7 @@ export function DefinitionsList({
       </p>
     );
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={f.t('definitions.caption')}>
       <table style={tableStyle} data-testid="definitions-table">
         <caption className="pf-sr-only">{f.t('definitions.caption')}</caption>
         <thead>
@@ -95,6 +95,6 @@ export function DefinitionsList({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

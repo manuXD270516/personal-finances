@@ -458,6 +458,29 @@ describe('Subida del archivo', () => {
   });
 });
 
+describe('Retomar el mapeo (fix-phase-4-debt-followups)', () => {
+  it('[TC-IMPORTS-CSV-031] [TC-IMPORTS-CSV-034] getImport en AWAITING_MAPPING devuelve la muestra y el mapeo sugerido; el VIEWER también los lee', async () => {
+    // una importación anterior de la cuenta con mapeo guardado
+    await mapImport(await uploaded(fixture('extracto-octubre/input.csv')));
+    const created = await uploaded(fixture('extracto-octubre/input.csv'));
+    const detail = await getImport(created.id, viewer);
+    expect(detail.status).toBe('AWAITING_MAPPING');
+    expect(detail.header).toEqual(['Fecha', 'Descripción', 'Monto']);
+    expect(detail.sampleRows).toEqual(created.sampleRows);
+    expect(detail.sampleRows).toHaveLength(4);
+    expect(detail.suggestedMapping).toMatchObject({ columns: { date: { index: 0 } } });
+  });
+
+  it('[TC-IMPORTS-CSV-033] una importación ya mapeada no devuelve filas de muestra', async () => {
+    const created = await uploaded(fixture('extracto-octubre/input.csv'));
+    await mapImport(created);
+    const detail = (await getImport(created.id)) as unknown as Record<string, unknown>;
+    expect(detail['status']).toBe('AWAITING_REVIEW');
+    expect(detail).not.toHaveProperty('sampleRows');
+    expect(detail).not.toHaveProperty('suggestedMapping');
+  });
+});
+
 describe('Mapeo y vista previa', () => {
   it('[TC-IMPORTS-CSV-006][TC-IMPORTS-CSV-015] 4 filas nuevas, salidas 281.30, entradas 8000.00 y saldo resultante 11718.70 sin efectos', async () => {
     const created = await uploaded(fixture('extracto-octubre/input.csv'));

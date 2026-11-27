@@ -1,16 +1,12 @@
 import type { DiagramModel, DiagramLayout } from './logic';
 import { NODE_H } from './logic';
 
-const ON = '#0969da';
-const ON_DARK = '#0a3069';
-const OFF = '#8c959f';
-const OFF_TEXT = '#57606a';
-
 /**
  * Diagrama SVG de la máquina de estados (estático y determinista, sin librería de gráficos): estados visitados y
  * transiciones recorridas destacados (trazo continuo, numeradas por orden), estado actual con énfasis (relleno y
  * "(actual)") y lo no recorrido atenuado (trazo discontinuo). El color nunca es la única señal. `role="img"` con nombre
- * y `aria-describedby` a la línea de tiempo, que es la alternativa accesible.
+ * y `aria-describedby` a la línea de tiempo, que es la alternativa accesible. Los colores salen de clases `.pf-lc-*` de
+ * `app/globals.css` (tokens `--pf-chart-*`), así que siguen el tema claro u oscuro.
  */
 export function LifecycleDiagram({
   model,
@@ -65,11 +61,11 @@ export function LifecycleDiagram({
             markerHeight="7"
             orient="auto-start-reverse"
           >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill={on ? ON : OFF} />
+            <path d="M 0 0 L 10 5 L 0 10 z" className={on ? 'pf-lc-arrow--on' : 'pf-lc-arrow--off'} />
           </marker>
         ))}
       </defs>
-      <circle cx={layout.start.x} cy={layout.start.y} r={layout.start.r} fill="#24292f" />
+      <circle cx={layout.start.x} cy={layout.start.y} r={layout.start.r} className="pf-lc-start" />
       {ordered.map(({ geo, state }) => (
         <g
           key={geo.id}
@@ -83,7 +79,7 @@ export function LifecycleDiagram({
           <path
             d={geo.d}
             fill="none"
-            stroke={state.traversed ? ON : OFF}
+            className={state.traversed ? 'pf-lc-edge--on' : 'pf-lc-edge--off'}
             strokeWidth={state.traversed ? 2.25 : 1.25}
             strokeDasharray={state.traversed ? undefined : '5 4'}
             opacity={state.traversed ? 1 : 0.7}
@@ -95,7 +91,7 @@ export function LifecycleDiagram({
             textAnchor={geo.label.anchor}
             fontSize="12"
             fontWeight={state.traversed ? 600 : 400}
-            fill={state.traversed ? ON_DARK : OFF_TEXT}
+            className={state.traversed ? 'pf-lc-edge-label--on' : 'pf-lc-edge-label--off'}
           >
             {transitionLabel(state.transition)}
           </text>
@@ -107,8 +103,7 @@ export function LifecycleDiagram({
                 width={16 + 7 * state.order.join(', ').length}
                 height={18}
                 rx={9}
-                fill={ON}
-                stroke="#ffffff"
+                className="pf-lc-pill"
                 strokeWidth={1.5}
               />
               <text
@@ -117,7 +112,7 @@ export function LifecycleDiagram({
                 textAnchor="middle"
                 fontSize="11"
                 fontWeight={700}
-                fill="#ffffff"
+                className="pf-lc-pill-text"
               >
                 {state.order.join(', ')}
               </text>
@@ -129,8 +124,7 @@ export function LifecycleDiagram({
         const state = nodeOf.get(n.code)!;
         const x = n.x - n.w / 2;
         const y = n.y - n.h / 2;
-        const fill = state.current ? ON : state.visited ? '#ddf4ff' : '#f6f8fa';
-        const text = state.current ? '#ffffff' : state.visited ? ON_DARK : OFF_TEXT;
+        const tone = state.current ? 'current' : state.visited ? 'visited' : 'off';
         return (
           <g
             key={n.code}
@@ -146,8 +140,7 @@ export function LifecycleDiagram({
               width={n.w}
               height={n.h}
               rx={10}
-              fill={fill}
-              stroke={state.current ? ON_DARK : state.visited ? ON : OFF}
+              className={`pf-lc-node pf-lc-node--${tone}`}
               strokeWidth={state.current ? 3 : state.visited ? 1.75 : 1.25}
               strokeDasharray={state.visited ? undefined : '5 4'}
             />
@@ -159,7 +152,7 @@ export function LifecycleDiagram({
                 height={n.h - 8}
                 rx={7}
                 fill="none"
-                stroke={state.current ? '#ffffff' : state.visited ? ON : OFF}
+                className={`pf-lc-node-inner pf-lc-node-inner--${tone}`}
                 strokeWidth={1}
               />
             ) : null}
@@ -169,12 +162,18 @@ export function LifecycleDiagram({
               textAnchor="middle"
               fontSize="13"
               fontWeight={state.visited ? 600 : 400}
-              fill={text}
+              className={`pf-lc-node-text--${tone}`}
             >
               {stateLabel(n.code)}
             </text>
             {state.current ? (
-              <text x={n.x} y={n.y + NODE_H / 2 - 7} textAnchor="middle" fontSize="10" fill="#ffffff">
+              <text
+                x={n.x}
+                y={n.y + NODE_H / 2 - 7}
+                textAnchor="middle"
+                fontSize="10"
+                className="pf-lc-node-text--current"
+              >
                 {currentLabel}
               </text>
             ) : null}

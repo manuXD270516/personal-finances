@@ -14,7 +14,9 @@ type: e2e
 level: e2e
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: deprecated
+deprecated_by_change: refine-data-tables
+deprecation_reason: "La medición de INP con 2 000 filas no confirma el problema (mediana de abrir fila 200 ms y de filtrar 140 ms, bajo el objetivo de 200 ms; ver tasks 6.1): no se pagina la vista previa y el requirement se retira (docs/82, pregunta 7, recomendación)."
 regression_suite: false
 phase: 9
 tags: ["imports", "pagination"]

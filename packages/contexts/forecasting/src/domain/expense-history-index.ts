@@ -1,5 +1,5 @@
 import { LocalDate, type Decimal } from '@pf/shared-kernel';
-import type { ExpenseHistory } from './spending-anomaly-detector.js';
+import { mainCategoryOf, type ExpenseHistory } from './spending-anomaly-detector.js';
 
 /** Días de historia de cada gasto: los 365 anteriores a su fecha (D473, decisión 4). */
 export const HISTORY_DAYS = 365;
@@ -53,6 +53,8 @@ function window(entries: readonly Entry[] | undefined, from: string, before: str
 export class ExpenseHistoryIndex {
   private readonly categories = new Map<string, Entry[]>();
   private readonly counterparties = new Map<string, Entry[]>();
+  /** Por par contraparte-categoría principal (D513). */
+  private readonly counterpartyCategories = new Map<string, Entry[]>();
   private readonly all: Entry[] = [];
 
   constructor(expenses: readonly ValuedExpense[]) {
@@ -60,6 +62,14 @@ export class ExpenseHistoryIndex {
       this.all.push({ date: e.date, value: e.total });
       if (e.counterpartyId !== null)
         push(this.counterparties, e.counterpartyId, { date: e.date, value: e.total });
+      if (e.counterpartyId !== null) {
+        const main = mainCategoryOf(e.portions);
+        if (main !== null)
+          push(this.counterpartyCategories, pairKey(e.counterpartyId, main), {
+            date: e.date,
+            value: e.total,
+          });
+      }
       for (const p of e.portions) {
         if (p.categoryId !== null) push(this.categories, p.categoryId, { date: e.date, value: p.value });
       }
@@ -67,6 +77,7 @@ export class ExpenseHistoryIndex {
     this.all.sort(byDate);
     for (const list of this.categories.values()) list.sort(byDate);
     for (const list of this.counterparties.values()) list.sort(byDate);
+    for (const list of this.counterpartyCategories.values()) list.sort(byDate);
   }
 
   historyFor(date: string): ExpenseHistory {
@@ -74,10 +85,14 @@ export class ExpenseHistoryIndex {
     return {
       category: (id) => window(this.categories.get(id), from, date),
       counterparty: (id) => window(this.counterparties.get(id), from, date),
+      counterpartyInCategory: (id, categoryId) =>
+        window(this.counterpartyCategories.get(pairKey(id, categoryId)), from, date),
       workspace: () => window(this.all, from, date),
     };
   }
 }
+
+const pairKey = (counterpartyId: string, categoryId: string): string => `${counterpartyId}|${categoryId}`;
 
 function push(map: Map<string, Entry[]>, key: string, entry: Entry): void {
   const list = map.get(key);

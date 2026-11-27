@@ -120,6 +120,13 @@
       "displayNameRequired": "Ingresa un nombre visible.",
       "displayNameTooLong": "El nombre admite hasta 100 caracteres.",
       "timezoneInvalid": "No es una zona horaria IANA válida (por ejemplo America/La_Paz)."
+    },
+    "theme": {
+      "legend": "Tema",
+      "hint": "«Sistema» sigue el modo claro u oscuro de tu dispositivo.",
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Oscuro"
     }
   },
   "Auth": {
@@ -1109,7 +1116,8 @@
       "customFields": "Campos personalizados",
       "reconciliation": "Conciliación",
       "statementRef": "Extracto del {date} por {balance}",
-      "source": "Origen"
+      "source": "Origen",
+      "editDescriptive": "Editar descripción y notas"
     },
     "history": {
       "title": "Historial (ciclo de vida)",
@@ -1220,6 +1228,16 @@
       "voided": "Registro anulado",
       "undoReason": "Deshecho desde el aviso de registro",
       "recordAndDetail": "Registrar e ir al detalle"
+    },
+    "managedEdit": {
+      "title": "Editar descripción y notas",
+      "loanManaged": "Este movimiento lo administra el préstamo: solo se pueden editar la descripción y las notas.",
+      "cardManaged": "Lo administra la tarjeta: el monto, la cuenta, la fecha, la moneda y las categorías no se editan aquí.",
+      "cardManagedNamed": "Lo administra la tarjeta {name}: el monto, la cuenta, la fecha, la moneda y las categorías no se editan aquí.",
+      "account": "Cuenta",
+      "currency": "Moneda",
+      "viewCard": "Ver la tarjeta",
+      "categories": "Categorías"
     }
   },
   "Fx": {
@@ -2256,7 +2274,16 @@
     "suggest": {
       "open": "Sugerir desde el historial"
     },
-    "historyRegion": "Historial de cambios del plan"
+    "historyRegion": "Historial de cambios del plan",
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "de menor a mayor",
+      "descending": "de mayor a menor",
+      "textAscending": "de la A a la Z",
+      "textDescending": "de la Z a la A",
+      "dateAscending": "de la más antigua a la más reciente",
+      "dateDescending": "de la más reciente a la más antigua"
+    }
   },
   "Templates": {
     "title": "Templates de presupuesto",
@@ -3457,6 +3484,15 @@
       "statementSave": "Guardar monto del extracto",
       "statementSaved": "Se guardó el monto del extracto.",
       "truncated": "Se muestran los primeros {limit} cargos."
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "de menor a mayor",
+      "descending": "de mayor a menor",
+      "textAscending": "de la A a la Z",
+      "textDescending": "de la Z a la A",
+      "dateAscending": "de la más antigua a la más reciente",
+      "dateDescending": "de la más reciente a la más antigua"
     }
   },
   "AuditLog": {
@@ -3705,6 +3741,7 @@
     "cardPayment": {
       "label": "Pago de tarjeta · {name}",
       "estimated": "Estimado: se ajusta al emitirse el estado de cuenta",
+      "installments": "cuotas",
       "viewCard": "Ver la tarjeta"
     }
   },
@@ -6803,6 +6840,15 @@
         "TAG": "una etiqueta",
         "COUNTERPARTY": "una contraparte"
       }
+    },
+    "sort": {
+      "announce": "Ordenado por {column}, {direction}",
+      "ascending": "de menor a mayor",
+      "descending": "de mayor a menor",
+      "textAscending": "de la A a la Z",
+      "textDescending": "de la Z a la A",
+      "dateAscending": "de la más antigua a la más reciente",
+      "dateDescending": "de la más reciente a la más antigua"
     }
   },
   "ImportConnections": {
@@ -7415,8 +7461,9 @@
     "reportingAmount": "Equivale a {amount}",
     "reason": {
       "CATEGORY_OUTLIER": "{ratio} veces la mediana de \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
-      "COUNTERPARTY_OUTLIER": "{ratio} veces la mediana de tus gastos con \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
-      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nueva \"{name}\", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil 95 de tus gastos ({reference}, {count} gastos)"
+      "COUNTERPARTY_OUTLIER": "{ratio} veces la mediana de \"{name}\" en \"{category}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "COUNTERPARTY_OUTLIER_LEGACY": "{ratio} veces la mediana de tus gastos con \"{name}\" ({reference} en los últimos 12 meses, {count} gastos)",
+      "NEW_COUNTERPARTY_HIGH_AMOUNT": "Contraparte nueva \"{name}\", sin gastos en los últimos 12 meses, con un monto igual o mayor al percentil alto de tus gastos ({reference}, {count} gastos)"
     },
     "dismiss": {
       "label": "No es atípico",

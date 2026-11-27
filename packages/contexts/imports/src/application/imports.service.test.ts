@@ -180,6 +180,48 @@ describe('CreateCsvImport', () => {
   });
 });
 
+describe('getImport al retomar el mapeo (fix-phase-4-debt-followups)', () => {
+  it('[TC-IMPORTS-CSV-031] en AWAITING_MAPPING devuelve las filas de muestra iguales a las de la creación', async () => {
+    const ctx = setup();
+    const created = await upload(ctx);
+    const detail = await ctx.queries.get(WS, created.id);
+    expect(detail.status).toBe('AWAITING_MAPPING');
+    expect(detail.header).toEqual(['Fecha', 'Descripción', 'Monto']);
+    expect(detail.sampleRows).toEqual(created.sampleRows);
+    expect(detail.sampleRows).toHaveLength(4);
+  });
+
+  it('[TC-IMPORTS-CSV-032] la muestra se limita a 20 filas en el orden del archivo', async () => {
+    const ctx = setup();
+    const rows = Array.from({ length: 150 }, (_, i) => `01/10/2026;MOV ${i + 1};-1,00`);
+    const created = await upload(ctx, ['Fecha;Descripción;Monto', ...rows].join('\r\n') + '\r\n');
+    const detail = await ctx.queries.get(WS, created.id);
+    expect(detail.sampleRows).toHaveLength(20);
+    expect(detail.sampleRows?.[0]?.[1]).toBe('MOV 1');
+    expect(detail.sampleRows?.[19]?.[1]).toBe('MOV 20');
+  });
+
+  it('[TC-IMPORTS-CSV-033] una importación ya mapeada no devuelve muestra ni mapeo sugerido', async () => {
+    const ctx = setup();
+    const { created } = await mapped(ctx);
+    const detail = await ctx.queries.get(WS, created.id);
+    expect(detail.status).toBe('AWAITING_REVIEW');
+    expect(detail).not.toHaveProperty('sampleRows');
+    expect(detail).not.toHaveProperty('suggestedMapping');
+  });
+
+  it('[TC-IMPORTS-CSV-034] [TC-IMPORTS-CSV-035] devuelve el mapeo de la importación anterior de la cuenta y, sin anterior, no lo trae', async () => {
+    const ctx = setup();
+    const first = await upload(ctx);
+    expect(await ctx.queries.get(WS, first.id)).not.toHaveProperty('suggestedMapping');
+    const { created } = await mapped(ctx);
+    await approveAndPersist(ctx, created.id);
+    const next = await upload(ctx);
+    const detail = await ctx.queries.get(WS, next.id);
+    expect(detail.suggestedMapping).toEqual(SIGNED_MAPPING);
+  });
+});
+
 describe('SetImportMapping y vista previa', () => {
   it('[TC-IMPORTS-CSV-006][TC-IMPORTS-CSV-015] 3 salidas por 281.30 y 1 entrada de 8000.00; saldo resultante 11718.70', async () => {
     const ctx = setup();
