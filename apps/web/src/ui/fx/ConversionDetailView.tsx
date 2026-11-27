@@ -16,8 +16,8 @@ import {
   mutedStyle,
   numCellStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 
 export const formatRateValue = (rate: Rate, locale: string): string =>
@@ -153,7 +153,7 @@ export function ConversionDetailView({
       </p>
       <PricingSummary pricing={detail} f={f} fees={detail.fees} />
       {revisions.length > 1 ? (
-        <div style={tableWrapStyle}>
+        <TableRegion label={t('detail.revisions')}>
           <table style={tableStyle} data-testid="conversion-revisions">
             <caption style={{ textAlign: 'left' }}>{t('detail.revisions')}</caption>
             <thead>
@@ -185,7 +185,7 @@ export function ConversionDetailView({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       ) : null}
       <details data-testid="accounting-detail">
         <summary>{t('detail.accounting')}</summary>

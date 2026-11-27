@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { Tabs } from '../common/Tabs';
-import { cellStyle, mutedStyle, numCellStyle, pageStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, numCellStyle, pageStyle, tableStyle, TableRegion } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
@@ -29,7 +29,7 @@ export function LoansTable({
   href: (path: string) => string;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('list.region')}>
+    <TableRegion label={f.t('list.region')}>
       <table style={tableStyle} data-testid="loans-table">
         <caption className="pf-sr-only">{f.t('list.caption')}</caption>
         <thead>
@@ -96,7 +96,7 @@ export function LoansTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

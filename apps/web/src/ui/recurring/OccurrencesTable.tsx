@@ -1,5 +1,5 @@
 import { problemMessage } from '../../errors/error-messages';
-import { cellStyle, mutedStyle, numCellStyle, rowStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, numCellStyle, rowStyle, tableStyle, TableRegion } from '../common/ui';
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { AmountText, OccurrenceStatusBadge } from './Badges';
@@ -59,7 +59,7 @@ export function OccurrencesTable({
     );
   const withActions = canEdit && onAction !== undefined;
   return (
-    <div style={tableWrapStyle}>
+    <TableRegion label={caption}>
       <table style={tableStyle} data-testid="occurrences-table">
         <caption className="pf-sr-only">{caption}</caption>
         <thead>
@@ -201,6 +201,6 @@ export function OccurrencesTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

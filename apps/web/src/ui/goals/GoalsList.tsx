@@ -12,7 +12,7 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -42,7 +42,7 @@ export function GoalsTable({
   href: (path: string) => string;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('list.region')}>
+    <TableRegion label={f.t('list.region')}>
       <table style={tableStyle} data-testid="goals-table">
         <caption className="pf-sr-only">{f.t('list.caption')}</caption>
         <thead>
@@ -117,7 +117,7 @@ export function GoalsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }
 

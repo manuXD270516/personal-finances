@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { formatDecimal } from '../AuditHistory';
+import { SortableHeader, SortStatus } from '../common/SortableHeader';
+import type { SortDirection, SortKind } from '../common/sort';
 import {
   cellStyle,
   Field,
@@ -9,9 +11,7 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
-  warningStyle,
-} from '../common/ui';
+    warningStyle, TableRegion } from '../common/ui';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext, Money } from '../dashboard/types';
 import {
@@ -133,34 +133,86 @@ export function ConversionBlock({ meta, f }: { meta: ReportMeta; f: FormatContex
   );
 }
 
+/** Orden por columna de una `DataTable`: qué encabezados son ordenables y cómo se activa cada uno. */
+export interface DataTableSort {
+  /** Clave de orden por índice de encabezado; `undefined` deja la columna sin botón. */
+  readonly keys: readonly (string | undefined)[];
+  readonly directionOf: (key: string) => SortDirection | undefined;
+  readonly onSort: (key: string, label: string) => void;
+  /** Anuncio del último cambio de orden (región `role="status"` de la tabla). */
+  readonly message: string;
+}
+
+/** Arma el `sortable` de una `DataTable` a partir del estado de `useTableSort` de la vista. */
+export function dataTableSort<K extends string>(
+  sorter: {
+    directionOf: (key: K) => SortDirection | undefined;
+    toggle: (key: K, label: string, kind: SortKind) => void;
+    message: string;
+  },
+  keys: readonly (K | undefined)[],
+  kinds: Readonly<Record<K, SortKind>>,
+): DataTableSort {
+  return {
+    keys,
+    directionOf: (key) => sorter.directionOf(key as K),
+    onSort: (key, label) => sorter.toggle(key as K, label, kinds[key as K]),
+    message: sorter.message,
+  };
+}
+
 /** Tabla de datos equivalente a un gráfico (NFR-USAB-105): encabezados de columna, leyenda y desplazamiento accesible. */
 export function DataTable({
   caption,
   headers,
   children,
   label,
+  sortable,
 }: {
   caption: string;
   headers: readonly string[];
   children: ReactNode;
   label: string;
+  sortable?: DataTableSort;
 }) {
-  return (
-    <div style={tableWrapStyle} role="region" aria-label={label} tabIndex={0}>
+  const table = (
+    <TableRegion label={label}>
       <table style={tableStyle}>
         <caption style={{ textAlign: 'left', ...mutedStyle }}>{caption}</caption>
         <thead>
           <tr>
-            {headers.map((h, i) => (
-              <th key={h} scope="col" style={i === 0 ? cellStyle : { ...cellStyle, textAlign: 'right' }}>
-                {h}
-              </th>
-            ))}
+            {headers.map((h, i) => {
+              const align = i === 0 ? 'left' : 'right';
+              const key = sortable?.keys[i];
+              if (sortable && key !== undefined) {
+                return (
+                  <SortableHeader
+                    key={h}
+                    label={h}
+                    align={align}
+                    direction={sortable.directionOf(key)}
+                    onSort={() => sortable.onSort(key, h)}
+                  />
+                );
+              }
+              return (
+                <th key={h} scope="col" style={i === 0 ? cellStyle : { ...cellStyle, textAlign: 'right' }}>
+                  {h}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>{children}</tbody>
       </table>
-    </div>
+    </TableRegion>
+  );
+  if (!sortable) return table;
+  return (
+    <>
+      {table}
+      <SortStatus message={sortable.message} />
+    </>
   );
 }
 export const Td = ({ children, num = true }: { children: ReactNode; num?: boolean }) => (

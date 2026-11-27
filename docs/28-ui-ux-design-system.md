@@ -414,7 +414,7 @@ As-built de `add-dark-theme` (lote L3 de [docs/78](78-propuesta-mejora-ui-ux-mod
 
 - Breakpoints de la hoja propia: `640 · 768 · 1024` px. Diseño base para 360–414 px.
 - Mobile prioriza: quick add, saldo disponible, próximos pagos, lista de transacciones con swipe (categorizar / anular con confirmación).
-- Tablas → listas de tarjetas en móvil; reportes muestran KPI + gráfico simplificado + "ver tabla".
+- Tablas: se desplazan a lo ancho dentro de su región con nombre y foco (`TableRegion`), sin vista apilada (as-built de refine-data-tables: `display: block` en `table`/`tr`/`td` quita los roles de tabla); cabecera fija en las tablas largas (alto máximo propio), columna de identificación fija en la vista previa del import y el cronograma, orden por columna en las tablas comparativas y medidas con `<meter>`. Reportes muestran KPI + gráfico simplificado + "ver tabla".
 - Quick add como **sheet** inferior con teclado numérico (`inputmode="decimal"`), monto autoenfocado.
 - PWA (instalable, ícono, splash) como Could en Phase 2+; offline queue futuro.
 

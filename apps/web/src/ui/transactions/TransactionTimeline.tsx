@@ -1,7 +1,7 @@
 import { formatInstant, formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import type { AuditLogEntry, Money } from '../common/types';
-import { badgeStyle, cardStyle, cellStyle, mutedStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { badgeStyle, cardStyle, cellStyle, mutedStyle, tableStyle, TableRegion } from '../common/ui';
 import { buildTimeline, statusAfterEach } from './logic';
 
 /** Resolución de ids a nombres legibles (cuentas, categorías, contrapartes, tags). */
@@ -152,7 +152,7 @@ export function TransactionTimeline({
                 </p>
               ) : null}
               {item.changes.length > 0 ? (
-                <div style={tableWrapStyle}>
+                <TableRegion label={t('history.changesCaption')}>
                   <table style={tableStyle}>
                     <caption style={{ ...mutedStyle, textAlign: 'left' }}>
                       {t('history.changesCaption')}
@@ -182,7 +182,7 @@ export function TransactionTimeline({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TableRegion>
               ) : null}
             </li>
           ))}

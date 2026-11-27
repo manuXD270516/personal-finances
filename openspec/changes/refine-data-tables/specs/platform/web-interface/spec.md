@@ -113,23 +113,6 @@ Trace: NFR-PERF-004 · Priority: Should
 - **CUANDO** un flujo mide 650 ms
 - **ENTONCES** el informe lo marca como por encima del aviso y la suite no falla por eso
 
-### Requirement: Vista previa del import por páginas
-La vista previa de un import DEBE (MUST) mostrar sus filas de a una página por vez, con acciones «Anterior» y «Siguiente», la posición y el total en texto y el foco llevado al inicio de la tabla al cambiar de página. Cambiar el filtro DEBE (MUST) volver a la primera página. Las decisiones tomadas sobre las filas DEBEN (MUST) conservarse al cambiar de página.
-Trace: FR-IMPORTS-002, NFR-PERF-004, NFR-USAB-102 · Priority: Should
-
-#### Scenario: Extracto de 450 filas
-- **CUANDO** el OWNER abre la vista previa de un import de 450 filas
-- **ENTONCES** la tabla muestra las filas 1 a 200 con el texto "Filas 1–200 de 450"
-- **Y** al pulsar «Siguiente» muestra las filas 201 a 400 y el foco queda al inicio de la tabla
-
-#### Scenario: Decisión conservada entre páginas
-- **CUANDO** el OWNER marca como duplicada la fila 10 de un gasto de 60.00 BOB, pasa a la página 2 y vuelve a la 1
-- **ENTONCES** la fila 10 sigue marcada como duplicada
-
-#### Scenario: Cambiar el filtro
-- **CUANDO** en la página 2 el OWNER filtra por las filas sin categoría
-- **ENTONCES** la vista previa vuelve a la página 1 del filtro
-
 ### Requirement: Filas de tabla dibujadas completas
 Las filas y los grupos de filas de las tablas NO DEBEN (MUST NOT) diferir su dibujo con contención de contenido: esa técnica no actúa sobre filas de tabla, y el costo de las tablas largas se reduce con páginas.
 Trace: NFR-PERF-004 · Priority: Should

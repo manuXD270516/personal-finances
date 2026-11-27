@@ -2,9 +2,19 @@ import type { ReactNode } from 'react';
 import { barRatio, maxAmount } from '../dashboard/category-comparison';
 import { formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext, Money } from '../dashboard/types';
+import { useTableSort } from '../common/SortableHeader';
+import { sortRows, type SortKind, type SortState } from '../common/sort';
 import { mutedStyle } from '../common/ui';
 import { BarsChart, LineChart } from './ReportChart';
-import { ConsolidatedCell, DataTable, IncompleteNote, NativeList, Td, VariationCell } from './ReportParts';
+import {
+  ConsolidatedCell,
+  DataTable,
+  dataTableSort,
+  IncompleteNote,
+  NativeList,
+  Td,
+  VariationCell,
+} from './ReportParts';
 import {
   shortDate,
   type AccountBalanceHistoryReport,
@@ -78,7 +88,35 @@ const baselineText = (b: ReportBaseline | undefined, f: FormatContext): string =
   });
 };
 
+type IncomeSortKey = 'period' | 'income' | 'expenses' | 'savings';
+const INCOME_SORT_KINDS: Readonly<Record<IncomeSortKey, SortKind>> = {
+  period: 'date',
+  income: 'decimal',
+  expenses: 'decimal',
+  savings: 'decimal',
+};
+
 export function IncomeExpensesView({ f, data, onDrill }: ViewProps<IncomeExpensesReport>) {
+  const sorter = useTableSort<IncomeSortKey>(f);
+  const sortedRows = sorter.sort
+    ? sortRows(
+        data.rows,
+        (r) => {
+          switch (sorter.sort?.key) {
+            case 'income':
+              return r.income.consolidated.amount;
+            case 'expenses':
+              return r.expenses.consolidated.amount;
+            case 'savings':
+              return r.savings.consolidated.amount;
+            default:
+              return r.period.from;
+          }
+        },
+        sorter.sort.direction,
+        INCOME_SORT_KINDS[sorter.sort.key],
+      )
+    : data.rows;
   const compared = data.meta.comparison !== null;
   const hasBaseline = data.rows.some((r) => r.baseline);
   const headers = [
@@ -131,8 +169,17 @@ export function IncomeExpensesView({ f, data, onDrill }: ViewProps<IncomeExpense
             })}
           </p>
         )}
-      <DataTable caption={f.t('income.caption')} label={f.t('income.caption')} headers={headers}>
-        {data.rows.map((r) => (
+      <DataTable
+        caption={f.t('income.caption')}
+        label={f.t('income.caption')}
+        headers={headers}
+        sortable={dataTableSort(
+          sorter,
+          ['period', 'income', 'expenses', 'savings'],
+          INCOME_SORT_KINDS,
+        )}
+      >
+        {sortedRows.map((r) => (
           <tr key={r.period.label + r.period.from} data-testid="ie-row">
             <Td num={false}>
               {r.period.label}
@@ -195,6 +242,7 @@ export function IncomeExpensesView({ f, data, onDrill }: ViewProps<IncomeExpense
 
 function CategoryRows({
   leaf,
+  order,
   depth,
   max,
   f,
@@ -204,6 +252,7 @@ function CategoryRows({
   compared,
 }: {
   leaf: CategoryLeaf;
+  order: OrderRows;
   depth: number;
   max: string;
   f: FormatContext;
@@ -248,9 +297,10 @@ function CategoryRows({
           <Td>{leaf.comparison ? <VariationCell v={leaf.comparison} kind="expense" f={f} /> : '—'}</Td>
         )}
       </tr>
-      {(leaf.subcategories ?? []).map((s) => (
+      {order(leaf.subcategories ?? []).map((s) => (
         <CategoryRows
           key={s.categoryId}
+          order={order}
           leaf={s}
           depth={depth + 1}
           max={max}
@@ -265,7 +315,26 @@ function CategoryRows({
   );
 }
 
+type CategorySortKey = 'name' | 'amount';
+const CATEGORY_SORT_KINDS: Readonly<Record<CategorySortKey, SortKind>> = { name: 'text', amount: 'decimal' };
+/** Ordena por nombre o monto consolidado a cada nivel (grupos, categorías y subcategorías), sin mezclarlos. */
+type OrderRows = <T extends { name: string; amount: ReportAmount }>(rows: readonly T[]) => readonly T[];
+
+function orderBy(sort: SortState<CategorySortKey> | undefined): OrderRows {
+  if (!sort) return (rows) => rows;
+  const { key, direction } = sort;
+  return (rows) =>
+    sortRows(
+      rows,
+      (r) => (key === 'name' ? r.name : r.amount.consolidated.amount),
+      direction,
+      CATEGORY_SORT_KINDS[key],
+    );
+}
+
 export function ExpensesByCategoryView({ f, data, onDrill }: ViewProps<ExpensesByCategoryReport>) {
+  const sorter = useTableSort<CategorySortKey>(f);
+  const order = orderBy(sorter.sort);
   const compared = data.meta.comparison !== null;
   const period = { from: data.meta.from, to: data.meta.to };
   const max = maxAmount([
@@ -276,11 +345,17 @@ export function ExpensesByCategoryView({ f, data, onDrill }: ViewProps<ExpensesB
   if (compared) headers.push(f.t('category.vs'));
   return (
     <div className="pf-rp" data-testid="report-by-category">
-      <DataTable caption={f.t('category.caption')} label={f.t('category.caption')} headers={headers}>
-        {data.groups.map((g) => (
+      <DataTable
+        caption={f.t('category.caption')}
+        label={f.t('category.caption')}
+        headers={headers}
+        sortable={dataTableSort(sorter, ['name', 'amount', ...(compared ? [undefined] : [])], CATEGORY_SORT_KINDS)}
+      >
+        {order(data.groups).map((g) => (
           <GroupRows
             key={g.groupId}
             g={g}
+            order={order}
             max={max}
             f={f}
             period={period}
@@ -313,6 +388,7 @@ export function ExpensesByCategoryView({ f, data, onDrill }: ViewProps<ExpensesB
 
 function GroupRows({
   g,
+  order,
   max,
   f,
   period,
@@ -320,6 +396,7 @@ function GroupRows({
   compared,
 }: {
   g: ExpensesByCategoryReport['groups'][number];
+  order: OrderRows;
   max: string;
   f: FormatContext;
   period: { from: string; to: string };
@@ -338,9 +415,10 @@ function GroupRows({
         </Td>
         {compared && <Td>{g.comparison ? <VariationCell v={g.comparison} kind="expense" f={f} /> : '—'}</Td>}
       </tr>
-      {g.categories.map((c) => (
+      {order(g.categories).map((c) => (
         <CategoryRows
           key={c.categoryId}
+          order={order}
           leaf={c}
           depth={1}
           max={max}

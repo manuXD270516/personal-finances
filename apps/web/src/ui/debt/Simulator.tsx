@@ -14,8 +14,8 @@ import {
   pageStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatMoney } from '../dashboard/format';
@@ -182,7 +182,7 @@ export function StrategiesResult({ f, result }: { f: FormatContext; result: Payo
           amount: formatMoney({ amount: result.startBalance, currency }, f.locale),
         })}
       </p>
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('simulator.compareTitle')}>
+      <TableRegion label={f.t('simulator.compareTitle')}>
         <table style={tableStyle} data-testid="simulator-table">
           <caption className="pf-sr-only">{f.t('simulator.compareTitle')}</caption>
           <thead>
@@ -228,7 +228,7 @@ export function StrategiesResult({ f, result }: { f: FormatContext; result: Payo
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       <BalanceChart f={f} currency={currency} strategies={result.strategies} />
       {result.outOfStrategy.length > 0 ? (
         <section role="note" style={warningStyle} data-testid="simulator-out">
@@ -259,7 +259,7 @@ function ExtrasResult({
   const rows = [['current', result.current] as const, ['scenario', result.scenario] as const];
   return (
     <div style={{ display: 'grid', gap: 'var(--pf-space-3)' }} data-testid="simulator-extras">
-      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('simulator.compareTitle')}>
+      <TableRegion label={f.t('simulator.compareTitle')}>
         <table style={tableStyle} data-testid="simulator-table">
           <caption className="pf-sr-only">{f.t('simulator.compareTitle')}</caption>
           <thead>
@@ -295,7 +295,7 @@ function ExtrasResult({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRegion>
       <p style={{ margin: 0 }} data-testid="simulator-saved">
         {f.t('simulator.saved', {
           amount: formatMoney({ amount: result.interestSaved, currency }, f.locale),

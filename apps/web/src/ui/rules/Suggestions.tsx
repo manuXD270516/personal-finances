@@ -12,8 +12,8 @@ import {
   mutedStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
@@ -243,7 +243,7 @@ export function SuggestionPreviewView({
           {f.t('suggestions.preview.none')}
         </p>
       ) : (
-        <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('suggestions.preview.region')}>
+        <TableRegion label={f.t('suggestions.preview.region')}>
           <table style={tableStyle} data-testid="suggestion-preview-table">
             <caption className="pf-sr-only">{f.t('suggestions.preview.caption')}</caption>
             <thead>
@@ -289,7 +289,7 @@ export function SuggestionPreviewView({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       )}
       {hidden > 0 ? (
         <p style={mutedStyle} data-testid="suggestion-preview-shown">

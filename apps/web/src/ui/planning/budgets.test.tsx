@@ -115,12 +115,14 @@ describe('Pantalla de presupuestos (planning/budgets 6.1)', () => {
     const viewer = renderToStaticMarkup(
       <BudgetLinesTable budget={plan(lines)} names={names} f={f} canEdit={false} />,
     );
-    expect(viewer).not.toContain('<button');
+    // Los botones de los encabezados (orden por columna) no son acciones sobre las líneas.
+    const actionButtons = (html: string) => (html.match(/<button(?![^>]*pf-sort-btn)/g) ?? []).length;
+    expect(actionButtons(viewer)).toBe(0);
     expect(textOf(viewer)).not.toContain('Acciones');
     const closed = renderToStaticMarkup(
       <BudgetLinesTable budget={plan(lines, { periodStatus: 'CLOSED' })} names={names} f={f} canEdit />,
     );
-    expect(closed).not.toContain('<button');
+    expect(actionButtons(closed)).toBe(0);
     const editor = renderToStaticMarkup(
       <BudgetLinesTable budget={plan(lines)} names={names} f={f} canEdit />,
     );

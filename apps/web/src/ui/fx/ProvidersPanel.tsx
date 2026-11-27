@@ -16,7 +16,7 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
+  TableRegion,
 } from '../common/ui';
 import { listAll, problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import { formatAge, formatInstant, formatLocalDate } from '../dashboard/format';
@@ -274,7 +274,7 @@ export function ProviderCard({
         </p>
       )}
       {s.feeds.length > 0 ? (
-        <div style={tableWrapStyle}>
+        <TableRegion label={t('providers.feeds')}>
           <table style={{ ...tableStyle, marginTop: '0.5rem' }}>
             <caption style={{ textAlign: 'left', fontWeight: 600 }}>{t('providers.feeds')}</caption>
             <thead>
@@ -324,7 +324,7 @@ export function ProviderCard({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       ) : null}
       {pairs.map((pair) => {
         const side = sides.get(`${s.provider}:${pair}`);

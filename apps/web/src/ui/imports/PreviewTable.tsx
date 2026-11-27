@@ -10,8 +10,8 @@ import {
   numCellStyle,
   rowStyle,
   tableStyle,
-  tableWrapStyle,
   warningStyle,
+  TableRegion,
 } from '../common/ui';
 import {
   CLASSIFICATION_PRESENTATION,
@@ -129,16 +129,16 @@ export function PreviewTable({
   onDecide: (row: ImportPreviewRow, decision: ImportRowDecision) => void;
 }) {
   return (
-    <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('review.tableRegion')}>
-      <table style={tableStyle} data-testid="import-preview">
+    <TableRegion label={f.t('review.tableRegion')} tall>
+      <table style={tableStyle} className="pf-table--idcol" data-testid="import-preview">
         <caption className="pf-sr-only">{f.t('review.tableCaption')}</caption>
         <thead>
           <tr>
             <th scope="col" style={cellStyle}>
-              {f.t('row.line')}
+              {f.t('row.date')}
             </th>
             <th scope="col" style={cellStyle}>
-              {f.t('row.date')}
+              {f.t('row.line')}
             </th>
             <th scope="col" style={cellStyle}>
               {f.t('row.description')}
@@ -171,9 +171,9 @@ export function PreviewTable({
                   data-line={row.lineNumber}
                 >
                   <th scope="row" style={cellStyle}>
-                    {row.lineNumber}
+                    {row.date ? formatBusinessDate(row.date) : '—'}
                   </th>
-                  <td style={cellStyle}>{row.date ? formatBusinessDate(row.date) : '—'}</td>
+                  <td style={cellStyle}>{row.lineNumber}</td>
                   <td style={cellStyle} data-testid="import-row-description">
                     {row.description ?? '—'}
                   </td>
@@ -238,6 +238,6 @@ export function PreviewTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRegion>
   );
 }

@@ -198,7 +198,7 @@ describe('Evolución del patrimonio (add-net-worth-evolution, tarea 6.1)', () =>
     // La vista completa usa h1 y la tabla visible.
     const full = render(many, 'full');
     expect(full).toContain('<h1 id="nw-full-heading">');
-    expect(full).toContain('class="pf-nw-table-wrap"');
+    expect(full).toContain('class="pf-table-wrap"');
     expect((full.match(/data-testid="net-worth-row"/g) ?? []).length).toBe(12);
   });
 

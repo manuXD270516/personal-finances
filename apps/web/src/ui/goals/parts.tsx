@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { formatDecimal } from '../AuditHistory';
-import { badgeStyle, mutedStyle } from '../common/ui';
+import { badgeStyle, Meter, mutedStyle } from '../common/ui';
 import { formatMoney, formatSignedDecimal } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { RateSourceBadge } from '../dashboard/RateSourceBadge';
@@ -17,15 +17,6 @@ import {
 import type { GoalRequired, GoalTracking, Money, ResolvedRate } from './types';
 
 /** Piezas presentacionales compartidas por el listado, el detalle, las reservas y la tarjeta del Home. */
-
-const trackStyle: CSSProperties = {
-  height: '0.625rem',
-  borderRadius: 'var(--pf-radius-full)',
-  background: 'var(--pf-surface-sunken)',
-  border: '1px solid var(--pf-border-strong)',
-  overflow: 'hidden',
-  minWidth: '6rem',
-};
 
 const warnBadge: CSSProperties = {
   ...badgeStyle,
@@ -87,7 +78,7 @@ export function IncompleteMark({ f, unconverted }: { f: FormatContext; unconvert
 }
 
 /**
- * Progreso: porcentaje en TEXTO ("33,33 %" y "5.000,00 de 15.000,00 BOB") más una barra `role="progressbar"` con
+ * Progreso: porcentaje en TEXTO ("33,33 %" y "5.000,00 de 15.000,00 BOB") más una medida `<meter>` con
  * nombre y valor. Sobre 100 % la barra queda llena y el texto sigue diciendo el porcentaje real (104,17 %).
  */
 export function GoalProgressBar({
@@ -125,25 +116,13 @@ export function GoalProgressBar({
         ) : null}
         {exceedsTarget(percent) ? <span style={mutedStyle}> · {f.t('progress.exceeded')}</span> : null}
       </p>
-      <div
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={barWidth(percent)}
-        aria-valuetext={detail ? `${text} · ${detail}` : text}
-        style={trackStyle}
-        data-testid={`${testIdPrefix}-progress-bar`}
-      >
-        <div
-          aria-hidden="true"
-          style={{
-            width: `${barWidth(percent)}%`,
-            height: '100%',
-            background: exceedsTarget(percent) ? 'var(--pf-fin-ok)' : 'var(--pf-primary)',
-          }}
-        />
-      </div>
+      <Meter
+        value={barWidth(percent)}
+        label={label}
+        valueText={detail ? `${text} · ${detail}` : text}
+        color={exceedsTarget(percent) ? 'var(--pf-fin-ok)' : 'var(--pf-primary)'}
+        testId={`${testIdPrefix}-progress-bar`}
+      />
     </div>
   );
 }

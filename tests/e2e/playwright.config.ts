@@ -38,7 +38,7 @@ export default defineConfig({
     { name: 'alerts', testMatch: /notifications\.spec\.ts$/, use: { browserName: 'chromium' } },
     {
       name: 'chromium',
-      testIgnore: /notifications\.spec\.ts$/,
+      testIgnore: [/notifications\.spec\.ts$/, /inp\.spec\.ts$/],
       dependencies: ['alerts'],
       use: { browserName: 'chromium' },
     },
@@ -52,6 +52,15 @@ export default defineConfig({
       // y con un motor más lento por pantalla: cinco minutos por test (en Windows, sobre el stack cargado, el test largo de `transactions` pasó de 180 s; en Linux CI WebKit completo tarda 3,4 min).
       timeout: 300_000,
       use: { ...devices['Desktop Safari'], browserName: 'webkit' },
+    },
+    // Medición informativa de INP con un extracto sintético de 2 000 filas (refine-data-tables): proyecto propio, solo
+    // Chromium (Event Timing no es fiable en otros motores en CI) y al final, para poder excluirlo del job de PR si
+    // alarga el job `e2e` (límite de 40 min). Local: `playwright test --project=inp --no-deps`.
+    {
+      name: 'inp',
+      testMatch: /inp\.spec\.ts$/,
+      dependencies: ['chromium'],
+      use: { browserName: 'chromium' },
     },
   ],
 });

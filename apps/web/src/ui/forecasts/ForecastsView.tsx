@@ -24,6 +24,7 @@ import type {
   ForecastSeries,
   LatestForecast,
 } from './types';
+import { TableRegion } from '../common/ui';
 
 export interface ForecastsViewProps {
   readonly latest: LatestForecast;
@@ -457,7 +458,7 @@ export function ForecastsView(props: ForecastsViewProps) {
                       band: f.t('chart.band'),
                     }}
                   />
-                  <div className="pf-fc-table-wrap">
+                  <TableRegion label={f.t('table.caption', { name: seriesLabel(selected, f) })}>
                     <table className="pf-fc-table" data-testid="forecast-table">
                       <caption>{f.t('table.caption', { name: seriesLabel(selected, f) })}</caption>
                       <thead>
@@ -513,7 +514,7 @@ export function ForecastsView(props: ForecastsViewProps) {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </TableRegion>
                 </>
               ) : null}
             </section>
