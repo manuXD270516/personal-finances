@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/tls.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["e2e", "tls", "upload", "csp"]
@@ -30,7 +31,7 @@ expected_result:
   - "la petición de subida va a https://localhost con el puerto TLS de archivos y responde con éxito"
   - "no hay bloqueos por contenido mixto ni violaciones de CSP"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-STACK-011 — La subida directa de un documento funciona por HTTPS sin contenido mixto

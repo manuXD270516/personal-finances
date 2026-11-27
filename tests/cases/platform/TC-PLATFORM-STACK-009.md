@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/tls.spec.ts
+status: automated
 regression_suite: false
 phase: 9
 tags: ["e2e", "tls", "stack"]
@@ -30,7 +31,7 @@ expected_result:
   - "las tres URL usan https://localhost con el puerto TLS de la corrida"
   - "el login termina en la aplicación con la cookie de sesión presente"
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-27
 ---
 
 # TC-PLATFORM-STACK-009 — Las URL públicas del stack de E2E son https y el login termina con sesión

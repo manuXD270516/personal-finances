@@ -30,6 +30,7 @@ apps/api/contract/
 # Playwright (tests/e2e)
 tests/e2e/playwright-report/
 tests/e2e/test-results/
+tests/e2e/playwright-results.json
 tests/e2e/service-logs/
 
 # Financial Regression Suite generada (pnpm traceability:regression)

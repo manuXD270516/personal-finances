@@ -341,8 +341,9 @@ jobs:
       # TC-PLATFORM-STACK-*: perfil core healthy, migrate, reset+seed, backup/restore… (tarea 4.3 en Linux).
       - run: pnpm test:stack
 
-  # E2E con Playwright (Chromium) contra el stack Compose desechable `pfos-e2e` con Keycloak real (add-workspace-
-  # identity, grupo 9). Prueba las imágenes construidas UNA vez por el job `image` (sin reconstruir). Aún NO es un
+  # E2E con Playwright (Chromium y un subconjunto en WebKit, por https con el proxy TLS del perfil `tls`: add-e2e-https,
+  # D516) contra el stack Compose desechable `pfos-e2e` con Keycloak real (add-workspace-
+  # identity, grupo 9). WebKit corre dentro de este mismo job: sin check nuevo. Prueba las imágenes construidas UNA vez por el job `image` (sin reconstruir). Aún NO es un
   # check requerido de `main` (docs/23 §16: pendiente de agregar a la protección de rama).
   e2e:
     needs: [image]
@@ -367,9 +368,14 @@ jobs:
       - name: Cargar las imágenes del job `image` (sin reconstruir)
         run: for f in "$RUNNER_TEMP"/images/*.tar; do docker load -i "$f"; done
       # Navegador de la versión de @playwright/test fijada en el lockfile (con sus dependencias de sistema).
-      - name: Instalar Chromium de Playwright
-        run: pnpm --filter @pf/e2e exec playwright install --with-deps chromium
+      - name: Instalar Chromium y WebKit de Playwright
+        run: pnpm --filter @pf/e2e exec playwright install --with-deps chromium webkit
       - run: pnpm test:e2e
+      # Duración por proyecto (chromium y webkit) en el resumen del job (TC-PLATFORM-PIPELINE-044). Si el job pasa de
+      # 35 minutos, se reduce el subconjunto de WebKit (add-e2e-https, design.md decisión 8).
+      - name: Resumen de duración por proyecto
+        if: ${{ !cancelled() }}
+        run: pnpm exec tsx tests/e2e/src/duration-summary.ts tests/e2e/playwright-results.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ failure() }}
         with:
@@ -377,6 +383,7 @@ jobs:
           path: |
             tests/e2e/playwright-report
             tests/e2e/test-results
+            tests/e2e/playwright-results.json
             tests/e2e/service-logs
           if-no-files-found: ignore
           retention-days: 7
