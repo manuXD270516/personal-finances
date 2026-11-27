@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { routing } from '../../i18n/routing';
 import { ProblemMessage } from '../errors/ProblemMessage';
 import { useFocusFirstErrorOnSubmit } from './common/forms';
+import { installStore } from './common/install';
 import { NoticeRegion, NoticesProvider } from './common/notices';
 import { WorkspaceSelector } from './identity/IdentityViews';
 import { switchLocalePath, type UiLocale } from './identity/logic';
@@ -21,6 +22,10 @@ import {
   showQuickAdd,
   type NavKey,
 } from './shell/nav';
+
+// `beforeinstallprompt` llega una sola vez y puede adelantarse al botón de Mis preferencias: la escucha se registra al
+// cargar el módulo del marco (change add-pwa-install, decisión 4).
+installStore.start();
 
 /** Nombre de cada idioma de la UI en el catálogo `Locales`. */
 const LOCALE_NAME: Record<UiLocale, 'es-BO' | 'en-US' | 'pt-BR'> = { es: 'es-BO', en: 'en-US', pt: 'pt-BR' };

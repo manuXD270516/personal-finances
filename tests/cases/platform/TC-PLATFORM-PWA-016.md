@@ -12,9 +12,9 @@ invariants: []
 priority: low
 type: e2e
 level: e2e
-automation_status: not_automated
+automation_status: manual
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 9
 tags: ["pwa", "theme", "manual"]

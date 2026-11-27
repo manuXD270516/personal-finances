@@ -46,6 +46,8 @@ Al redactar los changes 82 a 84 quedaron seis puntos que D500–D516 no cubren. 
 
 **¿Bloquea?** No.
 
+**Aplicada (2026-11-27):** el change 82 se implementó con la opción (A), por indicación de la sesión principal, sin esperar la confirmación explícita del owner. El runbook de N1 (fase 9) dice que se instala solo desde el dominio de D452.
+
 ### 3. Ayuda para instalar en iPhone
 
 **Contexto.** Safari en iOS no emite el aviso `beforeinstallprompt`: en un iPhone el botón «Instalar la aplicación» no aparece nunca y la instalación es por «Compartir → Agregar a pantalla de inicio». La regla del change es no mostrar nunca un control de instalación que no funcione. Detectar «es un iPhone» exigiría leer el agente de usuario, que la guía desaconseja.
@@ -58,6 +60,8 @@ Al redactar los changes 82 a 84 quedaron seis puntos que D500–D516 no cubren. 
 **Recomendación: (B).** Cuesta una línea de texto, no interrumpe y sirve también en otros navegadores sin aviso. (C) es ruido para una función Could.
 
 **¿Bloquea?** No. Si se elige (B), se agrega un scenario al requirement «Botón “Instalar” solo cuando el navegador lo ofrece» antes de implementar la tarea 5.4.
+
+**Aplicada (2026-11-27):** se implementó la opción (B), por indicación de la sesión principal, sin esperar la confirmación explícita del owner: el delta ganó el scenario «Ayuda para iPhone y iPad» y el TC-PLATFORM-PWA-017. El texto («En iPhone o iPad: Compartir → Agregar a pantalla de inicio.») se muestra solo si no hay aviso del navegador y la app no corre instalada; en es, en y pt.
 
 ## L7: `refine-perceived-performance`
 

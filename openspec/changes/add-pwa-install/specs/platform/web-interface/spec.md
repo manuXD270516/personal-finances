@@ -31,7 +31,7 @@ Trace: NFR-USAB-005, NFR-USAB-103 · Priority: Could
 - **ENTONCES** el motivo completo queda dentro del círculo
 
 ### Requirement: Botón «Instalar» solo cuando el navegador lo ofrece
-Mis preferencias DEBE (MUST) mostrar el botón «Instalar la aplicación» solo después de que el navegador avise que la aplicación se puede instalar, y al usarlo DEBE (MUST) abrir el diálogo de instalación del propio navegador. El botón NO DEBE (MUST NOT) mostrarse cuando el navegador no lo ofrece, cuando la aplicación ya corre instalada ni después de instalarla, y la interfaz NO DEBE (MUST NOT) mostrar en ningún momento un control de instalación que no funcione. Los textos DEBEN (MUST) estar en es, en y pt.
+Mis preferencias DEBE (MUST) mostrar el botón «Instalar la aplicación» solo después de que el navegador avise que la aplicación se puede instalar, y al usarlo DEBE (MUST) abrir el diálogo de instalación del propio navegador. El botón NO DEBE (MUST NOT) mostrarse cuando el navegador no lo ofrece, cuando la aplicación ya corre instalada ni después de instalarla, y la interfaz NO DEBE (MUST NOT) mostrar en ningún momento un control de instalación que no funcione. Mientras el navegador no ofrezca la instalación y la aplicación no corra instalada, Mis preferencias DEBE (MUST) mostrar un texto fijo (no un botón ni un enlace) con los pasos para instalar desde iPhone o iPad («Compartir → Agregar a pantalla de inicio»), sin detectar el navegador. Los textos DEBEN (MUST) estar en es, en y pt.
 Trace: NFR-USAB-005, NFR-USAB-001, NFR-USAB-102 · Priority: Could
 
 #### Scenario: El navegador ofrece la instalación
@@ -50,6 +50,11 @@ Trace: NFR-USAB-005, NFR-USAB-001, NFR-USAB-102 · Priority: Could
 #### Scenario: Instalación aceptada
 - **CUANDO** el EDITOR acepta el diálogo de instalación del navegador
 - **ENTONCES** el botón «Instalar la aplicación» desaparece sin recargar la página
+
+#### Scenario: Ayuda para iPhone y iPad
+- **CUANDO** el EDITOR abre Mis preferencias en un navegador que no avisa que la aplicación se puede instalar
+- **ENTONCES** aparece un texto fijo con los pasos «Compartir → Agregar a pantalla de inicio», sin detectar el navegador
+- **Y** el texto no es un botón ni un enlace y no aparece con la aplicación ya instalada
 
 ### Requirement: Instalación sin funcionamiento sin conexión
 La aplicación NO DEBE (MUST NOT) registrar un service worker ni guardar páginas, respuestas de la API o datos financieros para usarlos sin conexión. La política de seguridad de contenido NO DEBE (MUST NOT) cambiar para la instalación. Sin conexión, la aplicación instalada DEBE (MUST) comportarse como el navegador sin conexión, sin mostrar datos guardados.

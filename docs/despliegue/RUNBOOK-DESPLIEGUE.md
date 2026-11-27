@@ -493,7 +493,8 @@ Los respaldos ficticios quedan en `pgbackrest/poc/` hasta que venza su lock (21 
 1. Grafana Cloud: checks sintéticos según §2.6.4, más una alerta por el heartbeat de respaldos.
 2. Alertas de Budgets confirmadas. La alarma de `BurstCapacityPercentage` (< 30 %) ya quedó creada y probada en la fase 7.
 3. **Con la primera factura** (supuestos de la ratificación): anotá el recargo y los impuestos reales de la tarjeta en la de AWS (regla de corte 5) y el cobro de clase D en la de B2 (B16), y pasá los dos montos a [`.despliegue.json`](.despliegue.json).
-4. Si querés ML (requiere C1 fusionado y aplicado): seguí la nota as-built del runbook vigente y repetí la medición de memoria de la fase 7 durante 48 h.
+4. **Instalar la app en el teléfono** (change `add-pwa-install`, M-34 de docs/78): instalala **solo desde el dominio definitivo** (`https://app.<dominio>`, D452); una app instalada queda atada a su origen y cambiar el dominio después obliga a migrarla. Android (Chrome): botón «Instalar la aplicación» en Mis preferencias o el menú del navegador. iPhone (Safari): Compartir → Agregar a pantalla de inicio, e iniciá sesión de nuevo dentro de la app (iOS no comparte cookies con Safari). Verificá a mano TC-PLATFORM-PWA-013 y -016 (abrir sin sesión y volver a Inicio, barra en tema oscuro) y anotá dispositivo, versión y resultado en esos TC. Los íconos actuales son provisionales hasta que el owner apruebe el diseño (pregunta 1 de docs/85).
+5. Si querés ML (requiere C1 fusionado y aplicado): seguí la nota as-built del runbook vigente y repetí la medición de memoria de la fase 7 durante 48 h.
 
 **Terminada cuando:** el check sintético está en verde y llegó un email de prueba de cada alerta.
 

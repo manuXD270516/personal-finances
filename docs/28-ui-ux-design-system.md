@@ -416,7 +416,7 @@ As-built de `add-dark-theme` (lote L3 de [docs/78](78-propuesta-mejora-ui-ux-mod
 - Mobile prioriza: quick add, saldo disponible, próximos pagos, lista de transacciones con swipe (categorizar / anular con confirmación).
 - Tablas: se desplazan a lo ancho dentro de su región con nombre y foco (`TableRegion`), sin vista apilada (as-built de refine-data-tables: `display: block` en `table`/`tr`/`td` quita los roles de tabla); cabecera fija en las tablas largas (alto máximo propio), columna de identificación fija en la vista previa del import y el cronograma, orden por columna en las tablas comparativas y medidas con `<meter>`. Reportes muestran KPI + gráfico simplificado + "ver tabla".
 - Quick add como **sheet** inferior con teclado numérico (`inputmode="decimal"`), monto autoenfocado.
-- PWA (instalable, ícono, splash) como Could en Phase 2+; offline queue futuro.
+- PWA (as-built de add-pwa-install, D504: solo instalable): manifiesto `app/manifest.ts` (`/manifest.webmanifest`, `id`, `start_url` y `scope` `/`, `display: standalone`, `lang: es-BO`, colores del tema claro, atajo «Registrar gasto» a `/transacciones/nueva`), íconos PNG de 192, 512 y adaptable (`public/icons/`) y `app/apple-icon.png` de 180 px, generados desde `src/ui/brand/app-icon.svg` con `apps/web/scripts/generate-app-icons.mjs` (hoy **provisionales**: el diseño definitivo espera al owner), y la sección «Aplicación» de Mis preferencias con el botón «Instalar la aplicación» solo tras `beforeinstallprompt` (Chromium) o, sin aviso y sin estar instalada, el texto fijo de instalación para iPhone y iPad. **Sin service worker** ni funcionamiento sin conexión; la CSP no cambia. Alta de gastos sin conexión (offline queue): change aparte.
 
 ## 12. Empty states
 
